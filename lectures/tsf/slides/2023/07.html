@@ -1,0 +1,2054 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src="07_files/libs/clipboard/clipboard.min.js"></script>
+<script src="07_files/libs/quarto-html/tabby.min.js"></script>
+<script src="07_files/libs/quarto-html/popper.min.js"></script>
+<script src="07_files/libs/quarto-html/tippy.umd.min.js"></script>
+<link href="07_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="07_files/libs/quarto-html/quarto-html.min.css" rel="stylesheet" data-mode="light">
+<link href="07_files/libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.2.237">
+
+  <meta name="author" content="Ігор Мірошниченко">
+  <title>07 - ЕКСПОНЕНЦІАЛЬНЕ ЗГЛАДЖУВАННЯ</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href="07_files/libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href="07_files/libs/revealjs/dist/reveal.css">
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+      }
+    pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+    div.sourceCode
+      { color: #e1e4e8; background-color: #24292e; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #e1e4e8; } /* Normal */
+    code span.al { color: #ff5555; font-weight: bold; } /* Alert */
+    code span.an { color: #6a737d; } /* Annotation */
+    code span.at { color: #f97583; } /* Attribute */
+    code span.bn { color: #79b8ff; } /* BaseN */
+    code span.bu { color: #f97583; } /* BuiltIn */
+    code span.cf { color: #f97583; } /* ControlFlow */
+    code span.ch { color: #9ecbff; } /* Char */
+    code span.cn { color: #79b8ff; } /* Constant */
+    code span.co { color: #6a737d; } /* Comment */
+    code span.cv { color: #6a737d; } /* CommentVar */
+    code span.do { color: #6a737d; } /* Documentation */
+    code span.dt { color: #f97583; } /* DataType */
+    code span.dv { color: #79b8ff; } /* DecVal */
+    code span.er { color: #ff5555; text-decoration: underline; } /* Error */
+    code span.ex { color: #f97583; font-weight: bold; } /* Extension */
+    code span.fl { color: #79b8ff; } /* Float */
+    code span.fu { color: #b392f0; } /* Function */
+    code span.im { color: #9ecbff; } /* Import */
+    code span.in { color: #6a737d; } /* Information */
+    code span.kw { color: #f97583; } /* Keyword */
+    code span.op { color: #e1e4e8; } /* Operator */
+    code span.ot { color: #b392f0; } /* Other */
+    code span.pp { color: #f97583; } /* Preprocessor */
+    code span.re { color: #6a737d; } /* RegionMarker */
+    code span.sc { color: #79b8ff; } /* SpecialChar */
+    code span.ss { color: #9ecbff; } /* SpecialString */
+    code span.st { color: #9ecbff; } /* String */
+    code span.va { color: #ffab70; } /* Variable */
+    code span.vs { color: #9ecbff; } /* VerbatimString */
+    code span.wa { color: #ff5555; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="07_files/libs/revealjs/dist/theme/quarto.css" id="theme">
+  <link href="07_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href="07_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href="07_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href="07_files/libs/revealjs/plugin/reveal-chalkboard/font-awesome/css/all.css" rel="stylesheet">
+  <link href="07_files/libs/revealjs/plugin/reveal-chalkboard/style.css" rel="stylesheet">
+  <link href="07_files/libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+
+  .callout {
+    margin-top: 1em;
+    margin-bottom: 1em;  
+    border-radius: .25rem;
+  }
+
+  .callout.callout-style-simple { 
+    padding: 0em 0.5em;
+    border-left: solid #acacac .3rem;
+    border-right: solid 1px silver;
+    border-top: solid 1px silver;
+    border-bottom: solid 1px silver;
+    display: flex;
+  }
+
+  .callout.callout-style-default {
+    border-left: solid #acacac .3rem;
+    border-right: solid 1px silver;
+    border-top: solid 1px silver;
+    border-bottom: solid 1px silver;
+  }
+
+  .callout .callout-body-container {
+    flex-grow: 1;
+  }
+
+  .callout.callout-style-simple .callout-body {
+    font-size: 1rem;
+    font-weight: 400;
+  }
+
+  .callout.callout-style-default .callout-body {
+    font-size: 0.9rem;
+    font-weight: 400;
+  }
+
+  .callout.callout-captioned.callout-style-simple .callout-body {
+    margin-top: 0.2em;
+  }
+
+  .callout:not(.callout-captioned) .callout-body {
+      display: flex;
+  }
+
+  .callout:not(.no-icon).callout-captioned.callout-style-simple .callout-content {
+    padding-left: 1.6em;
+  }
+
+  .callout.callout-captioned .callout-header {
+    padding-top: 0.2em;
+    margin-bottom: -0.2em;
+  }
+
+  .callout.callout-captioned .callout-caption  p {
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+  }
+    
+  .callout.callout-captioned.callout-style-simple .callout-content  p {
+    margin-top: 0;
+  }
+
+  .callout.callout-captioned.callout-style-default .callout-content  p {
+    margin-top: 0.7em;
+  }
+
+  .callout.callout-style-simple div.callout-caption {
+    border-bottom: none;
+    font-size: .9rem;
+    font-weight: 600;
+    opacity: 75%;
+  }
+
+  .callout.callout-style-default  div.callout-caption {
+    border-bottom: none;
+    font-weight: 600;
+    opacity: 85%;
+    font-size: 0.9rem;
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+  }
+
+  .callout.callout-style-default div.callout-content {
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+  }
+
+  .callout.callout-style-simple .callout-icon::before {
+    height: 1rem;
+    width: 1rem;
+    display: inline-block;
+    content: "";
+    background-repeat: no-repeat;
+    background-size: 1rem 1rem;
+  }
+
+  .callout.callout-style-default .callout-icon::before {
+    height: 0.9rem;
+    width: 0.9rem;
+    display: inline-block;
+    content: "";
+    background-repeat: no-repeat;
+    background-size: 0.9rem 0.9rem;
+  }
+
+  .callout-caption {
+    display: flex
+  }
+    
+  .callout-icon::before {
+    margin-top: 1rem;
+    padding-right: .5rem;
+  }
+
+  .callout.no-icon::before {
+    display: none !important;
+  }
+
+  .callout.callout-captioned .callout-body > .callout-content > :last-child {
+    margin-bottom: 0.5rem;
+  }
+
+  .callout.callout-captioned .callout-icon::before {
+    margin-top: .5rem;
+    padding-right: .5rem;
+  }
+
+  .callout:not(.callout-captioned) .callout-icon::before {
+    margin-top: 1rem;
+    padding-right: .5rem;
+  }
+
+  /* Callout Types */
+
+  div.callout-note {
+    border-left-color: #4582ec !important;
+  }
+
+  div.callout-note .callout-icon::before {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAAEU0lEQVRYCcVXTWhcVRQ+586kSUMMxkyaElstCto2SIhitS5Ek8xUKV2poatCcVHtUlFQk8mbaaziwpWgglJwVaquitBOfhQXFlqlzSJpFSpIYyXNjBNiTCck7x2/8/LeNDOZxDuEkgOXe++553zfefee+/OYLOXFk3+1LLrRdiO81yNqZ6K9cG0P3MeFaMIQjXssE8Z1JzLO9ls20MBZX7oG8w9GxB0goaPrW5aNMp1yOZIa7Wv6o2ykpLtmAPs/vrG14Z+6d4jpbSKuhdcSyq9wGMPXjonwmESXrriLzFGOdDBLB8Y6MNYBu0dRokSygMA/mrun8MGFN3behm6VVAwg4WR3i6FvYK1T7MHo9BK7ydH+1uurECoouk5MPRyVSBrBHMYwVobG2aOXM07sWrn5qgB60rc6mcwIDJtQrnrEr44kmy+UO9r0u9O5/YbkS9juQckLed3DyW2XV/qWBBB3ptvI8EUY3I9p/67OW+g967TNr3Sotn3IuVlfMLVnsBwH4fsnebJvyGm5GeIUA3jljERmrv49SizPYuq+z7c2H/jlGC+Ghhupn/hcapqmcudB9jwJ/3jvnvu6vu5lVzF1fXyZuZZ7U8nRmVzytvT+H3kilYvH09mLWrQdwFSsFEsxFVs5fK7A0g8gMZjbif4ACpKbjv7gNGaD8bUrlk8x+KRflttr22JEMRUbTUwwDQScyzPgedQHZT0xnx7ujw2jfVfExwYHwOsDTjLdJ2ebmeQIlJ7neo41s/DrsL3kl+W2lWvAga0tR3zueGr6GL78M3ifH0rGXrBC2aAR8uYcIA5gwV8zIE8onoh8u0Fca/ciF7j1uOzEnqcIm59sEXoGc0+z6+H45V1CvAvHcD7THztu669cnp+L0okAeIc6zjbM/24LgGM1gZk7jnRu1aQWoU9sfUOuhrmtaPIO3YY1KLLWZaEO5TKUbMY5zx8W9UJ6elpLwKXbsaZ4EFl7B4bMtDv0iRipKoDQT2sNQI9b1utXFdYisi+wzZ/ri/1m7QfDgEuvgUUEIJPq3DhX/5DWNqIXDOweC2wvIR90Oq3lDpdMIgD2r0dXvGdsEW5H6x6HLRJYU7C69VefO1x8Gde1ZFSJLfWS1jbCnhtOPxmpfv2LXOA2Xk2tvnwKKPFuZ/oRmwBwqRQDcKNeVQkYcOjtWVBuM/JuYw5b6isojIkYxyYAFn5K7ZBF10fea52y8QltAg6jnMqNHFBmGkQ1j+U43HMi2xMar1Nv0zGsf1s8nUsmUtPOOrbFIR8bHFDMB5zL13Gmr/kGlCkUzedTzzmzsaJXhYawnA3UmARpiYj5ooJZiUoxFRtK3X6pgNPv+IZVPcnwbOl6f+aBaO1CNvPW9n9LmCp01nuSaTRF2YxHqZ8DYQT6WsXT+RD6eUztwYLZ8rM+rcPxamv1VQzFUkzFXvkiVrySGQgJNvXHJAxiU3/NwiC03rSf05VBaPtu/Z7/B8Yn/w7eguloAAAAAElFTkSuQmCC');
+  }
+
+  div.callout-note.callout-style-default .callout-caption {
+    background-color: #dae6fb
+  }
+
+  div.callout-important {
+    border-left-color: #d9534f !important;
+  }
+
+  div.callout-important .callout-icon::before {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAAEKklEQVRYCcVXTWhcVRS+575MJym48A+hSRFr00ySRQhURRfd2HYjk2SSTokuBCkU2o0LoSKKraKIBTcuFCoidGFD08nkBzdREbpQ1EDNIv8qSGMFUboImMSZd4/f9zJv8ibJMC8xJQfO3HPPPef7zrvvvnvviIkpC9nsw0UttFunbUhpFzFtarSd6WJkStVMw5xyVqYTvkwfzuf/5FgtkVoB0729j1rjXwThS7Vio+Mo6DNnvLfahoZ+i/o32lULuJ3NNiz7q6+pyAUkJaFF6JwaM2lUJlV0MlnQn5aTRbEu0SEqHUa0A4AdiGuB1kFXRfVyg5d87+Dg4DL6m2TLAub60ilj7A1Ec4odSAc8X95sHh7+ZRPCFo6Fnp7HfU/fBng/hi10CjCnWnJjsxvDNxWw0NfV6Rv5GgP3I3jGWXumdTD/3cbEOP2ZbOZp69yniG3FQ9z1jD7bnBu9Fc2tKGC2q+uAJOQHBDRiZX1x36o7fWBs7J9ownbtO+n0/qWkvW7UPIfc37WgT6ZGR++EOJyeQDSb9UB+DZ1G6DdLDzyS+b/kBCYGsYgJbSQHuThGKRcw5xdeQf8YdNHsc6ePXrlSYMBuSIAFTGAtQo+VuALo4BX83N190NWZWbynBjhOHsmNfFWLeL6v+ynsA58zDvvAC8j5PkbOcXCMg2PZFk3q8MjI7WAG/Dp9AwP7jdGBOOQkAvlFUB+irtm16I1Zw9YBcpGTGXYmk3kQIC/Cds55l+iMI3jqhjAuaoe+am2Jw5GT3Nbz3CkE12NavmzN5+erJW7046n/CH1RO/RVa8lBLozXk9uqykkGAyRXLWlLv5jyp4RFsG5vGVzpDLnIjTWgnRy2Rr+tDKvRc7Y8AyZq10jj8DqXdnIRNtFZb+t/ZRtXcDiVnzpqx8mPcDWxgARUqx0W1QB9MeUZiNrV4qP+Ehc+BpNgATsTX8ozYKL2NtFYAHc84fG7ndxUPr+AR/iQSns7uSUufAymwDOb2+NjK27lEFocm/EE2WpyIy/Hi66MWuMKJn8RvxIcj87IM5Vh9663ziW36kR0HNenXuxmfaD8JC7tfKbrhFr7LiZCrMjrzTeGx+PmkosrkNzW94ObzwocJ7A1HokLolY+AvkTiD/q1H0cN48c5EL8Crkttsa/AXQVDmutfyku0E7jShx49XqV3MFK8IryDhYVbj7Sj2P2eBxwcXoe8T8idsKKPRcnZw1b+slFTubwUwhktrfnAt7J++jwQtLZcm3sr9LQrjRzz6cfMv9aLvgmnAGvpoaGLxM4mAEaLV7iAzQ3oU0IvD5x9ix3yF2RAAuYAOO2f7PEFWCXZ4C9Pb2UsgDeVnFSpbFK7/IWu7TPTvBqzbGdCHOJQSxiEjt6IyZmxQyEJHv6xyQsYk//moVFsN2zP6fRImjfq7/n/wFDguUQFNEwugAAAABJRU5ErkJggg==');
+  }
+
+  div.callout-important.callout-style-default .callout-caption {
+    background-color: #f7dddc
+  }
+
+  div.callout-warning {
+    border-left-color: #f0ad4e !important;
+  }
+
+  div.callout-warning .callout-icon::before {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAAETklEQVRYCeVWW2gcVRg+58yaTUnizqbipZeX4uWhBEniBaoUX1Ioze52t7sRq6APio9V9MEaoWlVsFasRq0gltaAPuxms8lu0gcviE/FFOstVbSIxgcv6SU7EZqmdc7v9+9mJtNks51NTUH84ed889/PP+cmxP+d5FIbMJmNbpREu4WUkiTtCicKny0l1pIKmBzovF2S+hIJHX8iEu3hZJ5lNZGqyRrGSIQpq15AzF28jgpeY6yk6GVdrfFqdrD6Iw+QlB8g0YS2g7dyQmXM/IDhBhT0UCiRf59lfqmmDvzRt6kByV/m4JjtzuaujMUM2c5Z2d6JdKrRb3K2q6mA+oYVz8JnDdKPmmNthzkAk/lN63sYPgevrguc72aZX/L9C6x09GYyxBgCX4NlvyGUHOKELlm5rXeR1kchuChJt4SSwyddZRXgvwMGvYo4QSlk3/zkHD8UHxwVJA6zjZZqP8v8kK8OWLnIZtLyCAJagYC4rTGW/9Pqj92N/c+LUaAj27movwbi19tk/whRCIE7Q9vyI6yvRpftAKVTdUjOW40X3h5OXsKCdmFcx0xlLJoSuQngnrJe7Kcjm4OMq9FlC7CMmScQANuNvjfP3PjGXDBaUQmbp296S5L4DrpbrHN1T87ZVEZVCzg1FF0Ft+dKrlLukI+/c9ENo+TvlTDbYFvuKPtQ9+l052rXrgKoWkDAFnvh0wTOmYn8R5f4k/jN/fZiCM1tQx9jQQ4ANhqG4hiL0qIFTGViG9DKB7GYzgubnpofgYRwO+DFjh0Zin2m4b/97EDkXkc+f6xYAPX0KK2I/7fUQuwzuwo/L3AkcjugPNixC8cHf0FyPjWlItmLxWw4Ou9YsQCr5fijMGoD/zpdRy95HRysyXA74MWOnscpO4j2y3HAVisw85hX5+AFBRSHt4ShfLFkIMXTqyKFc46xdzQM6XbAi702a7sy04J0+feReMFKp5q9esYLCqAZYw/k14E/xcLLsFElaornTuJB0svMuJINy8xkIYuL+xPAlWRceH6+HX7THJ0djLUom46zREu7tTkxwmf/FdOZ/sh6Q8qvEAiHpm4PJ4a/doJe0gH1t+aHRgCzOvBvJedEK5OFE5jpm4AGP2a8Dxe3gGJ/pAutug9Gp6he92CsSsWBaEcxGx0FHytmIpuqGkOpldqNYQK8cSoXvd+xLxXADw0kf6UkJNFtdo5MOgaLjiQOQHcn+A6h5NuL2s0qsC2LOM75PcF3yr5STuBSAcGG+meA14K/CI21HcS4LBT6tv0QAh8Dr5l93AhZzG5ZJ4VxAqdZUEl9z7WJ4aN+svMvwHHL21UKTd1mqvChH7/Za5xzXBBKrUcB0TQ+Ulgkfbi/H/YT5EptrGzsEK7tR1B7ln9BBwckYfMiuSqklSznIuoIIOM42MQO+QnduCoFCI0bpkzjCjddHPN/F+2Yu+sd9bKNpVwHhbS3LluK/0zgfwD0xYI5dXuzlQAAAABJRU5ErkJggg==');
+  }
+
+  div.callout-warning.callout-style-default .callout-caption {
+    background-color: #fcefdc
+  }
+
+  div.callout-tip {
+    border-left-color: #02b875 !important;
+  }
+
+  div.callout-tip .callout-icon::before {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAADr0lEQVRYCe1XTWgTQRj9ZjZV8a9SPIkKgj8I1bMHsUWrqYLVg4Ue6v9BwZOxSYsIerFao7UiUryIqJcqgtpimhbBXoSCVxUFe9CTiogUrUp2Pt+3aUI2u5vdNh4dmMzOzHvvezuz8xNFM0mjnbXaNu1MvFWRXkXEyE6aYOYJpdW4IXuA4r0fo8qqSMDBU0v1HJUgVieAXxzCsdE/YJTdFcVIZQNMyhruOMJKXYFoLfIfIvVIMWdsrd+Rpd86ZmyzzjJmLStqRn0v8lzkb4rVIXvnpScOJuAn2ACC65FkPzEdEy4TPWRLJ2h7z4cArXzzaOdKlbOvKKX25Wl00jSnrwVxAg3o4dRxhO13RBSdNvH0xSARv3adTXbBdTf64IWO2vH0LT+cv4GR1DJt+DUItaQogeBX/chhbTBxEiZ6gftlDNXTrvT7co4ub5A6gp9HIcHvzTa46OS5fBeP87Qm0fQkr4FsYgVQ7Qg+ZayaDg9jhg1GkWj8RG6lkeSacrrHgDaxdoBiZPg+NXV/KifMuB6//JmYH4CntVEHy/keA6x4h4CU5oFy8GzrBS18cLJMXcljAKB6INjWsRcuZBWVaS3GDrqB7rdapVIeA+isQ57Eev9eCqzqOa81CY05VLd6SamW2wA2H3SiTbnbSxmzfp7WtKZkqy4mdyAlGx7ennghYf8voqp9cLSgKdqNfa6RdRsAAkPwRuJZNbpByn+RrJi1RXTwdi8RQF6ymDwGMAtZ6TVE+4uoKh+MYkcLsT0Hk8eAienbiGdjJHZTpmNjlbFJNKDVAp2fJlYju6IreQxQ08UJDNYdoLSl6AadO+fFuCQqVMB1NJwPm69T04Wv5WhfcWyfXQB+wXRs1pt+nCknRa0LVzSA/2B+a9+zQJadb7IyyV24YAxKp2Jqs3emZTuNnKxsah+uabKbMk7CbTgJx/zIgQYErIeTKRQ9yD9wxVof5YolPHqaWo7TD6tJlh7jQnK5z2n3+fGdggIOx2kaa2YI9QWarc5Ce1ipNWMKeSG4DysFF52KBmTNMmn5HqCFkwy34rDg05gDwgH3bBi+sgFhN/e8QvRn8kbamCOhgrZ9GJhFDgfcMHzFb6BAtjKpFhzTjwv1KCVuxHvCbsSiEz4CANnj84cwHdFXAbAOJ4LTSAawGWFn5tDhLMYz6nWeU2wJfIhmIJBefcd/A5FWQWGgrWzyORZ3Q6HuV+Jf0Bj+BTX69fm1zWgK7By1YTXchFDORywnfQ7GpzOo6S+qECrsx2ifVQAAAABJRU5ErkJggg==');
+  }
+
+  div.callout-tip.callout-style-default .callout-caption {
+    background-color: #ccf1e3
+  }
+
+  div.callout-caution {
+    border-left-color: #fd7e14 !important;
+  }
+
+  div.callout-caution .callout-icon::before {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAACV0lEQVRYCdVWzWoUQRCuqp2ICBLJXgITZL1EfQDBW/bkzUMUD7klD+ATSHBEfAIfQO+iXsWDxJsHL96EHAwhgzlkg8nBg25XWb0zIb0zs9muYYWkoKeru+vn664fBqElyZNuyh167NXJ8Ut8McjbmEraKHkd7uAnAFku+VWdb3reSmRV8PKSLfZ0Gjn3a6Xlcq9YGb6tADjn+lUfTXtVmaZ1KwBIvFI11rRXlWlatwIAAv2asaa9mlB9wwygiDX26qaw1yYPzFXg2N1GgG0FMF8Oj+VIx7E/03lHx8UhvYyNZLN7BwSPgekXXLribw7w5/c8EF+DBK5idvDVYtEEwMeYefjjLAdEyQ3M9nfOkgnPTEkYU+sxMq0BxNR6jExrAI31H1rzvLEfRIdgcv1XEdj6QTQAS2wtstEALLG1yEZ3QhH6oDX7ExBSFEkFINXH98NTrme5IOaaA7kIfiu2L8A3qhH9zRbukdCqdsA98TdElyeMe5BI8Rs2xHRIsoTSSVFfCFCWGPn9XHb4cdobRIWABNf0add9jakDjQJpJ1bTXOJXnnRXHRf+dNL1ZV1MBRCXhMbaHqGI1JkKIL7+i8uffuP6wVQAzO7+qVEbF6NbS0LJureYcWXUUhH66nLR5rYmva+2tjRFtojkM2aD76HEGAD3tPtKM309FJg5j/K682ywcWJ3PASCcycH/22u+Bh7Aa0ehM2Fu4z0SAE81HF9RkB21c5bEn4Dzw+/qNOyXr3DCTQDMBOdhi4nAgiFDGCinIa2owCEChUwD8qzd03PG+qdW/4fDzjUMcE1ZpIAAAAASUVORK5CYII=');
+  }
+
+  div.callout-caution.callout-style-default .callout-caption {
+    background-color: #ffe5d0
+  }
+
+  </style>
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+  
+  <script src="07_files/libs/kePrint-0.0.1/kePrint.js"></script>
+  <link href="07_files/libs/lightable-0.0.1/lightable.css" rel="stylesheet">
+</head>
+<body class="quarto-dark">
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide" class="quarto-title-block center">
+  <h1 class="title">07 - ЕКСПОНЕНЦІАЛЬНЕ ЗГЛАДЖУВАННЯ</h1>
+  <p class="subtitle">Прогнозування часових рядів</p>
+
+<div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+Ігор Мірошниченко 
+</div>
+        <p class="quarto-title-affiliation">
+            КНЕУ::ІІТЕ
+          </p>
+    </div>
+</div>
+
+  <p class="date">11/9/22</p>
+</section><section id="TOC">
+<nav role="doc-toc"> 
+<h2 id="toc-title">ЗМІСТ</h2>
+<ul>
+<li><a href="#/експоненціальне-згладжування-концепція" id="/toc-експоненціальне-згладжування-концепція">Експоненціальне згладжування: концепція</a></li>
+<li><a href="#/просте-експоненціальне-згладжування-ses" id="/toc-просте-експоненціальне-згладжування-ses">Просте експоненціальне згладжування (SES)</a></li>
+<li><a href="#/моделі-з-трендом-хольт" id="/toc-моделі-з-трендом-хольт">Моделі з трендом: Хольт</a></li>
+<li><a href="#/метод-демпфованого-тренду" id="/toc-метод-демпфованого-тренду">Метод демпфованого тренду</a></li>
+<li><a href="#/моделі-з-сезонністю-хольт-вінтерс" id="/toc-моделі-з-сезонністю-хольт-вінтерс">Моделі з сезонністю: Хольт-Вінтерс</a></li>
+<li><a href="#/демпфований-метод-хольта-вінтерса" id="/toc-демпфований-метод-хольта-вінтерса">Демпфований метод Хольта-Вінтерса</a></li>
+<li><a href="#/інноваційні-моделі" id="/toc-інноваційні-моделі">Інноваційні моделі</a></li>
+<li><a href="#/прогнозування-з-експоненціальним-згладжуванням" id="/toc-прогнозування-з-експоненціальним-згладжуванням">Прогнозування з експоненціальним згладжуванням</a></li>
+</ul>
+</nav>
+</section>
+<section>
+<section id="експоненціальне-згладжування-концепція" class="title-slide slide level1 center">
+<h1>Експоненціальне згладжування: концепція</h1>
+
+</section>
+<section id="історична-довідка" class="slide level2">
+<h2>Історична довідка</h2>
+<ul>
+<li><p>Розроблено в 1950-х і 1960-х роках як методи (алгоритми) для створення точкових прогнозів.</p></li>
+<li><p>Об’єднує «рівень», «тренд» і «сезонну» компоненти для опису часових рядів.</p></li>
+<li><p>Швидкість зміни компонентів контролюється «параметрами згладжування»: <span class="math inline">\(\alpha\)</span>, <span class="math inline">\(\beta\)</span> і <span class="math inline">\(\gamma\)</span> відповідно.</p></li>
+<li><p>Необхідно вибрати оптимальні значення для параметрів згладжування (та початкових значеннь).</p></li>
+<li><p>Сучасні моделі ETS (<em>error-trend-seasonal</em>), розроблені в 1990-х і 2000-х роках.</p></li>
+</ul>
+</section>
+<section id="головна-ідея-контроль-за-швидкістю-зміни" class="slide level2">
+<h2>Головна ідея: контроль за швидкістю зміни</h2>
+<p><span class="math inline">\(\alpha\)</span> контролює зміну <strong>рівнів</strong> часового ряду</p>
+<ul>
+<li>Якщо <span class="math inline">\(\alpha = 0\)</span>, рівні ніколи не оновлюються (середній)</li>
+<li>Якщо <span class="math inline">\(\alpha = 1\)</span>, рівні оновлюються повністю (наївно)</li>
+</ul>
+<p><span class="math inline">\(\beta\)</span> контролює зміну <strong>тренду</strong></p>
+<ul>
+<li>Якщо <span class="math inline">\(\beta = 0\)</span>, тренд є лінійним</li>
+<li>Якщо <span class="math inline">\(\beta = 1\)</span>, тренд змінюється для кожного спостереження</li>
+</ul>
+<p><span class="math inline">\(\gamma\)</span> контролює зміну <strong>сезонності</strong></p>
+<ul>
+<li>Якщо <span class="math inline">\(\gamma = 0\)</span>, сезонність фіксована (середня сезонність)</li>
+<li>Якщо <span class="math inline">\(\gamma = 1\)</span>, сезонність повністю оновлюється (наївна сезонність)</li>
+</ul>
+</section>
+<section id="модель-для-рівнів-тредну-та-сезонності" class="slide level2">
+<h2>Модель для рівнів, тредну та сезонності</h2>
+<p>Нам потрібна модель, яка визначає рівень <span class="math inline">\((\ell_t)\)</span>, тренд <span class="math inline">\((b_t)\)</span> і сезонність <span class="math inline">\((s_t)\)</span>.</p>
+<p><strong>Як поєднати ці елементи?</strong></p>
+<p><strong>Адитивно?</strong> <span class="math display">\[y_t = \ell_{t-1} + b_{t-1} + s_{t-m} + \varepsilon_t\]</span></p>
+<p><strong>Мультиплікативно?</strong> <span class="math display">\[y_t = \ell_{t-1}b_{t-1}s_{t-m}(1 + \varepsilon_t)\]</span></p>
+<p><strong>Може поєднаємо все?</strong> <span class="math display">\[y_t = (\ell_{t-1} + b_{t-1}) s_{t-m} + \varepsilon_t\]</span></p>
+<p><strong>Як рівень, тренд та сезонність змінюються з часом?</strong></p>
+</section>
+<section id="ets-моделі" class="slide level2">
+<h2>ETS моделі</h2>
+<h3 id="форма-запису-e-t-s-exponentialsmoothing">Форма запису &nbsp; &nbsp; &nbsp; <strong>E T S</strong> : &nbsp; &nbsp; &nbsp; <strong>E</strong>xponen<strong>T</strong>ial<strong>S</strong>moothing <br></h3>
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="math inline">\(\nearrow\)</span> &nbsp; &nbsp; <span class="math inline">\(\uparrow\)</span> &nbsp; &nbsp; <span class="math inline">\(\nwarrow\)</span> <br> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <strong>E</strong>rror &nbsp; &nbsp; <strong>T</strong>rend &nbsp; &nbsp; <strong>S</strong>eason</p>
+<p><strong>Error</strong>: Адитивні (<code>"A"</code>) або мультиплікативні (<code>"M"</code>)</p>
+<p><strong>Trend</strong>: Відсутній (<code>"N"</code>), адитивний (<code>"A"</code>), мультиплікативний (<code>"M"</code>) або демпфований (<code>"Ad"</code> або <code>"Md"</code>).</p>
+<p><strong>Seasonality</strong>: Відсутній (<code>"N"</code>), адитивна (<code>"A"</code>) or мультиплікативна (<code>"M"</code>)</p>
+</section></section>
+<section>
+<section id="просте-експоненціальне-згладжування-ses" class="title-slide slide level1 center">
+<h1>Просте експоненціальне згладжування (SES)</h1>
+
+</section>
+<section id="прості-методи" class="slide level2">
+<h2>Прості методи</h2>
+<p>Часовий ряд <span class="math inline">\(y_1, y_2, \dots, y_T\)</span></p>
+<p><strong>Наїваний метод</strong> (<em>naive</em>) <span class="math display">\[\hat{y}_{T+h|T} = y_T\]</span></p>
+<p><strong>На основі середнього</strong> (<em>average</em>) <span class="math display">\[\hat{y}_{T+h|T} = \frac1T\sum_{t=1}^T y_t\]</span></p>
+<ul>
+<li>Хочете щось середнє між цими методами.</li>
+<li>Останні дані повинні мати більшу вагу.</li>
+</ul>
+</section>
+<section id="просте-експоненціальне-згладжування" class="slide level2">
+<h2>Просте експоненціальне згладжування</h2>
+<p><strong>Рівняння:</strong> <span class="math display">\[\hat{y}_{T+1|T} = \alpha y_T + \alpha(1-\alpha) y_{T-1} + \alpha(1-\alpha)^2 y_{T-2}+ \cdots\]</span> де <span class="math inline">\(0 \le \alpha \le 1\)</span></p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 18%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Спостереження</th>
+<th><span class="math inline">\(\alpha = 0.2\)</span></th>
+<th><span class="math inline">\(\alpha = 0.4\)</span></th>
+<th><span class="math inline">\(\alpha = 0.6\)</span></th>
+<th><span class="math inline">\(\alpha = 0.8\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><span class="math inline">\(y_t\)</span></td>
+<td>0.2</td>
+<td>0.4</td>
+<td>0.6</td>
+<td>0.8</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(y_{t-1}\)</span></td>
+<td>0.16</td>
+<td>0.24</td>
+<td>0.24</td>
+<td>0.16</td>
+</tr>
+<tr class="odd">
+<td><span class="math inline">\(y_{t-2}\)</span></td>
+<td>0.128</td>
+<td>0.144</td>
+<td>0.096</td>
+<td>0.032</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(y_{t-3}\)</span></td>
+<td>0.1024</td>
+<td>0.0864</td>
+<td>0.0384</td>
+<td>0.0064</td>
+</tr>
+<tr class="odd">
+<td><span class="math inline">\(y_{t-4}\)</span></td>
+<td>0.0819</td>
+<td>0.0518</td>
+<td>0.0154</td>
+<td>0.0013</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(y_{t-5}\)</span></td>
+<td>0.0655</td>
+<td>0.0311</td>
+<td>0.0061</td>
+<td>0.0003</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="просте-експоненціальне-згладжування-1" class="slide level2">
+<h2>Просте експоненціальне згладжування</h2>
+
+<img data-src="07_files/figure-revealjs/unnamed-chunk-1-1.gif" class="r-stretch"></section>
+<section id="компоненти" class="slide level2">
+<h2>Компоненти</h2>
+<p><strong>Формула прогнозу:</strong> <span class="math inline">\(\hat{y}_{t+h|t} = \ell_{t}\)</span></p>
+<p><strong>Формула згладжування:</strong> <span class="math inline">\(\ell_{t} = \alpha y_{t} + (1 - \alpha)\ell_{t-1}\)</span></p>
+<ul>
+<li><span class="math inline">\(\ell_t\)</span> – це рівень (або згладжене значення) ряду в момент часу t.</li>
+<li><span class="math inline">\(\hat{y}_{t+1|t} = \alpha y_t + (1-\alpha) \hat{y}_{t|t-1}\)</span></li>
+</ul>
+<p><strong>SES має “плоску” функцію прогнозу:</strong> <span class="math display">\[\hat{y}_{T+h|T} = \hat{y}_{T+1|T} = \ell_{T}, \quad h = 2,3,\dots\]</span> &gt; Такі прогнози будуть придатними лише в тому випадку, якщо часовий ряд не має тенденційної чи сезонної складової.</p>
+</section>
+<section id="оптимізація-параметру-згладжування" class="slide level2">
+<h2>Оптимізація параметру згладжування</h2>
+<ul>
+<li><p>Необхідно обрати оптимальне значення <span class="math inline">\(\alpha\)</span> та <span class="math inline">\(\ell_0\)</span></p></li>
+<li><p>Аналогічно до МНК, обираємо оптимальне за рахунок мінімізації суми квадтару відхилення: <span class="math display">\[SSE = \sum_{t=1}^T(y_t - \hat{y}_{t|t-1})^2 = \sum_{t=1}^Te_t^2\]</span></p></li>
+</ul>
+</section>
+<section id="etsa-n-n-модель-ses" class="slide level2">
+<h2>ETS(A, N, N): модель SES</h2>
+<h3 id="компоненти-1">Компоненти:</h3>
+<p><strong>Формула прогнозу:</strong> <span class="math inline">\(\hat{y}_{t+h|t} = \ell_{t}\)</span></p>
+<p><strong>Формула згладжування:</strong> <span class="math inline">\(\ell_{t} = \alpha y_{t} + (1 - \alpha)\ell_{t-1}\)</span></p>
+<p><strong>Залишки моделі:</strong> <span class="math inline">\(e_t = y_t - \hat{y}_{t|t-1} = y_t - \ell_{t-1}\)</span></p>
+<p><strong>Формула з залишками:</strong> <span class="math inline">\(y_t = \ell_{t-1} + e_t; \quad \ell_{t}= \ell_{t-1}+\alpha(y_{t}-\ell_{t-1}) = \ell_{t-1}+\alpha e_{t}\)</span></p>
+<p><strong>Похибки на навчальній вибірці призводять до коригування оцінки рівнів часового ряду в процесі згладжування.</strong> <br> Наприклад, якщо залишок в момент часу <span class="math inline">\(t\)</span> від’ємний, тобто <span class="math inline">\(y_t &lt; \hat{y}_{t|t-1}\)</span>, тоді рівень в момент часу <span class="math inline">\(t-1\)</span> був завищений. Новий рівень <span class="math inline">\(\ell_t\)</span> це попередній рівень <span class="math inline">\(\ell_{t-1}\)</span> скорегований на заниження.</p>
+</section>
+<section id="etsa-n-n-специфікація-моделі" class="slide level2">
+<h2>ETS(A, N, N): специфікація моделі</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1"></a><span class="fu">ETS</span>(y <span class="sc">~</span> <span class="fu">error</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">trend</span>(<span class="st">"N"</span>) <span class="sc">+</span> <span class="fu">season</span>(<span class="st">"N"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>За замовчуванням підбираються оптимальні значення для <span class="math inline">\(\alpha\)</span> та <span class="math inline">\(\ell_0\)</span>.</p>
+<p>Або можна обрати вручну з <code>trend()</code></p>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1"></a><span class="fu">trend</span>(<span class="st">"N"</span>, <span class="at">alpha =</span> <span class="fl">0.5</span>)</span>
+<span id="cb2-2"><a href="#cb2-2"></a><span class="fu">trend</span>(<span class="st">"N"</span>, <span class="at">alpha_range =</span> <span class="fu">c</span>(<span class="fl">0.2</span>, <span class="fl">0.8</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="приклад-експорт-алжиру" class="slide level2">
+<h2>Приклад: Експорт Алжиру</h2>
+<div class="cell light-mode" data-hash="07_cache/revealjs/ses-fit_1af1ddd910d5f1c6c968f65872147f82">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1"></a>algeria_economy <span class="ot">&lt;-</span> global_economy <span class="sc">%&gt;%</span></span>
+<span id="cb3-2"><a href="#cb3-2"></a>  <span class="fu">filter</span>(Country <span class="sc">==</span> <span class="st">"Algeria"</span>)</span>
+<span id="cb3-3"><a href="#cb3-3"></a>fit <span class="ot">&lt;-</span> algeria_economy <span class="sc">%&gt;%</span></span>
+<span id="cb3-4"><a href="#cb3-4"></a>  <span class="fu">model</span>(<span class="at">ANN =</span> <span class="fu">ETS</span>(Exports <span class="sc">~</span> <span class="fu">error</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">trend</span>(<span class="st">"N"</span>) <span class="sc">+</span> <span class="fu">season</span>(<span class="st">"N"</span>)))</span>
+<span id="cb3-5"><a href="#cb3-5"></a><span class="fu">report</span>(fit)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: Exports 
+Model: ETS(A,N,N) 
+  Smoothing parameters:
+    alpha = 0.8399875 
+
+  Initial states:
+   l[0]
+ 39.539
+
+  sigma^2:  35.6301
+
+     AIC     AICc      BIC 
+446.7154 447.1599 452.8968 </code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-експорт-алжиру-1" class="slide level2">
+<h2>Приклад: Експорт Алжиру</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1"></a><span class="fu">components</span>(fit) <span class="sc">%&gt;%</span> <span class="fu">autoplot</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+
+</div>
+<img data-src="07_files/figure-revealjs/unnamed-chunk-2-1.png" width="960" class="r-stretch"></section>
+<section id="приклад-експорт-алжиру-2" class="slide level2">
+<h2>Приклад: Експорт Алжиру</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1"></a><span class="fu">components</span>(fit) <span class="sc">%&gt;%</span></span>
+<span id="cb6-2"><a href="#cb6-2"></a>  <span class="fu">left_join</span>(<span class="fu">fitted</span>(fit), <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"Country"</span>, <span class="st">".model"</span>, <span class="st">"Year"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A dable: 59 x 7 [1Y]
+# Key:     Country, .model [1]
+# :        Exports = lag(level, 1) + remainder
+   Country .model  Year Exports level remainder .fitted
+   &lt;fct&gt;   &lt;chr&gt;  &lt;dbl&gt;   &lt;dbl&gt; &lt;dbl&gt;     &lt;dbl&gt;   &lt;dbl&gt;
+ 1 Algeria ANN     1959    NA    39.5    NA        NA  
+ 2 Algeria ANN     1960    39.0  39.1    -0.496    39.5
+ 3 Algeria ANN     1961    46.2  45.1     7.12     39.1
+ 4 Algeria ANN     1962    19.8  23.8   -25.3      45.1
+ 5 Algeria ANN     1963    24.7  24.6     0.841    23.8
+ 6 Algeria ANN     1964    25.1  25.0     0.534    24.6
+ 7 Algeria ANN     1965    22.6  23.0    -2.39     25.0
+ 8 Algeria ANN     1966    26.0  25.5     3.00     23.0
+ 9 Algeria ANN     1967    23.4  23.8    -2.07     25.5
+10 Algeria ANN     1968    23.1  23.2    -0.630    23.8
+# … with 49 more rows</code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-експорт-алжиру-3" class="slide level2">
+<h2>Приклад: Експорт Алжиру</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1"></a>fit <span class="sc">%&gt;%</span></span>
+<span id="cb8-2"><a href="#cb8-2"></a>  <span class="fu">forecast</span>(<span class="at">h =</span> <span class="dv">5</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb8-3"><a href="#cb8-3"></a>  <span class="fu">autoplot</span>(algeria_economy) <span class="sc">+</span></span>
+<span id="cb8-4"><a href="#cb8-4"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">"% від ВВП"</span>, <span class="at">title =</span> <span class="st">"Експорт: Алжир"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+
+</div>
+<img data-src="07_files/figure-revealjs/unnamed-chunk-4-1.png" width="960" class="r-stretch"></section></section>
+<section>
+<section id="моделі-з-трендом-хольт" class="title-slide slide level1 center">
+<h1>Моделі з трендом: Хольт</h1>
+
+</section>
+<section id="модель-хольта" class="slide level2">
+<h2>Модель Хольта</h2>
+<h3 id="компоненти-2">Компоненти:</h3>
+<p><strong>Прогноз:</strong> <span class="math inline">\(\quad \hat{y}_{t+h|t} = \ell_{t} + hb_{t}\)</span></p>
+<p><strong>Рівень:</strong> <span class="math inline">\(\quad \quad\ell_{t} = \alpha y_{t} + (1 - \alpha)(\ell_{t-1} + b_{t-1})\)</span></p>
+<p><strong>Тренд:</strong> <span class="math inline">\(\quad \quad b_{t} = \beta^*(\ell_{t} - \ell_{t-1}) + (1 -\beta^*)b_{t-1},\)</span></p>
+<ul>
+<li><p>Параметри згладжування <span class="math inline">\(\alpha\)</span> та <span class="math inline">\(\beta^*\)</span> <span class="math inline">\(\quad(0\le\alpha,\beta^*\le1)\)</span></p></li>
+<li><p><span class="math inline">\(\ell_t\)</span> рівень: зважене середнє між <span class="math inline">\(y_t\)</span> та прогнозом на один крок вперед в момент часу <span class="math inline">\(t\)</span>, <span class="math inline">\(\quad(\ell_{t-1} + b_{t-1}=\hat{y}_{t|t-1})\)</span></p></li>
+<li><p><span class="math inline">\(b_t\)</span> градієнт: зважене середнє між <span class="math inline">\((\ell_{t} - \ell_{t-1})\)</span> та <span class="math inline">\(b_{t-1}\)</span>, поточна та попередня оцінка нахилу тренду.</p></li>
+</ul>
+</section>
+<section id="etsaan" class="slide level2">
+<h2>ETS(A,A,N)</h2>
+<h3 id="модель-хольта-з-адитивними-залишками">Модель Хольта з адитивними залишками</h3>
+<ul>
+<li><p>Припустимо <span class="math inline">\(\varepsilon_t=y_t-\ell_{t-1}-b_{t-1} \sim \text{NID}(0,\sigma^2)\)</span></p></li>
+<li><p>Тоді підставлючи похибки у рівняння: <span class="math display">\[y_t =\ell_{t-1}+b_{t-1}+\varepsilon_t \\ \ell_t =\ell_{t-1}+b_{t-1}+\alpha \varepsilon_t \\ b_t =b_{t-1}+\alpha\beta^* \varepsilon_t\]</span></p></li>
+<li><p>Для простоти запишемо <span class="math inline">\(\beta=\alpha \beta^*\)</span>, тоді: <span class="math display">\[b_t =b_{t-1}+\beta \varepsilon_t\]</span></p></li>
+</ul>
+</section>
+<section id="еспоненціальне-згладжування-тренд" class="slide level2">
+<h2>Еспоненціальне згладжування: тренд</h2>
+
+<img data-src="07_files/figure-revealjs/unnamed-chunk-5-1.gif" class="r-stretch"></section>
+<section id="etsaan-специфікація-моделі" class="slide level2">
+<h2>ETS(A,A,N): специфікація моделі</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1"></a><span class="fu">ETS</span>(y <span class="sc">~</span> <span class="fu">error</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">trend</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">season</span>(<span class="st">"N"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>За замовчуванням підбираються оптимальні значення для <span class="math inline">\(\beta\)</span> та <span class="math inline">\(b_0\)</span>.</p>
+<p><span class="math inline">\(\beta\)</span> можна обрати вручну з <code>trend()</code></p>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1"></a><span class="fu">trend</span>(<span class="st">"A"</span>, <span class="at">beta =</span> <span class="fl">0.004</span>)</span>
+<span id="cb10-2"><a href="#cb10-2"></a><span class="fu">trend</span>(<span class="st">"A"</span>, <span class="at">beta_range =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="fl">0.1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="приклад-населення-австралії" class="slide level2">
+<h2>Приклад: населення Австралії</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1"></a>aus_economy <span class="ot">&lt;-</span> global_economy <span class="sc">%&gt;%</span> <span class="fu">filter</span>(Code <span class="sc">==</span> <span class="st">"AUS"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-2"><a href="#cb11-2"></a>  <span class="fu">mutate</span>(<span class="at">Pop =</span> Population<span class="sc">/</span><span class="fl">1e6</span>)</span>
+<span id="cb11-3"><a href="#cb11-3"></a>fit <span class="ot">&lt;-</span> aus_economy <span class="sc">%&gt;%</span></span>
+<span id="cb11-4"><a href="#cb11-4"></a>  <span class="fu">model</span>(<span class="at">AAN =</span> <span class="fu">ETS</span>(Pop <span class="sc">~</span> <span class="fu">error</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">trend</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">season</span>(<span class="st">"N"</span>)))</span>
+<span id="cb11-5"><a href="#cb11-5"></a><span class="fu">report</span>(fit)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: Pop 
+Model: ETS(A,A,N) 
+  Smoothing parameters:
+    alpha = 0.9999 
+    beta  = 0.3266366 
+
+  Initial states:
+     l[0]      b[0]
+ 10.05414 0.2224818
+
+  sigma^2:  0.0041
+
+      AIC      AICc       BIC 
+-76.98569 -75.83184 -66.68347 </code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-населення-австралії-1" class="slide level2">
+<h2>Приклад: населення Австралії</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1"></a><span class="fu">components</span>(fit) <span class="sc">%&gt;%</span></span>
+<span id="cb13-2"><a href="#cb13-2"></a>  <span class="fu">left_join</span>(<span class="fu">fitted</span>(fit), <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"Country"</span>, <span class="st">".model"</span>, <span class="st">"Year"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A dable: 59 x 8 [1Y]
+# Key:     Country, .model [1]
+# :        Pop = lag(level, 1) + lag(slope, 1) + remainder
+   Country   .model  Year   Pop level slope remainder .fitted
+   &lt;fct&gt;     &lt;chr&gt;  &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;     &lt;dbl&gt;   &lt;dbl&gt;
+ 1 Australia AAN     1959  NA    10.1 0.222 NA           NA  
+ 2 Australia AAN     1960  10.3  10.3 0.222 -0.000145    10.3
+ 3 Australia AAN     1961  10.5  10.5 0.217 -0.0159      10.5
+ 4 Australia AAN     1962  10.7  10.7 0.231  0.0418      10.7
+ 5 Australia AAN     1963  11.0  11.0 0.223 -0.0229      11.0
+ 6 Australia AAN     1964  11.2  11.2 0.221 -0.00641     11.2
+ 7 Australia AAN     1965  11.4  11.4 0.221 -0.000314    11.4
+ 8 Australia AAN     1966  11.7  11.7 0.235  0.0418      11.6
+ 9 Australia AAN     1967  11.8  11.8 0.206 -0.0869      11.9
+10 Australia AAN     1968  12.0  12.0 0.208  0.00350     12.0
+# … with 49 more rows</code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-населення-австралії-2" class="slide level2">
+<h2>Приклад: населення Австралії</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1"></a>fit <span class="sc">%&gt;%</span></span>
+<span id="cb15-2"><a href="#cb15-2"></a>  <span class="fu">forecast</span>(<span class="at">h =</span> <span class="dv">10</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb15-3"><a href="#cb15-3"></a>  <span class="fu">autoplot</span>(aus_economy) <span class="sc">+</span></span>
+<span id="cb15-4"><a href="#cb15-4"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">"Мільйонів"</span>, <span class="at">title=</span> <span class="st">"населення: Австралія"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+
+</div>
+<img data-src="07_files/figure-revealjs/unnamed-chunk-7-1.png" width="960" class="r-stretch"></section></section>
+<section>
+<section id="метод-демпфованого-тренду" class="title-slide slide level1 center">
+<h1>Метод демпфованого тренду</h1>
+
+</section>
+<section id="метод-демпфованого-тренду-1" class="slide level2">
+<h2>Метод демпфованого тренду</h2>
+<h3 id="компоненти-3">Компоненти:</h3>
+<p><span class="math display">\[\hat{y}_{t+h|t} = \ell_{t} + (\phi+\phi^2 + \dots + \phi^{h})b_{t} \\ \ell_{t} = \alpha y_{t} + (1 - \alpha)(\ell_{t-1} + \phi b_{t-1}) \\ b_{t} = \beta^*(\ell_{t} - \ell_{t-1}) + (1 -\beta^*)\phi b_{t-1}\]</span></p>
+<ul>
+<li><p>Параметр демпфування <span class="math inline">\(0&lt;\phi&lt;1\)</span></p></li>
+<li><p>Коли <span class="math inline">\(\phi=1\)</span>, модель ідентична моделі Хольта</p></li>
+<li><p>Якщо <span class="math inline">\(h\rightarrow\infty\)</span>, <span class="math inline">\(\hat{y}_{T+h|T}\rightarrow \ell_T+\frac{\phi b_T}{(1-\phi)}\)</span></p></li>
+<li><p>Короткострокові прогнози мають тренд, довгострокові прогнози - незмінні.</p></li>
+</ul>
+</section>
+<section id="приклад-населення-австралії-3" class="slide level2">
+<h2>Приклад: населення Австралії</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1"></a>aus_economy <span class="sc">%&gt;%</span></span>
+<span id="cb16-2"><a href="#cb16-2"></a>  <span class="fu">model</span>(<span class="at">holt =</span> <span class="fu">ETS</span>(Pop <span class="sc">~</span> <span class="fu">error</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">trend</span>(<span class="st">"Ad"</span>) <span class="sc">+</span> <span class="fu">season</span>(<span class="st">"N"</span>))) <span class="sc">%&gt;%</span></span>
+<span id="cb16-3"><a href="#cb16-3"></a>  <span class="fu">forecast</span>(<span class="at">h =</span> <span class="dv">20</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb16-4"><a href="#cb16-4"></a>  <span class="fu">autoplot</span>(aus_economy)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+
+</div>
+<img data-src="07_files/figure-revealjs/unnamed-chunk-8-1.png" width="960" class="r-stretch"></section>
+<section id="приклад-населення-австралії-4" class="slide level2">
+<h2>Приклад: населення Австралії</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1"></a>fit <span class="ot">&lt;-</span> aus_economy <span class="sc">%&gt;%</span></span>
+<span id="cb17-2"><a href="#cb17-2"></a>  <span class="fu">filter</span>(Year <span class="sc">&lt;=</span> <span class="dv">2010</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb17-3"><a href="#cb17-3"></a>  <span class="fu">model</span>(</span>
+<span id="cb17-4"><a href="#cb17-4"></a>    <span class="at">ses =</span> <span class="fu">ETS</span>(Pop <span class="sc">~</span> <span class="fu">error</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">trend</span>(<span class="st">"N"</span>) <span class="sc">+</span> <span class="fu">season</span>(<span class="st">"N"</span>)),</span>
+<span id="cb17-5"><a href="#cb17-5"></a>    <span class="at">holt =</span> <span class="fu">ETS</span>(Pop <span class="sc">~</span> <span class="fu">error</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">trend</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">season</span>(<span class="st">"N"</span>)),</span>
+<span id="cb17-6"><a href="#cb17-6"></a>    <span class="at">damped =</span> <span class="fu">ETS</span>(Pop <span class="sc">~</span> <span class="fu">error</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">trend</span>(<span class="st">"Ad"</span>) <span class="sc">+</span> <span class="fu">season</span>(<span class="st">"N"</span>))</span>
+<span id="cb17-7"><a href="#cb17-7"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1"></a><span class="fu">tidy</span>(fit)</span>
+<span id="cb18-2"><a href="#cb18-2"></a><span class="fu">accuracy</span>(fit)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="приклад-населення-австралії-5" class="slide level2">
+<h2>Приклад: населення Австралії</h2>
+<div class="cell light-mode">
+<div class="cell-output-display">
+
+<table>
+ <thead>
+  <tr>
+   <th style="text-align:right;"> term </th>
+   <th style="text-align:right;"> SES </th>
+   <th style="text-align:right;"> Linear trend </th>
+   <th style="text-align:right;"> Damped trend </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:right;"> $\alpha$ </td>
+   <td style="text-align:right;"> 1.00 </td>
+   <td style="text-align:right;"> 1.00 </td>
+   <td style="text-align:right;"> 1.00 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> $\beta^*$ </td>
+   <td style="text-align:right;">  </td>
+   <td style="text-align:right;"> 0.30 </td>
+   <td style="text-align:right;"> 0.40 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> $\phi$ </td>
+   <td style="text-align:right;">  </td>
+   <td style="text-align:right;">  </td>
+   <td style="text-align:right;"> 0.98 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> $\ell_0$ </td>
+   <td style="text-align:right;"> 10.28 </td>
+   <td style="text-align:right;"> 10.05 </td>
+   <td style="text-align:right;"> 10.04 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> $b_0$ </td>
+   <td style="text-align:right;">  </td>
+   <td style="text-align:right;"> 0.22 </td>
+   <td style="text-align:right;"> 0.25 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> Training RMSE </td>
+   <td style="text-align:right;"> 0.24 </td>
+   <td style="text-align:right;"> 0.06 </td>
+   <td style="text-align:right;"> 0.07 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> Test RMSE </td>
+   <td style="text-align:right;"> 1.63 </td>
+   <td style="text-align:right;"> 0.15 </td>
+   <td style="text-align:right;"> 0.21 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> Test MASE </td>
+   <td style="text-align:right;"> 6.18 </td>
+   <td style="text-align:right;"> 0.55 </td>
+   <td style="text-align:right;"> 0.75 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> Test MAPE </td>
+   <td style="text-align:right;"> 6.09 </td>
+   <td style="text-align:right;"> 0.55 </td>
+   <td style="text-align:right;"> 0.74 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> Test MAE </td>
+   <td style="text-align:right;"> 1.45 </td>
+   <td style="text-align:right;"> 0.13 </td>
+   <td style="text-align:right;"> 0.18 </td>
+  </tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</section></section>
+<section>
+<section id="моделі-з-сезонністю-хольт-вінтерс" class="title-slide slide level1 center">
+<h1>Моделі з сезонністю: Хольт-Вінтерс</h1>
+
+</section>
+<section id="адитивна-модель-хольта-вінтерса" class="slide level2">
+<h2>Адитивна модель Хольта-Вінтерса</h2>
+<p>Холь та Вінтерс розширили модель Хольта, яка включає сезонність.</p>
+<h3 id="компоненти-4">Компоненти:</h3>
+<p><span class="math display">\[\hat{y}_{t+h|t} = \ell_{t} + hb _{t} + s_{t+h-m(k+1)}\]</span> <span class="math display">\[\ell_{t} = \alpha(y_{t} - s_{t-m}) + (1 - \alpha)(\ell_{t-1} + b_{t-1})\]</span> <span class="math display">\[b_{t} = \beta^*(\ell_{t} - \ell_{t-1}) + (1 - \beta^*)b_{t-1}\]</span> <span class="math display">\[s_{t} = \gamma (y_{t}-\ell_{t-1}-b_{t-1}) + (1-\gamma)s_{t-m}\]</span></p>
+<ul>
+<li><span class="math inline">\(k=\)</span> ціла частина від <span class="math inline">\((h-1)/m\)</span>. Використовує останній сезон для прогнозування.</li>
+<li>Параметри: &nbsp; <span class="math inline">\(0\le \alpha\le 1\)</span>, &nbsp; <span class="math inline">\(0\le \beta^*\le 1\)</span>, &nbsp; <span class="math inline">\(0\le \gamma\le 1-\alpha\)</span> та <span class="math inline">\(m=\)</span> період сезонності.</li>
+</ul>
+</section>
+<section id="адитивна-модель-хольта-вінтерса-1" class="slide level2">
+<h2>Адитивна модель Хольта-Вінтерса</h2>
+<ul>
+<li><p>Сезонна складова зазвичай записується як <span class="math display">\[s_{t} = \gamma^*(y_{t}-\ell_{t})+(1-\gamma^*)s_{t-m}\]</span></p></li>
+<li><p>Замінивши <span class="math inline">\(\ell_t\)</span>: <span class="math display">\[s_{t} = \gamma^*(1-\alpha) (y_{t}-\ell_{t-1}-b_{t-1})+ [1-\gamma^*(1-\alpha)]s_{t-m}\]</span></p></li>
+<li><p>Записуємо <span class="math display">\[\gamma=\gamma^*(1-\alpha)\]</span></p></li>
+<li><p>Звичайне обмеження параметру <span class="math inline">\(0\le\gamma^*\le1\)</span> переписується як <span class="math display">\[0\le\gamma\le(1-\alpha)\]</span></p></li>
+</ul>
+</section>
+<section id="еспоненціальне-згладжування-сезонність" class="slide level2">
+<h2>Еспоненціальне згладжування: сезонність</h2>
+
+<img data-src="07_files/figure-revealjs/unnamed-chunk-12-1.gif" class="r-stretch"></section>
+<section id="еспоненціальне-згладжування-сезонність-1" class="slide level2">
+<h2>Еспоненціальне згладжування: сезонність</h2>
+
+<img data-src="07_files/figure-revealjs/unnamed-chunk-13-1.png" width="960" class="r-stretch"></section>
+<section id="etsaaa" class="slide level2">
+<h2>ETS(A,A,A)</h2>
+<h3 id="адитивна-модель-хольта-вінтерса-з-адитивними-залишками">Адитивна модель Хольта-Вінтерса з адитивними залишками</h3>
+<p><strong>Рівняння прогнозу:</strong> <span class="math inline">\(\quad\quad\hat{y}_{t+h|t} = \ell_{t} + hb_{t} + s_{t+h-m(k+1)}\)</span></p>
+<p><strong>Рівняння спостережень:</strong> <span class="math inline">\(\quad y_t=\ell_{t-1}+b_{t-1}+s_{t-m} + \varepsilon_t\)</span></p>
+<p><strong>Рівняння компонент:</strong> <span class="math inline">\(\quad\quad\quad\ell_t=\ell_{t-1}+b_{t-1}+\alpha \varepsilon_t\)</span> <span class="math display">\[b_t=b_{t-1}+\beta \varepsilon_t \\ s_t = s_{t-m} + \gamma\varepsilon_t\]</span></p>
+<ul>
+<li>Похибки прогнозу: <span class="math inline">\(\varepsilon_{t} = y_t - \hat{y}_{t|t-1}\)</span></li>
+<li><span class="math inline">\(k\)</span> ціла частина з <span class="math inline">\((h-1)/m\)</span></li>
+</ul>
+</section>
+<section id="мультиплікативний-метод-хольта-вінтерса" class="slide level2">
+<h2>Мультиплікативний метод Хольта-Вінтерса</h2>
+<blockquote>
+<p>Коли сезонні коливання змінюються пропорційно зміні рівнів ряду.</p>
+</blockquote>
+<p><strong>Компоненти:</strong> <span class="math display">\[\hat{y}_{t+h|t} = (\ell_{t} + hb_{t})s_{t+h-m(k+1)} \\ \quad\quad\ell_{t} = \alpha \frac{y_{t}}{s_{t-m}} + (1 - \alpha)(\ell_{t-1} + b_{t-1}) \\ \quad b_{t} = \beta^*(\ell_{t}-\ell_{t-1}) + (1 - \beta^*)b_{t-1} \\ \quad\quad s_{t} = \gamma \frac{y_{t}}{(\ell_{t-1} + b_{t-1})} + (1 - \gamma)s_{t-m}\]</span></p>
+<ul>
+<li><span class="math inline">\(k\)</span> ціла частина з <span class="math inline">\((h-1)/m\)</span></li>
+<li>Для адитивного методу <span class="math inline">\(s_t\)</span> у абсолютних значеннях: <span class="math inline">\(\sum_i s_i \approx 0\)</span></li>
+<li>Для мультиплікативного методу <span class="math inline">\(s_t\)</span> у відносних значеннях: <span class="math inline">\(\sum_i s_i \approx m\)</span></li>
+</ul>
+</section>
+<section id="etsmam" class="slide level2">
+<h2>ETS(M,A,M)</h2>
+<h3 id="мультиплікативний-метод-хольта-вінтерса-з-мультиплікативними-залишками">Мультиплікативний метод Хольта-Вінтерса з мультиплікативними залишками</h3>
+<p><strong>Рівняння прогнозу:</strong> <span class="math inline">\(\quad\quad\quad\hat{y}_{t+h|t} = (\ell_{t} + hb_{t}) s_{t+h-m(k+1)}\)</span></p>
+<p><strong>Рівняння спостережень:</strong> <span class="math inline">\(\quad y_t = (\ell_{t-1}+b_{t-1})s_{t-m}(1 + \varepsilon_t)\)</span></p>
+<p><strong>Рівняння компонент:</strong> <span class="math inline">\(\quad\quad\ell_t=(\ell_{t-1}+b_{t-1})(1+\alpha \varepsilon_t)\)</span> <span class="math display">\[\quad \quad b_t=b_{t-1} +\beta(\ell_{t-1}+b_{t-1}) \varepsilon_t \\ s_t = s_{t-m}(1 + \gamma\varepsilon_t)\]</span></p>
+<ul>
+<li>Похибки прогнозу: <span class="math inline">\(\varepsilon_{t} = (y_t - \hat{y}_{t|t-1})/\hat{y}_{t|t-1}\)</span></li>
+<li><span class="math inline">\(k\)</span> ціла частина з <span class="math inline">\((h-1)/m\)</span></li>
+</ul>
+</section>
+<section id="приклад-туризм-австралії" class="slide level2">
+<h2>Приклад: туризм Австралії</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1"></a>aus_holidays <span class="ot">&lt;-</span> tourism <span class="sc">%&gt;%</span></span>
+<span id="cb19-2"><a href="#cb19-2"></a>  <span class="fu">filter</span>(Purpose <span class="sc">==</span> <span class="st">"Holiday"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb19-3"><a href="#cb19-3"></a>  <span class="fu">summarise</span>(<span class="at">Trips =</span> <span class="fu">sum</span>(Trips))</span>
+<span id="cb19-4"><a href="#cb19-4"></a>fit <span class="ot">&lt;-</span> aus_holidays <span class="sc">%&gt;%</span></span>
+<span id="cb19-5"><a href="#cb19-5"></a>  <span class="fu">model</span>(</span>
+<span id="cb19-6"><a href="#cb19-6"></a>    <span class="at">additive =</span> <span class="fu">ETS</span>(Trips <span class="sc">~</span> <span class="fu">error</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">trend</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">season</span>(<span class="st">"A"</span>)),</span>
+<span id="cb19-7"><a href="#cb19-7"></a>    <span class="at">multiplicative =</span> <span class="fu">ETS</span>(Trips <span class="sc">~</span> <span class="fu">error</span>(<span class="st">"M"</span>) <span class="sc">+</span> <span class="fu">trend</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">season</span>(<span class="st">"M"</span>))</span>
+<span id="cb19-8"><a href="#cb19-8"></a>  )</span>
+<span id="cb19-9"><a href="#cb19-9"></a>fc <span class="ot">&lt;-</span> fit <span class="sc">%&gt;%</span> <span class="fu">forecast</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="приклад-туризм-австралії-1" class="slide level2">
+<h2>Приклад: туризм Австралії</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1"></a>fc <span class="sc">%&gt;%</span></span>
+<span id="cb20-2"><a href="#cb20-2"></a>  <span class="fu">autoplot</span>(aus_holidays, <span class="at">level =</span> <span class="cn">NULL</span>) <span class="sc">+</span></span>
+<span id="cb20-3"><a href="#cb20-3"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">"Тисяч"</span>, <span class="at">title =</span> <span class="st">"Нічні поїздки"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+
+</div>
+<img data-src="07_files/figure-revealjs/unnamed-chunk-14-1.png" width="960" class="r-stretch"></section>
+<section id="компоненти-5" class="slide level2">
+<h2>Компоненти</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1"></a><span class="fu">components</span>(fit)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A dable: 168 x 7 [1Q]
+# Key:     .model [2]
+# :        Trips = lag(level, 1) + lag(slope, 1) + lag(season, 4) + remainder
+   .model   Quarter  Trips level slope season remainder
+   &lt;chr&gt;      &lt;qtr&gt;  &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt;     &lt;dbl&gt;
+ 1 additive 1997 Q1    NA    NA   NA    1512.      NA  
+ 2 additive 1997 Q2    NA    NA   NA    -290.      NA  
+ 3 additive 1997 Q3    NA    NA   NA    -684.      NA  
+ 4 additive 1997 Q4    NA  9899. -37.4  -538.      NA  
+ 5 additive 1998 Q1 11806. 9964. -24.5  1512.     433. 
+ 6 additive 1998 Q2  9276. 9851. -35.6  -290.    -374. 
+ 7 additive 1998 Q3  8642. 9700. -50.2  -684.    -489. 
+ 8 additive 1998 Q4  9300. 9694. -44.6  -538.     188. 
+ 9 additive 1999 Q1 11172. 9652. -44.3  1512.      10.7
+10 additive 1999 Q2  9608. 9676. -35.6  -290.     290. 
+# … with 158 more rows</code></pre>
+</div>
+</div>
+</section>
+<section id="компоненти-6" class="slide level2">
+<h2>Компоненти</h2>
+
+<img data-src="07_files/figure-revealjs/unnamed-chunk-16-1.png" width="960" class="r-stretch"></section></section>
+<section>
+<section id="демпфований-метод-хольта-вінтерса" class="title-slide slide level1 center">
+<h1>Демпфований метод Хольта-Вінтерса</h1>
+
+</section>
+<section id="демпфований-метод-хольта-вінтерса-1" class="slide level2">
+<h2>Демпфований метод Хольта-Вінтерса</h2>
+<blockquote>
+<p><strong>Часто єдиний найточніший метод прогнозування для сезонних даних:</strong></p>
+</blockquote>
+<p><span class="math display">\[\hat{y}_{t+h|t} = [\ell_{t} + (\phi+\phi^2 + \dots + \phi^{h})b_{t}]s_{t+h-m(k+1)} \\
+\ell_{t} = \alpha(y_{t} / s_{t-m}) + (1 - \alpha)(\ell_{t-1} + \phi b_{t-1})\\
+b_{t} = \beta^*(\ell_{t} - \ell_{t-1}) + (1 - \beta^*)\phi b_{t-1}       \\
+s_{t} = \gamma \frac{y_{t}}{(\ell_{t-1} + \phi b_{t-1})} + (1 - \gamma)s_{t-m}\]</span></p>
+</section>
+<section id="хольт-вінтерс-для-щоденних-даних" class="slide level2">
+<h2>Хольт-Вінтерс для щоденних даних</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1"></a> sth_cross_ped <span class="ot">&lt;-</span> pedestrian <span class="sc">%&gt;%</span></span>
+<span id="cb23-2"><a href="#cb23-2"></a>  <span class="fu">filter</span>(Date <span class="sc">&gt;=</span> <span class="st">"2016-07-01"</span>,</span>
+<span id="cb23-3"><a href="#cb23-3"></a>         Sensor <span class="sc">==</span> <span class="st">"Southern Cross Station"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb23-4"><a href="#cb23-4"></a>  <span class="fu">index_by</span>(Date) <span class="sc">%&gt;%</span></span>
+<span id="cb23-5"><a href="#cb23-5"></a>  <span class="fu">summarise</span>(<span class="at">Count =</span> <span class="fu">sum</span>(Count)<span class="sc">/</span><span class="dv">1000</span>)</span>
+<span id="cb23-6"><a href="#cb23-6"></a></span>
+<span id="cb23-7"><a href="#cb23-7"></a>sth_cross_ped <span class="sc">%&gt;%</span></span>
+<span id="cb23-8"><a href="#cb23-8"></a>  <span class="fu">filter</span>(Date <span class="sc">&lt;=</span> <span class="st">"2016-07-31"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb23-9"><a href="#cb23-9"></a>  <span class="fu">model</span>(</span>
+<span id="cb23-10"><a href="#cb23-10"></a>    <span class="at">hw =</span> <span class="fu">ETS</span>(Count <span class="sc">~</span> <span class="fu">error</span>(<span class="st">"M"</span>) <span class="sc">+</span> <span class="fu">trend</span>(<span class="st">"Ad"</span>) <span class="sc">+</span> <span class="fu">season</span>(<span class="st">"M"</span>))</span>
+<span id="cb23-11"><a href="#cb23-11"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb23-12"><a href="#cb23-12"></a>  <span class="fu">forecast</span>(<span class="at">h =</span> <span class="st">"2 weeks"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb23-13"><a href="#cb23-13"></a>  <span class="fu">autoplot</span>(sth_cross_ped <span class="sc">%&gt;%</span> <span class="fu">filter</span>(Date <span class="sc">&lt;=</span> <span class="st">"2016-08-14"</span>)) <span class="sc">+</span></span>
+<span id="cb23-14"><a href="#cb23-14"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Трафік пішоходів: Southern Cross"</span>,</span>
+<span id="cb23-15"><a href="#cb23-15"></a>       <span class="at">y=</span><span class="st">"Пішоходів ('000)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="хольт-вінтерс-для-щоденних-даних-1" class="slide level2">
+<h2>Хольт-Вінтерс для щоденних даних</h2>
+
+<img data-src="07_files/figure-revealjs/hwdaily-1.png" width="960" class="r-stretch"></section></section>
+<section>
+<section id="інноваційні-моделі" class="title-slide slide level1 center">
+<h1>Інноваційні моделі</h1>
+
+</section>
+<section id="методи-експоненціального-згладжування" class="slide level2 smaller">
+<h2>Методи експоненціального згладжування</h2>
+<div class="cell light-mode">
+<div class="cell-output-display">
+
+<table class=" lightable-material-dark" style="font-family: &quot;Source Sans Pro&quot;, helvetica, sans-serif; margin-left: auto; margin-right: auto;">
+ <thead>
+<tr>
+<th style="empty-cells: hide;" colspan="1"></th>
+<th style="padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3"><div style="border-bottom: 1px solid #FFFFFF12; padding-bottom: 16px; padding-top: 16px; height: 56px;">Компонента сезонності</div></th>
+</tr>
+  <tr>
+   <th style="text-align:left;"> Компонента тренду </th>
+   <th style="text-align:left;"> N (Відсутня) </th>
+   <th style="text-align:left;"> A (Адитивна) </th>
+   <th style="text-align:left;"> M (Мультиплікативна) </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> N (Відсутня) </td>
+   <td style="text-align:left;"> (N,N) </td>
+   <td style="text-align:left;"> (N,A) </td>
+   <td style="text-align:left;"> (N,M) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> A (Адитивний) </td>
+   <td style="text-align:left;"> (A,N) </td>
+   <td style="text-align:left;"> (A,A) </td>
+   <td style="text-align:left;"> (A,M) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Ad (Адитивний демпфований) </td>
+   <td style="text-align:left;"> (Ad, N) </td>
+   <td style="text-align:left;"> (Ad, A) </td>
+   <td style="text-align:left;"> (Ad, M) </td>
+  </tr>
+</tbody>
+</table>
+
+</div>
+</div>
+<p><span class="math inline">\((N,N)\)</span>: &nbsp; Просте експоненціальне згаджування <br> <span class="math inline">\((A,N)\)</span>: &nbsp;&nbsp; Лінійний метод Хольта <br> <span class="math inline">\((A_d,N)\)</span>: &nbsp; Адитивний демпфований тред <br> <span class="math inline">\((A,A)\)</span>: &nbsp;&nbsp;&nbsp; Адитивний метод Хольта-Вінтерса <br> <span class="math inline">\((A,M)\)</span>: &nbsp;&nbsp; Мультиплікативний метод Хольта-Вінтерса <br> <span class="math inline">\((A_d,M)\)</span>: &nbsp; Демпфований мультиплікативний метод Хольта-Вінтерса</p>
+</section>
+<section id="ets-моделі-1" class="slide level2 smaller">
+<h2>ETS моделі</h2>
+<div class="cell light-mode">
+<div class="cell-output-display">
+
+<table class=" lightable-material-dark table table-striped" style="font-family: &quot;Source Sans Pro&quot;, helvetica, sans-serif; margin-left: auto; margin-right: auto; font-size: 20px; width: auto !important; margin-left: auto; margin-right: auto;">
+ <thead>
+<tr><th style="padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; color: #BF5B15 !important;font-size: 24px;" colspan="4"><div style="border-bottom: 1px solid #FFFFFF12; padding-bottom: 16px; padding-top: 16px; height: 56px;">АДИТИВНІ ЗАЛИШКИ</div></th></tr>
+<tr>
+<th style="empty-cells: hide;" colspan="1"></th>
+<th style="padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3"><div style="border-bottom: 1px solid #FFFFFF12; padding-bottom: 16px; padding-top: 16px; height: 56px;">Компонента сезонності</div></th>
+</tr>
+  <tr>
+   <th style="text-align:left;"> Компонента тренду </th>
+   <th style="text-align:left;"> N (Відсутня) </th>
+   <th style="text-align:left;"> A (Адитивна) </th>
+   <th style="text-align:left;"> M (Мультиплікативна) </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> N (Відсутня) </td>
+   <td style="text-align:left;"> (A,N,N) </td>
+   <td style="text-align:left;"> (A,N,A) </td>
+   <td style="text-align:left;"> (A,N,M) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> A (Адитивний) </td>
+   <td style="text-align:left;"> (A,A,N) </td>
+   <td style="text-align:left;"> (A,A,A) </td>
+   <td style="text-align:left;"> (A,A,M) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Ad (Адитивний демпфований) </td>
+   <td style="text-align:left;"> (A,Ad,N) </td>
+   <td style="text-align:left;"> (A,Ad,A) </td>
+   <td style="text-align:left;"> (A,Ad,M) </td>
+  </tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</section>
+<section id="ets-моделі-2" class="slide level2 smaller">
+<h2>ETS моделі</h2>
+<div class="cell light-mode">
+<div class="cell-output-display">
+
+<table class=" lightable-material-dark table table-striped" style="font-family: &quot;Source Sans Pro&quot;, helvetica, sans-serif; margin-left: auto; margin-right: auto; font-size: 20px; width: auto !important; margin-left: auto; margin-right: auto;">
+ <thead>
+<tr><th style="padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; color: #BF5B15 !important;font-size: 24px;" colspan="4"><div style="border-bottom: 1px solid #FFFFFF12; padding-bottom: 16px; padding-top: 16px; height: 56px;">МУЛЬТИПЛІКАТИВНІ ЗАЛИШКИ</div></th></tr>
+<tr>
+<th style="empty-cells: hide;" colspan="1"></th>
+<th style="padding-bottom:0; padding-left:3px;padding-right:3px;text-align: center; " colspan="3"><div style="border-bottom: 1px solid #FFFFFF12; padding-bottom: 16px; padding-top: 16px; height: 56px;">Компонента сезонності</div></th>
+</tr>
+  <tr>
+   <th style="text-align:left;"> Компонента тренду </th>
+   <th style="text-align:left;"> N (Відсутня) </th>
+   <th style="text-align:left;"> A (Адитивна) </th>
+   <th style="text-align:left;"> M (Мультиплікативна) </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> N (Відсутня) </td>
+   <td style="text-align:left;"> (M,N,N) </td>
+   <td style="text-align:left;"> (M,N,A) </td>
+   <td style="text-align:left;"> (M,N,M) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> A (Адитивний) </td>
+   <td style="text-align:left;"> (M,A,N) </td>
+   <td style="text-align:left;"> (M,A,A) </td>
+   <td style="text-align:left;"> (M,A,M) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Ad (Адитивний демпфований) </td>
+   <td style="text-align:left;"> (M,Ad,N) </td>
+   <td style="text-align:left;"> (M,Ad,A) </td>
+   <td style="text-align:left;"> (M,Ad,M) </td>
+  </tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</section>
+<section id="моделі-з-адитивними-залишками" class="slide level2">
+<h2>Моделі з адитивними залишками</h2>
+
+<img data-src="img/statespacemodels-1%20(2).png" class="r-stretch"></section>
+<section id="моделі-з-мультиплікативними-залишками" class="slide level2">
+<h2>Моделі з мультиплікативними залишками</h2>
+
+<img data-src="img/statespacemodels-1%20(3).png" class="r-stretch"></section>
+<section id="оцінювання-ets-моделей" class="slide level2">
+<h2>Оцінювання ETS моделей</h2>
+<ul>
+<li><p>Параметри згладжування <span class="math inline">\(\alpha\)</span>, <span class="math inline">\(\beta\)</span>, <span class="math inline">\(\gamma\)</span> та <span class="math inline">\(\phi\)</span>, а також початкові значення <span class="math inline">\(\ell_0\)</span>, <span class="math inline">\(b_0\)</span>, <span class="math inline">\(s_0,s_{-1},\dots,s_{ -m+1}\)</span> оцінюються шляхом максимізації “правдоподібності” = ймовірності даних, що випливають із зазначеної моделі.</p></li>
+<li><p>Для моделей з адитивними помилками підхід еквівалентний мінімізації SSE.</p></li>
+<li><p>Для моделей з мультиплікативними помилками підхід <strong>НЕ</strong> еквівалентний мінімізації SSE.</p></li>
+</ul>
+</section>
+<section id="оцінювання-ets-моделей-1" class="slide level2">
+<h2>Оцінювання ETS моделей</h2>
+<p><strong>Традиційно:</strong> * <span class="math inline">\(0&lt; \alpha,\beta^*,\gamma^*,\phi&lt;1\)</span> * У модель ми підставляємо <span class="math inline">\(\beta=\alpha\beta^*\)</span> та <span class="math inline">\(\gamma=(1-\alpha)\gamma^*\)</span> * Тому <span class="math inline">\(0&lt; \alpha &lt;1\)</span>, &nbsp;&nbsp; <span class="math inline">\(0 &lt; \beta &lt; \alpha\)</span> &nbsp;та&nbsp; <span class="math inline">\(0&lt; \gamma &lt; 1-\alpha\)</span> * <span class="math inline">\(0.8&lt;\phi&lt;0.98\)</span> - для полегшення розрахунку</p>
+<p><strong>Допустимі обмеження:</strong> * Щоб запобігти впливу спостережень з далекого минулого на поточні прогнози. * Зазвичай (але не завжди) менші обмежування ніж в традиційному підході. * Наприклад, для ETS(A,N,N): <br> традиційно <span class="math inline">\(0&lt; \alpha &lt;1\)</span> припускається <span class="math inline">\(0&lt; \alpha &lt;2\)</span>.</p>
+</section>
+<section id="вибір-моделі" class="slide level2">
+<h2>Вибір моделі</h2>
+<h3 id="інформаційний-критерій-акаіке-aic">Інформаційний критерій Акаіке (AIC)</h3>
+<p><span class="math display">\[\text{AIC} = -2\log(\text{L}) + 2k\]</span> де <span class="math inline">\(L\)</span> – правдоподібність, а <span class="math inline">\(k\)</span> – кількість параметрів моделі.</p>
+<h3 id="скорегований-aicc">Скорегований AICc</h3>
+<p><span class="math display">\[\text{AIC}_{\text{c}} = \text{AIC} + \frac{2k(k+1)}{T-k-1}\]</span> для корегування зміщення.</p>
+<h3 id="баесовий-інформаційний-криетрій-bic">Баесовий інформаційний криетрій (BIC)</h3>
+<p><span class="math display">\[\text{BIC} = \text{AIC} + k[\log(T)-2].\]</span></p>
+</section>
+<section id="автоматизація-прогнозування" class="slide level2">
+<h2>Автоматизація прогнозування:</h2>
+<p><strong>З роботи Hyndman та інших (IJF, 2002):</strong></p>
+<ul>
+<li>Застосовується кожна модель, яка відповідає даним. <br> Оптимізуються параметри та початкові значення за допомогою ММП (або іншого критерію).</li>
+<li>Обирається найкращий метод за допомогою AICc:</li>
+<li>Будується прогноз, використовуючи найкращий метод.</li>
+<li>Обчислюються довірчі інтервали.</li>
+</ul>
+<p>Метод дуже добре показав себе на змаганнях М3.</p>
+</section>
+<section id="приклад-населення-країн-світу" class="slide level2">
+<h2>Приклад: населення країн світу</h2>
+<div class="cell light-mode" data-hash="07_cache/revealjs/popfit_df0630af390b5a280224e3effd827a5b">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1"></a>fit <span class="ot">&lt;-</span> global_economy <span class="sc">%&gt;%</span></span>
+<span id="cb24-2"><a href="#cb24-2"></a>  <span class="fu">mutate</span>(<span class="at">Pop =</span> Population <span class="sc">/</span> <span class="fl">1e6</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb24-3"><a href="#cb24-3"></a>  <span class="fu">model</span>(<span class="at">ets =</span> <span class="fu">ETS</span>(Pop))</span>
+<span id="cb24-4"><a href="#cb24-4"></a></span>
+<span id="cb24-5"><a href="#cb24-5"></a>fit</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A mable: 263 x 2
+# Key:     Country [263]
+   Country                      ets
+   &lt;fct&gt;                    &lt;model&gt;
+ 1 Afghanistan         &lt;ETS(A,A,N)&gt;
+ 2 Albania             &lt;ETS(M,A,N)&gt;
+ 3 Algeria             &lt;ETS(M,A,N)&gt;
+ 4 American Samoa      &lt;ETS(M,A,N)&gt;
+ 5 Andorra             &lt;ETS(M,A,N)&gt;
+ 6 Angola              &lt;ETS(M,A,N)&gt;
+ 7 Antigua and Barbuda &lt;ETS(M,A,N)&gt;
+ 8 Arab World          &lt;ETS(M,A,N)&gt;
+ 9 Argentina           &lt;ETS(A,A,N)&gt;
+10 Armenia             &lt;ETS(M,A,N)&gt;
+# … with 253 more rows</code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-населення-країн-світу-1" class="slide level2">
+<h2>Приклад: населення країн світу</h2>
+<div class="cell light-mode" data-hash="07_cache/revealjs/popfc_9e4fc4d94f4d481c7b7353d5c016269f">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1"></a>fit <span class="sc">%&gt;%</span></span>
+<span id="cb26-2"><a href="#cb26-2"></a>  <span class="fu">forecast</span>(<span class="at">h =</span> <span class="dv">5</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A fable: 1,315 x 5 [1Y]
+# Key:     Country, .model [263]
+   Country     .model  Year             Pop .mean
+   &lt;fct&gt;       &lt;chr&gt;  &lt;dbl&gt;          &lt;dist&gt; &lt;dbl&gt;
+ 1 Afghanistan ets     2018    N(36, 0.012) 36.4 
+ 2 Afghanistan ets     2019    N(37, 0.059) 37.3 
+ 3 Afghanistan ets     2020     N(38, 0.16) 38.2 
+ 4 Afghanistan ets     2021     N(39, 0.35) 39.0 
+ 5 Afghanistan ets     2022     N(40, 0.64) 39.9 
+ 6 Albania     ets     2018 N(2.9, 0.00012)  2.87
+ 7 Albania     ets     2019   N(2.9, 6e-04)  2.87
+ 8 Albania     ets     2020  N(2.9, 0.0017)  2.87
+ 9 Albania     ets     2021  N(2.9, 0.0036)  2.86
+10 Albania     ets     2022  N(2.9, 0.0066)  2.86
+# … with 1,305 more rows</code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-електроенергія-україни" class="slide level2">
+<h2>Приклад: електроенергія України</h2>
+<div class="cell light-mode" data-hash="07_cache/revealjs/unnamed-chunk-20_5ddc0a5f3ca30ab42ffb1b28f40868b0">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1"></a>energy <span class="ot">&lt;-</span> <span class="fu">vroom</span>(<span class="st">"https://git.io/JDYAX"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb28-2"><a href="#cb28-2"></a>  <span class="fu">pivot_longer</span>(<span class="sc">!</span>time, <span class="at">names_to =</span> <span class="st">"type"</span>, <span class="at">values_to =</span> <span class="st">"value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb28-3"><a href="#cb28-3"></a>   <span class="fu">mutate</span>(<span class="at">time =</span> <span class="fu">ymd_hms</span>(time)) <span class="sc">%&gt;%</span></span>
+<span id="cb28-4"><a href="#cb28-4"></a>   <span class="fu">as_tsibble</span>(<span class="at">index =</span> time, <span class="at">key =</span> type)</span>
+<span id="cb28-5"><a href="#cb28-5"></a></span>
+<span id="cb28-6"><a href="#cb28-6"></a>energy</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tsibble: 750,541 x 3 [1h] &lt;UTC&gt;
+# Key:       type [11]
+   time                type  value
+   &lt;dttm&gt;              &lt;chr&gt; &lt;dbl&gt;
+ 1 2014-01-01 00:00:00 AES   10728
+ 2 2014-01-01 01:00:00 AES   10606
+ 3 2014-01-01 02:00:00 AES   10515
+ 4 2014-01-01 03:00:00 AES   10475
+ 5 2014-01-01 04:00:00 AES   10427
+ 6 2014-01-01 05:00:00 AES   10473
+ 7 2014-01-01 06:00:00 AES   10469
+ 8 2014-01-01 07:00:00 AES   10493
+ 9 2014-01-01 08:00:00 AES   10479
+10 2014-01-01 09:00:00 AES   10455
+# … with 750,531 more rows</code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-електроенергія-україни-1" class="slide level2">
+<h2>Приклад: електроенергія України</h2>
+<div class="cell light-mode" data-hash="07_cache/revealjs/unnamed-chunk-21_226fe73a7e270af57aff0e881d4cb3b1">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1"></a>energy_fit <span class="ot">&lt;-</span> energy <span class="sc">%&gt;%</span></span>
+<span id="cb30-2"><a href="#cb30-2"></a>  <span class="fu">model</span>(<span class="at">ets =</span> <span class="fu">ETS</span>(value))</span>
+<span id="cb30-3"><a href="#cb30-3"></a></span>
+<span id="cb30-4"><a href="#cb30-4"></a>energy_fit</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A mable: 11 x 2
+# Key:     type [11]
+   type                  ets
+   &lt;chr&gt;             &lt;model&gt;
+ 1 AES         &lt;ETS(A,Ad,N)&gt;
+ 2 CONSUMPTION  &lt;ETS(M,N,M)&gt;
+ 3 GAES_GEN     &lt;ETS(A,N,A)&gt;
+ 4 GAES_PUMP    &lt;ETS(A,N,A)&gt;
+ 5 GES          &lt;ETS(A,N,A)&gt;
+ 6 TEC         &lt;ETS(M,Ad,M)&gt;
+ 7 TES          &lt;ETS(M,N,M)&gt;
+ 8 UK_BLR_RUS   &lt;ETS(A,N,A)&gt;
+ 9 UK_EURO      &lt;ETS(A,N,A)&gt;
+10 UK_MLD       &lt;ETS(A,N,A)&gt;
+11 VDE         &lt;ETS(A,Ad,A)&gt;</code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-електроенергія-україни-2" class="slide level2">
+<h2>Приклад: електроенергія України</h2>
+<div class="cell light-mode" data-hash="07_cache/revealjs/unnamed-chunk-22_24740d26dfe0bb80db16959baa26bd36">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1"></a>energy_fit <span class="sc">%&gt;%</span></span>
+<span id="cb32-2"><a href="#cb32-2"></a>  <span class="fu">filter</span>(type <span class="sc">==</span> <span class="st">"VDE"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb32-3"><a href="#cb32-3"></a>  <span class="fu">report</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: value 
+Model: ETS(A,Ad,A) 
+  Smoothing parameters:
+    alpha = 0.8048643 
+    beta  = 0.0001001706 
+    gamma = 0.1951258 
+    phi   = 0.9751766 
+
+  Initial states:
+     l[0]      b[0]      s[0]     s[-1]     s[-2]    s[-3]    s[-4]   s[-5]
+ 124.8749 0.4850034 -205.5111 -207.4407 -207.1193 -204.368 -185.616 -123.64
+     s[-6]    s[-7]    s[-8]    s[-9]   s[-10]   s[-11]   s[-12]   s[-13]
+ -18.78656 107.8249 234.3663 349.6245 423.2788 462.4296 449.4224 369.3013
+   s[-14]   s[-15]    s[-16]    s[-17]    s[-18]    s[-19]    s[-20]   s[-21]
+ 230.1887 46.91798 -102.0972 -180.2585 -201.2115 -208.0023 -208.1248 -207.123
+    s[-22]   s[-23]
+ -206.8092 -207.246
+
+  sigma^2:  8130.499
+
+    AIC    AICc     BIC 
+1373796 1373796 1374070 </code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-електроенергія-україни-3" class="slide level2">
+<h2>Приклад: електроенергія України</h2>
+<div class="cell light-mode" data-hash="07_cache/revealjs/unnamed-chunk-23_9dc63f3189a8cc07b579522fc5b546b0">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1"></a>energy_fit <span class="sc">%&gt;%</span></span>
+<span id="cb34-2"><a href="#cb34-2"></a>  <span class="fu">filter</span>(type <span class="sc">==</span> <span class="st">"VDE"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-3"><a href="#cb34-3"></a>  <span class="fu">components</span>(energy_fit)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A dable: 68,255 x 8 [1h] &lt;UTC&gt;
+# Key:     type, .model [1]
+# :        value = lag(level, 1) + 0.975176649672342 * lag(slope, 1) +
+#   lag(season, 24) + remainder
+   type  .model time                value level slope season remainder
+   &lt;chr&gt; &lt;chr&gt;  &lt;dttm&gt;              &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt;     &lt;dbl&gt;
+ 1 VDE   ets    2013-12-31 00:00:00    NA    NA    NA -207.         NA
+ 2 VDE   ets    2013-12-31 01:00:00    NA    NA    NA -207.         NA
+ 3 VDE   ets    2013-12-31 02:00:00    NA    NA    NA -207.         NA
+ 4 VDE   ets    2013-12-31 03:00:00    NA    NA    NA -208.         NA
+ 5 VDE   ets    2013-12-31 04:00:00    NA    NA    NA -208.         NA
+ 6 VDE   ets    2013-12-31 05:00:00    NA    NA    NA -201.         NA
+ 7 VDE   ets    2013-12-31 06:00:00    NA    NA    NA -180.         NA
+ 8 VDE   ets    2013-12-31 07:00:00    NA    NA    NA -102.         NA
+ 9 VDE   ets    2013-12-31 08:00:00    NA    NA    NA   46.9        NA
+10 VDE   ets    2013-12-31 09:00:00    NA    NA    NA  230.         NA
+# … with 68,245 more rows</code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-електроенергія-україни-4" class="slide level2">
+<h2>Приклад: електроенергія України</h2>
+<div class="cell light-mode" data-hash="07_cache/revealjs/unnamed-chunk-24_4091f5ae6d927311194952a614347151">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1"></a>energy_fit <span class="sc">%&gt;%</span></span>
+<span id="cb36-2"><a href="#cb36-2"></a>  <span class="fu">filter</span>(type <span class="sc">==</span> <span class="st">"VDE"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb36-3"><a href="#cb36-3"></a>  <span class="fu">components</span>(energy_fit) <span class="sc">%&gt;%</span></span>
+<span id="cb36-4"><a href="#cb36-4"></a>  <span class="fu">autoplot</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+
+</div>
+<img data-src="07_files/figure-revealjs/unnamed-chunk-24-1.png" width="960" class="r-stretch"></section>
+<section id="приклад-електроенергія-україни-5" class="slide level2">
+<h2>Приклад: електроенергія України</h2>
+<div class="cell light-mode" data-hash="07_cache/revealjs/unnamed-chunk-25_73eacaa7e0351eef382c4b07dda4c219">
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1"></a>energy_fit <span class="sc">%&gt;%</span> <span class="fu">forecast</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A fable: 528 x 5 [1h] &lt;UTC&gt;
+# Key:     type, .model [11]
+   type  .model time                         value .mean
+   &lt;chr&gt; &lt;chr&gt;  &lt;dttm&gt;                      &lt;dist&gt; &lt;dbl&gt;
+ 1 AES   ets    2021-10-13 23:00:00  N(9951, 2205) 9951.
+ 2 AES   ets    2021-10-14 00:00:00  N(9951, 4687) 9951.
+ 3 AES   ets    2021-10-14 01:00:00  N(9951, 7403) 9951.
+ 4 AES   ets    2021-10-14 02:00:00 N(9951, 10312) 9951.
+ 5 AES   ets    2021-10-14 03:00:00 N(9951, 13382) 9951.
+ 6 AES   ets    2021-10-14 04:00:00 N(9951, 16584) 9951.
+ 7 AES   ets    2021-10-14 05:00:00 N(9951, 19892) 9951.
+ 8 AES   ets    2021-10-14 06:00:00 N(9951, 23287) 9951.
+ 9 AES   ets    2021-10-14 07:00:00 N(9951, 26753) 9951.
+10 AES   ets    2021-10-14 08:00:00 N(9951, 30276) 9951.
+# … with 518 more rows</code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-електроенергія-україни-6" class="slide level2">
+<h2>Приклад: електроенергія України</h2>
+<div class="cell light-mode" data-hash="07_cache/revealjs/unnamed-chunk-26_ba9d76d3a1619c5c28fa863c4db4e746">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1"></a>energy_fit <span class="sc">%&gt;%</span></span>
+<span id="cb39-2"><a href="#cb39-2"></a>  <span class="fu">forecast</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb39-3"><a href="#cb39-3"></a>  <span class="fu">filter</span>(type <span class="sc">==</span> <span class="st">"VDE"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb39-4"><a href="#cb39-4"></a>  <span class="fu">autoplot</span>(energy <span class="sc">%&gt;%</span> <span class="fu">filter_index</span>(<span class="st">"2021-09-01"</span> <span class="sc">~</span> .)) <span class="sc">+</span></span>
+<span id="cb39-5"><a href="#cb39-5"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Прогноз соживання ВДЕ України"</span>, <span class="at">y =</span> <span class="st">"МВт"</span>, <span class="at">x =</span> <span class="cn">NULL</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+
+</div>
+<img data-src="07_files/figure-revealjs/unnamed-chunk-26-1.png" width="960" class="r-stretch"></section>
+<section id="залишки" class="slide level2">
+<h2>Залишки</h2>
+<p><strong>Звичайні:</strong> <span class="math display">\[\hat{e}_t = y_t - \hat{y}_{t|t-1}\]</span></p>
+<p><strong>Просунуті (іноваційні):</strong> * Адитивні <span class="math display">\[\hat\varepsilon_t = y_t - \hat{y}_{t|t-1}\]</span></p>
+<ul>
+<li>Мультиплікативні <span class="math display">\[\hat\varepsilon_t = \frac{y_t - \hat{y}_{t|t-1}}{\hat{y}_{t|t-1}}\]</span></li>
+</ul>
+</section>
+<section id="приклад-електроенергія-україни-7" class="slide level2">
+<h2>Приклад: електроенергія України</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1"></a>tes_fit <span class="ot">&lt;-</span> energy_fit <span class="sc">%&gt;%</span></span>
+<span id="cb40-2"><a href="#cb40-2"></a>  <span class="fu">filter</span>(type <span class="sc">==</span> <span class="st">"TES"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb40-3"><a href="#cb40-3"></a>  <span class="fu">report</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: value 
+Model: ETS(M,N,M) 
+  Smoothing parameters:
+    alpha = 0.8509127 
+    gamma = 0.1386315 
+
+  Initial states:
+     l[0]     s[0]    s[-1]    s[-2]    s[-3]    s[-4]    s[-5]    s[-6]
+ 7215.222 0.885151 1.077347 0.906587 1.020852 1.181553 1.067999 1.252148
+    s[-7]    s[-8]    s[-9]   s[-10]   s[-11]   s[-12]   s[-13]    s[-14]
+ 1.159245 1.212238 1.129374 1.207462 1.174475 1.162923 1.064444 0.9882759
+    s[-15]    s[-16]   s[-17]    s[-18]    s[-19]    s[-20]    s[-21]    s[-22]
+ 0.9559876 0.9943594 0.944768 0.8241083 0.7233081 0.7095042 0.7773208 0.7607846
+    s[-23]
+ 0.8197847
+
+  sigma^2:  0.0021
+
+    AIC    AICc     BIC 
+1508282 1508282 1508528 </code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-електроенергія-україни-8" class="slide level2">
+<h2>Приклад: електроенергія України</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1"></a><span class="fu">residuals</span>(tes_fit)</span>
+<span id="cb42-2"><a href="#cb42-2"></a><span class="fu">residuals</span>(tes_fit, <span class="at">type =</span> <span class="st">"response"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+
+<img data-src="07_files/figure-revealjs/unnamed-chunk-29-1.png" width="960" class="r-stretch"></section>
+<section id="приклад-електроенергія-україни-9" class="slide level2">
+<h2>Приклад: електроенергія України</h2>
+<p>.code70[</p>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1"></a>tes_fit <span class="sc">%&gt;%</span></span>
+<span id="cb43-2"><a href="#cb43-2"></a>  <span class="fu">augment</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tsibble: 68,231 x 7 [1h] &lt;UTC&gt;
+# Key:       type, .model [1]
+   type  .model time                value .fitted .resid  .innov
+   &lt;chr&gt; &lt;chr&gt;  &lt;dttm&gt;              &lt;dbl&gt;   &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;
+ 1 TES   ets    2014-01-01 00:00:00  6044   5915.  129.   0.0218
+ 2 TES   ets    2014-01-01 01:00:00  6038   5591.  447.   0.0799
+ 3 TES   ets    2014-01-01 02:00:00  5865   6101. -236.  -0.0387
+ 4 TES   ets    2014-01-01 03:00:00  5524   5385.  139.   0.0257
+ 5 TES   ets    2014-01-01 04:00:00  5506   5610. -104.  -0.0186
+ 6 TES   ets    2014-01-01 05:00:00  5346   6291. -945.  -0.150 
+ 7 TES   ets    2014-01-01 06:00:00  5343   6290. -947.  -0.151 
+ 8 TES   ets    2014-01-01 07:00:00  5324   5772. -448.  -0.0776
+ 9 TES   ets    2014-01-01 08:00:00  5366   5183.  183.   0.0354
+10 TES   ets    2014-01-01 09:00:00  5431   5519.  -88.0 -0.0159
+# … with 68,221 more rows</code></pre>
+</div>
+</div>
+</section>
+<section id="деякі-нестабільні-моделі" class="slide level2">
+<h2>Деякі нестабільні моделі</h2>
+<ul>
+<li><p>Деякі комбінації (Error, Trend, Seasonal) можуть призвести до чисельних труднощів;</p></li>
+<li><p>Це: ETS(A,N,M), ETS(A,A,M), ETS(A,Ad,M);</p></li>
+<li><p>Моделі з мультиплікативними помилками корисні для позитивних даних, але є нестабільними з даними, що містять нулі або від’ємні значення. У цьому випадку будуть застосовані лише шість повністю адитивних моделей.</p></li>
+</ul>
+</section></section>
+<section>
+<section id="прогнозування-з-експоненціальним-згладжуванням" class="title-slide slide level1 center">
+<h1>Прогнозування з експоненціальним згладжуванням</h1>
+
+</section>
+<section id="прогнозування-з-ets-моделями" class="slide level2">
+<h2>Прогнозування з ETS моделями</h2>
+<p><strong>Традиційний точковий прогноз:</strong> повторіть рівняння для <span class="math inline">\(t=T+1,T+2,\dots,T+h\)</span> і встановіть усі <span class="math inline">\(\varepsilon_t=0\)</span> для <span class="math inline">\(t&gt;T\)</span>.</p>
+<p><strong>Довірчі інтервали:</strong> можна отримати лише за допомогою моделей.</p>
+<ul>
+<li>ДІ будуть відрізнятися між моделями з адитивними та мультиплікативними помилками.</li>
+</ul>
+<p>Для більшості ETS моделей ДІ: <span class="math display">\[\hat{y}_{T+h|T} \pm c \sigma_h\]</span> де <span class="math inline">\(c\)</span> - показник ймовірності, а <span class="math inline">\(\sigma_h\)</span> стандартне відхилення прогнозу</p>
+</section>
+<section id="прогнозування-з-ets-моделями-1" class="slide level2">
+<h2>Прогнозування з ETS моделями</h2>
+<p>Для ETS моделей стандартне відхилення розраховується залежно від моделі, наприклад:</p>
+
+<img data-src="img/sigma.png" class="r-stretch"></section>
+<section id="приклад-продаж-ліків" class="slide level2">
+<h2>Приклад: продаж ліків</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb45-1"><a href="#cb45-1"></a>h02 <span class="ot">&lt;-</span> PBS <span class="sc">%&gt;%</span></span>
+<span id="cb45-2"><a href="#cb45-2"></a>  <span class="fu">filter</span>(ATC2 <span class="sc">==</span> <span class="st">"H02"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb45-3"><a href="#cb45-3"></a>  <span class="fu">summarise</span>(<span class="at">Cost =</span> <span class="fu">sum</span>(Cost))</span>
+<span id="cb45-4"><a href="#cb45-4"></a>h02 <span class="sc">%&gt;%</span></span>
+<span id="cb45-5"><a href="#cb45-5"></a>  <span class="fu">autoplot</span>(Cost)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+
+</div>
+<img data-src="07_files/figure-revealjs/h02-plot-1.png" width="960" class="r-stretch"></section>
+<section id="приклад-продаж-ліків-1" class="slide level2">
+<h2>Приклад: продаж ліків</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1"></a>h02 <span class="sc">%&gt;%</span></span>
+<span id="cb46-2"><a href="#cb46-2"></a>  <span class="fu">model</span>(<span class="fu">ETS</span>(Cost)) <span class="sc">%&gt;%</span></span>
+<span id="cb46-3"><a href="#cb46-3"></a>  <span class="fu">report</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: Cost 
+Model: ETS(M,Ad,M) 
+  Smoothing parameters:
+    alpha = 0.3071016 
+    beta  = 0.0001006793 
+    gamma = 0.0001007181 
+    phi   = 0.977528 
+
+  Initial states:
+     l[0]    b[0]      s[0]     s[-1]     s[-2]     s[-3]
+ 417268.7 8205.82 0.8716807 0.8259747 0.7562808 0.7733338
+     s[-4]    s[-5]    s[-6]    s[-7]    s[-8]    s[-9]   s[-10]
+ 0.6872373 1.283821 1.324616 1.180067 1.163601 1.104801 1.047963
+    s[-11]
+ 0.9806235
+
+  sigma^2:  0.0046
+
+     AIC     AICc      BIC 
+5515.212 5518.909 5574.938 </code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-продаж-ліків-2" class="slide level2">
+<h2>Приклад: продаж ліків</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1"></a>h02 <span class="sc">%&gt;%</span></span>
+<span id="cb48-2"><a href="#cb48-2"></a>  <span class="fu">model</span>(<span class="fu">ETS</span>(Cost <span class="sc">~</span> <span class="fu">error</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">trend</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">season</span>(<span class="st">"A"</span>))) <span class="sc">%&gt;%</span></span>
+<span id="cb48-3"><a href="#cb48-3"></a>  <span class="fu">report</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: Cost 
+Model: ETS(A,A,A) 
+  Smoothing parameters:
+    alpha = 0.1702163 
+    beta  = 0.006310854 
+    gamma = 0.4545987 
+
+  Initial states:
+     l[0]     b[0]      s[0]     s[-1]     s[-2]     s[-3]
+ 409705.9 9097.111 -99075.37 -136602.3 -191496.1 -174530.8
+     s[-4]    s[-5]    s[-6]    s[-7]    s[-8]    s[-9]  s[-10]
+ -241436.7 210643.8 244644.2 145368.2 130569.6 84457.69 39131.7
+    s[-11]
+ -11673.71
+
+  sigma^2:  3498869384
+
+     AIC     AICc      BIC 
+5585.278 5588.568 5641.686 </code></pre>
+</div>
+</div>
+</section>
+<section id="приклад-продаж-ліків-3" class="slide level2">
+<h2>Приклад: продаж ліків</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb50-1"><a href="#cb50-1"></a>h02 <span class="sc">%&gt;%</span> <span class="fu">model</span>(<span class="fu">ETS</span>(Cost)) <span class="sc">%&gt;%</span> <span class="fu">forecast</span>() <span class="sc">%&gt;%</span> <span class="fu">autoplot</span>(h02)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+
+</div>
+<img data-src="07_files/figure-revealjs/unnamed-chunk-34-1.png" width="960" class="r-stretch"></section>
+<section id="приклад-продаж-ліків-4" class="slide level2">
+<h2>Приклад: продаж ліків</h2>
+<div class="cell light-mode">
+<div class="sourceCode cell-code" id="cb51"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1"></a>h02 <span class="sc">%&gt;%</span></span>
+<span id="cb51-2"><a href="#cb51-2"></a>  <span class="fu">model</span>(</span>
+<span id="cb51-3"><a href="#cb51-3"></a>    <span class="at">auto =</span> <span class="fu">ETS</span>(Cost),</span>
+<span id="cb51-4"><a href="#cb51-4"></a>    <span class="at">AAA =</span> <span class="fu">ETS</span>(Cost <span class="sc">~</span> <span class="fu">error</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">trend</span>(<span class="st">"A"</span>) <span class="sc">+</span> <span class="fu">season</span>(<span class="st">"A"</span>))</span>
+<span id="cb51-5"><a href="#cb51-5"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb51-6"><a href="#cb51-6"></a>  <span class="fu">accuracy</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell light-mode">
+<div class="cell-output-display">
+
+<table>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> Model </th>
+   <th style="text-align:right;"> MAE </th>
+   <th style="text-align:right;"> RMSE </th>
+   <th style="text-align:right;"> MAPE </th>
+   <th style="text-align:right;"> MASE </th>
+   <th style="text-align:right;"> RMSSE </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> auto </td>
+   <td style="text-align:right;"> 38649.04 </td>
+   <td style="text-align:right;"> 51102.24 </td>
+   <td style="text-align:right;"> 4.988983 </td>
+   <td style="text-align:right;"> 0.6375806 </td>
+   <td style="text-align:right;"> 0.6891173 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> AAA </td>
+   <td style="text-align:right;"> 43378.40 </td>
+   <td style="text-align:right;"> 56784.23 </td>
+   <td style="text-align:right;"> 6.047574 </td>
+   <td style="text-align:right;"> 0.7155993 </td>
+   <td style="text-align:right;"> 0.7657394 </td>
+  </tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</section></section>
+<section id="дякую-за-увагу" class="title-slide slide level1 unnumbered unlisted center">
+<h1>Дякую за увагу!</h1>
+<p><br> <br></p>
+<p><svg aria-hidden="true" role="img" viewbox="0 0 512 512" style="height:1em;width:1em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><path d="M464 64C490.5 64 512 85.49 512 112C512 127.1 504.9 141.3 492.8 150.4L275.2 313.6C263.8 322.1 248.2 322.1 236.8 313.6L19.2 150.4C7.113 141.3 0 127.1 0 112C0 85.49 21.49 64 48 64H464zM217.6 339.2C240.4 356.3 271.6 356.3 294.4 339.2L512 176V384C512 419.3 483.3 448 448 448H64C28.65 448 0 419.3 0 384V176L217.6 339.2z"></path></svg> ihor.miroshnychenko@kneu.ua</p>
+<p><svg aria-hidden="true" role="img" viewbox="0 0 576 512" style="height:1em;width:1.12em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><path d="M575.8 255.5C575.8 273.5 560.8 287.6 543.8 287.6H511.8L512.5 447.7C512.5 450.5 512.3 453.1 512 455.8V472C512 494.1 494.1 512 472 512H456C454.9 512 453.8 511.1 452.7 511.9C451.3 511.1 449.9 512 448.5 512H392C369.9 512 352 494.1 352 472V384C352 366.3 337.7 352 320 352H256C238.3 352 224 366.3 224 384V472C224 494.1 206.1 512 184 512H128.1C126.6 512 125.1 511.9 123.6 511.8C122.4 511.9 121.2 512 120 512H104C81.91 512 64 494.1 64 472V360C64 359.1 64.03 358.1 64.09 357.2V287.6H32.05C14.02 287.6 0 273.5 0 255.5C0 246.5 3.004 238.5 10.01 231.5L266.4 8.016C273.4 1.002 281.4 0 288.4 0C295.4 0 303.4 2.004 309.5 7.014L564.8 231.5C572.8 238.5 576.9 246.5 575.8 255.5L575.8 255.5z"></path></svg> <a href="https://aranaur.rbind.io">aranaur.rbind.io</a></p>
+<p><svg aria-hidden="true" role="img" viewbox="0 0 496 512" style="height:1em;width:0.97em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3 .3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5 .3-6.2 2.3zm44.2-1.7c-2.9 .7-4.9 2.6-4.6 4.9 .3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3 .7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3 .3 2.9 2.3 3.9 1.6 1 3.6 .7 4.3-.7 .7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3 .7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3 .7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg> <a href="https://github.com/Aranaur">@aranaur</a></p>
+<p><svg aria-hidden="true" role="img" viewbox="0 0 448 512" style="height:1em;width:0.88em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><path d="M416 32H31.9C14.3 32 0 46.5 0 64.3v383.4C0 465.5 14.3 480 31.9 480H416c17.6 0 32-14.5 32-32.3V64.3c0-17.8-14.4-32.3-32-32.3zM135.4 416H69V202.2h66.5V416zm-33.2-243c-21.3 0-38.5-17.3-38.5-38.5S80.9 96 102.2 96c21.2 0 38.5 17.3 38.5 38.5 0 21.3-17.2 38.5-38.5 38.5zm282.1 243h-66.4V312c0-24.8-.5-56.7-34.5-56.7-34.6 0-39.9 27-39.9 54.9V416h-66.4V202.2h63.7v29.2h.9c8.9-16.8 30.6-34.5 62.9-34.5 67.2 0 79.7 44.3 79.7 101.9V416z"></path></svg> <a href="https://www.linkedin.com/in/ihormiroshnychenko/">@ihormiroshnychenko</a></p>
+<p><svg aria-hidden="true" role="img" viewbox="0 0 496 512" style="height:1em;width:0.97em;vertical-align:-0.125em;margin-left:auto;margin-right:auto;font-size:inherit;fill:currentColor;overflow:visible;position:relative;"><path d="M248 8C111 8 0 119 0 256S111 504 248 504 496 392.1 496 256 384.1 8 248 8zM362.1 176.7c-3.732 39.22-19.88 134.4-28.1 178.3-3.476 18.58-10.32 24.82-16.95 25.42-14.4 1.326-25.34-9.517-39.29-18.66-21.83-14.31-34.16-23.22-55.35-37.18-24.49-16.14-8.612-25 5.342-39.5 3.652-3.793 67.11-61.51 68.33-66.75 .153-.655 .3-3.1-1.154-4.384s-3.59-.849-5.135-.5q-3.283 .746-104.6 69.14-14.85 10.19-26.89 9.934c-8.855-.191-25.89-5.006-38.55-9.123-15.53-5.048-27.88-7.717-26.8-16.29q.84-6.7 18.45-13.7 108.4-47.25 144.6-62.3c68.87-28.65 83.18-33.62 92.51-33.79 2.052-.034 6.639 .474 9.61 2.885a10.45 10.45 0 0 1 3.53 6.716A43.76 43.76 0 0 1 362.1 176.7z"></path></svg> <a href="https://t.me/araprof">Data Mirosh</a></p>
+
+<img src="img/logo.png" class="slide-logo r-stretch"><div class="footer footer-default">
+<p><a href="https://t.me/araprof">Data Mirosh</a></p>
+</div>
+</section>
+    </div>
+  </div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src="07_files/libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src="07_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src="07_files/libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src="07_files/libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src="07_files/libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src="07_files/libs/revealjs/plugin/reveal-chalkboard/plugin.js"></script>
+  <script src="07_files/libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src="07_files/libs/revealjs/plugin/notes/notes.js"></script>
+  <script src="07_files/libs/revealjs/plugin/search/search.js"></script>
+  <script src="07_files/libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script src="07_files/libs/revealjs/plugin/math/math.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': true,
+'previewLinksAuto': false,
+'smaller': false,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleChalkboard(event)\"><kbd>b</kbd> Toggle Chalkboard</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleNotesCanvas(event)\"><kbd>c</kbd> Toggle Notes Canvas</a></li>\n<li class=\"slide-tool-item\" data-item=\"6\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.downloadDrawings(event)\"><kbd>d</kbd> Download Drawings</a></li>\n<li class=\"slide-tool-item\" data-item=\"7\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'chalkboard': {"buttons":true},
+'smaller': false,
+ 
+        // Display controls in the bottom right corner
+        controls: false,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: 'c/t',
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'linear',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: null,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: true,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'fade',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'none',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1050,
+
+        height: 700,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 0.1,
+
+        math: {
+          mathjax: 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js',
+          config: 'TeX-AMS_HTML-full',
+          tex2jax: {
+            inlineMath: [['\\(','\\)']],
+            displayMath: [['\\[','\\]']],
+            balanceBraces: true,
+            processEscapes: false,
+            processRefs: true,
+            processEnvironments: true,
+            preview: 'TeX',
+            skipTags: ['script','noscript','style','textarea','pre','code'],
+            ignoreClass: 'tex2jax_ignore',
+            processClass: 'tex2jax_process'
+          },
+        },
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, RevealChalkboard, QuartoSupport,
+
+          RevealMath,
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    
+    <script>
+      // htmlwidgets need to know to resize themselves when slides are shown/hidden.
+      // Fire the "slideenter" event (handled by htmlwidgets.js) when the current
+      // slide changes (different for each slide format).
+      (function () {
+        // dispatch for htmlwidgets
+        function fireSlideEnter() {
+          const event = window.document.createEvent("Event");
+          event.initEvent("slideenter", true, true);
+          window.document.dispatchEvent(event);
+        }
+
+        function fireSlideChanged(previousSlide, currentSlide) {
+          fireSlideEnter();
+
+          // dispatch for shiny
+          if (window.jQuery) {
+            if (previousSlide) {
+              window.jQuery(previousSlide).trigger("hidden");
+            }
+            if (currentSlide) {
+              window.jQuery(currentSlide).trigger("shown");
+            }
+          }
+        }
+
+        // hookup for slidy
+        if (window.w3c_slidy) {
+          window.w3c_slidy.add_observer(function (slide_num) {
+            // slide_num starts at position 1
+            fireSlideChanged(null, w3c_slidy.slides[slide_num - 1]);
+          });
+        }
+
+      })();
+    </script>
+
+    <script id="quarto-html-after-body" type="application/javascript">
+    window.document.addEventListener("DOMContentLoaded", function (event) {
+      const toggleBodyColorMode = (bsSheetEl) => {
+        const mode = bsSheetEl.getAttribute("data-mode");
+        const bodyEl = window.document.querySelector("body");
+        if (mode === "dark") {
+          bodyEl.classList.add("quarto-dark");
+          bodyEl.classList.remove("quarto-light");
+        } else {
+          bodyEl.classList.add("quarto-light");
+          bodyEl.classList.remove("quarto-dark");
+        }
+      }
+      const toggleBodyColorPrimary = () => {
+        const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+        if (bsSheetEl) {
+          toggleBodyColorMode(bsSheetEl);
+        }
+      }
+      toggleBodyColorPrimary();  
+      const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+      tabsets.forEach(function(tabset) {
+        const tabby = new Tabby('#' + tabset.id);
+      });
+      const clipboard = new window.ClipboardJS('.code-copy-button', {
+        target: function(trigger) {
+          return trigger.previousElementSibling;
+        }
+      });
+      clipboard.on('success', function(e) {
+        // button target
+        const button = e.trigger;
+        // don't keep focus
+        button.blur();
+        // flash "checked"
+        button.classList.add('code-copy-button-checked');
+        var currentTitle = button.getAttribute("title");
+        button.setAttribute("title", "Copied!");
+        let tooltip;
+        if (window.bootstrap) {
+          button.setAttribute("data-bs-toggle", "tooltip");
+          button.setAttribute("data-bs-placement", "left");
+          button.setAttribute("data-bs-title", "Copied!");
+          tooltip = new bootstrap.Tooltip(button, 
+            { trigger: "manual", 
+              customClass: "code-copy-button-tooltip",
+              offset: [0, -8]});
+          tooltip.show();    
+        }
+        setTimeout(function() {
+          if (tooltip) {
+            tooltip.hide();
+            button.removeAttribute("data-bs-title");
+            button.removeAttribute("data-bs-toggle");
+            button.removeAttribute("data-bs-placement");
+          }
+          button.setAttribute("title", currentTitle);
+          button.classList.remove('code-copy-button-checked');
+        }, 1000);
+        // clear code selection
+        e.clearSelection();
+      });
+      function tippyHover(el, contentFn) {
+        const config = {
+          allowHTML: true,
+          content: contentFn,
+          maxWidth: 500,
+          delay: 100,
+          arrow: false,
+          appendTo: function(el) {
+              return el.closest('section.slide') || el.parentElement;
+          },
+          interactive: true,
+          interactiveBorder: 10,
+          theme: 'quarto-reveal',
+          placement: 'bottom-start'
+        };
+          config['offset'] = [0,0];
+          config['maxWidth'] = 700;
+        window.tippy(el, config); 
+      }
+      const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+      for (var i=0; i<noterefs.length; i++) {
+        const ref = noterefs[i];
+        tippyHover(ref, function() {
+          // use id or data attribute instead here
+          let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+          try { href = new URL(href).hash; } catch {}
+          const id = href.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          return note.innerHTML;
+        });
+      }
+      const findCites = (el) => {
+        const parentEl = el.parentElement;
+        if (parentEl) {
+          const cites = parentEl.dataset.cites;
+          if (cites) {
+            return {
+              el,
+              cites: cites.split(' ')
+            };
+          } else {
+            return findCites(el.parentElement)
+          }
+        } else {
+          return undefined;
+        }
+      };
+      var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+      for (var i=0; i<bibliorefs.length; i++) {
+        const ref = bibliorefs[i];
+        const citeInfo = findCites(ref);
+        if (citeInfo) {
+          tippyHover(citeInfo.el, function() {
+            var popup = window.document.createElement('div');
+            citeInfo.cites.forEach(function(cite) {
+              var citeDiv = window.document.createElement('div');
+              citeDiv.classList.add('hanging-indent');
+              citeDiv.classList.add('csl-entry');
+              var biblioDiv = window.document.getElementById('ref-' + cite);
+              if (biblioDiv) {
+                citeDiv.innerHTML = biblioDiv.innerHTML;
+              }
+              popup.appendChild(citeDiv);
+            });
+            return popup.innerHTML;
+          });
+        }
+      }
+    });
+    </script>
+    
+
+</body></html>
