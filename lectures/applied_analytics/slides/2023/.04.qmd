@@ -1,0 +1,1842 @@
+---
+title: "Python: Читання/запис файлів та регулярні вирази"
+title-slide-attributes:
+    data-background-iframe: colored-particles/index.html
+subtitle: "Прикладна аналітика при розробці IT"
+author: "Ігор Мірошниченко"
+footer: <a href="https://aranaur.rbind.io/lectures/applied_analytics/">Прикладна аналітика при розробці IT</a>
+# date: today
+# date-format: iso
+institute: КНУ імені Тараса Шевченка, ФІТ
+language: _language-ua.yml
+format:
+  revealjs: 
+    theme: [simple, custom.scss]
+    logo: fit.png
+    chalkboard: true
+    slide-number: true
+    toc: true
+    toc-title: ЗМІСТ
+    transition: fade
+    mouse-wheel: true
+    highlight-style: github
+    mainfont: metropolis
+    toc-depth: 1
+    fig-width: 9
+    fig-height: 5
+    # auto-stretch: false
+
+from: markdown+emoji
+
+execute: 
+  echo: true
+
+jupyter: python3
+        
+# knitr: 
+#   opts_chunk: 
+#     echo: true
+#     warnings: false
+#     message: false
+editor_options: 
+  chunk_output_type: console
+---
+
+# Читання та запис файлів {background-iframe="colored-particles/index.html"}
+
+## Запис даних
+
+До цього часу більшість програм, які ми писали, просто зберігали всю інформацію **в пам'яті**, тобто в змінних або всередині самої програми. 
+
+Недоліком цього є те, що як тільки програма завершує роботу, все, що ви ввели, все, що ви робили з цією програмою, втрачається.
+
+Використовуючи файли, ви можете зберігати інформацію довгостроково, і **введення/виведення файлів** (англ. *file I/O*) в контексті програмування - це написання коду, який може читати з файлів, тобто завантажувати інформацію з них, або записувати до них, тобто зберігати інформацію у самих файлах.
+
+## Запис даних
+
+Для початку пропоную розглянути знайому структуру даних, яку ми бачили раніше - `list`.
+
+Створимо програму `names.py`, яка буде зберігати імена у списку, а потім виводити їх на екран:
+
+```{.bash filename="Terminal"}
+code names.py
+```
+<br>
+
+```{python}
+#| label: io-names-eval
+#| eval: false
+
+name = input("Як Вас звати? ")
+print(f'Привіт, {name}!')
+```
+
+## Запис даних
+
+Припустімо, що ми хочемо додати підтримку збереження декількох імен, наприклад трьох. Для цього ми можемо використати список. Для цього необхідно створити пустий список `names` і додавати (`append`) до нього імена, які вводить користувач. Вивід імен відсортуємо за алфавітом:
+
+```{python}
+#| label: io-names-list-eval
+#| eval: false
+
+names = []
+
+for _ in range(3):
+    names.append(input("Як Вас звати? "))
+
+for name in sorted(names):
+    print(f'Привіт, {name}!')
+```
+
+```{.output}
+Як Вас звати? Гаррі
+Як Вас звати? Рон
+Як Вас звати? Герміона
+Привіт, Гаррі!
+Привіт, Герміона!
+Привіт, Рон!
+```
+
+Звичайно, якщо я запущу цю програму ще раз, всі імена пропадуть. Було б непогано мати можливість якось зберігати цю інформацію. І саме тут з'являється ввід-вивід файлів, і саме тут з'являються файли.
+
+## Запис даних
+
+Давайте перепишемо нашу програму так, щоб вона зберігала імена у файлі `names.txt`. 
+
+Для цього нам необхідно відкрити файл, використовуючи функцію `open()` - ця функція приймає два аргументи: ім'я файлу і режим відкриття.
+
+Режим відкриття може бути:
+
+- `r` (англ. *read*) - читання, це режим за замовчуванням.
+- `w` (англ. *write*) - запис, цей режим перезаписує файл.
+- `a` (англ. *append*) - дописування, цей режим додає дані до файлу.
+
+Якщо файл не існує, то він буде створений. Давайте перепишемо нашу програму з використанням функції `open()`:
+
+```{python}
+#| label: io-names-list-file-eval
+#| eval: false
+
+name = input("Як Вас звати? ")
+
+file = open('names.txt', 'w')
+file.write(name)
+file.close()
+```
+
+## Запис даних {.smaller}
+
+Запустимо цю програму і перевіримо, чи вона працює:
+
+```{.bash filename="Terminal"}
+python names.py
+Як Вас звати? Гаррі
+code names.txt
+```
+
+Відкриємо створений файл:
+
+```{.bash filename="names.txt"}
+Гаррі
+```
+
+Все працює! Тепер давайте виконаємо цю програму ще раз, але цього разу введемо ім'я `Рон`:
+
+```{.bash filename="Terminal"}
+python names.py
+Як Вас звати? Рон
+code names.txt
+```
+
+Відкриємо створений файл:
+
+```{.bash filename="names.txt"}
+Рон
+```
+
+Як бачимо, файл перезаписався, і тепер в ньому знаходиться тільки ім'я `Рон`. 
+
+## Запис даних
+
+Якщо ми хочемо додати ім'я до файлу, а не перезаписати його, то використовуйте режим `a`.
+
+Видаліть файл `names.txt` і давайте перепишемо нашу програму так, щоб вона дописувала імена до файлу `names.txt`:
+
+```{.bash filename="Terminal"}
+rm names.txt
+remove names.txt? y
+```
+
+```{python}
+#| label: io-names-list-file-append-eval
+#| eval: false
+
+name = input("Як Вас звати? ")
+
+file = open('names.txt', 'a')
+file.write(name)
+file.close()
+```
+
+Запустимо цю програму і перевіримо, чи вона працює:
+
+```{.bash filename="Terminal"}
+python names.py
+Як Вас звати? Герміона
+code names.txt
+```
+
+```{.bash filename="names.txt"}
+Герміона
+```
+
+## Запис даних
+
+Запустимо програму ще раз і спробуємо додати ім'я `Гаррі` та `Рон`:
+
+```{.bash filename="Terminal"}
+python names.py
+Як Вас звати? Гаррі
+python names.py
+Як Вас звати? Рон
+code names.txt
+```
+
+```{.bash filename="names.txt"}
+ГерміонаГарріРон
+```
+
+Зовсім не той результат, який ми очікували. 
+
+Імена записалися в один рядок. Це тому, що функція `write` не додає символ переносу рядка (`\n`) після запису імені.
+
+## Запис даних {.smaller}
+
+Щоб це виправити, ми можемо додати символ переносу рядка після запису імені:
+
+```{.bash filename="Terminal"}
+rm names.txt
+remove names.txt? y
+```
+
+```{python}
+#| label: io-names-append-newline-eval
+#| eval: false
+
+name = input("Як Вас звати? ")
+
+file = open('names.txt', 'a')
+file.write(name + '\n')
+file.close()
+```
+
+Запустимо цю програму:
+
+```{.bash filename="Terminal"}
+python names.py
+Як Вас звати? Герміона
+python names.py
+Як Вас звати? Гаррі
+python names.py
+Як Вас звати? Рон
+code names.txt
+```
+
+```{.bash filename="names.txt"}
+Герміона
+Гаррі
+Рон
+```
+
+::: {.callout-note}
+Документація до функції `open`: <https://docs.python.org/3/library/functions.html#open>
+:::
+
+## Контекстний менеджер
+
+Під час написання коду дуже легко забути закрити файли і це може стати проблемою. Тому ми можемо піти більш безпечним шляхом і використовувати контекстний менеджер. 
+
+**Контекстний менеджер** - це спеціальна конструкція мови Python, яка дозволяє виконувати певні дії до входу в блок коду і після виходу з блоку коду. 
+
+Для використання контекстного менеджера використовується ключове слово `with`. Давайте перепишемо нашу програму з використанням контекстного менеджера:
+
+```{python}
+#| label: io-names-list-file-with-eval
+#| eval: false
+
+name = input("Як Вас звати? ")
+
+with open('names.txt', 'a', encoding="utf8") as file:
+    file.write(name + '\n')
+```
+
+Такий підхід не змінює функціональність програми, але є більш пітоничним.
+
+## Читання даних {.smaller}
+
+Для читання, у функції `open` використовується режим `r`.
+
+Давайте створимо програму `names_read.py`, яка буде читати імена з файлу `names.txt` і виводити їх на екран:
+
+```{.bash filename="Terminal"}
+code names_read.py
+```
+
+Для читання використаємо метод `readlines`, яка повертає список рядків, які містяться у файлі. 
+
+Цей метод повертає список, тому ми можемо використати цикл `for` для виведення імен на екран. Також слід врахувати, що метод `readlines` повертає список, в якому кожен рядок містить символ переносу рядка (`\n`). 
+
+Щоб цього уникнути, ми можемо використати метод `rstrip`, який видаляє символ переносу рядка з кінця рядка:
+
+```{python}
+#| label: io-names-list-file-read-eval
+#| eval: false
+
+with open('names.txt', 'r', encoding="utf8") as file:
+    lines = file.readlines()
+
+for line in lines:
+    print(f'Привіт, {line.rstrip()}!')
+```
+
+```{.output}
+Привіт, Герміона!
+Привіт, Гаррі!
+Привіт, Рон!
+```
+
+## Читання даних
+
+Але у попередньому прикладі ми двічі проходимось по всьому файлу: спочатку ми читаємо його у список, а потім виводимо список на екран.
+
+Це не є найкращим рішенням, оскільки ми можемо витратити багато пам'яті, якщо файл дуже великий.
+
+Тому ми можемо використати цикл `for` безпосередньо для читання файлу:
+
+```{python}
+#| label: io-names-list-file-read-eval-2
+#| eval: false
+
+with open('names.txt', 'r', encoding="utf8") as file:
+    for line in file:
+        print(f'Привіт, {line.rstrip()}!')
+```
+
+```{.output}
+Привіт, Герміона!
+Привіт, Гаррі!
+Привіт, Рон!
+```
+
+## Читання даних
+
+Тепер трошки ускладнимо задачу.
+
+Припустимо, що ми хочемо виводити привітання у алфавітному порядку. Для цього нам необхідно відсортувати список імен.
+
+Для цього ми можемо використати функцію `sorted()`, яка повертає відсортований список:
+```{python}
+#| label: io-names-list-file-read-sort-eval
+#| eval: false
+
+names = []
+
+with open('names.txt', 'r', encoding="utf8") as file:
+    for line in file:
+        names.append(line.rstrip())
+
+for name in sorted(names):
+    print(f'Привіт, {name}!')
+```
+
+```{.output}
+Привіт, Гаррі!
+Привіт, Герміона!
+Привіт, Рон!
+```
+
+## Читання даних
+
+Ми можемо зробити цю програму більш компактною. Для цього ми можемо відсортувати сам файл:
+
+```{python}
+#| label: io-names-list-file-read-sort-eval-2
+#| eval: false
+
+with open('names.txt', 'r', encoding="utf8") as file:
+    for line in sorted(file):
+        print(f'Привіт, {line.rstrip()}!')
+```
+
+```{.output}
+Привіт, Гаррі!
+Привіт, Герміона!
+Привіт, Рон!
+```
+
+. . .
+
+Для зворотного сортування ми можемо використати параметр `reverse` функції `sorted`:
+
+```{python}
+#| label: io-names-list-file-read-sort-reverse-eval
+#| eval: false
+
+with open('names.txt', 'r', encoding="utf8") as file:
+    for line in sorted(file, reverse=True):
+        print(f'Привіт, {line.rstrip()}!')
+```
+
+```{.output}
+Привіт, Рон!
+Привіт, Герміона!
+Привіт, Гаррі!
+```
+
+::: {.callout-note}
+Документація до функції `sorted`: <https://docs.python.org/3/library/functions.html#sorted>
+:::
+
+## Файли csv
+
+Файли **csv** (англ. *comma-separated values*, значення, розділені комами) - це файли, які містять дані у вигляді таблиці, де значення розділені комами.
+
+Давайте створимо файл `students.csv`:
+
+```{.bash filename="Terminal"}
+code students.csv
+```
+
+Запишемо у нього імена і додамо гуртожиток:
+
+```{.bash filename="students.csv"}
+Гаррі,Гріфіндор
+Герміона,Гріфіндор
+Рон,Гріфіндор
+Драко,Слизерин
+```
+
+## Файли csv
+
+Тепер давайте створимо програму `students.py`, яка буде читати цей файл.
+
+```{.bash filename="Terminal"}
+code students.py
+```
+
+Ми можемо використати метод `split` для розділення рядка на частини. Давайте перепишемо нашу програму з використанням методу `split`:
+
+```{python}
+#| label: io-csv-eval
+#| eval: false
+
+with open('students.csv', 'r', encoding="utf8") as file:
+    for line in file:
+        row = line.rstrip().split(',')
+        print(f'{row[0]} живе в гуртожитку {row[1]}')
+```
+
+```{.output}
+Гаррі живе в гуртожитку Гріфіндор
+Герміона живе в гуртожитку Гріфіндор
+Рон живе в гуртожитку Гріфіндор
+Драко живе в гуртожитку Слизерин
+```
+
+## Файли csv
+
+Коли у вас є змінна, яка є списком, наприклад `row`, вам не обов'язково переносити всі ці змінні у окремий список.
+
+Ви можете розпакувати всю послідовність одразу.
+
+Іншими словами, якщо ви знаєте, що функція типу `split` повертає список, який містить два елементи, ви можете розпакувати цей список у дві змінні:
+
+```{python}
+#| label: io-csv-unpack-eval
+#| eval: false
+
+with open('students.csv', 'r', encoding="utf8") as file:
+    for line in file:
+        name, house = line.rstrip().split(',')
+        print(f'{name} живе в гуртожитку {house}')
+```
+
+```{.output}
+Гаррі живе в гуртожитку Гріфіндор
+Герміона живе в гуртожитку Гріфіндор
+Рон живе в гуртожитку Гріфіндор
+Драко живе в гуртожитку Слизерин
+```
+
+## Файли csv
+
+Уявімо, що нам треба відсортувати цей список даних. 
+
+Для цього я можу використати функцію `sorted()` і вказати, що я хочу сортувати за другим елементом списку:
+
+```{python}
+#| label: io-csv-sorted-eval
+#| eval: false
+
+students_lst = []
+
+with open('students.csv', 'r', encoding="utf8") as file:
+    for line in file:
+        name, house = line.rstrip().split(',')
+        students_lst.append(f'{name} живе в гуртожитку {house}')
+
+for student in sorted(students_lst):
+    print(student)
+```
+
+```{.output}
+Драко живе в гуртожитку Слизерин
+Гаррі живе в гуртожитку Гріфіндор
+Герміона живе в гуртожитку Гріфіндор
+Рон живе в гуртожитку Гріфіндор
+```
+
+## Файли csv
+
+З технічної точки зору, це працює, але це не є найкращим рішенням, оскільки дані сортуються по цілому реченню.
+
+Ми можемо вирішити таку задачу за допомогою **словників**.
+
+Для цього нам необхідно створити пустий словник `student_dict` і додавати до нього інформацію про студентів:
+
+```{python}
+#| label: io-csv-dict-eval
+#| eval: false
+
+students_lst = []
+
+with open('students.csv', 'r', encoding="utf8") as file:
+    for line in file:
+        name, house = line.rstrip().split(',')
+        student_dict = {}
+        student_dict['name'] = name
+        student_dict['house'] = house
+        students_lst.append(student_dict)
+
+for student in students_lst:
+    print(f'{student["name"]} живе в гуртожитку {student["house"]}')
+```
+
+## Файли csv
+
+Ми можемо скоротити код шляхом присвоєння значень словнику одразу:
+
+```{python}
+#| label: io-csv-dict-eval-2
+#| eval: false
+
+students_lst = []
+
+with open('students.csv', 'r', encoding="utf8") as file:
+    for line in file:
+        name, house = line.rstrip().split(',')
+        student_dict = {'name': name, 'house': house}
+        students_lst.append(student_dict)
+
+for student in students_lst:
+    print(f'{student["name"]} живе в гуртожитку {student["house"]}')
+```
+
+## Файли csv
+
+Але результат все ще не відсортований. 
+
+Функція `sorted` приймає параметр `key`, який вказує, за яким ключем сортувати.
+
+Для цього ми можемо використати функцію `get_name`, яка повертає ім'я студента і використаємо її як параметр `key`:
+
+```{python}
+#| label: io-csv-dict-sorted-eval
+#| eval: false
+
+students_lst = []
+
+with open('students.csv', 'r', encoding="utf8") as file:
+    for line in file:
+        name, house = line.rstrip().split(',')
+        student_dict = {'name': name, 'house': house}
+        students_lst.append(student_dict)
+
+def get_name(student):
+    return student['name']
+
+for student in sorted(students_lst, key=get_name):
+    print(f'{student["name"]} живе в гуртожитку {student["house"]}')
+```
+
+```{.output}
+Драко живе в гуртожитку Слизерин
+Гаррі живе в гуртожитку Гріфіндор
+Герміона живе в гуртожитку Гріфіндор
+Рон живе в гуртожитку Гріфіндор
+```
+
+## Файли csv
+
+Якщо ж я захочу відсортувати за гуртожитком у зворотному порядку, то я можу використати функцію `get_house` і додати параметр `reverse=True` у функцію `sorted`:
+
+```{python}
+#| label: io-csv-dict-sorted-eval-2
+#| eval: false
+
+students_lst = []
+
+with open('students.csv', 'r', encoding="utf8") as file:
+    for line in file:
+        name, house = line.rstrip().split(',')
+        student_dict = {'name': name, 'house': house}
+        students_lst.append(student_dict)
+
+def get_house(student):
+    return student['house']
+
+for student in sorted(students_lst, key=get_house, reverse=True):
+    print(f'{student["name"]} живе в гуртожитку {student["house"]}')
+```
+
+```{.output}
+Драко живе в гуртожитку Слизерин
+Гаррі живе в гуртожитку Гріфіндор
+Герміона живе в гуртожитку Гріфіндор
+Рон живе в гуртожитку Гріфіндор
+```
+
+::: {.callout-warning}
+Зверніть увагу, що в якості аргументу `key` функції `sorted` ми передаємо функцію `get_house`, **без дужок**. Ми хочемо передати функцію, а не викликати її.
+:::
+
+## Анонімні функції
+
+У попередньому прикладі ми використовували функції `get_name` і `get_house`, які одразу використовуємо і більші ніколи до них не повертаємось.
+
+Ми можемо спростити цей код і використати **анонімні функції** (англ. *lambda functions*), які дозволяють нам визначити функцію в одному рядку:
+
+```{python}
+#| label: io-csv-dict-sorted-eval-3
+#| eval: false
+
+students_lst = []
+
+with open('students.csv', 'r', encoding="utf8") as file:
+    for line in file:
+        name, house = line.rstrip().split(',')
+        student_dict = {'name': name, 'house': house}
+        students_lst.append(student_dict)
+
+for student in sorted(students_lst, key=lambda student: student['name']):
+    print(f'{student["name"]} живе в гуртожитку {student["house"]}')
+```
+
+```{.output}
+Драко живе в гуртожитку Слизерин
+Гаррі живе в гуртожитку Гріфіндор
+Герміона живе в гуртожитку Гріфіндор
+Рон живе в гуртожитку Гріфіндор
+```
+
+## Пакет `csv` {.smaller}
+
+### Читання csv-файлів
+
+Давайте змінимо файл `students.csv` і замінимо гуртожитки на будинки де вони виросли:
+
+```{.bash filename="students.csv"}
+Гаррі,Тисова, 4
+Рон,Нора
+Драко,Маєток Мелфоїв
+```
+
+Тепер давайте виведемо ці дані на екран:
+
+```{python}
+#| label: io-csv-dict-sorted-eval-4
+#| eval: false
+
+students_lst = []
+
+with open('students.csv', 'r', encoding="utf8") as file:
+    for line in file:
+        name, home = line.rstrip().split(',')
+        student_dict = {'name': name, 'home': home}
+        students_lst.append(student_dict)
+
+for student in sorted(students_lst, key=lambda student: student['home']):
+    print(f'{student["name"]} з {student["home"]}')
+```
+
+```{.output}
+ValueError: too many values to unpack (expected 2)
+```
+
+У нас виникла помилка. Це тому, що у нас є рядок, який містить дві коми, а ми спробували розпакувати його у дві змінні. Для вирішення цієї проблеми ми можемо використати в якості роздільника якийсь менш популярний символ, наприклад `|`:
+
+```{.bash filename="students.csv"}
+Гаррі|Тисова, 4
+Рон|Нора
+Драко|Маєток Мелфоїв
+```
+
+## Пакет `csv` {.smaller}
+
+Інший варіант - це помістити значення у лапки:
+
+```{.bash filename="students.csv"}
+Гаррі,"Тисова, 4"
+Рон,Нора
+Драко,"Маєток Мелфоїв"
+```
+
+В будь-якому випадку необхідно буде змінювати код і продумувати логіку читання файлу. І це стає дуже незручним і складним, якщо у вас є багато різних файлів, які містять дані у різних форматах. Тому для роботи з csv-файлами використовують спеціальний пакет `csv`. Давайте перепишемо нашу програму з використанням пакету `csv`:
+
+::: {.panel-tabset}
+
+### Варіант 1
+
+```{python}
+#| label: io-csv-dict-sorted-eval-5
+#| eval: false
+
+import csv
+
+students_lst = []
+
+with open('students.csv', 'r', encoding="utf8") as file:
+    reader = csv.reader(file)
+    for row in reader:
+        student_dict = {'name': row[0], 'home': row[1]}
+        students_lst.append(student_dict)
+
+for student in sorted(students_lst, key=lambda student: student['home']):
+    print(f'{student["name"]} з {student["home"]}')
+```
+
+### Варіант 2
+
+Якщо ми чітко знаємо кількість стовпчиків у .csv-файлі, ми можемо розпакувати рядки одразу у змінні:
+
+```{python}
+#| label: io-csv-dict-sorted-eval-6
+#| eval: false
+
+import csv
+
+students_lst = []
+
+with open('students.csv', encoding="utf8") as file:
+    reader = csv.reader(file)
+    for name, home in reader:
+        students_lst.append({'name': name, 'home': home})
+
+for student in sorted(students_lst, key=lambda student: student['home']):
+    print(f'{student["name"]} з {student["home"]}')
+```
+
+:::
+
+```{.output}
+Драко з Маєток Мелфоїв
+Рон з Нора
+Гаррі з Тисова, 4
+```
+
+## Пакет `csv` {.smaller}
+
+Часто у табличних файлах перший рядок = за назву змінних. Давайте додамо `name` та `home` у `students.csv`:
+
+```{.bash filename="students.csv"}
+name,home
+Гаррі,"Тисова, 4"
+Рон,Нора
+Драко,Маєток Мелфоїв
+```
+
+В таких випадках ми можемо використати функцію `DictReader`, яка повертає словник, а не список:
+
+```{python}
+#| label: io-csv-dict-sorted-eval-7
+#| eval: false
+
+import csv
+
+students_lst = []
+
+with open('students.csv', encoding="utf8") as file:
+    reader = csv.DictReader(file)
+    for row in reader:
+        students_lst.append({'name': row['name'], 'home': row['home']}) # або students_lst.append(row)
+
+for student in sorted(students_lst, key=lambda student: student['home']):
+    print(f'{student["name"]} з {student["home"]}')
+```
+
+```{.output}
+Драко з Маєток Мелфоїв
+Рон з Нора
+Гаррі з Тисова, 4
+```
+
+Такий підхід є більш стійким до змін у файлі: хтось міг змінити порядок стовпчиків, але програма все одно буде працювати.
+
+::: {.callout-note}
+Документація до пакету `csv`: <https://docs.python.org/3/library/csv.html>
+:::
+
+## Пакет `csv` {.smaller}
+
+### Запис csv-файлів
+
+Припустимо, що ми створюємо програму, яка буде записувати дані про студентів у файл `students.csv`. 
+Залишимо у файлі `students.csv` наступні дані:
+
+```{.bash filename="students.csv"}
+name,home
+```
+
+Давайте перепишемо програму `students.py`, яка буде записувати дані у файл `students.csv`:
+
+```{python}
+#| label: io-csv-write-eval
+#| eval: false
+
+import csv
+
+name = input('Як Вас звати? ') # Гаррі
+home = input('Де Ви живете? ') # Тисова, 4
+
+with open('students.csv', 'a', encoding="utf8") as file:
+    writer = csv.writer(file)
+    writer.writerow([name, home])
+```
+
+Запустимо цю програму:
+
+```{.bash filename="Terminal"}
+python students.py
+Як Вас звати? Гаррі
+Де Ви живете? Тисова, 4
+```
+
+Відкриємо файл `students.csv`:
+
+```{.bash filename="students.csv"}
+name,home
+Гаррі,"Тисова, 4"
+```
+
+Як бачите, Python автоматично взяв рядок з комою у лапки щоб уникнути помилки.
+
+## Пакет `csv` {.smaller}
+
+### Запис csv-файлів
+
+Існує ще один спосіб реалізувати програму `students.py` не турбуючись про порядок змінних у списку. Для цього ми можемо використати функцію `DictWriter`, яка дозволяє записувати дані у файл у вигляді словника:
+
+```{python}
+#| label: io-csv-write-eval-2
+#| eval: false
+
+import csv
+
+name = input('Як Вас звати? ') # Драко
+home = input('Де Ви живете? ') # Маєток Мелфоїв
+
+with open('students.csv', 'a', encoding="utf8") as file:
+    writer = csv.DictWriter(file, fieldnames=['name', 'home'])
+    writer.writerow({'name': name, 'home': home})
+```
+
+Запустимо цю програму:
+
+```{.bash filename="Terminal"}
+python students.py
+Як Вас звати? Драко
+Де Ви живете? Маєток Мелфоїв
+```
+
+Відкриємо файл `students.csv`:
+
+```{.bash filename="students.csv"}
+name,home
+Гаррі,"Тисова, 4"
+Драко,Маєток Мелфоїв
+```
+
+## Бінарні файли
+
+**Бінарні файли** - це файл, який складається лише з нулів та одиниць і дозволяє зберігати будь-які дані: зображення, відео, звук, текст, тощо. 
+
+В Python є популярна бібліотека під назвою `pillow`, яка дозволяє працювати з зображеннями, застосовувати фільтри, як в Instagram, створювати анімації, тощо.
+
+::: {.callout-note}
+Документація до пакету `PIL`: <https://pillow.readthedocs.io>
+:::
+
+Давайте створимо анімоване GIF-зображення. Сьогодні такі файли зустрічаються скрізь у вигляді мемів, анімацій, наклейок тощо. Анімоване GIF-зображення -- це графічний файл, який містить кілька зображень всередині, а комп'ютер показує їх одне за одним, створюючи ефект анімації.
+
+## Бінарні файли
+
+Почнемо з двох статичних зображень:
+
+```{.bash filename="Terminal"}
+code costume1.gif
+code costume2.gif
+```
+
+::: {#fig-costume layout-ncol=2}
+
+![costume1.gif](img/costume1.gif){#fig-costume1}
+
+![costume2.gif](img/costume2.gif){#fig-costume2}
+
+Статичні зображення
+:::
+
+::: {.callout-note}
+Ці коти походять з мови програмування MIT під назвою Scratch.
+
+Посилання на зображення ви можете знайти у репозиторії: <https://github.com/Aranaur/py4ds/tree/main/img/python>
+:::
+
+## Бінарні файли {.smaller}
+
+Тепер створимо файл `costume.py`, який буде об'єднувати ці два зображення у анімацію:
+
+```{.bash filename="Terminal"}
+code costume.py
+```
+
+Для цього нам необхідно використати функцію `Image.open`, яка дозволяє відкрити зображення, а потім використати метод `save`, який дозволяє зберегти зображення у форматі GIF:
+
+```{python}
+#| label: io-gif-eval
+#| eval: false
+
+import sys
+from PIL import Image
+
+images_lst = []
+
+for arg in sys.argv[1:]:
+    image = Image.open(arg)
+    images_lst.append(image)
+
+images_lst[0].save(
+    'costume.gif',
+    save_all=True,
+    append_images=images_lst[1:],
+    duration=200,
+    loop=0)
+```
+
+```{python}
+#| label: io-gif-echo
+#| echo: false
+
+import glob
+from PIL import Image
+
+images_lst = []
+
+for filename in glob.glob('img/costume[1-2].gif'):
+    image = Image.open(filename)
+    images_lst.append(image)
+
+images_lst[0].save(
+    'img/costume.gif',
+    save_all=True,
+    append_images=images_lst[1:],
+    duration=200,
+    loop=0)
+```
+
+## Бінарні файли
+
+Згустимо програму:
+
+```{.bash filename="Terminal"}
+python costume.py costume1.gif costume2.gif
+```
+
+Відкриємо файл `costume.gif`:
+
+```{.bash filename="Terminal"}
+code costume.gif
+```
+
+![costume.gif](img/costume.gif){#fig-costume}
+
+# Регулярні вирази {background-iframe="colored-particles/index.html"}
+
+## Регулярні вирази
+
+**Регулярні вирази** (англ. *regular expressions*, *regexes*) - це патерни, які використовуються для знаходження певних комбінацій символів у тексті. 
+
+Наприклад, якщо користувач вводить адресу електронної пошти у вашій програмі, на веб-сайті або в додатку на телефоні, в ідеалі ви хочете мати можливість перевірити, що він дійсно ввів адресу електронної пошти, а не щось інше.
+
+Використовуючи регулярні вирази, ми можемо перевірити, чи = введений текст певному формату. Це дуже корисно, оскільки ви можете використовувати регулярні вирази для перевірки введення користувача, або для пошуку певних комбінацій символів у тексті.
+
+Вони дуже потужні, але в той же час достатньо складні. Якщо ви вперше з ними зіткнулися, то вони здаються дуже незрозумілими. Але якщо ви вже з ними працювали, то ви не зможете без них.
+
+## Звичайний пошук {.smaller}
+
+Для початку розглянемо декілька задач і спробуємо їх вирішити використовуючи більш простий синтаксис, і подивитися, з якими обмеженнями ми зіткнемося.
+
+Створимо файл `validate.py` метою якого є перевірка адреси електронної пошти користувача.
+
+```{.bash filename="Terminal"}
+code validate.py
+```
+
+Напишемо просту програму, яка буде приймати від користувача адресу електронної пошти і перевіряти, чи вона = певному формату. 
+
+Використаємо метод `strip()` для видалення зайвих пробілів з початку і кінця рядка. Але як перевірити, що введене значення дійсно є валідним для електронної пошти? 
+
+Перша ідея, яка з'являється - це перевірити, чи введений текст містить символ `@`. Якщо так, то ми можемо припустити, що це адреса електронної пошти:
+
+```{python}
+#| label: validate-eval-at
+#| eval: false
+
+email = input("Введіть email: ").strip()
+
+if "@" in email:
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: potter@hogwarts.edu
+Валідна адреса електронної пошти
+```
+
+Зрозуміло, що така програма не є ідеальною, оскільки ми можемо ввести тільки один або декілька символів `@` і програма буде пропускати такі випадки.
+
+## Звичайний пошук
+
+Наступна ідея - це додати додаткову перевірку, що введений текст містить символ "крапки" (`.`).
+
+Якщо так, то ми можемо припустити, що це адреса електронної пошти. Давайте спробуємо це зробити:
+
+```{python}
+#| label: validate-eval-dot
+#| eval: false
+
+email = input("Введіть email: ").strip()
+
+if "@" in email and "." in email:
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: potter@hogwarts.edu
+Валідна адреса електронної пошти
+```
+
+## Звичайний пошук
+
+Програма все ще не ідеальна.
+
+Давайте припустимо, що крапка може бути тільки після символа `@`.
+
+Для цього ми можемо поділити введений рядок на дві частини, використовуючи метод `split()` і перевірити, що друга частина містить крапку:
+
+```{python}
+#| label: validate-eval-split
+#| eval: false
+
+email = input("Введіть email: ").strip()
+
+username, domain = email.split("@")
+
+if username and "." in domain:
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: potter@hogwarts.edu
+Валідна адреса електронної пошти
+```
+
+## Метод `endswith()`
+
+Тепер давайте звузимо сферу застосування цієї програми і будемо шукати валідні адреси навчальних закладів, які мають домен `.edu`.
+
+Для цього ми можемо використати метод `endswith()`:
+
+```{python}
+#| label: validate-eval-endswith
+#| eval: false
+
+email = input("Введіть email: ").strip()
+
+username, domain = email.split("@")
+
+if username and domain.endswith(".edu"):
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: potter@hogwarts.edu
+Валідна адреса електронної пошти
+
+python validate.py
+Введіть email: potter@.hogwarts.edu
+Валідна адреса електронної пошти
+```
+
+Ми можемо продовжувати роботу над цією програмою. В кінцевому підсумку нам доведеться писати багато коду, просто щоб валідувати адресу електронної пошти.
+
+## Бібліотека `re`
+
+В Python є бібліотека для регулярних виразів, яка лаконічно називається `re`. В ній є багато можливостей для визначення, перевірки і заміни шаблонів.
+
+::: {.callout-note}
+Документація до бібліотеки `re` доступна за посиланням <https://docs.python.org/3/library/re.html>.
+:::
+
+Почнемо з однієї з найбільш універсальних функцій пошуку:
+
+`re.search(pattern, string, flags=0)`:
+
+-  `pattern` - регулярний вираз, який ми шукаємо
+-  `string` - рядок, в якому ми шукаємо
+-  `flags` - додаткові флаги, які визначають поведінку функції
+
+Ця функція повертає об'єкт, який містить інформацію про знайдений шаблон. Якщо шаблон не знайдено, то функція повертає `None`.
+
+## Бібліотека `re`
+
+Давайте спробуємо переписати нашу програму використовуючи функцію `re.search()`:
+
+```{python}
+#| label: validate-re-search
+#| eval: false
+
+import re
+
+email = input("Введіть email: ").strip()
+
+if re.search("@", email):
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: potter@hogwarts.edu
+Валідна адреса електронної пошти
+
+python validate.py
+Введіть email: @
+Валідна адреса електронної пошти
+```
+
+Цей варіант програми працює так само, як і наш перший варіант, але вже з використанням пакету `re`.
+
+## Регулярні вирази {.smaller}
+
+Нам треба уточнити потер пошуку: ліворуч від символа `@` може бути певний запис, праворуч від символа `@` має бути також якийсь запис, який закінчується на `.edu`. Для цього існує ряд спеціальних символів, які дозволяють визначити певні шаблони:
+
+| **Регулярний вираз** | **Опис** | **Приклади** |
+|:-----------------:|:------|----------|
+| `.`             | Будь-який символ | `a.b` = "acb", "a1b", "a#b" |
+| `*`             | 0 або більше повторень попереднього символу | `ab*c` = "ac", "abc", "abbc" |
+| `+`             | 1 або більше повторень попереднього символу | `ab+c` = "abc", "abbc", але не "ac" |
+| `?`             | 0 або 1 повторення попереднього символу | `colou?r` = "color" і "colour" |
+| `{n}`           | Рівно `n` повторень попереднього символу | `a{3}b` = "aaab" |
+| `{n, m}`        | Від `n` до `m` повторень попереднього символу | `a{2,4}b` = "aab", "aaab" і "aaaab" |
+| `{n,}`          | Від `n` повторень попереднього символу | `a{2,}b` = "aab", "aaab", "aaaab" і так далі |
+| `^`             | Початок рядка | `^start` =, якщо рядок починається з "start" |
+| `$`             | Кінець рядка | `end$` =, якщо рядок закінчується на "end" |
+| `[]`            | Набір символів | `[aeiou]` = будь-якому голосному символу |
+| `[^]`           | Набір символів, які не повинні зустрічатися | `[^0-9]` = будь-якому символу, крім цифр |
+| `A|B`           | Або | `cat|dog` = "cat" або "dog" |
+| `(...)`         | Група символів | `(ab)+` = "ab", "abab", "ababab" і так далі |
+| `?:...`         | Не захоплювати групу | `(?:ab)+` = "ab", "abab", "ababab" і так далі |
+
+: {tbl-colwidths="[20,50,30]"}
+
+## Регулярні вирази {.nostretch}
+
+Давайте спробуємо переписати нашу програму використовуючи функцію `re.search()` і регулярний вираз:
+
+```{python}
+#| label: validate-re-search-edu-ua
+#| eval: false
+
+import re
+
+email = input("Введіть email: ").strip()
+
+if re.search(".*@.*", email):
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+Комп'ютер використовує свого роду машину, реалізовану в програмному забезпеченні, відомому як **скінченний автомат** (англ. *finite state machine*) або **недетермінований скінченний автомат**. 
+
+Візуально це можна зобразити так:
+
+![Вираз: `.*@.*`](img/regex-email-00.png)
+
+## Регулярні вирази {.nostretch}
+
+Ми можемо переписати нашу програму з використанням регулярного виразу `.+`, який означає "один або більше будь-яких символів":
+
+
+```{python}
+#| label: validate-re-search-edu-ua-2
+#| eval: false
+
+import re
+
+email = input("Введіть email: ").strip()
+
+if re.search(".+@.+", email):
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+В такому випадку візуалізація недетермінованого скінченного автомату буде наступна:
+
+![Вираз: `.+@.+`](img/regex-email-01.png)
+
+## Регулярні вирази {.nostretch .smaller}
+
+Підемо далі і додамо перевірку, що домен закінчується на `.edu`:
+
+```{python}
+#| label: validate-re-search-edu-ua-3
+#| eval: false
+
+import re
+
+email = input("Введіть email: ").strip()
+
+if re.search(r".+@.+\.edu", email):
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: potter@hogwarts.edu
+Валідна адреса електронної пошти
+
+python validate.py
+Введіть email: potter?hogwarts.edu
+Невалідна адреса електронної пошти
+```
+
+::: {.callout-warning}
+Зверніть увагу, що ми використовуємо символ `\` для екранування крапки, оскільки в іншому випадку крапка буде сприйматися як будь-який символ.
+
+Крім того, слід враховувати, що комбінація символів `\n` вважається спеціальним символом, який позначає перехід на новий рядок. Тому ми вказуємо Python читати рядок як **"сирий"** (англ. *raw*), використовуючи префікс `r` перед рядком.
+:::
+
+Візуалізація:
+
+![Вираз: `.+@.+\.edu`](img/regex-email-02.png)
+
+## Початок та кінець рядка {.smaller .nostretch}
+
+Наша програма все ще має ряд недоліків. Наприклад, вона не враховує пробіли, які можуть зустрічатися у введеному тексті:
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: Моя пошта potter@hogwarts.edu
+Валідна адреса електронної пошти
+```
+
+Для таких випадків у світі регулярних виразів існують спеціальні символи початку `^` та кінця рядка `$`:
+
+```{python}
+#| label: validate-re-search-edu-ua-4
+#| eval: false
+
+import re
+
+email = input("Введіть email: ").strip()
+
+if re.search(r"^.+@.+\.edu$", email):
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: Моя пошта potter@hogwarts.edu
+Невалідна адреса електронної пошти
+```
+
+Візуалізація:
+
+![Вираз: `^.+@.+\.edu$`](img/regex-email-03.png)
+
+## Пошук та вилучення {.smaller .nostretch}
+
+Є ще один значний недолік нашої програми. Вона не враховує умову одного символу `@` у адресі електронної пошти:
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: potter@@@hogwarts.edu
+Валідна адреса електронної пошти
+```
+
+Для цього ми можемо використати символи `[]` для визначення набору символів, які можуть зустрічатися у тексті та `[^]` для символів, які не повинні зустрічатися у тексті. Оскільки ми не хочемо щоб символ `@` зустрічався більше одного разу, то ми можемо використати наступний регулярний вираз `[^@]`:
+
+```{python}
+#| label: validate-re-search-edu-ua-5
+#| eval: false 
+
+import re
+
+email = input("Введіть email: ").strip()
+
+if re.search(r"^[^@]+@[^@]+\.edu$", email):
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: potter@@@hogwarts.edu
+Невалідна адреса електронної пошти
+```
+
+Візуалізація:
+
+![Вираз: `^[^@]+@[^@]+\.edu$`](img/regex-email-04.png)
+
+## Слова та цифри {.smaller .nostretch}
+
+У світі стандартів існує багато різних специфікацій для адрес електронної пошти. Наприклад, вони повинні починатися з літери. Нам не потрібно перераховувати всі можливі літери алфавіту у нижньому та верхньому регістрі. Замість цього ми можемо використати спеціальний символ `[a-zA-Z]`, який означає будь-яку літеру англійського алфавіту незалежно від регістру. Якщо ж я хочу також врахувати цифри та символ `_`, то я можу використати спеціальний символ `[a-zA-Z0-9_]`. Давайте спробуємо використати цей регулярний вираз:
+
+```{python}
+#| label: validate-re-search-edu-ua-6
+#| eval: false
+
+import re
+
+email = input("Введіть email: ").strip()
+
+if re.search(r"^[a-zA-Z0-9_]+@[a-zA-Z0-9_]+\.edu$", email):
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: potter@@@hogwarts.edu
+Невалідна адреса електронної пошти
+```
+
+Візуалізація:
+
+![Вираз: `^[a-zA-Z0-9_]+@[a-zA-Z0-9_]+\.edu$`](img/regex-email-05.png)
+
+## Слова та цифри {.smaller .nostretch}
+
+Такі патерни досить часто зустрічаються, тому у регулярних виразах є готові спеціальні символи, які дозволяють замінити їх. 
+
+Наприклад, спеціальний метасимвол `\w` означає **будь-яку літеру англійського алфавіт**у незалежно від регістру, цифру або символ `_`. 
+
+Також є спеціальний метасимвол `\d`, який означає **будь-яку цифру**.
+
+```{python}
+#| label: validate-re-search-edu-ua-7
+#| eval: false
+
+import re
+
+email = input("Введіть email: ").strip()
+
+if re.search(r"^\w+@\w+\.edu$", email):
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+Візуалізація:
+
+![Вираз: `^\w+@\w+\.edu$`](img/regex-email-06.png)
+
+## Слова та цифри {.nostretch}
+
+Повний перелік спеціальних метасимволів:
+
+| **Метасимвол** | **Опис** |
+|:------------|:------|
+| `\w` | Будь-яка літера англійського алфавіту незалежно від регістру, цифра або символ `_` |
+| `\d` | Будь-яка цифра |
+| `\s` | Будь-який пробіл |
+| `\W` | Будь-який символ, крім літер англійського алфавіту незалежно від регістру, цифр та символу `_` |
+| `\D` | Будь-який символ, крім цифри |
+| `\S` | Будь-який символ, крім пробілу |
+
+: {tbl-colwidths="[25,75]"}
+
+## Флаги {.smaller}
+
+Давайте припустимо, що при введені адреси електронної пошти користувач випадково натиснув клавішу <kbd>Caps Lock</kbd> і ввів адресу з використанням великих літер. 
+
+Якщо ми використаємо наш регулярний вираз, то програма не буде вважати таку адресу валідною:
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: POTTER@HOGWARTS.EDU
+Невалідна адреса електронної пошти
+```
+
+Вирішити таку задачу можна декількома шляхами.
+
+Наприклад, ми можемо використати функцію `lower()` для перетворення всіх символів у нижній регістр. Це можна зробити на початку програми або використовуючи метод `lower()` для об'єкта `email`:
+
+```{python}
+#| label: validate-re-search-edu-ua-8
+#| eval: false
+
+import re
+
+email = input("Введіть email: ").strip().lower()
+
+if re.search(r"^\w+@\w+\.edu$", email): # або email.lower()
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+## Флаги {.smaller}
+
+Але є інший спосіб. Ми можемо використати аргумент `flag` для функції `re.search()`, який може приймати наступні значення:
+
+- `re.IGNORECASE` або `re.I` - ігнорувати регістр символів
+- `re.MULTILINE` або `re.M` - використовувати багаторядковий режим
+- `re.DOTALL` або `re.S` - використовувати режим, в якому крапка `.` відповідає будь-якому символу, включаючи символ нового рядка `\n`
+
+Тож для нашої задачі код буде виглядати наступним чином:
+
+```{python}
+#| label: validate-re-search-edu-ua-9
+#| eval: false
+
+import re
+
+email = input("Введіть email: ").strip()
+
+if re.search(r"^\w+@\w+\.edu$", email, re.IGNORECASE):
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: POTTER@HOGWARTS.EDU
+Валідна адреса електронної пошти
+```
+
+## Опціональність {.smaller .nostretch}
+
+Припустимо, що адреса користувача містить піддомен `gryff.hogwarts.edu`. В такому випадку нам слід врахувати варіативність піддоменів. Для цього ми можемо використати спеціальний символ `?`, який означає 0 або 1 повторення попереднього символу. Давайте спробуємо використати цей символ:
+
+```{python}
+#| label: validate-re-search-edu-ua-10
+#| eval: false
+
+import re
+
+email = input("Введіть email: ").strip()
+
+if re.search(r"^\w+@(\w+\.)?edu$", email, re.IGNORECASE):
+    print("Валідна адреса електронної пошти")
+else:
+    print("Невалідна адреса електронної пошти")
+```
+
+```{.bash filename="Terminal"}
+python validate.py
+Введіть email: potter@hogwarts.edu
+Валідна адреса електронної пошти
+
+python validate.py
+Введіть email: potter@gryff.hogwarts.edu
+Валідна адреса електронної пошти
+```
+
+Візуалізація:
+
+![Вираз: `^\w+@(\w+\.)?edu$`](img/regex-email-07.png)
+
+Запис `(\w+\.)?` означає, що група записів `\w+\.` може зустрічатися 0 або 1 раз. Таким чином, ми можемо врахувати варіативність піддоменів.
+
+## Приклади з реального світу {.smaller}
+
+Все що ми зробили до цього часу для відстеження адрес електронної пошти, все ще має ряд недоліків. Я наведу приклад регулярного виразу, який використовується в реальному світі для відстеження адрес електронної пошти:
+
+```
+^[a-zA-Z0-9_.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9-](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)
+```
+
+Візуально такий регулярний вираз виглядає так:
+
+![Приклад валідації email](img/regex-email-08.png)
+
+## Приклади з реального світу {.smaller}
+
+В інтернеті є ряд стандартів, які визначають, якими мають бути адреси електронної пошти. Один з них - це [RFC 5322](https://tools.ietf.org/html/rfc5322). Згідно цього стандарту 99.99% адрес електронної пошти можна відстежити за допомогою наступного регулярного виразу:
+
+```
+(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])
+```
+
+Візуально такий запис виглядає наступним чином:
+
+![Валідація email за RFC 5322](img/regex-email-09.png)
+
+## Очищення тексту {.smaller}
+
+Замість того, щоб просто перевіряти вхідні дані користувача і переконуватися, що вони виглядають так, як ми хочемо, давайте просто припустимо, що користувачі не збираються вводити дані саме так, як ми хочемо. Тому нам доведеться очистити їхні дані.
+
+Створимо програму `format.py`, яка очищуватиме введене ім'я користувача:
+
+```{.bash filename="Terminal"}
+code format.py
+```
+
+Деякі користувачі можуть мати звичку вводити спочатку своє ім'я, а потім прізвище через кому: `Гаррі, Поттер` замість `Поттер, Гаррі`. Це нормально, тому що обидва варіанти однаково добре читаються людиною. Але для комп'ютера це різні рядки. Тому нам потрібно буде очистити введені дані користувача. Створимо змінну `name`, яка буде містити введені дані користувача:
+
+```{python}
+#| label: format-name
+#| eval: false
+
+name = input("Введіть ім'я: ").strip()
+print(f'Привіт, {name}!')
+```
+
+Подивимось, як працює програма з різними введеними даними:
+
+```{.bash filename="Terminal"}
+python format.py
+Введіть ім'я: Гаррі Поттер
+Привіт, Гаррі Поттер!
+```
+
+```{.bash filename="Terminal"}
+python format.py
+Введіть ім'я: Поттер, Гаррі
+Привіт, Поттер, Гаррі!
+```
+
+## Очищення тексту {.smaller}
+
+Перший варіант нас може задовільнити, а от другий виглядає зовсім не так, як ми очікуємо. Давайте спробуємо виправити цю ситуацію через умовний оператор `if`:
+
+```{python}
+#| label: format-name-2
+#| eval: false
+
+name = input("Введіть ім'я: ").strip()
+
+if ',' in name:
+    last, first = name.split(', ')
+    name = f'{first} {last}'
+
+print(f'Привіт, {name}!')
+```
+
+```{.bash filename="Terminal"}
+python format.py
+Введіть ім'я: Поттер, Гаррі
+Привіт, Гаррі Поттер!
+```
+
+Ми виправили ситуацію, але що якщо користувач введе ім'я без використання пробілів? Наприклад, `Поттер,Гаррі`?
+
+Це призведе до помилки, оскільки ми використовуємо метод `split()` для розділення рядка на дві частини.
+
+Для цього нам знадобиться функція `re.search()`, яка повертає об'єкт `Match`. Якщо відповідність знайдена, то ми можемо використати метод `groups()` для отримання відповідного значення, які були записані у дужки.
+
+## Очищення тексту {.smaller}
+
+Давайте спробуємо використати регулярний вираз `^(.+), (.+)$`, який означає *"початок рядка, один або більше будь-яких символів, кома, пробіл, один або більше будь-яких символів, кінець рядка"*:
+
+```{python}
+#| label: format-name-3
+#| eval: false
+
+import re
+
+name = input("Введіть ім'я: ").strip()
+
+matches = re.search(r'^(.+), (.+)$', name)
+
+if matches:
+    last, first = matches.groups()
+    name = f'{first} {last}'
+
+print(f'Привіт, {name}!')
+```
+
+Якщо ми введемо ім'я користувача без коми, то з умовним оператором `if` нічого не буде відбуватися, оскільки `matches` буде `None` і програма одразу перейде до виведення привітання:
+
+```{.bash filename="Terminal"}
+python format.py
+Введіть ім'я: Гаррі Поттер
+Привіт, Гаррі Поттер!
+```
+
+У випадку, коли користувач введе ім'я з комою, то відбудеться відповідність регулярному виразу і ми зможемо використати метод `groups()` для отримання відповідних значень:
+
+```{.bash filename="Terminal"}
+python format.py
+Введіть ім'я: Поттер, Гаррі
+Привіт, Гаррі Поттер!
+```
+
+## Очищення тексту {.smaller}
+
+Якщо ж потрібно повернути конкретні групи замість всіх, то можна використати метод `group()`, який приймає номер групи:
+
+```{python}
+#| label: format-name-4
+#| eval: false
+
+import re
+
+name = input("Введіть ім'я: ").strip()
+
+matches = re.search(r'^(.+), (.+)$', name)
+
+if matches:
+    name = f'{matches.group(2)} {matches.group(1)}'
+
+print(f'Привіт, {name}!')
+```
+
+Ця програма має значний недолік - ми очікуємо, що ім'я та прізвище користувача будуть розділені одним пробілом. Якщо користувач введе ім'я без пробілу або навпаки використає декілька, то програма виведе не те, що ми очікуємо:
+
+```{.bash filename="Terminal"}
+python format.py
+Введіть ім'я: Поттер,Гаррі
+Привіт, Поттер,Гаррі!
+```
+
+## Очищення тексту {.smaller}
+
+Перший варіант, як врахувати таку ситуацію - це додати `*` до регулярного виразу:`^(.+), *(.+)?$`.
+
+Це буде означати *"початок рядка, один або більше будь-яких символів, кома, нуль або більше пробілів, один або більше будь-яких символів, кінець рядка"*:
+
+```{python}
+#| label: format-name-5
+#| eval: false
+
+import re
+
+name = input("Введіть ім'я: ").strip()
+
+matches = re.search(r'^(.+), *(.+)?$', name)
+
+if matches:
+    name = f'{matches.group(2)} {matches.group(1)}'
+
+print(f'Привіт, {name}!')
+```
+
+```{.bash filename="Terminal"}
+python format.py
+Введіть ім'я: Поттер,Гаррі
+Привіт, Гаррі Поттер!
+
+python format.py
+Введіть ім'я: Поттер,      Гаррі
+Привіт, Гаррі Поттер!
+```
+
+::: {.callout-warning}
+Залежно від того, наскільки безладними є дані, ваші регулярні вирази можуть ставати все складнішими і складнішими. Кількість умов напряму впливає на їх складність.
+:::
+
+## Моржевий оператор
+
+Ми можемо скоротити наш код, використовуючи "моржевий оператор" `:=` (англ. *walrus operator*), який дозволяє присвоювати значення змінній та одночасно використовувати її у виразі:
+
+```{python}
+#| label: format-name-6
+#| eval: false
+
+import re
+
+name = input("Введіть ім'я: ").strip()
+
+if matches := re.search(r'^(.+), *(.+)?$', name):
+    name = f'{matches.group(2)} {matches.group(1)}'
+
+print(f'Привіт, {name}!')
+```
+
+## Отримання даних з рядка
+
+Розглянемо варіант програми, де нам потрібно отримати дані з рядка, щоб відповісти на якесь питання. Наприклад, давайте створимо програму `twitter.py`, яка буде запитувати у користувачів URL-адресу їхнього профілю в Twitter і витягти з неї ім'я користувача:
+
+```{.bash filename="Terminal"}
+code twitter.py
+```
+
+Розглянемо рядок `https://twitter.com/harrypotter`. Перше на що звертаємо увагу - це те, адреса сервісу завжди починається з `https://twitter.com/`. Тому ми можемо замінити цю частину рядка на порожній рядок. Для цього ми можемо використати метод `replace()`:
+
+```{python}
+#| label: twitter-username
+
+url = 'https://twitter.com/harrypotter'
+
+username = url.replace('https://twitter.com/', '')
+print(f"Ім'я користувача: {username}")
+```
+
+## Отримання даних з рядка {.smaller}
+
+Але така проста програма не враховує низку ситуацій:
+
+- адреса може починатися без ``https://``
+- адреса може починатися з ``http://``
+- адреса може містити `www.`
+- тощо
+
+Використаємо бібліотеку функцію:
+
+`re.sub(pattern, repl, string, count=0, flags=0)`,
+
+яка замінює всі входження патерну `pattern` на `repl` у рядку `string`. 
+
+Використаємо регулярний вираз `^(https?://)?(www\.)?twitter\.com/`, який читається як: *"початок рядка, група символів `https://` або `http://` 0 або 1 раз, група символів `www.` 0 або 1 раз, `twitter.com/`"*:
+
+```{python}
+#| label: twitter-username-2
+
+import re
+
+url = 'https://twitter.com/harrypotter'
+
+username = re.sub(r'^(https?://)?(www\.)?twitter\.com/', '', url)
+
+print(f"Ім'я користувача: {username}")
+```
+
+## Отримання даних з рядка
+
+Проте, якщо користувач введе замість URL-адреси Twitter адресу іншого сервісу, регулярний вираз працювати не буде:
+
+```{python}
+#| label: twitter-username-3
+
+import re
+
+url = 'https://facebook.com/harrypotter'
+
+username = re.sub(r'^(https?://)?(www\.)?twitter\.com/', '', url)
+
+print(f"Ім'я користувача: {username}")
+```
+
+## Отримання даних з рядка
+
+В такому випадку ми можемо повернутися до `re.search()` та використати групи для отримання імені користувача, але для виключення певної групи з переліку можна використати `?:`:
+
+```{python}
+#| label: twitter-username-4
+
+import re
+
+url = 'https://facebook.com/harrypotter'
+
+if matches := re.search(r'^https?://(?:www\.)?twitter\.com/(.+)$', url, re.IGNORECASE):
+    username = matches.group(1)
+    print(f"Ім'я користувача: {username}")
+else:
+    print('Невідомий сервіс')
+```
+
+Тепер програма буде працювати з будь-якими URL-адресами:
+
+```{python}
+#| label: twitter-username-5
+
+import re
+
+url = 'https://www.twitter.com/harrypotter'
+
+if matches := re.search(r'^https?://(?:www\.)?twitter\.com/(.+)$', url, re.IGNORECASE):
+    username = matches.group(1)
+    print(f"Ім'я користувача: {username}")
+else:
+    print('Невідомий сервіс')
+```
+
+## Отримання даних з рядка {.smaller}
+
+Якщо ж ознайомитися з документацією Twitter, то можна знайти, що ім'я користувача може містити тільки літери, цифри, символ `_`, тобто не просто `.+`, що може бути чим завгодно. Тому ми можемо використати регулярний вираз `[a-z0-9_]+` для більш точного пошуку імені користувача, який читається як: *"будь-яка літера англійського алфавіту, цифра або символ `_` 1 або більше разів"*:
+
+```{python}
+#| label: twitter-username-6
+
+import re
+
+url = 'https://www.twitter.com/harrypotter'
+
+if matches := re.search(r'^https?://(?:www\.)?twitter\.com/([a-z0-9_]+)$', url, re.IGNORECASE):
+    username = matches.group(1)
+    print(f"Ім'я користувача: {username}")
+else:
+    print('Невідомий сервіс')
+```
+
+В пакеті `re` є ряд цікавих функцій:
+
+- `re.split(pattern, string, maxsplit=0, flags=0)` - розбиває рядок на частини за допомогою регулярного виразу
+- `re.findall(pattern, string, flags=0)` - повертає список всіх знайдених входжень регулярного виразу
+
+::: {.callout-tip}
+Для побудови, тестування та налагодження регулярних виразів можна використовувати [regex101.com](https://regex101.com/).
+:::
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe="colored-particles/index.html"}
+
+<br>
+<br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/applied_analytics/)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@kneu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

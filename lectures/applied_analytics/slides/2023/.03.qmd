@@ -1,0 +1,1078 @@
+---
+title: "Python: Винятки та бібліотеки"
+title-slide-attributes:
+    data-background-iframe: colored-particles/index.html
+subtitle: "Прикладна аналітика при розробці IT"
+author: "Ігор Мірошниченко"
+footer: <a href="https://aranaur.rbind.io/lectures/applied_analytics/">Прикладна аналітика при розробці IT</a>
+# date: today
+# date-format: iso
+institute: КНУ імені Тараса Шевченка, ФІТ
+language: _language-ua.yml
+format:
+  revealjs: 
+    theme: [simple, custom.scss]
+    logo: fit.png
+    chalkboard: true
+    slide-number: true
+    toc: true
+    toc-title: ЗМІСТ
+    transition: fade
+    mouse-wheel: true
+    highlight-style: github
+    mainfont: metropolis
+    toc-depth: 1
+    fig-width: 9
+    fig-height: 5
+
+from: markdown+emoji
+
+execute: 
+  echo: true
+
+jupyter: python3
+        
+# knitr: 
+#   opts_chunk: 
+#     echo: true
+#     warnings: false
+#     message: false
+editor_options: 
+  chunk_output_type: console
+---
+
+# Помилки та винятки {background-iframe="colored-particles/index.html"}
+
+## `SyntaxError`
+
+Винятки в Python, як і в інших мовах програмування, відносяться до проблем у вашому коді.
+
+Почнемо з простого прикладу: створимо файл `hello.py`:
+
+```{.bash filename="Terminal"}
+code cat.py
+```
+
+Напишемо простий код з помилкою:
+
+```{python}
+#| label: hello.py-1
+#| error: true
+
+print("Привіт, світ!)
+```
+
+Ми отримали помилку `SyntaxError`, яка означає, що Python не зміг зрозуміти наш код. Це найпростіший вид помилки, який можна виправити, виправивши помилку в коді. 
+
+Запис `unterminated`", як правило, означає, що я щось почав, але не зупинив. Запис `string` - це послідовність символів, з якою ми вже знайомі. А `literal` зазвичай відноситься до того, що ви буквально набрали.
+
+## `ValueError`
+
+Але в Python є багато інших типів помилок, які можна назвати `RuntimeError`, які трапляються під час роботи вашого коду. 
+
+Саме від вас залежить написання додаткового захисного коду для виявлення таких помилок. 
+
+Наприклад, давайте створимо файл `number.py`, яка буде приймати число від користувача і виводити це число на екран:
+
+```{.bash filename="Terminal"}
+code number.py
+```
+<br>
+```{python}
+#| label: number-eval-int
+#| eval: false
+
+number = int(input("Введіть число: ")) # 5
+print(f'Ваше число: {number}')
+```
+
+```{python}
+#| label: number-echo-int
+#| echo: false
+
+number = 5
+print(f'Ваше число: {number}')
+```
+
+## `ValueError`
+
+Але що станеться, якщо користувач введе не число, а текст? Наприклад, введе слово `п'ять`:
+
+```{python}
+#| label: number-eval-str
+#| eval: false
+
+number = int(input("Введіть число: ")) # п'ять
+print(f'Ваше число: {number}')
+```
+
+```{python}
+#| label: number-echo-str
+#| echo: false
+#| error: true
+
+number = int('п\'ять')
+print(f'Ваше число: {number}')
+```
+
+Ми отримали помилку `ValueError`, яка означає, що ми передали функції `int()` значення, яке вона не може перетворити на число. 
+
+Це вже не синтаксична помилка, а помилка, яка виникає під час виконання програми. І вирішення цієї помилки вже не залежить від вас, а від користувача, який вводить дані. 
+
+Тому вам потрібно написати додатковий код, який буде перевіряти введені дані на коректність. Як це зробити у Python? Виявляється у Python є **ключові слова** які можуть допомогти з цим.
+
+## Ключові слова `try` та `except`
+
+Якщо ви хочете спробувати зробити щось у Python, ви можете використовувати це ключове слово `try`.
+
+За рахунок нього ви можете перевірити, чи сталося щось помилкове. Отже, використовуючи `try`, я можу спробувати щось зробити, але якщо щось піде не так, я можу замість використати ключове слово `except`.
+
+Подивимось, як це працює:
+
+```{python}
+#| label: try-except-eval
+#| eval: false
+
+try:
+    number = int(input("Введіть число: ")) # п'ять
+    print(f'Ваше число: {number}')
+except ValueError:
+    print('Ви ввели не число')
+```
+
+```{python}
+#| label: try-except-echo
+#| echo: false
+
+try:
+    number = int('п\'ять')
+    print(f'Ваше число: {number}')
+except ValueError:
+    print('Ви ввели не число')
+```
+
+## `NameError`
+
+Якби я був впевнений, що функція `print()` не призведе до помилки, я міг би переписати код наступним чином і отримати нову помилку:
+
+```{python}
+#| label: try-except-eval-2
+#| eval: false
+
+try:
+    number = int(input("Введіть число: ")) # п'ять
+except ValueError:
+    print('Ви ввели не число')
+
+print(f'Ваше число: {number}')
+```
+
+```{python}
+#| label: try-except-echo-2
+#| echo: false
+#| error: true
+
+del number
+
+try:
+    number = int('п\'ять')
+except ValueError:
+    print('Ви ввели не число')
+
+print(f'Ваше число: {number}')
+```
+
+Помилка `NameError` означає, що я використовую змінну, яка не існує. Ця помилка виникла в наслідок порядку виконання операцій. 
+
+Помилка виникає в частині коду `int(input("Введіть число: "))`, яка знаходиться праворуч від оператора `=` і це приводить до того, що змінна `number` не створюється.
+
+То як вирішити цю проблему? Ви можете використовувати ключове слово `else`.
+
+## Ключове слово `else`
+
+Інтуіція ключового слова `else` схожа на інтуїцію ключового слова `else` в умовних конструкціях.
+
+Якщо в блоці `try` не виникає помилок, то виконується блок `else`:
+
+```{python}
+#| label: try-except-else-eval
+#| eval: false
+
+try:
+    number = int(input("Введіть число: ")) # п'ять
+except ValueError:
+    print('Ви ввели не число')
+else:
+    print(f'Ваше число: {number}')
+```
+
+```{python}
+#| label: try-except-else-echo
+#| echo: false
+#| error: true
+
+print('Ви ввели не число')
+```
+
+## Ключове слово `else`
+
+З мого боку трохи неввічливо відкидати вхідні дані користувача після того, як він не зміг ввести ціле число, і просто виходити з програми. 
+
+Було б зручніше, якби я просто підказував або перепитував користувача знову і знову. 
+
+І для цього я можу використовувати цикл `while`:
+
+```{python}
+#| label: try-except-else-while-eval
+#| eval: false
+
+while True:
+    try:
+        number = int(input("Введіть число: ")) # п'ять
+    except ValueError:
+        print('Ви ввели не число')
+    else:
+        print(f'Ваше число: {number}')
+        break
+```
+
+## Ключове слово `else`
+
+Уявіть ситуацію, що я буду намагатися отримати від користувача досить багато цифр.
+
+Було б непогано створити власну функцію, наприклад `get_int()`, яка буде повторювати запит на введення цілого числа, поки користувач не введе ціле число:
+
+```{python}
+#| label: try-except-else-while-func-eval
+#| eval: false
+
+def main():
+    number = get_int()
+    print(f'Ваше число: {number}')
+
+def get_int():
+    while True:
+        try:
+            number = int(input("Введіть число: ")) # п'ять
+        except ValueError:
+            print('Ви ввели не число')
+        else:
+            return number
+
+main()
+```
+
+## Ключове слово `pass`
+
+Підемо далі, і припустимо, що ми хочемо ловити помилки, але не хочемо виводити повідомлення про помилку.
+
+Для цього ми можемо використовувати ключове слово `pass`:
+
+```{python}
+#| label: try-except-pass-eval
+#| eval: false
+
+def main():
+    number = get_int()
+    print(f'Ваше число: {number}')
+
+def get_int():
+    while True:
+        try:
+            number = int(input("Введіть число: ")) # п'ять
+        except ValueError:
+            pass
+        else:
+            return number
+
+main()
+```
+
+Це просто ще один механізм для обробки помилок. 
+
+Іноді ви можете використовувати `pass`, якщо ви хочете, щоб ваш код був синтаксично правильним, але ви не хочете нічого робити, якщо виникає помилка.
+
+## Ключове слово `pass`
+
+Ми можемо скоротити цей код і перенести ключове слово `return` вище:
+
+```{python}
+#| label: try-except-pass-eval-2
+#| eval: false
+
+def main():
+    number = get_int()
+    print(f'Ваше число: {number}')
+
+def get_int():
+    while True:
+        try:
+            return int(input("Введіть число: ")) # п'ять
+        except ValueError:
+            pass
+
+main()
+```
+
+Це дозволить дещо скоротити код, але може бути дещо складнішим для розуміння. Який варіант обрати - це вже залежить від вас.
+
+## Ключове слово `pass`
+
+Тепер давайте створимо більш загальний варіант цієї програми і позбудемось від жорсткого коду. 
+
+Зробимо функцію `get_int()` більш універсальною: було б добре, якби функція `main()` не знала, як функція `get_int()` описує свої змінні. В нашому випадку це `'Введіть число'`, але можна було б написати `'Введіть ціле число'` або `'Введіть додатнє число'` або ще щось. 
+
+Для цього ми додамо параметр `prompt` до функції `get_int()`, який буде використовуватися для виведення повідомлення користувачу:
+
+```{python}
+#| label: try-except-pass-eval-3
+#| eval: false
+
+def main():
+    number = get_int('Введіть число: ')
+    print(f'Ваше число: {number}')
+
+def get_int(prompt):
+    while True:
+        try:
+            return int(input(prompt)) # п'ять
+        except ValueError:
+            pass
+
+main()
+```
+
+## Інші випадки
+
+Це далеко не все, що необхідно знати про винятки.
+
+Наприклад, ви можете використовувати ключове слово `raise`, щоб викликати виняток, або використовувати ключове слово `finally`, щоб виконати певний код незалежно від того, чи виникла помилка, чи ні.
+
+Але це вже виходить за рамки цього курсу. Якщо ви хочете дізнатися більше про винятки, ви можете:
+
+- прочитати документацію за посиланням [docs.python.org/3/tutorial/errors.html](https://docs.python.org/3/tutorial/errors.html)
+- переглянути матеріали [W3Schools](https://www.w3schools.com/python/python_try_except.asp)
+- переглянути матеріали [GeeksforGeeks](https://www.geeksforgeeks.org/python-exception-handling/)
+
+# Бібліотеки {background-iframe="colored-particles/index.html"}
+
+## Імпорт бібліотек
+
+**Бібліотеки** - це файли коду, написані людьми, які ви можете використовувати у своїх програмах.
+
+Python підтримує ідею можливості ділитися кодом з іншими і робить це за допомогою **модулів** (англ. *modules*) - це бібліотека, яка зазвичай має низку функцій, класів і інших речей, які ви можете використовувати у своїх програмах.
+
+Python встановлюється з низкою базових модулів, які ви можете використовувати у своїх програмах: робота з файлами,  мережею, даними, датами і часом, математичними функціями і багато іншого. Ці модулі називаються **стандартними бібліотеками** (англ. *standard libraries*).
+
+::: {.callout-note}
+Документація до стандартних бібліотек доступна за посиланням [https://docs.python.org/3/library/](https://docs.python.org/3/library/).
+:::
+
+## Імпорт бібліотек {.smaller}
+
+Щоб використовувати бібліотеку, її потрібно імпортувати.
+
+Це робиться за допомогою ключового слова `import` і назви бібліотеки.
+
+. . .
+
+**Приклад підкидання монетки:** 
+
+Оскільки ми маємо справу з випадковим процесом (підкидання монетки), то нам знадобиться модуль `random`. Щоб його використати, ми повинні його імпортувати:
+
+```{python}
+#| label: generate-default
+
+import random
+
+coin = ['орел', 'решка']
+print(random.choice(coin))
+```
+
+Запис `random.choice(coin)` означає, що ми використовуємо функцію `choice()` з модуля `random` і передаємо їй список `coin` як аргумент. Ця функція повертає випадковий елемент зі списку `coin`, який ми виводимо на екран.
+
+::: {.callout-note}
+Документація до модуля `random` доступна за посиланням [docs.python.org/3/library/random.html](https://docs.python.org/3/library/random.html).
+:::
+
+## Рандомізація
+
+Але що, якщо нам потрібно використати лише одну функцію з цієї бібліотеки? Тоді ми можемо імпортувати лише цю функцію за допомогою комбінації ключових слів `from` та `import`:
+
+```{python}
+#| label: generate-alternative
+
+from random import choice
+
+coin = ['орел', 'решка']
+print(choice(coin))
+```
+
+Тепер ми можемо використовувати функцію `choice()` без префіксу `random`.
+
+## Рандомізація
+
+Продовжимо досліджувати модуль `random`. 
+
+Цього разу це буде функція `random.randint(a, b)`, яка повертає випадкове ціле число від `a` до `b` включно.
+
+Давайте використаємо цю функцію, щоб симулювати підкидання гральної кістки з 20 гранню[^D21]:
+
+```{python}
+#| label: generate-dice
+
+import random
+
+d20 = random.randint(1, 20)
+print(d20)
+```
+
+[^D21]: 20-гранна  кістка використовується у деяких настільних іграх, наприклад, у [Dungeons & Dragons](https://uk.wikipedia.org/wiki/Dungeons_%26_Dragons).
+
+## Відтворюваність
+
+Щоб зробити наші експерименти відтворюваними, ми можемо використовувати функцію `random.seed()`.
+
+Ця функція приймає один аргумент - ціле число, яке використовується для генерації випадкових чисел.
+
+```{python}
+import random
+
+random.seed(42)
+print(random.randint(1, 20))
+```
+
+```{python}
+import random
+
+random.seed(2023)
+print(random.randint(1, 20))
+```
+
+```{python}
+import random
+
+random.seed(1)
+print(random.randint(1, 20))
+```
+
+## Тасування карт
+
+Розглянемо наступну функцію `random.shuffle(x)`, яка перемішує елементи списку `x` у випадковому порядку. Давайте використаємо цю функцію, щоб перемішати колоду карт:
+
+```{python}
+#| label: generate-shuffle
+
+import random
+
+cards = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+
+random.shuffle(cards)
+
+for card in cards:
+    print(card, end=' ')
+```
+
+::: {.callout-warning}
+Зверніть увагу, що функція `random.shuffle(x)` **не повертає** перемішаний список `x`, а просто перемішує його **на місці**. 
+
+Уважно читайте документацію!
+:::
+
+## Статистика
+
+Python також постачається з бібліотекою `statistics`, яка містить різноманітні статистичні функції для проведення базового дослідження мір центральної тенденції, варіації та залежностей.
+
+Створимо програму, яка буде розраховувати середнє арифметичне значення списку чисел:
+
+Імпортуємо модуль `statistics` та розрахуємо середнє значення поточної успішності студента за допомогою функції `mean()`:
+
+```{python}
+#| label: average-import
+
+import statistics
+
+grades = [
+    12, 10, 7, 12, 9, 10, 12,
+    8, 11, 12, 10, 9, 8, 11, 12,
+    10, 9, 8, 11, 12, 10, 9, 8, 11
+]
+
+print(statistics.mean(grades))
+```
+
+::: {.callout-note}
+Документація до модуля `statistics` доступна за посиланням [docs.python.org/3/library/statistics.html](https://docs.python.org/3/library/statistics.html).
+:::
+
+# Аргументи командного рядка {background-iframe="colored-particles/index.html"}
+
+## Аргументи командного рядка
+
+Існує ще більше функціональних можливостей, які постачаються з Python. Серед них є функції для роботи з аргументами командного рядка (англ. *command-line arguments*). 
+
+Створимо файл `name.py`, в якому будемо використовувати новий модуль `sys`:
+
+```{.bash filename="Terminal"}
+code name.py
+```
+
+Модуль `sys` дозволяє взаємодіяти з інтерпретатором Python. Цей модуль містить різноманітні функції, які дозволяють отримати доступ до аргументів командного рядка, змінних і функцій, які використовуються інтерпретатором Python.
+
+::: {.callout-note}
+Документація до модуля `sys` доступна за посиланням [docs.python.org/3/library/sys.html](https://docs.python.org/3/library/sys.html).
+:::
+
+## `sys.argv`
+
+Ми зосередимо увагу на функції `sys.argv`, яка повертає список аргументів командного рядка, переданих програмі. Давайте використаємо цю функцію, щоб вивести на екран другий аргумент командного рядка:
+
+```{python}
+#| label: name-argv
+#| eval: false
+
+import sys
+
+print('Привіт, мене звати ' + sys.argv[1] + '!')
+```
+
+Але цього разу замість команди `python name.py` ми виконаємо команду `python name.py Ігор`, яка передасть ім'я `Ігор` у якості аргумента командного рядка.
+
+```{.bash filename="Terminal"}
+python name.py Ігор
+```
+
+В результаті ми отримаємо наступне повідомлення:
+
+```{.output}
+Привіт, мене звати Ігор!
+```
+
+## `sys.argv`
+
+Якщо ж виконати цей код без аргументів командного рядка, то ми отримаємо помилку:
+
+```{.output}
+Traceback (most recent call last):
+  File "name.py", line 4, in <module>
+    print('Привіт, мене звати ' + sys.argv[1] + '!')
+
+IndexError: list index out of range
+```
+
+Це означає, що ми намагаємося отримати доступ до елемента списку, якого не існує. 
+
+Це тому, що список `sys.argv` не містить жодного елемента, якщо не передати аргументів командного рядка.
+
+## `sys.argv`
+
+Давайте виправимо цю помилку, додавши перевірку наявності аргументів командного рядка:
+
+```{python}
+#| label: name-argv-check
+#| eval: false
+
+import sys
+
+try:
+    print('Привіт, мене звати ' + sys.argv[1] + '!')
+except IndexError:
+    print('Введіть своє ім\'я як аргумент командного рядка!')
+```
+
+Виконаємо код з аргументами командного рядка:
+
+```{.bash filename="Terminal"}
+python name.py Ігор
+```
+<br>
+```{.output}
+Привіт, мене звати Ігор!
+```
+
+Виконаємо код без аргументів командного рядка:
+
+```{.bash filename="Terminal"}
+python name.py
+```
+<br>
+```{.output}
+Введіть своє ім'я як аргумент командного рядка!
+```
+
+## `sys.argv` {.smaller}
+
+З іншої сторони, ми можемо перевірити кількість аргументів командного рядка за допомогою функції `len()`:
+
+```{python}
+#| label: name-argv-len
+
+import sys
+
+if len(sys.argv) < 2:
+    print('Мало аргументів командного рядка!')
+elif len(sys.argv) > 2:
+    print('Багато аргументів командного рядка!')
+else:
+    print('Привіт, мене звати ' + sys.argv[1] + '!')
+```
+
+Виконаємо код з аргументами командного рядка:
+
+```{.bash filename="Terminal"}
+python name.py Ігор
+```
+
+```{.output}
+Привіт, мене звати Ігор!
+```
+
+Виконаємо код без аргументів командного рядка:
+
+```{.bash filename="Terminal"}
+python name.py
+```
+
+```{.output}
+Мало аргументів командного рядка!
+```
+
+Виконаємо код з багатьма аргументами командного рядка:
+
+```{.bash filename="Terminal"}
+python name.py Ігор Мірошниченко
+```
+
+```{.output}
+Багато аргументів командного рядка!
+```
+
+## `sys.argv` {.smaller}
+
+Одна з речей, яка мені не подобається у попередній версії коду полягає у тому, що суть моєї програми винесено у блок `else`. Є щось приємне в тому, щоб тримати всю обробку помилок окремо від коду, який вас дійсно цікавить. Існує кращий спосіб зробити це, використовуючи функцію `exit()`:
+
+```{python}
+#| label: name-argv-print
+#| eval: false
+
+import sys
+
+# Перевіряємо кількість аргументів командного рядка
+if len(sys.argv) < 2:
+    sys.exit('Мало аргументів командного рядка!')
+elif len(sys.argv) > 2:
+    sys.exit('Багато аргументів командного рядка!')
+
+# Виводимо повідомлення
+print('Привіт, мене звати ' + sys.argv[1] + '!')
+```
+
+Функція `exit()` приймає один аргумент - повідомлення, яке буде виведено на екран, і зупиняє виконання програми. Тепер ми можемо використовувати функцію `print()` без блоку `else`.
+
+Виконаємо код без аргументів командного рядка:
+
+```{.bash filename="Terminal"}
+python name.py
+```
+
+```{.output}
+Мало аргументів командного рядка!
+```
+
+## `sys.argv`
+
+Припустимо, що я хочу, щоб друкувалося не тільки моє ім'я, але й імена інших користувачів. Для цього ми можемо використати зрізи (англ. *slices*) списків. Для цього використовуються квадратні дужки `[]`, які вказують, які елементи списку потрібно вивести. Перепишемо програму `name.py`:
+
+```{python}
+#| label: name-argv-slice
+#| eval: false
+
+import sys
+
+if len(sys.argv) < 2:
+    sys.exit('Мало аргументів командного рядка!')
+
+for name in sys.argv[1:]:
+    print('Привіт, мене звати ' + name + '!')
+```
+
+Виконаємо код з аргументами командного рядка:
+
+```{.bash filename="Terminal"}
+python name.py Ігор Анна Яромир Артур Святослав
+```
+
+```{.output}
+Привіт, мене звати Ігор!
+Привіт, мене звати Анна!
+Привіт, мене звати Яромир!
+Привіт, мене звати Артур!
+Привіт, мене звати Святослав!
+```
+
+# Пакети {background-iframe="colored-particles/index.html"}
+
+## Пакети
+
+Однією з причин того, що Python є настільки популярним і потужним в наші дні, є те, що існує багато бібліотек сторонніх розробників, також відомих як **пакети** (англ. *packages*).
+
+Строго кажучи, у самій мові Python є термін "пакети", який по суті є модулем, реалізованим у папці, не просто у файлі. Але в більш загальному сенсі, **пакети** - це бібліотека сторонніх розробників, яку ми з вами можемо встановити на наш власний комп'ютер і отримати доступ до ще більшої функціональності, яку інші люди реалізували для нас.
+
+Одне з місць, де ви можете отримати всі ці пакунки, називається [**PyPI**](https://pypi.org/) (*The Python Package Index*). Це репозиторій, де розробники можуть розміщувати свої пакети, щоб інші люди могли їх встановити. Існує багато інших репозиторіїв, але PyPI є найбільш популярним.
+
+Для встановлення пакетів, Python використовує менеджер пакетів `pip` - це програма, яка поставляється з Python і дозволяє встановлювати пакети.
+
+## Cowsay {.smaller}
+
+Пакет `cowsay`, який дозволяє виводити повідомлення на екран у вигляді корови. Давайте встановимо пакет `cowsay` за допомогою команди `pip install cowsay`:
+
+```{.bash filename="Terminal"}
+pip install cowsay
+```
+
+::: {.callout-note}
+Документація до пакету `cowsay` доступна за посиланням [pypi.org/project/cowsay/](https://pypi.org/project/cowsay/).
+:::
+
+Тепер давайте створимо файл `cow.py`, який буде виводити повідомлення на екран у вигляді корови:
+
+```{.bash filename="Terminal"}
+code cow.py
+```
+
+Імпортуємо модуль `cowsay` та використаємо функцію `cowsay.cow()` для виведення повідомлення на екран у вигляді корови:
+
+```{python}
+#| label: cow
+
+import cowsay
+
+cowsay.cow('Привіт, мене звати Бакбик!')
+```
+
+## API
+
+API (англ. *Application Programming Interface*) - це спосіб, за допомогою якого програми можуть взаємодіяти одна з одною.
+
+Пакет, з яким ми будемо знайомитися, називається `requests`. Цей пакет дозволяє нам виконувати HTTP-запити до веб-сайтів. 
+
+Для його встановлення виконаємо команду:
+
+```{.bash filename="Terminal"}
+pip install requests
+```
+
+::: {.callout-note}
+Документація до пакету `requests` доступна за посиланням [pypi.org/project/requests/](https://pypi.org/project/requests/).
+:::
+
+## API
+
+Створимо новий файл `itunes.py`, який буде використовувати API iTunes. 
+
+Apple має власний API для свого сервісу iTunes, яке надає вам можливість завантажувати і шукати музику і пісні, а також іншу інформацію.
+
+```{.bash filename="Terminal"}
+code itunes.py
+```
+
+Якщо переглянути документацію до API iTunes, то ми побачимо, що для пошуку пісень потрібно використовувати адресу `entity=song`. 
+
+Для перегляну інформації про одну пісню необхідно до базової адреси додати `limit=1`. 
+
+Для пошуку пісень гурту Korn необхідно до базової адреси додати `term=korn`. 
+
+Таким чином, ми отримаємо наступну адресу:
+
+```
+https://itunes.apple.com/search?entity=song&limit=1&term=korn
+```
+
+## API {.smaller}
+
+Якщо перейти за цією адресою, ми отримаємо текстовий файл, зміст котрого буде виглядати приблизно наступним чином:
+
+```
+{
+ "resultCount":1,
+ "results": [
+{"wrapperType":"track", "kind":"song", "artistId":466532, "collectionId":423045626, "trackId":423045744, "artistName":"Korn", "collectionName":"Korn", "trackName":"Blind", "collectionCensoredName":"Korn", "trackCensoredName":"Blind", "artistViewUrl":"https://music.apple.com/us/artist/korn/466532?uo=4", "collectionViewUrl":"https://music.apple.com/us/album/blind/423045626?i=423045744&uo=4", "trackViewUrl":"https://music.apple.com/us/album/blind/423045626?i=423045744&uo=4", 
+"previewUrl":"https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/ef/a4/dd/efa4dd64-e8e0-6c12-c88b-a3a996b24b12/mzaf_13798363446300996858.plus.aac.p.m4a", "artworkUrl30":"https://is2-ssl.mzstatic.com/image/thumb/Music114/v4/09/2b/e7/092be7d0-7697-220d-c000-97f366e723e4/mzi.anacpwuj.jpg/30x30bb.jpg", "artworkUrl60":"https://is2-ssl.mzstatic.com/image/thumb/Music114/v4/09/2b/e7/092be7d0-7697-220d-c000-97f366e723e4/mzi.anacpwuj.jpg/60x60bb.jpg", "artworkUrl100":"https://is2-ssl.mzstatic.com/image/thumb/Music114/v4/09/2b/e7/092be7d0-7697-220d-c000-97f366e723e4/mzi.anacpwuj.jpg/100x100bb.jpg", "collectionPrice":9.99, "trackPrice":1.29, "releaseDate":"1994-08-01T07:00:00Z", "collectionExplicitness":"explicit", "trackExplicitness":"notExplicit", "discCount":1, "discNumber":1, "trackCount":12, "trackNumber":1, "trackTimeMillis":258267, "country":"USA", "currency":"USD", "primaryGenreName":"Metal", "isStreamable":true}]
+}
+```
+
+Наповнення виглядає дещо незрозуміло, воно має свою структуру: JSON (англ. *JavaScript Object Notation*).
+
+Це формат, який використовується для передачі даних між програмами. 
+
+Існує багато інших форматів, таких як XML, CSV, YAML, але JSON є одним з найпопулярніших форматів.
+
+## API {.smaller}
+
+Цей текст містить інформацію з бази даних Apple про одну пісню Korn. Давайте використаємо пакет `requests`, щоб отримати цю інформацію і вивести її на екран:
+
+```{python}
+#| label: itunes-eval
+#| eval: false
+
+import requests
+import sys
+
+if len(sys.argv) != 2:
+    sys.exit('Введіть назву гурту як аргумент командного рядка!')
+
+url = 'https://itunes.apple.com/search?entity=song&limit=1&term=' + sys.argv[1]
+response = requests.get(url)
+print(response.json())
+```
+
+```{python}
+#| label: itunes-echo
+#| echo: false
+
+import requests
+import sys
+
+url = 'https://itunes.apple.com/search?entity=song&limit=1&term=' + 'korn'
+response = requests.get(url)
+print(response.json())
+```
+
+Ми отримали той самий відформатований текст, але він був стандартизований у вигляді словника Python: Apple API віддає нам JSON, а пакет `requests` перетворює його у словник Python.
+
+## API {.smaller}
+
+Давайте відформатуємо вивід, щоб він був більш читабельним. Для цього використаємо бібліотеку `json`, яка вбудована в Python:
+
+```{python}
+#| label: itunes-pretty-eval
+#| eval: false
+
+import json
+import requests
+import sys
+
+if len(sys.argv) != 2:
+    sys.exit('Введіть назву гурту як аргумент командного рядка!')
+
+url = 'https://itunes.apple.com/search?entity=song&limit=1&term=' + sys.argv[1]
+response = requests.get(url)
+print(json.dumps(response.json(), indent=4))
+```
+
+```{python}
+#| label: itunes-pretty-echo
+#| echo: false
+
+import json
+import requests
+import sys
+
+url = 'https://itunes.apple.com/search?entity=song&limit=1&term=' + 'korn'
+response = requests.get(url)
+print(json.dumps(response.json(), indent=2))
+```
+
+## API {.smaller}
+
+Тепер ми отримали відформатований текст, який більш читабельний. Але що, якщо ми хочемо вивести лише назву пісні? Для цього нам потрібно звернутися до словника Python, який міститься у змінній `response.json()`. Цей словник містить ключ `results`, який містить список пісень. Цей список містить словник, який містить ключ `trackName`, який містить назву пісні. Пропоную модифікувати URL-адресу і вивести 10 треків (`limit=10`) гурту Korn:
+
+```{python}
+
+```{python}
+#| label: itunes-track-eval
+#| eval: false
+
+import json
+import requests
+import sys
+
+if len(sys.argv) != 2:
+    sys.exit('Введіть назву гурту як аргумент командного рядка!')
+
+url = 'https://itunes.apple.com/search?entity=song&limit=10&term=' + sys.argv[1]
+response = requests.get(url)
+data = response.json()
+
+for result in data['results']:
+    print(result['trackName'])
+```
+
+```{python}
+#| label: itunes-track-echo
+#| echo: false
+
+import json
+import requests
+import sys
+
+url = 'https://itunes.apple.com/search?entity=song&limit=10&term=' + 'korn'
+response = requests.get(url)
+data = response.json()
+
+for result in data['results']:
+    print(result['trackName'])
+```
+
+::: {.callout-note}
+Документація до пакету `json` доступна за посиланням [docs.python.org/3/library/json.html](https://docs.python.org/3/library/json.html).
+:::
+
+## Власні пакети
+
+Ви самі можете створювати власні бібліотеки. 
+
+Досі ми писали всі наші функції в одному файлі. Хорошою практикою було б якось об'єднати код, який ви повторно використовуєте, і створити власний модуль або пакет Python. Ви можете тримати його локально на власному комп'ютері або хмарному сервері, або ж ви можете пройти через певні кроки, щоб зробити його безкоштовним і з відкритим вихідним кодом і викласти його, наприклад на PyPI, щоб інші також могли ним користуватися. 
+
+Створимо новий файл `saying.py`, який буде моїм власним модулем:
+
+```{.bash filename="Terminal"}
+code saying.py
+```
+
+## Власні пакети
+
+В цьому файлі я створю функцію `say_hello()`, яка буде виводити вітальне повідомлення на екран, функцію `say_goodbye()`, яка буде виводити прощальне повідомлення на екран. Щоб переконатися, що ці функції працюють належним чином, я поміщу їх у функцію `main()`:
+
+```{python}
+#| label: saying
+
+def main():
+    say_hello('Гаррі')
+    say_goodbye('Гаррі')
+
+def say_hello(name):
+    print(f'Привіт, {name}')
+
+def say_goodbye(name):
+    print(f'До побачення, {name}')
+
+main()
+```
+
+## Власні пакети
+
+Тепер я хочу використовувати ці функції так, ніби я дійсно створив власну бібліотеку, який робить доступною весь його функціонал для будь кого. Для цього створимо новий файл `say.py`:
+
+```{.bash filename="Terminal"}
+code say.py
+```
+
+В цьому файлі я імпортую функції з модуля `saying` і використовую їх:
+
+```{python}
+#| label: say-eval
+#| eval: false
+
+import sys
+from saying import say_hello
+
+if len(sys.argv) == 2:
+    say_hello(sys.argv[1])
+```
+
+Виконаємо код з аргументом командного рядка:
+
+```{.bash filename="Terminal"}
+python say.py Гаррі
+```
+
+І отримаю наступний результат:
+
+```{.output}
+Привіт, Гаррі
+До побачення, Гаррі
+Привіт, Гаррі
+```
+
+## Власні пакети {.smaller}
+
+```{.output}
+Привіт, Гаррі
+До побачення, Гаррі
+Привіт, Гаррі
+```
+
+Чому так відбувається? Xоч я все зробив згідно з нашою попередньою практикою, це не зовсім правильний спосіб виклику `main()`. 
+
+Нюанс в тому, що у файлі `saying.py` я викликаю функцію `main()` у самому кінці. І навіть коли я імпортую цей модуль у новий файл `say.py`, то функція `main()` все одно буде викликана.
+
+Код `from saying import say_hello` просить Python знайти модуль `saying`, прочитати його, а потім імпортувати функцію `say_hello()`. На жаль, до того часу, як Python прочитає файл зверху вниз зліва направо, останній рядок коду викликає функцію `main()`, що призводить до **обов'язкового виклику** всього коду.
+
+## Власні пакети
+
+Для виправлення ситуації необхідно замість виклику функції `main()` у кінці коду використовувати запис:
+
+```{.python}
+if __name__ == '__main__':
+    main()
+```
+Запис `__name__` - це спеціальна змінна Python, яка містить ім'я поточного модуля. 
+
+Якщо модуль виконується **як програма**, то ця змінна містить рядок `'__main__'`.
+
+Якщо ж **модуль** імпортується, то ця змінна містить ім'я модуля.
+
+Таким чином, ми можемо **перевірити**, чи виконується модуль як програма, і якщо так, то викликати функцію `main()`.
+
+## Власні пакети
+
+Давайте подивимось. Спочатку виправимо нам модуль `saying.py`:
+
+```{python}
+#| label: saying-main-eval-fix
+#| eval: false
+
+def main():
+    say_hello('Гаррі')
+    say_goodbye('Гаррі')
+
+def say_hello(name):
+    print(f'Привіт, {name}')
+
+def say_goodbye(name):
+    print(f'До побачення, {name}')
+
+if __name__ == '__main__':
+    main()
+```
+
+Імпортуємо модуль `saying`:
+
+```{python}
+#| label: say-eval-fix
+#| eval: false
+
+import sys
+from saying import say_hello
+
+if len(sys.argv) == 2:
+    say_hello(sys.argv[1])
+```
+
+Виконаємо код з аргументом командного рядка:
+
+```{.bash filename="Terminal"}
+python say.py Гаррі
+```
+
+```{.output}
+Привіт, Гаррі
+```
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe="colored-particles/index.html"}
+
+<br>
+<br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/applied_analytics/)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@kneu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
