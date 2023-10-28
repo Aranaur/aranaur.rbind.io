@@ -1,0 +1,73 @@
+---
+title: "Baby Names Data"
+author: "Ігор Мірошниченко"
+description: "Джерело: United States Social Security office"
+date: today
+date-format: iso
+image: featured.gif
+number-sections: false
+# execute: 
+#   freeze: auto
+categories:
+  - zip
+  - categorical
+  - continuous
+  - visualization
+---
+
+::: {.column-margin}
+![](featured.gif)
+:::
+
+## Baby Names Data [{{< iconify material-symbols download >}}](https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/babynames/names.zip)
+
+Датасет від [SSA](https://www.ssa.gov/oact/babynames).
+
+Кожен піднабір містить п'ять статистик, які є (майже) однаковими в кожному випадку:
+
+- середнє значення `x`
+- середнє значення `y`
+- стандартне відхилення `x`
+- стандартне відхилення `y`
+- та кореляція Пірсона між `x` та `y`
+
+Однак діаграми розсіювання показують, що кожен піднабір даних виглядає дуже по-різному. Цей набір даних призначений для того, щоб навчити студентів, що важливо будувати власні графіки, а не покладатися лише на статистичні дані.
+
+```{python}
+#| eval: false
+
+'https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/babynames/names.zip'
+```
+
+```{python}
+#| echo: false
+
+import urllib.request
+import os.path
+
+# Завантажуємо дані безпосередньо з інтернету
+data_url = "https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/babynames/names.zip"
+local_filename = "babynames.zip"
+if not os.path.exists(local_filename): # якщо дані існують, не завантажувати знову
+    with urllib.request.urlopen(data_url) as resp, open(local_filename, 'wb') as f:
+        f.write(resp.read())
+
+        
+# Завантажити дані без розархівування файлу
+import zipfile
+babynames = [] 
+with zipfile.ZipFile(local_filename, "r") as zf:
+    data_files = [f for f in zf.filelist if f.filename[-3:] == "txt"]
+    def extract_year_from_filename(fn):
+        return int(fn[3:7])
+    for f in data_files:
+        year = extract_year_from_filename(f.filename)
+        with zf.open(f) as fp:
+            df = pd.read_csv(fp, names=["Name", "Sex", "Count"])
+            df["Year"] = year
+            babynames.append(df)
+babynames = pd.concat(babynames)
+
+
+babynames.head()
+```
