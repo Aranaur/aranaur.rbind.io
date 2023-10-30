@@ -1,0 +1,446 @@
+---
+title: "Логістична регресія"
+title-slide-attributes:
+    data-background-iframe: colored-particles/index.html
+subtitle: "Кількісні методи в економіці"
+author: "Ігор Мірошниченко"
+footer: <a href="https://aranaur.rbind.io/lectures/qme/">Кількісні методи в економіці</a>
+# date: today
+# date-format: iso
+institute: КНЕУ імені Вадима Гетьмана, ІІТЕ
+language: _language-ua.yml
+format:
+  revealjs: 
+    theme: [simple, custom.scss]
+    logo: iite.jpg
+    chalkboard: true
+    slide-number: true
+    toc: true
+    toc-title: ЗМІСТ
+    transition: fade
+    mouse-wheel: true
+    highlight-style: github
+    mainfont: metropolis
+    toc-depth: 1
+    fig-width: 9
+    fig-height: 5
+    df-print: paged
+    # auto-stretch: false
+
+from: markdown+emoji
+
+execute: 
+  echo: true
+
+# jupyter: python3
+        
+knitr: 
+  opts_chunk: 
+    echo: true
+    warnings: false
+    message: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+#| include: false
+
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+```
+
+# Основні поняття {background-iframe="colored-particles/index.html"}
+
+## Логістична регресія 
+
+**Залежна змінна** - номінативна змінна з двома рівнями: 0 та 1
+
+**Незалежні змінні** - кількісні та якісні.
+
+> Основна суть: розглянути задачу класифікації, як на задачу передбачення ймовірностей.
+
+## Ймовірність та шанси
+
+**Проблема:** ймовірність має бути у діапазоні від 0 до 1, а простого способу навчити лінійну модель відповідала таким умовам - не має.
+
+**Вихід:** навчити лінійну модель правильно передбачати якийсь об'єкт пов'язаний з ймовірністю, але в діапазоні $(-\infty, +\infty)$ та перетворити відповіді у ймовірності.
+
+> Таким об'єктом є **logit** або **log odds** - логарифм відношень шансів позитивної події до негативної $log(\frac{p}{1-p})$
+
+**Приклад:** маємо випадкову величину з двома рівнями, тоді **шанси (*odds*)** - це відношення ймовірності позитивних подій до негативних.
+
+Орел (+) випав 2 рази, Решка (-): 8.
+
+Ймовірність орла: $p = \frac{2}{2+8} = 0.2$
+
+Шанс орла: $odds = \frac{p}{1-p} = \frac{0.2}{1-0.2} = \frac{2}{8} = 0.25$
+
+## Ймовірності -> Шанси -> Логарифм шансів
+
+:::: {.columns}
+
+::: {.column width="40%"}
+```{r echo=FALSE}
+df <- data.frame(p = seq(0.01, 0.99, by = 0.01))
+
+df <- df %>% 
+  mutate(odds = p/(1-p),
+         log_odds = log(odds))
+df %>% knitr::kable(digits=2)
+```
+:::
+
+::: {.column width="60%"}
+```{r echo=FALSE, fig.width= 8}
+df %>% 
+  ggplot(aes(log_odds, p)) +
+  geom_point() +
+  geom_line()
+```
+
+$logit(p) = log(\frac{p}{1-p}) = \beta_0 + \beta_1*x_1$
+$p = \frac{exp(\beta_0 + \beta_1*x_1)}{(1 + exp(\beta_0 + \beta_1*x_1)}$
+:::
+
+::::
+
+# Модель без предикторів {background-iframe="colored-particles/index.html"}
+
+## Модель без предикторів
+
+```{r}
+titanic <- read_csv("https://git.io/J14n6")
+
+
+titanic <- mutate(titanic, 
+                  Survived = factor(Survived, labels = c("No", "Yes")), 
+                  Pclass = factor(Pclass, labels = c("First", "Second", "Third")), 
+                  Sex = factor(Sex, labels = c("Female", "Male")))
+
+titanic
+```
+
+## Модель без предикторів
+
+```{r}
+simple_fit <- glm(Survived ~ 1, titanic, family = "binomial")
+coef(simple_fit)
+table(titanic$Survived)
+odds <- 342 / 549
+log(odds)
+```
+
+## Модель без предикторів
+
+```{r echo=FALSE}
+summary(simple_fit)$coef %>% knitr::kable()
+```
+
+* $H_0$: шанс = 1 (або шанс вижити 1:1, або ймовірність вижити 0.5)
+* За умови $H_0$ ми отримуємо нормальний розподіл, оскільки не має різниці між виходами.
+* Тоді стандартне похибка $se = \sqrt{\frac{1}{n_0}+\frac{1}{n_1}} = 0.06888737$
+* $z_{value}$ - кількість стандартних відхилень
+* $z_{value} = \frac{log(odds)}{sd} = \frac{b_0}{se} = -6.870457$
+* $p_{value} = 2 * \Phi(\frac{-|\beta|}{SE(\beta)})$, де $\Phi$  - кумулятивна функція нормального стандартного розподілу
+
+```{r}
+pnorm(-abs(-0.4732877)/0.06888737)*2
+```
+
+# Модель з одним номінативним предиктором {background-iframe="colored-particles/index.html"}
+
+## Модель з одним номінативним предиктором
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r}
+fit1 <- glm(Survived ~ Sex, titanic,
+            family = "binomial")
+
+coef(fit1)
+
+table(titanic$Survived, titanic$Sex)
+```
+:::
+
+::: {.column width="50%"}
+```{r}
+odds_female <- 233 / 81
+odds_male <- 109 / 468
+
+log(odds_female)
+log(odds_male)
+
+odds_ratio <- odds_male / odds_female
+
+log(odds_ratio)
+```
+:::
+
+::::
+
+## Модель з одним номінативним предиктором
+
+### `Survived ~ Sex`
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r echo=FALSE}
+summary(fit1)$coef %>% knitr::kable()
+```
+:::
+
+::: {.column width="50%"}
+```{r echo=FALSE}
+table(titanic$Survived, titanic$Sex) %>% knitr::kable()
+```
+:::
+
+::::
+
+**Інтерпретація:**
+
+1. Дивимось на градації факторів для інтерпретації `Intercept`
+
+2. `Intercept` - натуральний логарифм шансів позитивного результату для жінок
+
+3. Коефіцієнт біля `SexMale` - логарифм відношення шансів позитивного результату для чоловіків і шансів для жінок.
+
+## Модель з одним номінативним предиктором {.smaller}
+
+1. Рівняння регресії: 
+$$ln(odds) = Intercept + \beta_1 * SexMale$$
+2. Значення `Intercept`- це логарифм шансів вижити для жінок:
+$$Intercept = ln(\frac{p_{surv}}{1-p_{surv}}) = ln(odds_{female})$$
+
+3. Значення коефіцієнта при `SexMale` - це логарифм відношення шансів вижити для чоловіків і шансів вижити для жінок, але за властивістю логарифмів ми можемо уявити логарифм відношення як різниця логарифмів:
+$$\beta_1 = ln(\frac{odds_{male}}{odds_{female}})=ln(odds_{male}) - ln(odds_{female})$$
+
+Таким чином, коефіцієнт при `SexMale` – це різниця логарифмів шансів. Іншими словами, це ціна переходу з однієї градації нашої ознаки на іншу!
+
+## Модель з одним номінативним предиктором
+
+4. Розглянемо завдання передбачення. Якщо **новий пасажир - жінка**, тоді значення змінної `SexMale` = 0 і ми отримаємо логарифм шансів для жінок:
+
+$$ln(odds_{female}) = ln(odds_{female}) + 0 * (ln(odds_{male})-ln(odds_{female}))$$
+
+. . .
+
+5. Тепер, зробимо **прогноз для пасажира чоловіка**, у цьому випадку SexMale = 1, шанси для жінок скоротяться, і ми отримаємо шанси для чоловіків:
+$$ln(odds_{male}) = ln(odds_{female}) + 1 * (ln(odds_{male})-ln(odds_{female}))= \\
+ln(odds_{female}) + ln(odds_{male})-ln(odds_{female})$$
+
+# Модель з двома номінативними предикторами {background-iframe="colored-particles/index.html"}
+
+## Модель з двома номінативними предикторами
+
+```{r}
+library(vcd)
+mosaic(~ Sex + Survived | Pclass, data=titanic) 
+```
+
+## Модель з двома номінативними предикторами
+
+```{r}
+fit2 <- glm(Survived ~ Sex * Pclass, titanic, family = "binomial")
+summary(fit2)$coef
+```
+
+## Модель з двома номінативними предикторами
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r}
+table(titanic$Survived, 
+      titanic$Pclass, 
+      titanic$Sex)
+```
+:::
+
+::: {.column width="50%"}
+```{r}
+female_p1_odds <- 91 / 3
+log(female_p1_odds)
+```
+`Intercept` - логарифм шансів позитивного виходу для жінок першого класу.
+
+```{r}
+# SexMale
+male_p1_odds <- 45  /  77 
+log(male_p1_odds)
+log(male_p1_odds / female_p1_odds)
+```
+:::
+
+::::
+
+## Модель з двома номінативними предикторами
+
+:::: {.columns}
+
+::: {.column width="65%"}
+```{r echo=FALSE}
+summary(fit2)$coef %>% kbl() %>% kable_styling(font_size = 20)
+```
+:::
+
+::: {.column width="35%"}
+```{r echo=FALSE, fig.width=6}
+mosaic(~ Sex + Survived | Pclass, data=titanic) 
+```
+:::
+
+::::
+
+$ln(\frac{odds_{male}}{odds_{female}}) = ln(odds_{male}) - ln(odds_{female})$
+
+`SexMale` - логарифм відношення шансів для чоловіків і жінок у першому класі.
+
+## Модель з двома номінативними предикторами
+
+:::: {.columns}
+
+::: {.column width="65%"}
+```{r echo=FALSE}
+summary(fit2)$coef %>% kbl() %>% kable_styling(font_size = 20)
+```
+:::
+
+::: {.column width="35%"}
+```{r echo=FALSE, fig.width=6}
+mosaic(~ Sex + Survived | Pclass, data=titanic) 
+```
+:::
+
+::::
+
+$ln(\frac{odds_{f_2}}{odds_{f_1}}) = ln(odds_{f_2}) - ln(odds_{f_1})$
+
+`PclassSecond` - логарифм відношення шансів для жінок у другому класі і жінок у першому класі.
+
+## Модель з двома номінативними предикторами
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r}
+table(titanic$Survived, 
+      titanic$Pclass, 
+      titanic$Sex)
+```
+:::
+
+::: {.column width="50%"}
+```{r}
+# PclassSecond
+female_p2_odds <- 70  /  6 
+log(female_p2_odds / female_p1_odds )
+```
+
+```{r}
+# PclassThird
+female_p3_odds <- 72  /  72 
+log(female_p3_odds / female_p1_odds )
+```
+:::
+
+::::
+
+# Модель зі взаємодією номінативних предикторів {background-iframe="colored-particles/index.html"}
+
+## Модель зі взаємодією номінативних предикторів
+
+:::: {.columns}
+
+::: {.column width="40%"}
+```{r}
+table(titanic$Survived, 
+      titanic$Pclass, 
+      titanic$Sex)
+```
+:::
+
+::: {.column width="60%"}
+```{r}
+# SexMale:PclassSecond
+male_p2_odds <- 17 / 91
+log(male_p2_odds / female_p2_odds) - log(male_p1_odds / female_p1_odds)
+```
+
+```{r}
+# Sexmale:PclassThird
+male_p3_odds <- 47 / 300
+log(male_p3_odds / female_p3_odds) - log(male_p1_odds / female_p1_odds)
+```
+:::
+
+::::
+
+## Модель зі взаємодією номінативних предикторів
+
+**SexMale:PclassSecond** - різниція логарифмів відношення шансів для чоловіків і жінок другого та першого класу.
+
+$$ln(\frac{odds_{male-2}}{odds_{female-2}}) - ln(\frac{odds_{male-1}}{odds_{female-1}}) = ln(\frac{odds_{male-2} * odds_{female-1}}{odds_{female-2} * odds_{male-1}})$$
+
+
+> **Взаємодія двох факторів говорить нам про те, що взаємодія між статтю пасажира і його статусом виявляється різною в залежності від від класу кают пасажирів.**
+
+## Модель зі взаємодією номінативних предикторів {.smaller}
+
+:::: {.columns}
+
+::: {.column width="55%"}
+```{r echo=FALSE}
+summary(fit2)$coef %>% kbl %>% kable_styling(font_size = 16)
+```
+**Intercept** - натуральний логарифм шансів позитивного виходу для жінок
+
+**SexMale** - логарифм відношення шансів позитивного виходу для чоловіків і шансів для жінок.
+:::
+
+::: {.column width="45%"}
+**PclassSecond** - логарифм відношення шансів для жінок у другому класі і жінок у першому класі.
+
+**PclassThird** - логарифм відношення шансів для жінок у третьому класі і жінок у першому класі.
+
+**SexMale:PclassSecond** - різниція логарифмів відношення шансів для чоловіків і жінок другого та першого класу.
+
+**SexMale:PclassThird**  - різниція логарифмів відношення шансів для чоловіків і жінок третього та першого класу.
+:::
+
+::::
+
+## Модель зі взаємодією номінативних предикторів
+
+Формула для розрахунку ймовірності:
+$$p = \frac{x}{1+x}$$
+де, $x$ - значення шансів.
+
+## Модель зі взаємодією номінативних предикторів
+
+```{r}
+fit3 <- glm(Survived ~ Sex + Pclass + Age, titanic, family = "binomial")
+summary(fit3)
+```
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe="colored-particles/index.html"}
+
+<br>
+<br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/qme/")
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@kneu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
