@@ -27,15 +27,13 @@ categories:
 
 ```{python}
 #| eval: false
-#| column: body-outset
+#| column: page-inset-right
 
 'https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/babynames/names.zip'
 ```
 
 ```{python}
-#| echo: true
-#| code-fold: true
-#| code-summary: "Код для завантаження даних"
+#| echo: false
 
 import pandas as pd
 import urllib.request
@@ -49,8 +47,6 @@ if not os.path.exists(local_filename): # якщо дані існують, не 
     with urllib.request.urlopen(data_url) as resp, open(local_filename, 'wb') as f:
         f.write(resp.read())
 
-        
-# Завантажити дані без розархівування файлу
 babynames = [] 
 with zipfile.ZipFile(local_filename, "r") as zf:
     data_files = [f for f in zf.filelist if f.filename[-3:] == "txt"]
@@ -64,6 +60,63 @@ with zipfile.ZipFile(local_filename, "r") as zf:
             babynames.append(df)
 babynames = pd.concat(babynames)
 
-
 babynames
 ```
+
+## Завантаження даних
+
+::: {.panel-tabset}
+## R
+
+``` {.r}
+library(tidyverse)
+library(vroom)
+
+# Завантаження даних безпосередньо з Інтернету
+data_url <- "https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/babynames/names.zip"
+local_filename <- "babynames.zip"
+if (!file.exists(local_filename)) { # якщо дані існують, не завантажувати знову
+  download.file(data_url, local_filename, mode = "wb")
+}
+
+data_files <- unzip(local_filename, junkpaths = TRUE, exdir = tempdir())
+
+babynames <- list()
+for (i in data_files) {
+  df <- vroom(i, col_names = c("Name", "Sex", "Count"), show_col_types = FALSE) %>% 
+    mutate(Year = str_match(i, "yob(\\d{4})\\.txt")[, 2] %>% 
+             as.numeric())
+  babynames <- bind_rows(babynames, df)
+}
+```
+
+## Python
+
+``` {.python}
+import pandas as pd
+import urllib.request
+import os.path
+import zipfile
+
+# Завантажуємо дані безпосередньо з інтернету
+data_url = "https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/babynames/names.zip"
+local_filename = "babynames.zip"
+if not os.path.exists(local_filename): # якщо дані існують, не завантажувати знову
+    with urllib.request.urlopen(data_url) as resp, open(local_filename, 'wb') as f:
+        f.write(resp.read())
+
+babynames = [] 
+with zipfile.ZipFile(local_filename, "r") as zf:
+    data_files = [f for f in zf.filelist if f.filename[-3:] == "txt"]
+    def extract_year_from_filename(fn):
+        return int(fn[3:7])
+    for f in data_files:
+        year = extract_year_from_filename(f.filename)
+        with zf.open(f) as fp:
+            df = pd.read_csv(fp, names=["Name", "Sex", "Count"])
+            df["Year"] = year
+            babynames.append(df)
+babynames = pd.concat(babynames)
+```
+
+:::
