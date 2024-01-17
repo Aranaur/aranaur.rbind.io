@@ -1,0 +1,661 @@
+---
+title: "Лінійна регресія"
+subtitle: "Прикладний статистичний аналіз"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка | ФІТ
+# date: today
+# date-format: iso
+from: markdown+emoji
+title-slide-attributes:
+  data-background-iframe: colored-particles/index.html
+  # data-background-color: "#eef3f8"
+language: _language-ua.yml
+footer: 🔗 <a href="https://aranaur.rbind.io/lectures/asa/">Матеріали курсу</a>
+format: 
+  revealjs:
+    transition: fade
+    chalkboard: true
+    logo: img/fit.png
+    code-line-numbers: false
+    slide-number: c/t
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    # highlight-style: github
+    pdf-separate-fragments: true
+    theme: [default, custom.scss]
+knitr: 
+  opts_chunk: 
+    echo: true
+    warnings: false
+    message: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Import libraries
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from IPython.display import Markdown
+from tabulate import tabulate
+
+# Set seaborn default style
+sns.set_style('whitegrid')
+sns.set_palette('colorblind')
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+grey_light = "grey70"
+grey_mid   = "grey50"
+grey_dark  = "grey20"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Про мене {.unnumbered .unlisted .smaller}
+
+::: nonincremental
+-   Мірошниченко Ігор Вікторович
+-   кандидат економічних наук, доцент
+-   доцент кафедри технологій управління КНУ імені Тараса Шевченка
+-   доцент кафедри математичного моделювання і статистики КНЕУ
+-   викладач Міжнародного інституту бізнесу (MBA)
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi github >}} [aranaur](https://github.com/Aranaur)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify mdi linkedin >}} [ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
+
+:::
+
+# DataCamp {.unnumbered .unlistedЇ}
+
+![](img/datacamp-logo.png)
+
+## DataCamp {.unlisted}
+
+:::: {.columns}
+
+::: {.column}
+![](img/datacamp-1.png)
+:::
+
+::: {.column}
+![](img/datacamp-2.png)
+:::
+
+::::
+
+## DataCamp {.unlisted .smaller}
+
+:::: {.columns}
+
+::: {.column width=60%}
+![](img/datacamp-cert.png)
+:::
+
+::: {.column width=40%}
+**Як долучитися?**
+
+1. Підписатися на канал {{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof/46)
+2. Зареєструйтесь на [DataCamp](http://datacamp.com)
+3. Приєднайтесь до класу за [посиланням](https://www.datacamp.com/groups/shared_links/defc08e8ea50d1b0bdaacbc7241cf24ad966ff57c5b993e8b45106ca939b81b8)
+
+:::
+
+::::
+
+. . .
+
+::: {.callout-note}
+Клас буде діяти до 11 квітня 2024 року, після чого буде буде відкрито наступний потік.
+
+Слідкуйте за оновленнями.
+:::
+
+# Кореляція {background-color="#eef3f8"}
+
+## Поняття кореляції
+
+[Коефіцієнт кореляції]{.hi} у своєму статистичному сенсі позначає силу і характер [взаємозв'язку]{.hi-purple} між двома кількісними змінними.
+
+```{python}
+#| label: corr-1
+#| echo: false
+
+# Set a random seed for reproducibility
+np.random.seed(42)
+
+# Function to generate datasets with specified correlation
+def generate_dataset(correlation):
+    mean = [0, 0]
+    cov_matrix = [[1, correlation], [correlation, 1]]
+    
+    # Generate random data with the specified correlation
+    data = np.random.multivariate_normal(mean, cov_matrix, 100)
+    
+    # Create a DataFrame
+    df = pd.DataFrame(data, columns=['x', 'y'])
+    
+    return df
+
+# Generate datasets with positive, negative, and no correlation
+positive_corr_data = generate_dataset(0.8)
+negative_corr_data = generate_dataset(-0.8)
+no_corr_data = generate_dataset(0)
+
+# Plot the datasets with regression lines
+plt.figure(figsize=(15, 4))
+
+# Positive Correlation
+plt.subplot(131)
+sns.regplot(x='x', y='y', data=positive_corr_data, color='blue', ci=None)
+plt.title('Позитивна кореляція')
+
+# Negative Correlation
+plt.subplot(132)
+sns.regplot(x='x', y='y', data=negative_corr_data, color='red', ci=None)
+plt.title('Негативна кореляція')
+
+# No Correlation
+plt.subplot(133)
+sns.regplot(x='x', y='y', data=no_corr_data, color='green', ci=None)
+plt.title('Відсутня кореляція')
+
+plt.tight_layout()
+plt.show()
+```
+
+## Коваріація {.smaller}
+
+[Коваріація]{.hi} - це міра взаємозв'язку між двома змінними, яка визначається як очікуване значення добутку відхилень від середніх значень.
+
+Припустимо, нам потрібно розрахувати коефіцієнт кореляції для двох кількісних величин $X$ і $Y$. Відповідно, середнє за вибіркою для кожної з цих величин буде $\bar{X}$ і $\bar{Y}$. Тоді коефіцієнт коваріації:
+
+$$ \text{cov}(X, Y) = \frac{\sum_{i=1}^{n} (X_i - \bar{X})(Y_i - \bar{Y})}{N-1}  $$
+
+де  $N$ - кількість спостережень у вибірці;<br>
+    $X_i$ - значення $X$ для $i$-го спостереження;<br>
+    $Y_i$ - значення $Y$ для $i$-го спостереження;
+
+. . .
+
+::: {.callout-important}
+Коваріація змінюється в довільному розкиді значень => складно інтерпретувати силу взаємозв'язку.
+:::
+
+## Кореляція {.smaller}
+
+[Кореляція]{.hi} - це нормалізована міра взаємозв'язку між двома змінними, яка визначається як коваріація, поділена на стандартне відхилення кожної змінної.
+
+$$ \text{corr}(X, Y) = \frac{\text{cov}(X, Y)}{\sigma_X \sigma_Y} $$
+
+де $\sigma_X$ - стандартне відхилення $X$;<br>
+    $\sigma_Y$ - стандартне відхилення $Y$.
+
+. . .
+
+::: {.callout-important}
+Коефіцієнт кореляції завжди лежить в діапазоні $[-1, 1]$.
+:::
+
+. . .
+
+Іноді можна зустріти таку формулу для коефіцієнта кореляції:
+
+$$
+r_{xy} = \frac{\sum{(x_i - \bar{x})(y_i - \bar{y})}}{\sqrt{\sum{(x_i - \bar{x})^2} \sum{(y_i - \bar{y})^2}}}
+$$
+
+У підручниках зі статистики часто зустрічається термін [кореляційний коефіцієнт Пірсона]{.hi}, який є частним випадком коефіцієнта кореляції. Це той самий коефіцієнт кореляції, який ми розглядаємо в цьому курсі.
+
+::: footer
+Додаток, де можна погратися з кореляцією: 🔗[Interpreting Correlations](https://rpsychologist.com/correlation/)
+:::
+
+## Перевірка гіпотези про кореляцію {.smaller}
+
+Ідея перевірки гіпотези про кореляцію полягає в тому, що ми перевіряємо, чи відрізняється коефіцієнт кореляції від нуля. Якщо нульова гіпотеза відхиляється, то ми можемо стверджувати, що між змінними існує взаємозв'язок.
+
+Основна гіпотеза: $H_0: r = 0$<br>
+Альтернативна гіпотеза: $H_1: r \neq 0$
+
+Статистика критерію:
+
+$$
+t = \frac{r \sqrt{n-2}}{\sqrt{1 - r^2}}
+$$
+
+де $r$ - коефіцієнт кореляції Пірсона;<br>
+    $n$ - кількість спостережень у вибірці.
+
+. . .
+
+::: {.callout-important}
+Критичне значення критерію Стьюдента для рівня значущості $\alpha = 0.05$ і $n-2$ ступенів свободи: $t_{\alpha/2, n-2} = 2.045$
+:::
+
+. . .
+
+::: {.callout-important}
+Якщо $|t| > t_{\alpha/2, n-2}$, то нульову гіпотезу відхиляють.
+:::
+
+## Умови застосування критерію Стьюдента
+
+1.  Взаємозв'язок між змінними має бути лінійним і монотонним (зростає або спадає у одному напрямку).
+2.  Відсутність викидів
+3.  Нормальний розподіл змінних
+
+У разі порушення цих припущень можуть бути корисними коефіцієнти кореляції Спірмена і Кендалла, які замість реальних значень аналізують їхні ранги.
+
+::: {.callout-note}
+Ні те, ні інше не є панацеєю, і за особливо сильних порушень припущень (особливо першого) вони також можуть бути неадекватними. Уважно вивчайте свої дані та їхній характер!
+:::
+
+## Квартер Енскомба {.smaller}
+
+Один із класичних прикладів необхідності перевірки припущень (і візуалізації даних перед аналізом) - [квартет Енскомба]{.hi}. 
+
+У всіх чотирьох наборів даних однаковий коефіцієнт кореляції Пірсона, хоча їхній характер очевидно різний.
+
+```{python}
+#| label: anscombe
+#| echo: false
+
+# Load the data
+anscombe = sns.load_dataset('anscombe')
+
+# Plot the data
+plt.figure(figsize=(15, 4))
+
+# First dataset
+plt.subplot(141)
+sns.regplot(x='x', y='y', data=anscombe.loc[anscombe['dataset'] == 'I'], color='#447099', ci=None)
+plt.title('Набір даних I')
+
+# Second dataset
+
+plt.subplot(142)
+sns.regplot(x='x', y='y', data=anscombe.loc[anscombe['dataset'] == 'II'], color='#C10000', ci=None)
+plt.title('Набір даних II')
+
+# Third dataset
+plt.subplot(143)
+sns.regplot(x='x', y='y', data=anscombe.loc[anscombe['dataset'] == 'III'], color='#00891A', ci=None)
+plt.title('Набір даних III')
+
+# Fourth dataset
+plt.subplot(144)
+sns.regplot(x='x', y='y', data=anscombe.loc[anscombe['dataset'] == 'IV'], color='#f45100', ci=None)
+plt.title('Набір даних IV')
+
+plt.tight_layout()
+plt.show()
+```
+
+## Datasaurus Dozen {.smaller}
+
+Ще один класичний приклад - [Datasaurus Dozen]{.hi}.
+
+У всіх даних однаковий коефіцієнт кореляції Пірсона, хоча їхній характер очевидно різний.
+
+```{python}
+#| label: datasaurus
+#| echo: false
+
+# Load the data
+datasaurus = pd.read_csv('https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/datasaurus/datasaurus.csv')
+
+# Plot the data
+plt.figure(figsize=(15, 4))
+
+# First dataset
+plt.subplot(131)
+sns.regplot(x='x', y='y', data=datasaurus.loc[datasaurus['dataset'] == 'dino'], color='#447099', ci=None)
+plt.title('Динозавр')
+
+# Second dataset
+plt.subplot(132)
+sns.regplot(x='x', y='y', data=datasaurus.loc[datasaurus['dataset'] == 'star'], color='#C10000', ci=None)
+plt.title('Віддалений')
+
+# Third dataset
+plt.subplot(133)
+sns.regplot(x='x', y='y', data=datasaurus.loc[datasaurus['dataset'] == 'h_lines'], color='#00891A', ci=None)
+plt.title('Горизонтальні лінії')
+
+plt.tight_layout()
+plt.show()
+```
+
+## Кореляція в Python {.smaller}
+
+```{python}
+#| label: vgsales
+
+vgsales = pd.read_csv("https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/video_games_sales/vgsales.csv")
+
+vgsales.head()
+```
+
+::: {.panel-tabset}
+
+### NumPy
+
+```{python}
+#| label: corr-np
+
+import numpy as np
+
+np_corr_p = np.corrcoef(vgsales['NA_Sales'], vgsales['Global_Sales'])[0, 1]
+print(f'Коефіцієнт кореляції: {np_corr_p:.3f}')
+```
+
+### SciPy
+
+```{python}
+#| label: corr-scipy
+
+import scipy.stats as st
+
+st_corr_p = st.pearsonr(vgsales['NA_Sales'], vgsales['Global_Sales'])[0]
+st_corr_s = st.spearmanr(vgsales['NA_Sales'], vgsales['Global_Sales'])[0]
+st_corr_k = st.kendalltau(vgsales['NA_Sales'], vgsales['Global_Sales'])[0]
+
+print(f'Коефіцієнт кореляції Пірсона: {st_corr_p:.3f}')
+print(f'Коефіцієнт кореляції Спірмена: {st_corr_s:.3f}')
+print(f'Коефіцієнт кореляції Кендалла: {st_corr_k:.3f}')
+```
+
+### Pandas
+
+```{python}
+#| label: corr-pandas
+
+import pandas as pd
+
+pd_corr_p = vgsales[['NA_Sales', 'Global_Sales']].corr(method='pearson').iloc[0, 1]
+pd_corr_s = vgsales[['NA_Sales', 'Global_Sales']].corr(method='spearman').iloc[0, 1]
+pd_corr_k = vgsales[['NA_Sales', 'Global_Sales']].corr(method='kendall').iloc[0, 1]
+
+print(f'Коефіцієнт кореляції Пірсона: {pd_corr_p:.3f}')
+print(f'Коефіцієнт кореляції Спірмена: {pd_corr_s:.3f}')
+print(f'Коефіцієнт кореляції Кендалла: {pd_corr_k:.3f}')
+```
+
+:::
+
+## Maximal Information-based Nonparametric Exploration
+
+[Maximal Information-based Nonparametric Exploration (MINE)]{.hi} - це алгоритм, який використовується для виявлення нелінійних залежностей між змінними.
+
+![](img/mic.jpg)
+
+::: footer
+🔗[minepy - Maximal Information-based Nonparametric Exploration](https://minepy.readthedocs.io/en/latest/)
+:::
+
+# Лінійна регресія {background-color="#eef3f8"}
+
+## Генеральна скупупність і вибірка {.smaller}
+
+[Генеральна скупупність]{.hi} - це сукупність всіх об'єктів, які ми вивчаємо.
+
+[Вибірка]{.hi} - це підмножина генеральної сукупності, яка використовується для отримання інформації про генеральну сукупність.
+
+. . .
+
+Ми запишемо [просту]{.hi} модель генеральної сукупності
+
+$$ y_i = \beta_0 + \beta_1 x_i + u_i $$
+
+де $y_i$ - залежна змінна;<br>
+    $x_i$ - незалежна змінна;<br>
+    $\beta_0$ - константа (перехоплення);<br>
+    $\beta_1$ - коефіцієнт регресії;<br>
+    $u_i$ - помилка (випадкова складова).
+
+. . .
+
+Тоді наша [модель регресії]{.hi} на основі вибірки:
+
+$$ y_i = \hat{\beta}_0 + \hat{\beta}_1 x_i + e_i $$
+
+де $e_i$ - помилка оцінки.
+
+. . .
+
+Розрахункова регресійна модель дає [оцінки]{.hi} для кожного спостереження:
+
+$$ \hat{y}_i = \hat{\beta}_0 + \hat{\beta}_1 x_i $$
+
+де $\hat{y}_i$ - прогнозоване значення залежної змінної.
+
+що дає нам _найкращу_ лінію в нашому наборі даних.
+
+## Генеральна скупупність і вибірка {.smaller}
+
+```{python}
+#| label: ols-gen
+#| include: false
+
+# Set population and sample sizes
+n_p = 100
+n_s = 30
+
+np.random.seed(42)
+
+# Function to generate datasets with specified correlation
+def generate_dataset(correlation):
+    mean = [0, 0]
+    cov_matrix = [[1, correlation], [correlation, 1]]
+    
+    # Generate random data with the specified correlation
+    data = np.random.multivariate_normal(mean, cov_matrix, 100)
+    
+    # Create a DataFrame
+    df = pd.DataFrame(data, columns=['x', 'y'])
+    
+    return df
+
+# Generate datasets with positive, negative, and no correlation
+pop_df = generate_dataset(0.8)
+
+pop_df['row'] = np.repeat(np.arange(1, np.sqrt(n_p) + 1), np.sqrt(n_p))
+pop_df['col'] = np.tile(np.arange(1, int(np.sqrt(n_p)) + 1), int(np.sqrt(n_p)))
+pop_df['s1'] = np.random.choice([True, False], size=n_p, p=[n_s / n_p, (n_p - n_s) / n_p])
+pop_df['s2'] = np.random.choice([True, False], size=n_p, p=[n_s / n_p, (n_p - n_s) / n_p])
+pop_df['s3'] = np.random.choice([True, False], size=n_p, p=[n_s / n_p, (n_p - n_s) / n_p])
+
+# Regressions
+lm0 = sm.OLS(pop_df['y'], sm.add_constant(pop_df['x'])).fit()
+lm1 = sm.OLS(pop_df.loc[pop_df['s1'], 'y'], sm.add_constant(pop_df.loc[pop_df['s1'], 'x'])).fit()
+lm2 = sm.OLS(pop_df.loc[pop_df['s2'], 'y'], sm.add_constant(pop_df.loc[pop_df['s2'], 'x'])).fit()
+lm3 = sm.OLS(pop_df.loc[pop_df['s3'], 'y'], sm.add_constant(pop_df.loc[pop_df['s3'], 'x'])).fit()
+```
+
+```{python}
+#| label: gen-dataset-2
+#| include: false
+#| cache: true
+
+# Simulation
+np.random.seed(12468)
+sim_df = pd.concat([sm.OLS(pop_df.sample(n=n_s).reset_index(drop=True)['y'], sm.add_constant(pop_df.sample(n=n_s).reset_index(drop=True)['x'])).fit().params.to_frame().T for _ in range(int(1e4))], ignore_index=True)
+```
+
+**Питання:** Чому ми співставляємо *генеральну сукупність і вибірку*?
+
+. . .
+
+:::: {.columns}
+
+::: {.column}
+
+```{python}
+#| label: pop1
+#| echo: false
+
+plt.figure(figsize=(5, 3))
+plt.scatter(pop_df['row'], pop_df['col'], color='darkslategray', s=100)
+
+plt.tick_params(axis='both', labelsize=0, length = 0)
+plt.box(False)
+plt.grid(None)
+
+# Display the plot
+plt.show()
+```
+
+**Генеральна сукупність**
+
+:::
+
+::: {.column}
+```{python}
+#| label: scatter1
+#| echo: false
+
+plt.figure(figsize=(5, 3))
+plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=60)
+plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2)
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+**Зв'язок у генеральній сукупності**
+
+```{python}
+#| echo: false
+
+Markdown(f"""
+$$ y_i = {round(lm0.params[0], 2)} + {round(lm0.params[1], 2)} x_i + u_i $$
+$$ y_i = \\beta_0 + \\beta_1 x_i + u_i $$
+""")
+```
+
+:::
+
+::::
+
+## Генеральна скупупність і вибірка {.smaller}
+
+**Питання:** Чому ми співставляємо *генеральну сукупність і вибірку*?
+
+:::: {.columns}
+
+::: {.column}
+
+```{python}
+#| label: sample1
+#| echo: false
+
+plt.figure(figsize=(5, 3))
+plt.scatter(pop_df.loc[pop_df['s1'], 'row'], pop_df.loc[pop_df['s1'], 'col'], color='darkslategray', s=100, marker='o')
+plt.scatter(pop_df.loc[~pop_df['s1'], 'row'], pop_df.loc[~pop_df['s1'], 'col'], facecolors='none', s=100, edgecolors='darkslategray', alpha=0.3)
+
+
+plt.tick_params(axis='both', labelsize=0, length = 0)
+plt.box(False)
+plt.grid(None)
+
+# Display the plot
+plt.show()
+```
+
+**Генеральна сукупність**
+
+:::
+
+::: {.column}
+```{python}
+#| label: sample1-scatter
+#| echo: false
+
+plt.figure(figsize=(5, 3))
+plt.scatter(pop_df.loc[pop_df['s1'], 'x'], pop_df.loc[pop_df['s1'], 'y'], color='darkslategray', s=60)
+plt.scatter(pop_df.loc[~pop_df['s1'], 'x'], pop_df.loc[~pop_df['s1'], 'y'], facecolors='none', s=60, edgecolors='darkslategray', alpha=0.3)
+plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2, alpha=0.3)
+plt.axline((0, lm1.params[0]), slope=lm1.params[1], linestyle='dashed', color='black', linewidth=2)
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+**Зв'язок у генеральній сукупності**
+
+```{python}
+#| echo: false
+
+Markdown(f"""
+$$ y_i = {round(lm0.params[0], 2)} + {round(lm0.params[1], 2)} x_i + u_i $$
+""")
+```
+
+**Зв'язок у вибірці**
+
+```{python}
+#| echo: false
+
+Markdown(f"""
+$$ \\hat{{y_i}} = {round(lm1.params[0], 2)} + {round(lm1.params[1], 2)} x_i $$
+""")
+```
+
+:::
+
+::::
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe="colored-particles/index.html"}
+
+<br>
+<br>
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi github >}} [aranaur](https://github.com/Aranaur)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify mdi linkedin >}} [ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
