@@ -7,8 +7,8 @@ institute: КНУ імені Тараса Шевченка | ФІТ
 # date-format: iso
 from: markdown+emoji
 title-slide-attributes:
-  data-background-iframe: colored-particles/index.html
-  # data-background-color: "#eef3f8"
+  # data-background-iframe: colored-particles/index.html
+  data-background-color: "#eef3f8"
 language: _language-ua.yml
 footer: 🔗 <a href="https://aranaur.rbind.io/lectures/asa/">Матеріали курсу</a>
 format: 
@@ -24,8 +24,11 @@ format:
     # highlight-style: github
     pdf-separate-fragments: true
     theme: [default, custom.scss]
+    fig-width: 15
+    # fig-height: 7.5
 knitr: 
   opts_chunk: 
+    fig.align: center
     echo: true
     warnings: false
     message: false
@@ -43,6 +46,7 @@ import pandas as pd
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.stats import norm, uniform
 
 from IPython.display import Markdown
 from tabulate import tabulate
@@ -165,7 +169,7 @@ negative_corr_data = generate_dataset(-0.8)
 no_corr_data = generate_dataset(0)
 
 # Plot the datasets with regression lines
-plt.figure(figsize=(15, 4))
+# plt.figure(figsize=(15, 4))
 
 # Positive Correlation
 plt.subplot(131)
@@ -219,7 +223,7 @@ $$ \text{corr}(X, Y) = \frac{\text{cov}(X, Y)}{\sigma_X \sigma_Y} $$
 Коефіцієнт кореляції завжди лежить в діапазоні $[-1, 1]$.
 :::
 
-. . .
+## Кореляція
 
 Іноді можна зустріти таку формулу для коефіцієнта кореляції:
 
@@ -253,15 +257,11 @@ $$
 
 ::: {.callout-important}
 Критичне значення критерію Стьюдента для рівня значущості $\alpha = 0.05$ і $n-2$ ступенів свободи: $t_{\alpha/2, n-2} = 2.045$
-:::
 
-. . .
-
-::: {.callout-important}
 Якщо $|t| > t_{\alpha/2, n-2}$, то нульову гіпотезу відхиляють.
 :::
 
-## Умови застосування критерію Стьюдента
+## Умови застосування критерію Стьюдента {.smaller}
 
 1.  Взаємозв'язок між змінними має бути лінійним і монотонним (зростає або спадає у одному напрямку).
 2.  Відсутність викидів
@@ -287,7 +287,7 @@ $$
 anscombe = sns.load_dataset('anscombe')
 
 # Plot the data
-plt.figure(figsize=(15, 4))
+# plt.figure(figsize=(15, 4))
 
 # First dataset
 plt.subplot(141)
@@ -328,7 +328,7 @@ plt.show()
 datasaurus = pd.read_csv('https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/datasaurus/datasaurus.csv')
 
 # Plot the data
-plt.figure(figsize=(15, 4))
+# plt.figure(figsize=(15, 4))
 
 # First dataset
 plt.subplot(131)
@@ -338,7 +338,7 @@ plt.title('Динозавр')
 # Second dataset
 plt.subplot(132)
 sns.regplot(x='x', y='y', data=datasaurus.loc[datasaurus['dataset'] == 'star'], color='#C10000', ci=None)
-plt.title('Віддалений')
+plt.title('Зірка')
 
 # Third dataset
 plt.subplot(133)
@@ -379,13 +379,13 @@ print(f'Коефіцієнт кореляції: {np_corr_p:.3f}')
 
 import scipy.stats as st
 
-st_corr_p = st.pearsonr(vgsales['NA_Sales'], vgsales['Global_Sales'])[0]
-st_corr_s = st.spearmanr(vgsales['NA_Sales'], vgsales['Global_Sales'])[0]
-st_corr_k = st.kendalltau(vgsales['NA_Sales'], vgsales['Global_Sales'])[0]
+st_corr_p = st.pearsonr(vgsales['NA_Sales'], vgsales['Global_Sales'])
+st_corr_s = st.spearmanr(vgsales['NA_Sales'], vgsales['Global_Sales'])
+st_corr_k = st.kendalltau(vgsales['NA_Sales'], vgsales['Global_Sales'])
 
-print(f'Коефіцієнт кореляції Пірсона: {st_corr_p:.3f}')
-print(f'Коефіцієнт кореляції Спірмена: {st_corr_s:.3f}')
-print(f'Коефіцієнт кореляції Кендалла: {st_corr_k:.3f}')
+print(f'Коефіцієнт кореляції Пірсона: {st_corr_p[0]:.3f} (p-value: {st_corr_p[1]:.3f})')
+print(f'Коефіцієнт кореляції Спірмена: {st_corr_s[0]:.3f} (p-value: {st_corr_s[1]:.3f})')
+print(f'Коефіцієнт кореляції Кендалла: {st_corr_k[0]:.3f} (p-value: {st_corr_k[1]:.3f})')
 ```
 
 ### Pandas
@@ -410,17 +410,17 @@ print(f'Коефіцієнт кореляції Кендалла: {pd_corr_k:.3f
 
 [Maximal Information-based Nonparametric Exploration (MINE)]{.hi} - це алгоритм, який використовується для виявлення нелінійних залежностей між змінними.
 
-![](img/mic.jpg)
+![](img/mic.jpg){fig-align="center"}
 
 ::: footer
 🔗[minepy - Maximal Information-based Nonparametric Exploration](https://minepy.readthedocs.io/en/latest/)
 :::
 
-# Лінійна регресія {background-color="#eef3f8"}
+# Генеральна сукупність і вибірка {background-color="#eef3f8"}
 
-## Генеральна скупупність і вибірка {.smaller}
+## Генеральна сукупність і вибірка {.smaller}
 
-[Генеральна скупупність]{.hi} - це сукупність всіх об'єктів, які ми вивчаємо.
+[Генеральна сукупність]{.hi} - це сукупність всіх об'єктів, які ми вивчаємо.
 
 [Вибірка]{.hi} - це підмножина генеральної сукупності, яка використовується для отримання інформації про генеральну сукупність.
 
@@ -444,7 +444,7 @@ $$ y_i = \hat{\beta}_0 + \hat{\beta}_1 x_i + e_i $$
 
 де $e_i$ - помилка оцінки.
 
-. . .
+## Генеральна сукупність і вибірка {.smaller}
 
 Розрахункова регресійна модель дає [оцінки]{.hi} для кожного спостереження:
 
@@ -454,7 +454,7 @@ $$ \hat{y}_i = \hat{\beta}_0 + \hat{\beta}_1 x_i $$
 
 що дає нам _найкращу_ лінію в нашому наборі даних.
 
-## Генеральна скупупність і вибірка {.smaller}
+## Генеральна сукупність і вибірка {.smaller}
 
 ```{python}
 #| label: ols-gen
@@ -495,16 +495,6 @@ lm2 = sm.OLS(pop_df.loc[pop_df['s2'], 'y'], sm.add_constant(pop_df.loc[pop_df['s
 lm3 = sm.OLS(pop_df.loc[pop_df['s3'], 'y'], sm.add_constant(pop_df.loc[pop_df['s3'], 'x'])).fit()
 ```
 
-```{python}
-#| label: gen-dataset-2
-#| include: false
-#| cache: true
-
-# Simulation
-np.random.seed(12468)
-sim_df = pd.concat([sm.OLS(pop_df.sample(n=n_s).reset_index(drop=True)['y'], sm.add_constant(pop_df.sample(n=n_s).reset_index(drop=True)['x'])).fit().params.to_frame().T for _ in range(int(1e4))], ignore_index=True)
-```
-
 **Питання:** Чому ми співставляємо *генеральну сукупність і вибірку*?
 
 . . .
@@ -517,7 +507,7 @@ sim_df = pd.concat([sm.OLS(pop_df.sample(n=n_s).reset_index(drop=True)['y'], sm.
 #| label: pop1
 #| echo: false
 
-plt.figure(figsize=(5, 3))
+# plt.figure(figsize=(5, 3))
 plt.scatter(pop_df['row'], pop_df['col'], color='darkslategray', s=100)
 
 plt.tick_params(axis='both', labelsize=0, length = 0)
@@ -537,7 +527,7 @@ plt.show()
 #| label: scatter1
 #| echo: false
 
-plt.figure(figsize=(5, 3))
+# plt.figure(figsize=(5, 3))
 plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=60)
 plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2)
 plt.box(False)
@@ -549,6 +539,7 @@ plt.show()
 **Зв'язок у генеральній сукупності**
 
 ```{python}
+#| label: formula1
 #| echo: false
 
 Markdown(f"""
@@ -561,7 +552,7 @@ $$ y_i = \\beta_0 + \\beta_1 x_i + u_i $$
 
 ::::
 
-## Генеральна скупупність і вибірка {.smaller}
+## Генеральна сукупність і вибірка {.smaller}
 
 **Питання:** Чому ми співставляємо *генеральну сукупність і вибірку*?
 
@@ -573,7 +564,7 @@ $$ y_i = \\beta_0 + \\beta_1 x_i + u_i $$
 #| label: sample1
 #| echo: false
 
-plt.figure(figsize=(5, 3))
+# plt.figure(figsize=(5, 3))
 plt.scatter(pop_df.loc[pop_df['s1'], 'row'], pop_df.loc[pop_df['s1'], 'col'], color='darkslategray', s=100, marker='o')
 plt.scatter(pop_df.loc[~pop_df['s1'], 'row'], pop_df.loc[~pop_df['s1'], 'col'], facecolors='none', s=100, edgecolors='darkslategray', alpha=0.3)
 
@@ -595,7 +586,7 @@ plt.show()
 #| label: sample1-scatter
 #| echo: false
 
-plt.figure(figsize=(5, 3))
+# plt.figure(figsize=(5, 3))
 plt.scatter(pop_df.loc[pop_df['s1'], 'x'], pop_df.loc[pop_df['s1'], 'y'], color='darkslategray', s=60)
 plt.scatter(pop_df.loc[~pop_df['s1'], 'x'], pop_df.loc[~pop_df['s1'], 'y'], facecolors='none', s=60, edgecolors='darkslategray', alpha=0.3)
 plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2, alpha=0.3)
@@ -609,6 +600,7 @@ plt.show()
 **Зв'язок у генеральній сукупності**
 
 ```{python}
+#| label: formula2
 #| echo: false
 
 Markdown(f"""
@@ -619,6 +611,7 @@ $$ y_i = {round(lm0.params[0], 2)} + {round(lm0.params[1], 2)} x_i + u_i $$
 **Зв'язок у вибірці**
 
 ```{python}
+#| label: formula3
 #| echo: false
 
 Markdown(f"""
@@ -630,22 +623,1286 @@ $$ \\hat{{y_i}} = {round(lm1.params[0], 2)} + {round(lm1.params[1], 2)} x_i $$
 
 ::::
 
+## Генеральна сукупність і вибірка {.smaller}
+
+**Питання:** Чому ми співставляємо *генеральну сукупність і вибірку*?
+
+:::: {.columns}
+
+::: {.column}
+
+```{python}
+#| label: sample2
+#| echo: false
+
+# plt.figure(figsize=(5, 3))
+plt.scatter(pop_df.loc[pop_df['s2'], 'row'], pop_df.loc[pop_df['s2'], 'col'], color='darkslategray', s=100, marker='o')
+plt.scatter(pop_df.loc[~pop_df['s2'], 'row'], pop_df.loc[~pop_df['s2'], 'col'], facecolors='none', s=100, edgecolors='darkslategray', alpha=0.3)
+
+
+plt.tick_params(axis='both', labelsize=0, length = 0)
+plt.box(False)
+plt.grid(None)
+
+# Display the plot
+plt.show()
+```
+
+**Генеральна сукупність**
+
+:::
+
+::: {.column}
+```{python}
+#| label: sample2-scatter
+#| echo: false
+
+# plt.figure(figsize=(5, 3))
+plt.scatter(pop_df.loc[pop_df['s2'], 'x'], pop_df.loc[pop_df['s2'], 'y'], color='darkslategray', s=60)
+plt.scatter(pop_df.loc[~pop_df['s2'], 'x'], pop_df.loc[~pop_df['s2'], 'y'], facecolors='none', s=60, edgecolors='darkslategray', alpha=0.3)
+plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2, alpha=0.3)
+plt.axline((0, lm1.params[0]), slope=lm1.params[1], linestyle='dashed', color='black', linewidth=2, alpha=0.3)
+plt.axline((0, lm2.params[0]), slope=lm2.params[1], linestyle='dashed', color='black', linewidth=2)
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+**Зв'язок у генеральній сукупності**
+
+```{python}
+#| label: formula4
+#| echo: false
+
+Markdown(f"""
+$$ y_i = {round(lm0.params[0], 2)} + {round(lm0.params[1], 2)} x_i + u_i $$
+""")
+```
+
+**Зв'язок у вибірці**
+
+```{python}
+#| label: formula5
+#| echo: false
+
+Markdown(f"""
+$$ \\hat{{y_i}} = {round(lm2.params[0], 2)} + {round(lm2.params[1], 2)} x_i $$
+""")
+```
+
+:::
+
+::::
+
+## Генеральна сукупність і вибірка {.smaller}
+
+**Питання:** Чому ми співставляємо *генеральну сукупність і вибірку*?
+
+:::: {.columns}
+
+::: {.column}
+
+```{python}
+#| label: sample3
+#| echo: false
+
+# plt.figure(figsize=(5, 3))
+plt.scatter(pop_df.loc[pop_df['s2'], 'row'], pop_df.loc[pop_df['s2'], 'col'], color='darkslategray', s=100, marker='o')
+plt.scatter(pop_df.loc[~pop_df['s2'], 'row'], pop_df.loc[~pop_df['s2'], 'col'], facecolors='none', s=100, edgecolors='darkslategray', alpha=0.3)
+
+
+plt.tick_params(axis='both', labelsize=0, length = 0)
+plt.box(False)
+plt.grid(None)
+
+# Display the plot
+plt.show()
+```
+
+**Генеральна сукупність**
+
+:::
+
+::: {.column}
+```{python}
+#| label: sample3-scatter
+#| echo: false
+
+# plt.figure(figsize=(5, 3))
+plt.scatter(pop_df.loc[pop_df['s3'], 'x'], pop_df.loc[pop_df['s3'], 'y'], color='darkslategray', s=60)
+plt.scatter(pop_df.loc[~pop_df['s3'], 'x'], pop_df.loc[~pop_df['s3'], 'y'], facecolors='none', s=60, edgecolors='darkslategray', alpha=0.3)
+plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2, alpha=0.3)
+plt.axline((0, lm1.params[0]), slope=lm1.params[1], linestyle='dashed', color='black', linewidth=2, alpha=0.3)
+plt.axline((0, lm2.params[0]), slope=lm2.params[1], linestyle='dashed', color='black', linewidth=2, alpha=0.3)
+plt.axline((0, lm3.params[0]), slope=lm3.params[1], linestyle='dashed', color='black', linewidth=2)
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+**Зв'язок у генеральній сукупності**
+
+```{python}
+#| label: formula6
+#| echo: false
+
+Markdown(f"""
+$$ y_i = {round(lm0.params[0], 2)} + {round(lm0.params[1], 2)} x_i + u_i $$
+""")
+```
+
+**Зв'язок у вибірці**
+
+```{python}
+#| label: formula7
+#| echo: false
+
+Markdown(f"""
+$$ \\hat{{y_i}} = {round(lm3.params[0], 2)} + {round(lm3.params[1], 2)} x_i $$
+""")
+```
+
+:::
+
+::::
+
+---
+
+Давайте повторимо це **10 000 разів**.
+
+Ця називається моделюванням (Монте-Карло).
+
+---
+
+## Генеральна сукупність і вибірка
+
+```{python}
+#| label: gen-dataset-2
+#| include: false
+
+# Simulation
+np.random.seed(12468)
+
+# Function to fit linear regression and return tidy summary
+def fit_linear_regression(size):
+    sampled_data = pop_df.sample(n=size)
+    model = sm.OLS(sampled_data['y'], sm.add_constant(sampled_data['x'])).fit()
+    return model.params
+
+# Perform linear regression simulations and concatenate results
+sim_results = [fit_linear_regression(size=n_s) for _ in range(int(1e4))]
+sim_df = pd.concat([pd.DataFrame(result) for result in sim_results], ignore_index=True, axis=1).T
+
+# Display the result
+print(sim_df)
+```
+
+```{python}
+#| label: gen-dataset-2-plot
+#| echo: false
+#| fig-dpi: 300
+
+# plt.figure(figsize=(10, 6))
+
+for intercept, slope in zip(sim_df['const'], sim_df['x']):
+    plt.axline((0, intercept), slope=slope, color='black', linewidth=0.1, alpha=0.1)
+
+plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=60)
+plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2)
+
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## Генеральна сукупність і вибірка
+
+**Питання:** Чому ми співставляємо *генеральну сукупність і вибірку*?
+
+:::: {.columns}
+
+::: {.column}
+```{python}
+#| label: gen-dataset-2-plot-2
+#| echo: false
+#| fig-dpi: 300
+
+# plt.figure(figsize=(10, 6))
+
+for intercept, slope in zip(sim_df['const'], sim_df['x']):
+    plt.axline((0, intercept), slope=slope, color='black', linewidth=0.1, alpha=0.1)
+
+plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=60)
+plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2)
+
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+:::
+
+::: {.column}
+- У **середньому** наші лінії регресії дуже добре відповідають лінії генеральної сукупності
+
+- Однак **окремі лінії** (зразки) можуть промахнутися.
+
+- Відмінності між окремими вибірками та генеральною сукупністю призводять до **невизначеності**.
+:::
+
+::::
+
+## Генеральна сукупність і вибірка
+
+**Питання:** Чому ми співставляємо *генеральну сукупність і вибірку*?
+
+**Відповідь:** Невизначеність має значення.
+
+$\hat{\beta}$  сама по собі є випадковою змінною, яка залежить від випадкової вибірки. Коли ми беремо зразок і запускаємо регресію, ми не знаємо, чи це «хороший» зразок ($\hat{\beta}$ близький до $\beta$) чи «поганий зразок» (наш зразок сильно відрізняється від генеральної сукупності).
+
+# Оцінювання параметрів регресії {background-color="#eef3f8"}
+
+## Оцінювання параметрів регресії {.smaller}
+
+Ми можемо оцінити лінію регресії в Python:
+
+`lm = sm.OLS(y, sm.add_constant(x)).fit()`
+
+Але звідки такі оцінки?
+
+Кілька слайдів назад:
+
+> $$ \hat{y}_i = \hat{\beta}_0 + \hat{\beta}_1 x_i $$
+> що дає нам *найкращий* рядок через наш набір даних.
+
+Але що ми маємо на увазі під «найкращою лінією»?
+
+## Бути «найкращим»{.smaller}
+
+**Питання:** Що ми маємо на увазі під *найкращою лінією*?
+
+**Відповіді:**
+
+- Загалом (у економетриці), *найкраща лінія* означає лінію, яка мінімізує суму квадратичних помилок (ESS):
+
+$$ \text{ESS} = \sum_{i = 1}^{n} e_i^2\quad $$
+
+де $\quad e_i = y_i - \hat{y}_i$
+
+- Звичайний метод **найменших квадратів** (**OLS**) мінімізує суму квадратів помилок.
+- На основі низки (здебільшого прийнятних) припущень, OLS
+   - Є незміщенним
+   - Це *найкращий* (мінімальна дисперсія) лінійний незміщений оцінювач
+
+## МНК {.smaller}
+
+Давайте розглянемо набір даних, який ми згенерували раніше.
+
+```{python}
+#| label: ols-plot-1
+#| echo: false
+
+plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=60)
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## МНК {.smaller}
+
+Для будь-якої лінії $\hat{y} = \hat{\beta}_0 + \hat{\beta}_1 x$
+
+```{python}
+#| label: ols-plot-2
+#| echo: false
+
+# Define line's parameters
+b0 = 0.5
+b1 = 0.2
+
+# Create a scatter plot
+plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=50, alpha=0.9)
+plt.axline((0, b0), slope=b1, color=orange, linewidth=2)
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## МНК {.smaller}
+
+Для будь-якої лінії $\hat{y} = \hat{\beta}_0 + \hat{\beta}_1 x$ ми можемо обчислити помилки: $e_i = y_i - \hat{y}_i$
+
+```{python}
+#| label: ols-plot-3
+#| echo: false
+
+# Define line's parameters
+b0 = 0.5
+b1 = 0.2
+
+pop_df['bestfit'] = b0 + b1 * pop_df['x']
+
+# Create a scatter plot
+plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=50, alpha=0.9)
+plt.axline((0, b0), slope=b1, color=orange, linewidth=2)
+
+for x_val, y_val, y_hat_val in zip(pop_df['x'], pop_df['y'], pop_df['bestfit']):
+    plt.plot([x_val, x_val], [y_val, y_hat_val], color='darkslategray', linewidth=0.5)
+
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## МНК {.smaller}
+Для будь-якої лінії $\hat{y} = \hat{\beta}_0 + \hat{\beta}_1 x$ ми можемо обчислити помилки: $e_i = y_i - \hat{y}_i$
+
+```{python}
+#| label: ols-plot-4
+#| echo: false
+
+# Define line's parameters
+b0 = 0.1
+b1 = 0.2
+
+pop_df['bestfit'] = b0 + b1 * pop_df['x']
+
+# Create a scatter plot
+plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=50, alpha=0.9)
+plt.axline((0, b0), slope=b1, color=orange, linewidth=2)
+
+for x_val, y_val, y_hat_val in zip(pop_df['x'], pop_df['y'], pop_df['bestfit']):
+    plt.plot([x_val, x_val], [y_val, y_hat_val], color='darkslategray', linewidth=0.5)
+
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## МНК {.smaller}
+Для будь-якої лінії $\hat{y} = \hat{\beta}_0 + \hat{\beta}_1 x$ ми можемо обчислити помилки: $e_i = y_i - \hat{y}_i$
+
+```{python}
+#| label: ols-plot-5
+#| echo: false
+
+# Define line's parameters
+b0 = 2
+b1 = -0.8
+
+pop_df['bestfit'] = b0 + b1 * pop_df['x']
+
+# Create a scatter plot
+plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=50, alpha=0.9)
+plt.axline((0, b0), slope=b1, color=orange, linewidth=2)
+
+for x_val, y_val, y_hat_val in zip(pop_df['x'], pop_df['y'], pop_df['bestfit']):
+    plt.plot([x_val, x_val], [y_val, y_hat_val], color='darkslategray', linewidth=0.5)
+
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## МНК {.smaller}
+
+ESS зводить помилки в квадрат $\sum e_i^2$: більші помилки отримують більші штрафи.
+
+```{python}
+#| label: ols-plot-6
+#| echo: false
+
+# Define line's parameters
+b0 = 1
+b1 = -0.8
+
+pop_df['bestfit'] = b0 + b1 * pop_df['x']
+
+# Create a scatter plot
+plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=50, alpha=0.9)
+plt.axline((0, b0), slope=b1, color=orange, linewidth=2)
+
+for x_val, y_val, y_hat_val in zip(pop_df['x'], pop_df['y'], pop_df['bestfit']):
+    plt.plot([x_val, x_val], [y_val, y_hat_val], color='darkslategray', linewidth=0.5)
+
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## МНК {.smaller}
+
+Оцінка МНК — це комбінація $\hat{\beta}_0$ і $\hat{\beta}_1$, які мінімізують ESS.
+
+```{python}
+#| label: ols-plot-7
+#| echo: false
+
+pop_df['bestfit'] = lm0.fittedvalues
+
+# Create a scatter plot
+plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=50, alpha=0.9)
+plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=orange, linewidth=2)
+
+for x_val, y_val, y_hat_val in zip(pop_df['x'], pop_df['y'], pop_df['bestfit']):
+    plt.plot([x_val, x_val], [y_val, y_hat_val], color='darkslategray', linewidth=0.5)
+
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## МНК {.smaller}
 
 
 
+У простій лінійній регресії оцінювач МНК виходить із вибору $\hat{\beta}_0$ і $\hat{\beta}_1$, які мінімізують суму квадратів помилок (ESS), _тобто_,
+
+$$ \min_{\hat{\beta}_0,\, \hat{\beta}_1} \text{ESS} $$
+
+. . .
+
+але ми вже знаємо $\text{ESS} = \sum_i e_i^2$. Тепер скористайтеся визначеннями $e_i$ і $\hat{y}$.
+
+$$
+\begin{aligned}
+   e_i^2 &= \left( y_i - \hat{y}_i \right)^2 = \left( y_i - \hat{\beta}_0 - \hat{\beta}_1 x_i \right)^2 \\
+   &= y_i^2 - 2 y_i \hat{\beta}_0 - 2 y_i \hat{\beta}_1 x_i + \hat{\beta}_0^2 + 2 \hat{\beta}_0 \hat{\beta }_1 x_i + \hat{\beta}_1^2 x_i^2
+\end{aligned}
+$$
+
+## МНК {.smaller}
 
 
 
+Ми наближаємось. Нам потрібно **мінімізувати ESS**. Ми показали, як ESS пов'язано з нашою вибіркою (наші дані: $x$ і $y$) і нашими оцінками (_тобто_, $\hat{\beta}_0$ і $\hat{\beta}_1$).
+
+$$ \text{ESS} = \sum_i e_i^2 = \sum_i \left( y_i^2 - 2 y_i \hat{\beta}_0 - 2 y_i \hat{\beta}_1 x_i + \hat{\beta} _0^2 + 2 \hat{\beta}_0 \hat{\beta}_1 x_i + \hat{\beta}_1^2 x_i^2 \right) $$
+
+Для умов мінімізації тепер беремо перші похідні ESS відносно $\hat{\beta}_0$ і $\hat{\beta}_1$.
+
+$$
+\begin{aligned}
+   \dfrac{\partial \text{ESS}}{\partial \hat{\beta}_0} &= \sum_i \left( 2 \hat{\beta}_0 + 2 \hat{\beta}_1 x_i - 2 y_i \right) = 2n \hat{\beta}_0 + 2 \hat{\beta}_1 \sum_i x_i - 2 \sum_i y_i \\
+   &= 2n \hat{\beta}_0 + 2n \hat{\beta}_1 \overline{x} - 2n \overline{y}
+\end{aligned}
+$$
+
+де $\overline{x} = \frac{\sum x_i}{n}$ і $\overline{y} = \frac{\sum y_i}{n}$ є вибірковими середніми $x$ і $y$ ( розмір $n$).
+
+## МНК {.smaller}
 
 
 
+Прирівнюємо похідну до нуля:
+
+$$ \dfrac{\partial \text{ESS}}{\partial \hat{\beta}_0} = 2n \hat{\beta}_0 + 2n \hat{\beta}_1 \overline{x} - 2n \overline{y} = 0 $$
+
+що означає
+
+::: recap
+$$ \hat{\beta}_0 = \overline{y} - \hat{\beta}_1 \overline{x} $$
+:::
+
+Тепер про $\hat{\beta}_1$...
+
+## МНК {.smaller}
 
 
 
+Візьміть похідну ESS відносно $\hat{\beta}_1$
+
+$$
+\begin{aligned}
+   \dfrac{\partial \text{ESS}}{\partial \hat{\beta}_1} &= \sum_i \left( 2 \hat{\beta}_0 x_i + 2 \hat{\beta}_1 x_i^2 - 2 y_i x_i \right) = 2 \hat{\beta}_0 \sum_i x_i + 2 \hat{\beta}_1 \sum_i x_i^2 - 2 \sum_i y_i x_i \\
+   &= 2n \hat{\beta}_0 \overline{x} + 2 \hat{\beta}_1 \sum_i x_i^2 - 2 \sum_i y_i x_i
+\end{aligned}
+$$
+
+встановити його рівним нулю
+
+$$ \dfrac{\partial \text{ESS}}{\partial \hat{\beta}_1} = 2n \hat{\beta}_0 \overline{x} + 2 \hat{\beta}_1 \sum_i x_i ^2 - 2 \sum_i y_i x_i = 0 $$
+
+замінюємо $\hat{\beta}_0$, _тобто_, $\hat{\beta}_0 = \overline{y} - \hat{\beta}_1 \overline{x}$ . Таким чином,
+
+$$
+  2n \left(\overline{y} - \hat{\beta}_1 \overline{x}\right) \overline{x} + 2 \hat{\beta}_1 \sum_i x_i^2 - 2 \sum_i y_i x_i = 0
+$$
+
+## МНК {.smaller}
 
 
 
-# Дякую за увагу! {.unnumbered .unlisted background-iframe="colored-particles/index.html"}
+Продовжуючи з останнього слайда
+
+$$ 2n \left(\overline{y} - \hat{\beta}_1 \overline{x}\right) \overline{x} + 2 \hat{\beta}_1 \sum_i x_i^2 - 2 \sum_i y_i x_i = 0 $$
+
+розкриваємо дужки
+
+$$ 2n \overline{y}\,\overline{x} - 2n \hat{\beta}_1 \overline{x}^2 + 2 \hat{\beta}_1 \sum_i x_i^2 - 2 \sum_i y_i x_i = 0 $$
+
+$$ \implies 2 \hat{\beta}_1 \left( \sum_i x_i^2 - n \overline{x}^2 \right) = 2 \sum_i y_i x_i - 2n \overline{y}\,\overline{ x} $$
+
+::: recap
+$$ \implies \hat{\beta}_1 = \dfrac{\sum_i y_i x_i - 2n \overline{y}\,\overline{x}}{\sum_i x_i^2 - n \overline{x}^2} = \dfrac{\sum_i (x_i - \overline{x})(y_i - \overline{y})}{\sum_i (x_i - \overline{x})^2} $$
+:::
+
+## МНК {.smaller}
+
+
+
+Готово!
+
+Тепер у нас є оцінювачі МНК для нахилу
+
+$$ \hat{\beta}_1 = \dfrac{\sum_i (x_i - \overline{x})(y_i - \overline{y})}{\sum_i (x_i - \overline{x})^2}$$
+
+і перетину
+
+$$ \hat{\beta}_0 = \overline{y} - \hat{\beta}_1 \overline{x} $$
+
+Тепер ми повернемося до припущень і властивостей OLS.
+
+# МНК: властивості та припущення {background-color="#eef3f8"}
+
+## Властивості
+
+**Згадуємо:** Функції щільності
+
+Пам'ятайте, що ми використовуємо **функції щільності ймовірності** (PDF) для опису ймовірності того, що **неперервна випадкова змінна** приймає діапазон значень. (Площа = 1.)
+
+Ці PDF-и характеризують розподіли ймовірностей, а найпоширеніші/відомі/популярні розподіли мають назви (_наприклад_, нормальний, *t*, Гамма).
+
+## Властивості
+
+**Згадуємо:** Функції щільності
+
+Імовірність того, що стандартна нормальна випадкова змінна набуває значення від -2 до 0: $\mathop{\text{P}}\left(-2 \leq X \leq 0\right) = 0,48$
+
+```{python}
+#| label: normal-pdf
+#| echo: false
+
+# Generate data for density's polygon
+x = np.arange(-4, 4.01, 0.01)
+y = norm.pdf(x)
+# Plot it
+plt.fill_between(x, y, 0, color='grey', alpha=0.8)
+plt.fill_between(x[(x > -2) & (x < 0)], norm.pdf(x[(x > -2) & (x < 0)]), 0, color=red_pink)
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## Властивості
+
+Імовірність того, що стандартна нормальна випадкова змінна набуває значення від -1,96 до 1,96: $\mathop{\text{P}}\left(-1,96 \leq X \leq 1,96\right) = 0,95$
+
+```{python}
+#| label: normal-pdf-2
+#| echo: false
+
+# Plot it
+plt.fill_between(x, y, 0, color='grey', alpha=0.8)
+plt.fill_between(x[(x > -1.96) & (x < 1.96)], norm.pdf(x[(x > -1.96) & (x < 1.96)]), 0, color=red_pink)
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## Властивості
+
+Імовірність того, що стандартна нормальна випадкова змінна набуває значення більше 2: $\mathop{\text{P}}\left(X > 2\right) = 0,023$
+
+```{python}
+#| label: normal-pdf-3
+#| echo: false
+
+# Plot it
+plt.fill_between(x, y, 0, color='grey', alpha=0.8)
+plt.fill_between(x[x > 2], norm.pdf(x[x > 2]), 0, color=red_pink)
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## Властивості
+
+Уявіть, що ми намагаємося оцінити невідомий параметр $\beta$, і нам відомі розподіли трьох конкуруючих оцінювачів.
+
+Який би ми обрали?
+
+```{python}
+#| label: three-estimators
+#| echo: false
+
+# Generate data for density's polygon
+x = np.arange(-4, 4.01, 0.01)
+y = norm.pdf(x)
+y_unif = uniform.pdf(x, loc=-0.5, scale=1.5)
+y_norm_2 = norm.pdf(x, loc=1, scale=0.5)
+# Plot it
+plt.fill_between(x, y, 0, color='darkslategray', alpha=0.6)
+plt.fill_between(x, y_unif, 0, color=red_pink, alpha=0.65)
+plt.fill_between(x, y_norm_2, 0, color='orange', alpha=0.8)
+# add vetical dashed lines at 0
+plt.axvline(0, color='black', linewidth=1, linestyle='dashed')
+plt.tick_params(left = False, right = False , labelleft = False , 
+                labelbottom = False, bottom = False) 
+plt.xlabel(r'$\beta$', fontsize=20)
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## Властивості
+
+**Питання:** Які властивості можуть бути важливі для оцінювача?
+
+. . .
+
+**Відповідь перша: зміщення (Bias)**
+
+Чи в середньому (після *багатьох* вибірок) оцінювач наближається до правильного значення?
+
+**Більш формально:** Чи дорівнює середнє значення розподілу оцінювача параметру, який він оцінює?
+
+$$ \mathop{\text{Bias}}_\beta \left( \hat{\beta} \right) = \mathop{\boldsymbol{E}}\left[ \hat{\beta} \right] - \beta $$
+
+## Властивості
+
+**Відповідь перша: зміщення (Bias)**
+
+:::: {.columns}
+
+::: {.column}
+**Незміщенна оцінка:** $\mathop{\boldsymbol{E}}\left[ \hat{\beta} \right] = \beta$
+
+```{python}
+#| label: unbiased-pdf
+#| echo: false
+
+plt.fill_between(x, y, 0, color=red_pink, alpha=0.9)
+# add vetical dashed lines at 0
+plt.axvline(0, color='black', linewidth=1, linestyle='dashed')
+plt.tick_params(left = False, right = False , labelleft = False , 
+                labelbottom = False, bottom = False) 
+plt.xlabel(r'$\beta$', fontsize=20)
+
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+:::
+
+::: {.column}
+**Зміщенна оцінка:** $\mathop{\boldsymbol{E}}\left[ \hat{\beta} \right] \neq \beta$
+
+```{python}
+#| label: biased-pdf
+#| echo: false
+fig, ax = plt.subplots()
+plt.fill_between(x, y, 0, color='darkslategray', alpha=0.9)
+# add vetical dashed lines at 0
+plt.axvline(-2, color='black', linewidth=1, linestyle='dashed')
+plt.tick_params(left = False, right = False , labelleft = False , 
+                labelbottom = False, bottom = False) 
+ax.set_xlabel(r'$\beta$', fontsize=20)
+ax.xaxis.set_label_coords(.27, 0)
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+:::
+
+::::
+
+## Властивості
+
+**Відповідь друга: відхилення/дисперсія (Variance).**
+
+. . .
+
+Важливі не лише центральні тенденції конкуруючих розподілів. 
+
+Ми також дбаємо про **дисперсію** оцінювача.
+
+$$ \mathop{\text{Var}} \left( \hat{\beta} \right) = \mathop{\boldsymbol{E}}\left[ \left( \hat{\beta} - \mathop{\boldsymbol{E}}\left[ \hat{\beta} \right] \right)^2 \right] $$
+
+Менші оцінки дисперсії означають, що ми отримуємо оцінки ближче до середнього в кожній вибірці.
+
+## Властивості
+
+**Відповідь друга: відхилення/дисперсія (Variance).**
+
+```{python}
+#| label: variance-pdf
+#| echo: false
+
+# Generate data for density's polygon
+x = np.arange(-4, 4.01, 0.01)
+y = norm.pdf(x)
+y_norm_2 = norm.pdf(x, loc=0, scale=0.5)
+# Plot it
+plt.fill_between(x, y_norm_2, 0, color=red_pink, alpha=0.8)
+plt.fill_between(x, y, 0, color='darkslategray', alpha=0.6)
+# add vetical dashed lines at 0
+plt.axvline(0, color='black', linewidth=1, linestyle='dashed')
+plt.tick_params(left = False, right = False , labelleft = False , 
+                labelbottom = False, bottom = False) 
+plt.xlabel(r'$\beta$', fontsize=20)
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## Властивості
+
+**Відповідь перша: зміщення**
+
+**Відповідь друга: відхилення.**
+
+**Тонкощі:** Компроміс зміщення-дисперсії (*bias-variance tradeoff*).
+
+Чи готові ми прийняти зміщення, щоб зменшити дисперсію?
+
+В економетриці/статистиці ми зазвичай дотримуємося незміщених оцінок. Але інші дисципліни (особливо у сфері ML) більше думають про цей компроміс.
+
+## The bias-variance tradeoff.
+
+```{python}
+#| label: variance-bias
+#| echo: false
+
+# Generate data for density's polygon
+x = np.arange(-4, 4.01, 0.01)
+y = norm.pdf(x)
+y_norm_2 = norm.pdf(x, loc=0.5, scale=0.5)
+# Plot it
+plt.fill_between(x, y_norm_2, 0, color=red_pink, alpha=0.8)
+plt.fill_between(x, y, 0, color='darkslategray', alpha=0.6)
+# add vetical dashed lines at 0
+plt.axvline(0, color='black', linewidth=1, linestyle='dashed')
+plt.tick_params(left = False, right = False , labelleft = False , 
+                labelbottom = False, bottom = False) 
+plt.xlabel(r'$\beta$', fontsize=20)
+plt.box(False)
+plt.grid(None)
+
+plt.show()
+```
+
+## Властивості
+
+Як ви вже могли здогадатися,
+
+- МНК є **незміщеною оцінкою**.
+- МНК має **мінімальне відхилення** серед усіх незміщених лінійних оцінювачів.
+
+## Властивості
+
+Але... ці (дуже гарні) властивості залежать від ряду припущень:
+
+1. Зв'язок генеральної сукупності є лінійним.
+
+2. Наша змінна $X$ є **екзогенною**, _тобто_, $\mathop{\boldsymbol{E}}\left[ u \mid X \right] = 0$.
+
+3. Змінна $X$ має варіацію. І якщо існує кілька пояснювальних змінних, вони не є абсолютно колінеарними.
+
+4. Збурення генеральної сукупності $u_i$ незалежно та однаково розподілені за нормальним законом розподілу із середнім в нулі $\left( \mathop{\boldsymbol{E}}\left[ u \right] = 0 \right)$ та дисперсією $\sigma^2$ (_тобто_, $\mathop{\boldsymbol{E}}\left[ u^2 \right] = \sigma^2$).
+
+::: footer
+🔗[Diagnostics for simple linear regression](https://gallery.shinyapps.io/slr_diag/)
+:::
+
+## Припущення
+
+Різні припущення гарантують різні властивості:
+
+- Припущення (1), (2) і (3) роблять OLS незміщеним.
+
+- Припущення (4) дає нам незміщену оцінку для дисперсії наших оцінок МНК.
+
+## Умовне сподівання {.smaller}
+
+Для багатьох випадків, нашим найважливішим припущенням є **екзогенність**, _тобто_,
+$$
+\begin{align}
+   \mathop{E}\left[ u \mid X \right] = 0
+\end{align}
+$$
+але що це насправді означає?
+
+. . .
+
+Один із способів подумати про це визначення:
+
+> Для *будь-якого* значення $X$ середнє значення залишків має дорівнювати нулю.
+
+- _Наприклад_, $\mathop{E}\left[ u \mid X=1 \right]=0$ *і* $\mathop{E}\left[ u \mid X=100 \right]= 0$
+
+- _Наприклад_, $\mathop{E}\left[ u \mid X_2=\text{Жінка} \right]=0$ *і* $\mathop{E}\left[ u \mid X_2=\text{Чоловік} \right]=0$
+
+---
+
+Графічно...
+
+---
+
+Дійсна екзогенність, _тобто_, $\mathop{E}\left[ u \mid X \right] = 0$
+
+```{python}
+#| label: ex-good-exog
+#| echo: false
+
+import joypy
+
+np.random.seed(123)
+
+n = 1000
+
+# Sample data
+df = pd.DataFrame({'var1': np.random.normal(0, 0.5, n),
+                   'group': [i for i in np.random.choice(list(range(4, -5, -1)), n)]})
+
+
+
+fig, ax = joypy.joyplot(df, by = "group", column = "var1")
+plt.xlabel('u')
+plt.ylabel('X')
+plt.show() 
+```
+
+---
+
+Недійсна екзогенність, _i.e._, $\mathop{E}\left[ u \mid X \right] \neq 0$
+
+```{python}
+#| label: ex-bad-exog
+#| echo: false
+
+# Add Bais to the data
+df['var2'] = df['var1'] + 0.5 * df['group']
+
+fig, ax = joypy.joyplot(df, by = "group", column = "var2")
+plt.xlabel('u')
+plt.ylabel('X')
+plt.show() 
+```
+
+# Невизначеність та помилки {background-color="#eef3f8"}
+
+## Щось ще?
+
+До цього моменту ми знаємо, що МНК має деякі хороші властивості, і ми знаємо, як оцінити перетин і коефіцієнт нахилу за допомогою МНК.
+
+Наш поточний робочий процес:
+
+- Отримати дані (точки зі значеннями $x$ і $y$)
+- Побудувати модель $y$ на $x$
+- Побудуйте лінію МНК (_тобто_, $\hat{y} = \hat{\beta}_0 + \hat{\beta}_1$)
+- Готово?
+
+Але чого ми **навчимося** з цієї вправи?
+
+## Щось ще? Так!
+
+Але чого ми **навчимося** з цієї вправи?
+
+- Наскільки ми повинні бути впевнені в точності наших оцінок?
+- Наскільки добре наша модель пояснює зміну $y$?
+
+Ми повинні вміти справлятися з невизначеністю. 
+
+## Вчимося на помилках
+
+Як показало наше попереднє моделювання, наша проблема з **невизначеністю** полягає в тому, що ми не знаємо, чи наша вибіркова оцінка *близька* чи *далека* від невідомого параметра генеральної сукупності.
+
+Проте ще не все втрачено. Ми можемо використовувати помилки $\left(e_i = y_i - \hat{y}_i\right)$, щоб зрозуміти, наскільки добре наша модель пояснює варіацію $y$.
+
+Коли здається, що наша модель виконує «гарну» роботу, ми можемо з більшою впевненістю використовувати її, щоб дізнатися про зв'язок між $y$ і $x$.
+
+Тепер нам просто потрібно формалізувати вищезазначене.
+
+## Вчимося на помилках
+
+Спочатку ми оцінимо дисперсію $u_i$ (нагадаємо: $\mathop{\text{Var}} \left( u_i \right) = \sigma^2$), використовуючи наші квадрати помилок, _тобто_,
+
+$$ s^2 = \dfrac{\sum_i e_i^2}{n - k} $$
+
+де $k$ дає кількість параметрів моделі, яку ми оцінюємо (_наприклад_, $\beta_0$ і $\beta_1$ дадуть $k=2$).
+
+$s^2$ є незміщеною оцінкою $\sigma^2$.
+
+## Вчимося на помилках
+
+Дисперсія $\hat{\beta}_1$ (для простої лінійної регресії) дорівнює
+
+$$ \mathop{\text{Var}} \left( \hat{\beta}_1 \right) = \dfrac{s^2}{\sum_i \left( x_i - \overline{x} \right)^2 } $$
+
+який показує, що дисперсія нашого оцінювача нахилу
+
+1. збільшується, оскільки наші збурення стають шумнішими
+
+2. зменшується зі збільшенням дисперсії $x$
+
+## Вчимося на помилках
+
+*Найчастіше:* **стандартна помилка** $\hat{\beta}_1$
+
+$$ \mathop{\hat{\text{SE}}} \left( \hat{\beta}_1 \right) = \sqrt{\dfrac{s^2}{\sum_i \left( x_i - \overline{ x} \right)^2}} $$
+
+*Нагадуємо:* Стандартна помилка оцінювача — це стандартне відхилення розподілу оцінювача.
+
+## МНК в Python {.smaller}
+
+::: {.panel-tabset}
+
+### Statsmodels v1
+
+```{python}
+#| label: lm-statsmodels-2
+
+import statsmodels.formula.api as smf
+
+results = smf.ols('Global_Sales ~ NA_Sales', vgsales).fit()
+print(results.summary())
+```
+
+### Statsmodels v2
+
+```{python}
+#| label: lm-statsmodels-1
+
+import statsmodels.api as sm
+
+X = sm.add_constant(vgsales.NA_Sales)
+model = sm.OLS(vgsales.Global_Sales, X)
+result = model.fit()
+print(result.summary())
+```
+
+### SciPy
+
+[Тільки парна регресія]{.red}
+
+```{python}
+#| label: lm-scipy
+
+from scipy import stats
+
+stats.linregress(x=vgsales.NA_Sales, y=vgsales.Global_Sales)
+```
+
+### Sklearn
+
+```{python}
+#| label: lm-sklearn
+
+from sklearn.linear_model import LinearRegression
+
+X = vgsales[['NA_Sales']]
+y = vgsales['Global_Sales']
+
+model = LinearRegression()
+model.fit(X, y)
+print(model.intercept_, model.coef_, model.score(X, y))
+```
+:::
+
+## Вчимося на помилках
+
+Ми використовуємо стандартну помилку $\hat{SE_{\hat{\beta}_1}}$ разом із самим $\hat{\beta}_1$, щоб дізнатися про параметр $\beta_1$.
+
+Після отримання розподілу $\hat{\beta}_1$, у нас є два (пов'язаних) варіанти формального статистичного висновку щодо нашого невідомого параметра $\beta_1$:
+
+- **Довірчі інтервали:** Використовуйте оцінку та її стандартну помилку, щоб створити інтервал, який при повторенні зазвичай міститиме справжній параметр.
+
+- **Перевірка гіпотези:** Визначте, чи є статистично значущі докази відхилення гіпотетичного значення або діапазону значень.
+
+# Довірчі інтервали {background-color="#eef3f8"}
+
+## Довірчі інтервали
+
+Будуємо довірчі інтервали рівня $(1-\alpha)$ для $\beta_1$
+$$ \hat{\beta_1}\ \pm t_{\alpha/2,\text{df}} \, \mathop{\hat{\text{SE}}} \left( \hat{\beta_1} \right) $$
+
+$t_{\alpha/2,\text{df}}$ позначає $\alpha/2$ квантиль $t$ розподілу з $n-k$ ступенями свободи.
+
+## Довірчі інтервали {.smaller}
+
+Будуємо довірчі інтервали рівня $(1-\alpha)$ для $\beta_1$
+$$ \hat{\beta_1}\ \pm t_{\alpha/2,\text{df}} \, \mathop{\hat{\text{SE}}} \left( \hat{\beta_1} \right) $$
+
+Наприклад, 100 спостережень, два коефіцієнти (_тобто_, $\hat{\beta}_0$ і $\hat{\beta}_1 \implies k = 2$), і $\alpha = 0,05$ ( для 95% довірчого інтервалу) дає нам $t_{0,025,\,98} = `r round(qt(0.025, 98), 2)`$
+
+```{python}
+#| label: t-dist
+#| echo: false
+
+x = np.arange(-4, 4.01, 0.01)
+y = stats.t.pdf(x, df=98)
+
+plt.fill_between(x[(x > -4) & (x < -1.98)], stats.t.pdf(x[(x > -4) & (x < -1.98)], df=98), 0, color=red_pink)
+plt.fill_between(x[(x > -1.98) & (x < 4)], stats.t.pdf(x[(x > -1.98) & (x < 4)], df=98), 0, color='gray', alpha=0.6)
+plt.axvline(-1.98, color='black', linewidth=1)
+plt.tick_params(left = False, right = False , labelleft = False , 
+                labelbottom = True, bottom = False)
+plt.box(False)
+plt.grid(None)
+plt.show()
+```
+
+## Довірчі інтервали {.smaller}
+
+Будуємо довірчі інтервали рівня $(1-\alpha)$ для $\beta_1$
+
+:::: {.columns}
+
+::: {.column width="70%"}
+```{python}
+#| label: ci-py-output
+#| echo: true
+
+results = smf.ols('y ~ x', pop_df).fit()
+print(results.summary())
+```
+:::
+
+::: {.column width="30%"}
+
+$$ \hat{\beta_1}\ \pm t_{\alpha/2,\text{df}} \, \mathop{\hat{\text{SE}}} \left( \hat{\beta_1} \right) $$
+
+Отже, наш 95% довірчий інтервал становить $0.7216 \pm 1.98 \times 0.067 = \left[ 0.589,\, 0.854 \right]$
+:::
+
+::::
+
+## Довірчі інтервали
+
+Отже, ми маємо довірчий інтервал для $\beta_1$, _тобто_, $\left[ 0.589,\, 0.854 \right]$.
+
+Що це означає?
+
+. . .
+
+**Неофіційно:** Довірчий інтервал дає нам область (інтервал), в якій ми можемо певною мірою довіряти щодо вмісту параметра.
+
+. . .
+
+**Більш формально:** Якщо неодноразово робити вибірку з нашої сукупності та будувати довірчі інтервали для кожної з цих вибірок, $(1-\alpha)$ відсотків наших інтервалів (*наприклад*, 95%) міститиме параметр генеральної сукупності *десь в інтервалі*.
+
+. . .
+
+Тепер повернемося до нашої симуляції...
+
+## Довірчі інтервали
+
+Ми відібрали 10 000 вибірок (кожна розміром $n = 30$) із нашої сукупності та оцінили нашу регресійну модель для кожної з цих симуляцій:
+
+$$ y_i = \hat{\beta}_0 + \hat{\beta}_1 x_i + e_i $$
+<center>(повторюється 10 000 разів)</center>
+
+Тепер давайте оцінимо 95% довірчі інтервали для кожного з цих інтервалів...
+
+## Довірчі інтервали
+
+**З нашого попереднього моделювання:** 97.5% 95% довірчих інтервалів містять справжнє значення параметра $\beta_1$.
+
+![](img/simulation-ci-1.png){fig-align="center"}
+
+# Тестування гіпотез {background-color="#eef3f8"}
+
+## Тестування гіпотез {.smaller}
+
+У багатьох дослідженнях ми хочемо знати більше, ніж точкову оцінку або діапазон значень. Ми хочемо знати, що наші статистичні дані говорять про існуючі теорії.
+
+Ми хочемо перевірити гіпотези, висунуті чиновниками, політиками, економістами, науковцями, друзями, дивними сусідами тощо.
+
+**Приклади**
+
+- Збільшення присутності поліції **зменшує злочинність**?
+
+- Будівництво гігантської стіни **зменшує злочинність**?
+
+- Розпуск уряду **згубно впливає на економіку**?
+
+- Чи легальний канабіс **зменшує водіння в нетверезому стані** або **зменшує вживання опіоїдів**?
+
+- Чи стандарти якості повітря **покращують здоров'я** та/або **зменшують кількість робочіх місць**?
+
+## Тестування гіпотез {.smaller}
+
+Перевірка гіпотез спирається на дуже схожі результати та інтуїцію.
+
+Хоча невизначеність, звичайно, існує, ми все ще можемо побудувати *надійні* статистичні тести (відкидаючи або не відхиляючи висунуту гіпотезу).
+
+. . .
+
+**МНК *t* тест**: Наша (нульова) гіпотеза стверджує, що $\beta_1$ дорівнює значенню $c$, _тобто_, $H_o:\: \beta_1 = c$
+
+З властивостей МНК ми можемо показати, що тестова статистика
+
+$$ t_\text{stat} = \dfrac{\hat{\beta}_1 - c}{\mathop{\hat{\text{SE}}} \left( \hat{\beta}_1 \right)} $$
+
+слідує розподілу $t$ з $n-k$ ступенями свободи.
+
+## Тестування гіпотез {.smaller}
+
+Для **двостороннього** тесту рівня $\alpha$ ми відхиляємо нульову гіпотезу (і завершуємо альтернативну гіпотезу), коли
+
+$$ \left|t_\text{stat}\right| > \left|t_{1-\alpha/2,\,df}\right| $$
+
+це означає, що наша **тестова статистика є більш екстремальною, ніж критичне значення**.
+
+Крім того, ми можемо обчислити **p-значення**, яке супроводжує нашу тестову статистику, що фактично дає нам імовірність побачити нашу тестову статистику *або більш екстремальну тестову статистику*, якщо нульова гіпотеза вірна.
+
+Дуже малі p-значення (зазвичай < 0,05) означають, що ми навряд чи побачимо наші результати, якби нульова гіпотеза дійсно була вірною — ми схильні відхиляти нуьлову гіпотезу для p-значень нижче 0,05.
+
+## Тестування гіпотез {.smaller}
+
+:::: {.columns}
+
+::: {.column width="70%"}
+```{python}
+#| label: hypothesis-test
+#| echo: true
+
+import statsmodels.formula.api as smf
+
+results = smf.ols('y ~ x', pop_df).fit()
+print(results.summary())
+```
+
+:::
+
+::: {.column width="30%"}
+$H_0$: $\beta_1 = 0$ *vs.* $H_a$: $\beta_1 \neq 0$
+
+$t_\text{stat} = 10.811$ та $t_\text{0.975, 98} = `r round(qt(0.975, 98), 2)`$
+
+*p*-значення $< 0,05$
+
+**Тому ми відкидаємо $H_0$!**
+
+:::
+
+::::
+
+## Тестування гіпотез
+
+Повертаємося до нашої симуляції! Давайте подивимося, що насправді робить наша $t$ статистика.
+
+У цій ситуації ми фактично можемо знати (і забезпечити) нульову гіпотезу, оскільки ми згенерували дані.
+
+Для кожного з 10 000 зразків ми обчислимо статистику $t$, а потім побачимо, скільки статистичних даних $t$ перевищує наше критичне значення (`r round(qt(0.975, 28), 2)`, як вище).
+
+Відповідь має бути приблизно 5 відсотків — наш рівень $\alpha$.
+
+## Тестування гіпотез
+
+У нашому моделюванні 2.1% нашої статистики $t$ відхиляє нульову гіпотезу.
+
+Розподіл нашої статистики $t$ (заштрихування областей відхилення).
+
+![](img/simulation-t-plot-1.png){fig-align="center"}
+
+---
+
+Відповідно, 2.1% наших значень $p$ відхиляє нульову гіпотезу.
+
+Розподіл наших значень $p$ (заштрихування значень $p$ нижче 0,05).
+
+![](img/simulation-p-plot-1.png){fig-align="center"}
+
+## F-тест
+
+Іноді можна зустріти $F$-тести.
+
+Ми використовуємо $F$-тести для перевірки гіпотез, які включають кілька випадків
+<br> (_наприклад_, $\beta_1 = \beta_2$ або $\beta_3 + \beta_4 = 1$),
+
+а не одна проста гіпотеза
+<br>(_наприклад_, $\beta_1 = 0$, для якого ми просто використаємо тест $t$).
+
+## F-тест
+
+**Приклад**
+
+Економісти люблять казати: «Гроші взаємозамінні».
+
+Уявіть собі, що ми можемо захотіти перевірити, чи дійсно гроші, отримані як дохід, мають такий же вплив на споживання, як гроші, отримані від податкових знижок.
+
+$$ \text{Споживання}_i = \beta_0 + \beta_1 \text{Дохід}_{i} + \beta_2 \text{Знижка}_i + u_i $$
+
+## F-тест
+
+**Приклад, продовження**
+
+Ми можемо записати нашу нульову гіпотезу як
+
+$$ H_o:\: \beta_1 = \beta_2 \iff H_o :\: \beta_1 - \beta_2 = 0 $$
+
+Накладення цієї нульової гіпотези дає нам **обмежену модель**
+
+$$ \text{Споживання}_i = \beta_0 + \beta_1 \text{Дохід}_{i} + \beta_1 \text{Знижка}_i + u_i $$
+$$ \text{Споживання}_i = \beta_0 + \beta_1 \left( \text{Дохід}_{i} + \text{Знижка}_i \right) + u_i $$
+
+## F-тест
+
+**Приклад, продовження**
+
+Щоб перевірити нульову гіпотезу $H_o :\: \beta_1 = \beta_2$ проти $H_a :\: \beta_1 \neq \beta_2$,
+<br>ми використовуємо статистику $F$
+$$
+\begin{align}
+   F_{q,\,n-k-1} = \dfrac{\left(\text{ESS}_r - \text{ESS}_u\right)/q}{\text{ESS}_u/(n-k-1)}
+\end{align}
+$$
+який (як випливає з назви) відповідає розподілу $F$ із ступенями свободи в чисельнику $q$ і ступенями свободи в знаменнику $n-k-1$.
+
+Тут $q$ — це кількість обмежень, які ми накладаємо через $H_o$.
+
+## F-тест {.smaller}
+
+**Приклад, продовження**
+
+$\text{ESS}_r$ – це сума квадратів помилок (ESS) з нашої **обмеженої моделі**
+$$ \text{Споживання}_i = \beta_0 + \beta_1 \left( \text{Дохід}_{i} + \text{Знижка}_i \right) + u_i $$
+
+а $\text{ESS}_u$ – це сума квадратів помилок (ESS) з нашої **необмеженої моделі**
+$$ \text{Споживання}_i = \beta_0 + \beta_1 \text{Дохід}_{i} + \beta_2 \text{Знижка}_i + u_i $$
+
+. . .
+
+Тест $F$ порівнює ефективність необмеженої моделі з ефективність обмеженої моделі, використовуючи їхні $\text{ESS}$.
+
+. . .
+
+$$
+\begin{align}
+   F_\text{stat} = \dfrac{\left(\text{ESS}_r - \text{ESS}_u\right)/q}{\text{ESS}_u/(n-k-1)} \sim F_{ q,\,n-k-1}
+\end{align}
+$$
+
+# Дякую за увагу! {background-color="#eef3f8"}
 
 <br>
 <br>
