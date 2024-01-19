@@ -1,0 +1,263 @@
+---
+title: "Множинна регресія"
+subtitle: "Прикладний статистичний аналіз"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка | ФІТ
+# date: today
+# date-format: iso
+from: markdown+emoji
+title-slide-attributes:
+  data-background-iframe: .02_files/libs/colored-particles/index.html
+#   data-background-color: "#eef3f8"
+language: _language-ua.yml
+footer: 🔗 <a href="https://aranaur.rbind.io/lectures/asa/">Матеріали курсу</a>
+format: 
+  revealjs:
+    transition: fade
+    chalkboard: true
+    logo: img/fit.png
+    code-line-numbers: false
+    slide-number: c/t
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    # highlight-style: github
+    pdf-separate-fragments: true
+    theme: [default, custom.scss]
+    fig-width: 15
+    fig-height: 7.5
+knitr: 
+  opts_chunk: 
+    fig.align: center
+    echo: true
+    warnings: false
+    message: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Import libraries
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.stats import norm, uniform
+
+from IPython.display import Markdown
+from tabulate import tabulate
+
+# Set seaborn default style
+sns.set_style('whitegrid')
+sns.set_palette('colorblind')
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+grey_light = "grey70"
+grey_mid   = "grey50"
+grey_dark  = "grey20"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Множинна регресія
+
+## Більше пояснювальних змінних
+
+Ми переходимо від **простої лінійної регресії** (одна [незалежна]{.purple} змінна та одна [залежна]{.pink})
+
+$$ \color{#e64173}{y_i} = \beta_0 + \beta_1 \color{#6A5ACD}{x_i} + u_i $$
+
+до **множинної лінійної регресії** (декілька [незалежних]{.purple} та одна [залежна]{.pink} змінні)
+
+$$ \color{#e64173}{y_i} = \beta_0 + \beta_1 \color{#6A5ACD}{x_{1i}} + \beta_2 \color{#6A5ACD}{x_{2i}} + \cdots + \beta_k \color{#6A5ACD}{x_{ki}} + u_i $$
+
+**Чому?**
+
+. . .
+
+Ми можемо краще пояснити варіацію $y$, покращити прогнози, уникнути зміщення пропущених змінних ...
+
+## Множинна регресія
+
+```{python}
+#| label: gen-data
+#| include: false
+
+n = 100
+np.random.seed(123)
+
+gen_df = pd.DataFrame({
+    'x1': np.random.uniform(-3, 3, n)
+})
+gen_df['x2'] = np.random.choice([True, False], n, replace=True)
+gen_df['u'] = np.random.normal(0, 1, n)
+gen_df['y'] = -0.5 + gen_df['x1'] + gen_df['x2'] * 4 + gen_df['u']
+
+mean_a = gen_df[gen_df['x2'] == False]['y'].mean()
+mean_b = gen_df[gen_df['x2'] == True]['y'].mean()
+
+gen_df['y_dm'] = gen_df['y'] - mean_a * (gen_df['x2'] == False) - mean_b * (gen_df['x2'] == True)
+```
+
+$y_i = \beta_0 + \beta_1 x_{1i} + \beta_2 x_{2i} + u_i \quad$ $x_1$ є неперервним $\quad x_2$ є категоріальним
+
+```{python}
+#| label: plot-data
+#| echo: false
+
+graph = sns.scatterplot(x='x1', y='y', hue='x2', data=gen_df, palette=sns.color_palette(["darkslategrey", red_pink]))
+graph.axvline(0, color='grey', alpha=0.8)
+graph.axhline(0, color='grey', alpha=0.8)
+plt.tick_params(left = False, right = False , labelleft = False , 
+                labelbottom = False, bottom = False)
+plt.ylabel('')
+plt.xlabel('')
+plt.annotate(text='y', xy = (0, 0), xytext = (-0.2, 4.5))
+plt.annotate(text='x', xy = (0, 0), xytext = (3.5, -0.2))
+plt.box(False)
+plt.grid(None)
+plt.show()
+```
+
+## Множинна регресія
+
+$\beta_0$ та категоріальна змінна $x_2$ керують середніми значеннями груп.
+
+```{python}
+#| label: plot-data2
+#| echo: false
+
+graph = sns.scatterplot(x='x1', y='y', hue='x2', data=gen_df, palette=sns.color_palette(["darkslategrey", red_pink]))
+graph.axvline(0, color='grey')
+graph.axhline(mean_a, color="darkslategrey", alpha=0.2)
+graph.axhline(mean_b, color=red_pink, alpha=0.2)
+graph.axhline(0, color='grey')
+plt.tick_params(left = False, right = False , labelleft = False , 
+                labelbottom = False, bottom = False)
+plt.ylabel('')
+plt.xlabel('')
+plt.annotate(text='y', xy = (0, 0), xytext = (-0.2, 8.5))
+plt.annotate(text='x', xy = (0, 0), xytext = (3.5, -0.2))
+plt.box(False)
+plt.grid(None)
+plt.show()
+```
+
+## Множинна регресія
+
+Якщо прибрати середнє значення груп:
+
+```{python}
+#| label: plot-data3
+#| echo: false
+
+graph = sns.scatterplot(x='x1', y='y_dm', hue='x2', data=gen_df, palette=sns.color_palette(["darkslategrey", red_pink]))
+graph.axvline(0, color='grey')
+graph.axhline(0, color='grey')
+plt.tick_params(left = False, right = False , labelleft = False , 
+                labelbottom = False, bottom = False)
+plt.ylabel('')
+plt.xlabel('')
+plt.annotate(text='y', xy = (0, 0), xytext = (-0.2, 4.5))
+plt.annotate(text='x', xy = (0, 0), xytext = (3.5, -0.2))
+plt.ylabel('y')
+plt.box(False)
+plt.grid(None)
+plt.show()
+```
+
+## Множинна регресія
+
+$\hat{\beta}_1$ оцінює співвідношення між $y$ і $x_1$ після врахування $x_2$.
+
+```{python}
+#| label: plot-data4
+#| echo: false
+
+graph = sns.scatterplot(x='x1', y='y_dm', hue='x2', data=gen_df, palette=sns.color_palette(["darkslategrey", red_pink]))
+sns.regplot(x='x1', y='y_dm', data=gen_df, scatter=False, color=orange, ci=None)
+graph.axvline(0, color='grey')
+graph.axhline(0, color='grey')
+plt.tick_params(left = False, right = False , labelleft = False , 
+                labelbottom = False, bottom = False)
+plt.ylabel('')
+plt.xlabel('')
+plt.annotate(text='y', xy = (0, 0), xytext = (-0.2, 4.5))
+plt.annotate(text='x', xy = (0, 0), xytext = (3.5, -0.2))
+plt.box(False)
+plt.grid(None)
+plt.show()
+```
+
+## Множинна регресія
+
+Інший варіант поглянути на це:
+
+```{python}
+#| label: plot-data5
+#| echo: false
+#| eval: false
+
+sns.lmplot(x='x1', y='y', hue='x2', data=gen_df, scatter=True, ci=None, palette=sns.color_palette(["darkslategrey", red_pink]))
+plt.axvline(0, color='grey')
+plt.axhline(0, color='grey')
+plt.tick_params(left = False, right = False , labelleft = False , 
+                labelbottom = False, bottom = False)
+plt.ylabel('')
+plt.xlabel('')
+plt.annotate(text='y', xy = (0, 0), xytext = (-0.2, 4.5))
+plt.annotate(text='x', xy = (0, 0), xytext = (3.5, -0.2))
+plt.gcf().set_size_inches(15, 7.5)
+plt.ylabel('y')
+plt.box(False)
+plt.grid(False)
+plt.show()
+```
+
+![](img/plot-data5-10.png){fig-align="center"}
+
+
+## Множинна регресія
+
+Поглянемо на оцінювання параметрів моделі...
+
+Для простої лінійної регресії $y_i = \beta_0 + \beta_1 x_i + u_i$
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Дякую за увагу! {background-color="#eef3f8"}
+
+<br>
+<br>
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi github >}} [aranaur](https://github.com/Aranaur)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify mdi linkedin >}} [ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
