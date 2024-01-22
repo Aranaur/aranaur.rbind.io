@@ -21,19 +21,17 @@ format:
     mouse-wheel: true
     width: 1350  
     height: 759.375
-    # highlight-style: github
+    highlight-style: github
     pdf-separate-fragments: true
-    theme: [default, custom.scss]
-    fig-width: 15
     # fig-height: 7.5
-knitr: 
-  opts_chunk: 
-    fig.align: center
-    echo: true
-    warnings: false
-    message: false
-editor_options: 
-  chunk_output_type: console
+    fig-width: 15
+    fig-align: center
+    fig-format: svg
+    theme: [default, custom.scss]
+jupyter: python3
+execute: 
+  warning: false
+  echo: true
 ---
 
 ```{python}
@@ -44,9 +42,10 @@ editor_options:
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.stats import norm, uniform
+from scipy.stats import norm, uniform, t
 
 from IPython.display import Markdown
 from tabulate import tabulate
@@ -64,9 +63,9 @@ blue       = "#181485"
 navy       = "#150E37FF"
 green      = "#8bb174"
 yellow     = "#D8BD44"
-grey_light = "grey70"
-grey_mid   = "grey50"
-grey_dark  = "grey20"
+# grey_light = "grey70"
+# grey_mid   = "grey50"
+# grey_dark  = "grey20"
 purple     = "#6A5ACD"
 slate      = "#314f4f"
 ```
@@ -80,15 +79,17 @@ slate      = "#314f4f"
 -   доцент кафедри математичного моделювання і статистики КНЕУ
 -   викладач Міжнародного інституту бізнесу (MBA)
 
-{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
 
 {{< iconify mdi github >}} [aranaur](https://github.com/Aranaur)
 
-{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+{{< iconify mdi envelope >}} <ihor.miroshnychenko@knu.ua>
 
 {{< iconify mdi linkedin >}} [ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
-
-{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
 
 :::
 
@@ -131,7 +132,7 @@ slate      = "#314f4f"
 
 . . .
 
-::: {.callout-note}
+::: {.callout-note icon="false"}
 Клас буде діяти до 11 квітня 2024 року, після чого буде буде відкрито наступний потік.
 
 Слідкуйте за оновленнями.
@@ -146,6 +147,7 @@ slate      = "#314f4f"
 ```{python}
 #| label: corr-1
 #| echo: false
+#| fig-align: center
 
 # Set a random seed for reproducibility
 np.random.seed(42)
@@ -282,6 +284,7 @@ $$
 ```{python}
 #| label: anscombe
 #| echo: false
+#| fig-align: center
 
 # Load the data
 anscombe = sns.load_dataset('anscombe')
@@ -323,6 +326,7 @@ plt.show()
 ```{python}
 #| label: datasaurus
 #| echo: false
+#| fig-align: center
 
 # Load the data
 datasaurus = pd.read_csv('https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/datasaurus/datasaurus.csv')
@@ -352,10 +356,9 @@ plt.show()
 ## Кореляція в Python {.smaller}
 
 ```{python}
-#| label: vgsales
+#| label: tbl-vgsales
 
 vgsales = pd.read_csv("https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/video_games_sales/vgsales.csv")
-
 vgsales.head()
 ```
 
@@ -422,7 +425,7 @@ print(f'Коефіцієнт кореляції Кендалла: {pd_corr_k:.3f
 
 [Генеральна сукупність]{.hi} - це сукупність всіх об'єктів, які ми вивчаємо.
 
-[Вибірка]{.hi} - це підмножина генеральної сукупності, яка використовується для отримання інформації про генеральну сукупність.
+[Вибірка]{.purple} - це підмножина генеральної сукупності, яка використовується для отримання інформації про генеральну сукупність.
 
 . . .
 
@@ -438,7 +441,7 @@ $$ y_i = \beta_0 + \beta_1 x_i + u_i $$
 
 . . .
 
-Тоді наша [модель регресії]{.hi} на основі вибірки:
+Тоді наша [модель регресії]{.purple} на основі вибірки:
 
 $$ y_i = \hat{\beta}_0 + \hat{\beta}_1 x_i + e_i $$
 
@@ -446,7 +449,7 @@ $$ y_i = \hat{\beta}_0 + \hat{\beta}_1 x_i + e_i $$
 
 ## Генеральна сукупність і вибірка {.smaller}
 
-Розрахункова регресійна модель дає [оцінки]{.hi} для кожного спостереження:
+Розрахункова регресійна модель дає [оцінки]{.purple} для кожного спостереження:
 
 $$ \hat{y}_i = \hat{\beta}_0 + \hat{\beta}_1 x_i $$
 
@@ -511,6 +514,7 @@ lm3 = sm.OLS(pop_df.loc[pop_df['s3'], 'y'], sm.add_constant(pop_df.loc[pop_df['s
 plt.scatter(pop_df['row'], pop_df['col'], color='darkslategray', s=100)
 
 plt.tick_params(axis='both', labelsize=0, length = 0)
+
 plt.box(False)
 plt.grid(None)
 
@@ -526,10 +530,12 @@ plt.show()
 ```{python}
 #| label: scatter1
 #| echo: false
+#| fig-align: center
 
 # plt.figure(figsize=(5, 3))
 plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=60)
 plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2)
+plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
 
@@ -591,6 +597,7 @@ plt.scatter(pop_df.loc[pop_df['s1'], 'x'], pop_df.loc[pop_df['s1'], 'y'], color=
 plt.scatter(pop_df.loc[~pop_df['s1'], 'x'], pop_df.loc[~pop_df['s1'], 'y'], facecolors='none', s=60, edgecolors='darkslategray', alpha=0.3)
 plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2, alpha=0.3)
 plt.axline((0, lm1.params[0]), slope=lm1.params[1], linestyle='dashed', color='black', linewidth=2)
+plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
 
@@ -638,8 +645,6 @@ $$ \\hat{{y_i}} = {round(lm1.params[0], 2)} + {round(lm1.params[1], 2)} x_i $$
 # plt.figure(figsize=(5, 3))
 plt.scatter(pop_df.loc[pop_df['s2'], 'row'], pop_df.loc[pop_df['s2'], 'col'], color='darkslategray', s=100, marker='o')
 plt.scatter(pop_df.loc[~pop_df['s2'], 'row'], pop_df.loc[~pop_df['s2'], 'col'], facecolors='none', s=100, edgecolors='darkslategray', alpha=0.3)
-
-
 plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
@@ -663,6 +668,7 @@ plt.scatter(pop_df.loc[~pop_df['s2'], 'x'], pop_df.loc[~pop_df['s2'], 'y'], face
 plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2, alpha=0.3)
 plt.axline((0, lm1.params[0]), slope=lm1.params[1], linestyle='dashed', color='black', linewidth=2, alpha=0.3)
 plt.axline((0, lm2.params[0]), slope=lm2.params[1], linestyle='dashed', color='black', linewidth=2)
+plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
 
@@ -708,8 +714,8 @@ $$ \\hat{{y_i}} = {round(lm2.params[0], 2)} + {round(lm2.params[1], 2)} x_i $$
 #| echo: false
 
 # plt.figure(figsize=(5, 3))
-plt.scatter(pop_df.loc[pop_df['s2'], 'row'], pop_df.loc[pop_df['s2'], 'col'], color='darkslategray', s=100, marker='o')
-plt.scatter(pop_df.loc[~pop_df['s2'], 'row'], pop_df.loc[~pop_df['s2'], 'col'], facecolors='none', s=100, edgecolors='darkslategray', alpha=0.3)
+plt.scatter(pop_df.loc[pop_df['s3'], 'row'], pop_df.loc[pop_df['s3'], 'col'], color='darkslategray', s=100, marker='o')
+plt.scatter(pop_df.loc[~pop_df['s3'], 'row'], pop_df.loc[~pop_df['s3'], 'col'], facecolors='none', s=100, edgecolors='darkslategray', alpha=0.3)
 
 
 plt.tick_params(axis='both', labelsize=0, length = 0)
@@ -736,6 +742,7 @@ plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2,
 plt.axline((0, lm1.params[0]), slope=lm1.params[1], linestyle='dashed', color='black', linewidth=2, alpha=0.3)
 plt.axline((0, lm2.params[0]), slope=lm2.params[1], linestyle='dashed', color='black', linewidth=2, alpha=0.3)
 plt.axline((0, lm3.params[0]), slope=lm3.params[1], linestyle='dashed', color='black', linewidth=2)
+plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
 
@@ -811,7 +818,7 @@ for intercept, slope in zip(sim_df['const'], sim_df['x']):
 
 plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=60)
 plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2)
-
+plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
 
@@ -837,7 +844,7 @@ for intercept, slope in zip(sim_df['const'], sim_df['x']):
 
 plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=60)
 plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=red_pink, linewidth=2)
-
+plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
 
@@ -906,9 +913,9 @@ $$ \text{ESS} = \sum_{i = 1}^{n} e_i^2\quad $$
 #| echo: false
 
 plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=60)
+plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
-
 plt.show()
 ```
 
@@ -919,6 +926,7 @@ plt.show()
 ```{python}
 #| label: ols-plot-2
 #| echo: false
+#| fig-align: center
 
 # Define line's parameters
 b0 = 0.5
@@ -927,9 +935,9 @@ b1 = 0.2
 # Create a scatter plot
 plt.scatter(pop_df['x'], pop_df['y'], color='darkslategray', s=50, alpha=0.9)
 plt.axline((0, b0), slope=b1, color=orange, linewidth=2)
+plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
-
 plt.show()
 ```
 
@@ -954,9 +962,9 @@ plt.axline((0, b0), slope=b1, color=orange, linewidth=2)
 for x_val, y_val, y_hat_val in zip(pop_df['x'], pop_df['y'], pop_df['bestfit']):
     plt.plot([x_val, x_val], [y_val, y_hat_val], color='darkslategray', linewidth=0.5)
 
+plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
-
 plt.show()
 ```
 
@@ -980,9 +988,9 @@ plt.axline((0, b0), slope=b1, color=orange, linewidth=2)
 for x_val, y_val, y_hat_val in zip(pop_df['x'], pop_df['y'], pop_df['bestfit']):
     plt.plot([x_val, x_val], [y_val, y_hat_val], color='darkslategray', linewidth=0.5)
 
+plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
-
 plt.show()
 ```
 
@@ -1006,9 +1014,9 @@ plt.axline((0, b0), slope=b1, color=orange, linewidth=2)
 for x_val, y_val, y_hat_val in zip(pop_df['x'], pop_df['y'], pop_df['bestfit']):
     plt.plot([x_val, x_val], [y_val, y_hat_val], color='darkslategray', linewidth=0.5)
 
+plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
-
 plt.show()
 ```
 
@@ -1033,9 +1041,9 @@ plt.axline((0, b0), slope=b1, color=orange, linewidth=2)
 for x_val, y_val, y_hat_val in zip(pop_df['x'], pop_df['y'], pop_df['bestfit']):
     plt.plot([x_val, x_val], [y_val, y_hat_val], color='darkslategray', linewidth=0.5)
 
+plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
-
 plt.show()
 ```
 
@@ -1056,9 +1064,9 @@ plt.axline((0, lm0.params[0]), slope=lm0.params[1], color=orange, linewidth=2)
 for x_val, y_val, y_hat_val in zip(pop_df['x'], pop_df['y'], pop_df['bestfit']):
     plt.plot([x_val, x_val], [y_val, y_hat_val], color='darkslategray', linewidth=0.5)
 
+plt.tick_params(axis='both', labelsize=0, length = 0)
 plt.box(False)
 plt.grid(None)
-
 plt.show()
 ```
 
@@ -1192,6 +1200,7 @@ $$ \hat{\beta}_0 = \overline{y} - \hat{\beta}_1 \overline{x} $$
 ```{python}
 #| label: normal-pdf
 #| echo: false
+#| fig-align: center
 
 # Generate data for density's polygon
 x = np.arange(-4, 4.01, 0.01)
@@ -1207,11 +1216,12 @@ plt.show()
 
 ## Властивості
 
-Імовірність того, що стандартна нормальна випадкова змінна набуває значення від -1,96 до 1,96: $\mathop{\text{P}}\left(-1,96 \leq X \leq 1,96\right) = 0,95$
+Ймовірність того, що стандартна нормальна випадкова змінна набуває значення від -1,96 до 1,96: $\mathop{\text{P}}\left(-1,96 \leq X \leq 1,96\right) = 0,95$
 
 ```{python}
 #| label: normal-pdf-2
 #| echo: false
+#| fig-align: center
 
 # Plot it
 plt.fill_between(x, y, 0, color='grey', alpha=0.8)
@@ -1229,6 +1239,7 @@ plt.show()
 ```{python}
 #| label: normal-pdf-3
 #| echo: false
+#| fig-align: center
 
 # Plot it
 plt.fill_between(x, y, 0, color='grey', alpha=0.8)
@@ -1248,6 +1259,7 @@ plt.show()
 ```{python}
 #| label: three-estimators
 #| echo: false
+#| fig-align: center
 
 # Generate data for density's polygon
 x = np.arange(-4, 4.01, 0.01)
@@ -1651,11 +1663,12 @@ $t_{\alpha/2,\text{df}}$ позначає $\alpha/2$ квантиль $t$ роз
 Будуємо довірчі інтервали рівня $(1-\alpha)$ для $\beta_1$
 $$ \hat{\beta_1}\ \pm t_{\alpha/2,\text{df}} \, \mathop{\hat{\text{SE}}} \left( \hat{\beta_1} \right) $$
 
-Наприклад, 100 спостережень, два коефіцієнти (_тобто_, $\hat{\beta}_0$ і $\hat{\beta}_1 \implies k = 2$), і $\alpha = 0,05$ ( для 95% довірчого інтервалу) дає нам $t_{0,025,\,98} = `r round(qt(0.025, 98), 2)`$
+Наприклад, 100 спостережень, два коефіцієнти (_тобто_, $\hat{\beta}_0$ і $\hat{\beta}_1 \implies k = 2$), і $\alpha = 0,05$ ( для 95% довірчого інтервалу) дає нам $t_{0,025,\,98} = `{python} round(t.ppf(0.025, df=98), 2)`$
 
 ```{python}
 #| label: t-dist
 #| echo: false
+#| fig-align: center
 
 x = np.arange(-4, 4.01, 0.01)
 y = stats.t.pdf(x, df=98)
@@ -1796,7 +1809,7 @@ print(results.summary())
 ::: {.column width="30%"}
 $H_0$: $\beta_1 = 0$ *vs.* $H_a$: $\beta_1 \neq 0$
 
-$t_\text{stat} = 10.811$ та $t_\text{0.975, 98} = `r round(qt(0.975, 98), 2)`$
+$t_\text{stat} = 10.811$ та $t_\text{0.975, 98} = `{python} round(t.ppf(0.025, df=98), 2)`$
 
 *p*-значення $< 0,05$
 
@@ -1812,7 +1825,7 @@ $t_\text{stat} = 10.811$ та $t_\text{0.975, 98} = `r round(qt(0.975, 98), 2)`$
 
 У цій ситуації ми фактично можемо знати (і забезпечити) нульову гіпотезу, оскільки ми згенерували дані.
 
-Для кожного з 10 000 зразків ми обчислимо статистику $t$, а потім побачимо, скільки статистичних даних $t$ перевищує наше критичне значення (`r round(qt(0.975, 28), 2)`, як вище).
+Для кожного з 10 000 зразків ми обчислимо статистику $t$, а потім побачимо, скільки статистичних даних $t$ перевищує наше критичне значення (`{python} round(t.ppf(0.025, df=98), 2)`, як вище).
 
 Відповідь має бути приблизно 5 відсотків — наш рівень $\alpha$.
 
@@ -1907,12 +1920,14 @@ $$
 <br>
 <br>
 
-{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
 
 {{< iconify mdi github >}} [aranaur](https://github.com/Aranaur)
 
-{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+{{< iconify mdi envelope >}} <ihor.miroshnychenko@knu.ua>
 
 {{< iconify mdi linkedin >}} [ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
-
-{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
