@@ -612,9 +612,9 @@
 <span id="cb1-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-4"><a href="" aria-hidden="true" tabindex="-1"></a>np.random.seed(<span class="dv">1234</span>)</span>
 <span id="cb1-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-6"><a href="" aria-hidden="true" tabindex="-1"></a>user_id <span class="op">=</span> np.random.choice([<span class="st">'id_1'</span>, <span class="st">'id_2'</span>, <span class="st">'id_3'</span>, <span class="st">'id_4'</span>], <span class="dv">5</span>, replace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb1-6"><a href="" aria-hidden="true" tabindex="-1"></a>user_id <span class="op">=</span> np.random.choice(<span class="bu">range</span>(<span class="dv">1000</span>), size<span class="op">=</span><span class="dv">1000</span>, replace<span class="op">=</span><span class="va">False</span>)</span>
 <span id="cb1-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.DataFrame({<span class="st">'user'</span>: user_id})</span>
+<span id="cb1-8"><a href="" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.DataFrame({<span class="st">'user_id'</span>: user_id})</span>
 <span id="cb1-9"><a href="" aria-hidden="true" tabindex="-1"></a>df</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div id="data-gen" class="cell-output cell-output-display" data-execution_count="2">
 <div>
@@ -636,33 +636,58 @@
 <thead>
 <tr class="header" style="text-align: right;">
 <th data-quarto-table-cell-role="th"></th>
-<th data-quarto-table-cell-role="th">user</th>
+<th data-quarto-table-cell-role="th">user_id</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td data-quarto-table-cell-role="th">0</td>
-<td>id_4</td>
+<td>681</td>
 </tr>
 <tr class="even">
 <td data-quarto-table-cell-role="th">1</td>
-<td>id_4</td>
+<td>990</td>
 </tr>
 <tr class="odd">
 <td data-quarto-table-cell-role="th">2</td>
-<td>id_3</td>
+<td>155</td>
 </tr>
 <tr class="even">
 <td data-quarto-table-cell-role="th">3</td>
-<td>id_2</td>
+<td>768</td>
 </tr>
 <tr class="odd">
 <td data-quarto-table-cell-role="th">4</td>
-<td>id_1</td>
+<td>438</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">995</td>
+<td>204</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">996</td>
+<td>53</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">997</td>
+<td>294</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">998</td>
+<td>723</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">999</td>
+<td>815</td>
 </tr>
 </tbody>
 </table>
 
+<p>1000 rows × 1 columns</p>
 </div>
 </div>
 </div>
@@ -696,69 +721,23 @@
 <div id="cell-hash-apply" class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Створюємо функцію для розбиття на групи</span></span>
 <span id="cb4-2"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> hash_group(user_id, salt, n_groups):</span>
-<span id="cb4-3"><a href="" aria-hidden="true" tabindex="-1"></a>    value_str <span class="op">=</span> user_id <span class="op">+</span> salt</span>
-<span id="cb4-4"><a href="" aria-hidden="true" tabindex="-1"></a>    value_num <span class="op">=</span> <span class="bu">int</span>(hashlib.md5(value_str.encode(<span class="st">'utf-8'</span>)).hexdigest(), <span class="dv">16</span>)</span>
+<span id="cb4-3"><a href="" aria-hidden="true" tabindex="-1"></a>    value_str <span class="op">=</span> <span class="bu">str</span>(user_id) <span class="op">+</span> <span class="bu">str</span>(salt)</span>
+<span id="cb4-4"><a href="" aria-hidden="true" tabindex="-1"></a>    value_num <span class="op">=</span> <span class="bu">int</span>(hashlib.md5(value_str.encode()).hexdigest(), <span class="dv">16</span>)</span>
 <span id="cb4-5"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> value_num <span class="op">%</span> n_groups</span>
 <span id="cb4-6"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-7"><a href="" aria-hidden="true" tabindex="-1"></a>salt <span class="op">=</span> <span class="st">'test'</span></span>
-<span id="cb4-8"><a href="" aria-hidden="true" tabindex="-1"></a>n_groups <span class="op">=</span> <span class="dv">3</span></span>
-<span id="cb4-9"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Застосовуємо функцію до всіх користувачів</span></span>
-<span id="cb4-10"><a href="" aria-hidden="true" tabindex="-1"></a>df[<span class="st">'group'</span>] <span class="op">=</span> df[<span class="st">'user'</span>].<span class="bu">apply</span>(hash_group, args<span class="op">=</span>(salt, n_groups))</span>
-<span id="cb4-11"><a href="" aria-hidden="true" tabindex="-1"></a>df</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb4-7"><a href="" aria-hidden="true" tabindex="-1"></a>salt <span class="op">=</span> <span class="st">'test_1'</span></span>
+<span id="cb4-8"><a href="" aria-hidden="true" tabindex="-1"></a>n_groups <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb4-9"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-10"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Застосовуємо функцію до всіх користувачів</span></span>
+<span id="cb4-11"><a href="" aria-hidden="true" tabindex="-1"></a>df[<span class="st">'group'</span>] <span class="op">=</span> df[<span class="st">'user_id'</span>].<span class="bu">apply</span>(hash_group, args<span class="op">=</span>(salt, n_groups))</span>
+<span id="cb4-12"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-13"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Перевіряємо розподіл користувачів</span></span>
+<span id="cb4-14"><a href="" aria-hidden="true" tabindex="-1"></a>df[<span class="st">'group'</span>].value_counts()</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div id="hash-apply" class="cell-output cell-output-display" data-execution_count="4">
-<div>
-<style scoped="">
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-
-<table class="dataframe" data-quarto-postprocess="true" data-border="1">
-<thead>
-<tr class="header" style="text-align: right;">
-<th data-quarto-table-cell-role="th"></th>
-<th data-quarto-table-cell-role="th">user</th>
-<th data-quarto-table-cell-role="th">group</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td data-quarto-table-cell-role="th">0</td>
-<td>id_4</td>
-<td>2</td>
-</tr>
-<tr class="even">
-<td data-quarto-table-cell-role="th">1</td>
-<td>id_4</td>
-<td>2</td>
-</tr>
-<tr class="odd">
-<td data-quarto-table-cell-role="th">2</td>
-<td>id_3</td>
-<td>0</td>
-</tr>
-<tr class="even">
-<td data-quarto-table-cell-role="th">3</td>
-<td>id_2</td>
-<td>1</td>
-</tr>
-<tr class="odd">
-<td data-quarto-table-cell-role="th">4</td>
-<td>id_1</td>
-<td>0</td>
-</tr>
-</tbody>
-</table>
-
-</div>
+<pre><code>group
+1    512
+0    488
+Name: count, dtype: int64</code></pre>
 </div>
 </div>
 </section>
@@ -795,6 +774,17 @@
 <li>Запуск експерименту і збір метрик</li>
 <li>Оцінювання результату</li>
 </ol>
+</section></section>
+<section>
+<section id="aa-експерименти-і-валідація-метрик" class="title-slide slide level1 center" data-background-color="#eef3f8">
+<h1>A/A-експерименти і валідація метрик</h1>
+
+</section>
+<section class="slide level2">
+
+</section>
+<section class="slide level2">
+
 </section></section>
 <section id="дякую-за-увагу" class="title-slide slide level1 center" data-background-color="#eef3f8">
 <h1>Дякую за увагу!</h1>
