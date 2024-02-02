@@ -1,0 +1,777 @@
+---
+title: "Землекористування/покрив України у 2022 році"
+date: 2024-02-02
+date-format: iso
+description: "Візуалізація земляного покриву та землекористування в Україні"
+image: "featured.png"
+twitter-card:
+  image: "featured.png"
+open-graph:
+  image: "featured.png"
+categories:
+  - R
+  - map
+  - rayshader
+  - visualisation
+citation:
+  type: post-weblog
+  author: Ihor Miroshnychenko
+  title: "Ukraine's land use/cover in 2022"
+  language: uk-UA
+  available-date: 2024-02-02
+
+format: 
+  html: 
+    code-fold: false
+execute: 
+  warning: false
+  message: false
+---
+
+Карти землекористування та земляного покриву є важливим інструментом для вивчення взаємодії людини та природи. Вони дозволяють візуалізувати, як змінюється ландшафт внаслідок діяльності людини, а також виявляти тенденції у зміні землекористування. У цій статті я покажу, як можна побудувати вражаючі візуалізації земляного покриву та землекористування за допомогою R та пакету `rayshader`.
+
+# Пакети
+
+Для цієї візуалізації я використовував наступні пакети:
+
+```{r}
+#| label: packages
+
+if (!require("pacman")) install.packages("pacman")
+
+pacman::p_load(
+    terra, # <1>
+    giscoR, # <2>
+    sf, # <3>
+    tidyverse, # <4>
+    ggtern, # <5>
+    elevatr, # <6>
+    png, # <7>
+    rayshader, # <8>
+    magick, # <9>
+    furrr, # <10>
+    here, # <11>
+    future, # <12>
+    rvest, # <13>
+    RSelenium, # <14>
+    netstat, # <15>
+    janitor, # <16>
+    extrafont # <17>
+)
+```
+
+1. `terra` - для роботи з растровим
+2. `giscoR` - для завантаження геоданих Європейського союзу
+3. `sf` - для роботи з векторними геоданими
+4. `tidyverse` - для роботи з даними
+5. `ggtern` - для побудови тернарних графіків
+6. `elevatr` - для завантаження цифрових моделей рельєфу
+7. `png` - для роботи з зображеннями
+8. `rayshader` - для побудови 3D-візуалізацій
+9. `magick` - для роботи з зображеннями
+10. `furrr` - для паралельних обчислень
+11. `here` - для роботи з шляхами
+12. `future` - для паралельних обчислень
+13. `rvest` - для парсингу веб-сторінок
+14. `RSelenium` - для автоматизації браузера
+15. `netstat` - для роботи з мережевими даними
+16. `janitor` - для роботи з даними
+17. `extrafont` - для роботи з шрифтами
+
+# Завантаження даних
+
+Для візуалізації земляного покриву та землекористування я використовував дані [Sentinel-2 10m land use/land cover time series of the world](https://www.arcgis.com/home/item.html?id=cfcb7609de5f478eb7666240902d4d3d), які підготовлені Impact Observatory, Microsoft та Esri з використанням [моделі глибокого навчання штучного інтелекту Impact Observatory для класифікації земель](https://www.impactobservatory.com/).
+
+## Кордони України
+
+Для початку завантажимо кордони України з [Geoportal of the State Service of Ukraine for Geodesy, Cartography and Cadastre](https://map.land.gov.ua/kadastrova-karta) за допомогою пакету `giscoR`:
+
+```{r}
+#| label: fig-ukraine-border
+#| fig-cap: Кордони України
+
+country_sf <- gisco_get_countries(
+    country = "UA", # <1>
+    resolution = "1" # <2>
+)
+
+plot(st_geometry(country_sf))
+```
+
+1. `country` - код країни згідно з [ISO 3166-1 alpha-2](https://www.iban.com/country-codes)
+2. `resolution` - рівень градації кордонів (1 - країна, 2 - область)
+
+Збережемо кордони України у форматі файл `ua-borders.png`:
+
+```{r}
+#| label: ukraine-border-png
+
+png("ua-borders.png")
+```
+
+## Земляний покрив
+
+Завантажимо растровий шар земляного покриву для України. Для цього необхідно перейти на сайт <https://livingatlas.arcgis.com/landcoverexplorer> та натиснути кнопку завантаження у лівому нижньому кутку карти.
+
+Після чого відкриється мапа земляного покриву, на якій можна вибрати область для завантаження. Виберемо всі області, які входять до складу України. Клікаємо на кожну область щоб вибрати плитку та рік:
+
+![](img/esri-1.png)
+
+Копіюємо посилання та зберігаємо їх змінну `urls`:
+
+```{r}
+#| label: urls
+
+urls <- c(
+    "https://lulctimeseries.blob.core.windows.net/lulctimeseriesv003/lc2022/34U_20220101-20230101.tif",
+    "https://lulctimeseries.blob.core.windows.net/lulctimeseriesv003/lc2022/35U_20220101-20230101.tif",
+    "https://lulctimeseries.blob.core.windows.net/lulctimeseriesv003/lc2022/36U_20220101-20230101.tif",
+    "https://lulctimeseries.blob.core.windows.net/lulctimeseriesv003/lc2022/37U_20220101-20230101.tif",
+    "https://lulctimeseries.blob.core.windows.net/lulctimeseriesv003/lc2022/35T_20220101-20230101.tif",
+    "https://lulctimeseries.blob.core.windows.net/lulctimeseriesv003/lc2022/36T_20220101-20230101.tif",
+    "https://lulctimeseries.blob.core.windows.net/lulctimeseriesv003/lc2022/37T_20220101-20230101.tif"
+)
+```
+
+Для завантаження даних використаємо функцію `download.file()`. За замовчування вона завантажує файли впродовж 60 секунд і якщо файл не встиг завантажитись, видасть помилку. Щоб уникнути цього, збільшимо час завантаження до 480 секунд:
+
+```{r}
+#| label: timeout
+
+options(timeout = 480)
+```
+
+Створимо функцію для завантаження растрових даних якщо вони ще не були завантажені. Це дозволить нам уникнути повторного завантаження файлів, якщо вони вже були завантажені. Імена файлів будуть взяті з посилань за допомогою функції `basename()`:
+
+```{r}
+#| label: download-raster-function
+
+download_if_not_exists <- function(url) {
+    if (!file.exists(basename(url))) {
+        download.file(url, basename(url), mode = "wb")
+    }
+}
+```
+
+Завантажимо файли за допомогою нашої функції та функції `map()` з пакету `purrr`:
+
+```{r}
+#| label: download-rasters
+#| eval: false
+
+map(urls, download_if_not_exists)
+```
+
+## Об'єднання растрових файлів
+
+Збережемо перелік всіх завантажених файлів у змінну `raster_files`:
+
+```{r}
+#| label: raster-files-list
+
+raster_files <- list.files(
+    path = here(), # <1>
+    pattern = "20230101.tif$", # <2>
+    full.names = TRUE # <3>
+)
+```
+
+1. `path` - шлях до папки, в якій знаходяться файли. В даному випадку це поточна папка, яку ми отримуємо за допомогою функції `here()`
+2. `pattern` - шаблон імен файлів, які ми шукаємо. В даному випадку це файли, які закінчуються на `20230101.tif`
+3. `full.names` - будемо зберігати повні шляхи до файлів
+
+Для подальшої роботи і об'єднання всіх файлів в один створимо змінну з `crs` в якій буде збережено інформацію про систему координат, в якій знаходяться файли. В даному випадку це [EPSG:32635](https://epsg.io/32635):
+
+```{r}
+#| label: crs
+
+crs <- "EPSG:4326"
+```
+
+Об'єднаємо всі файли в один за допомогою функції `terra::rast()`:
+
+```{r}
+#| label: merge-rasters
+#| eval: false
+
+if(!file.exists("ua_land_cover_vrt.vrt")){
+    for(raster in raster_files){
+        cat("Start with:", raster, "\n")
+        rasters <- rast(raster) # <1>
+        country <- country_sf %>% # <2>
+            sf::st_transform(
+                crs = crs(
+                    rasters
+                )
+            )
+        land_cover <- crop( # <3>
+            rasters,
+            vect(
+                country
+            ),
+            snap = "in",
+            mask = TRUE
+        ) %>% 
+        terra::aggregate( # <4>
+            fact = 5,
+            fun = "modal"
+        ) %>% 
+        terra::project(crs) # <5>
+        # write raster
+        terra::writeRaster( # <6>
+            land_cover,
+            paste0(
+                raster,
+                "_ua",
+                ".tif"
+            ),
+            overwrite=FALSE
+        )
+    }
+  }
+```
+
+1. Завантажуємо растровий файл за допомогою функції `terra::rast()`
+2. Трансформуємо систему координат.
+3. Обрізаємо растровий файл за допомогою векторного файлу кордонів України та зберігаємо його.
+4. Агрегуємо растровий файл для зменшення об'єму даних.
+5. Проектуємо растровий файл в систему координат `EPSG:4326`.
+6. Зберігаємо растровий файл.
+
+Нарешті можемо об'єднати всі файли в один за допомогою функції `terra::vrt()`, яка створить віртуальний растровий файл:
+
+```{r}
+#| label: vrt
+#| eval: false
+
+r_list <- list.files(
+    path = here(),
+    pattern = "_ua.tif",
+    full.names = TRUE
+)
+
+land_cover_vrt <- terra::vrt(
+    r_list,
+    "ua_land_cover_vrt.vrt",
+    overwrite = TRUE
+)
+```
+
+# Отримання оригінальної палітри кольорів
+
+Для візуалізації земляного покриву нам знадобиться палітра кольорів, яка використовується на оригінальній мапі. Для цього завантажимо один з растрових файлів та витягнемо з нього палітру кольорів:
+
+```{r}
+#| label: original-palette
+#| eval: false
+
+ras <- rast( # <1>
+    raster_files[[1]]
+)
+
+raster_color_table <- do.call( # <2>
+    data.frame,
+    coltab(ras) # <3>
+)
+```
+
+1. Завантажуємо растровий файл за допомогою функції `terra::rast()`
+2. Створюємо датафрейм з палітрою кольорів
+3. Витягуємо палітру кольорів з растрового файлу
+
+Зверніть увагу на те, що палітра кольорів зберігається у форматі RGB:
+```{r}
+#| label: raster-color-table
+#| eval: false
+
+head(raster_color_table)
+```
+
+Для подальшої роботи нам знадобиться HEX-код кольорів, тому перетворимо RGB-коди кольорів у HEX-коди за допомогою функції `ggtern::rgb2hex()`:
+
+```{r}
+#| label: rgb2hex
+#| eval: false
+
+hex_code <- rgb2hex( # <4>
+    r = raster_color_table[,2],
+    g = raster_color_table[,3],
+    b = raster_color_table[,4]
+)
+
+hex_code[1:14]
+```
+
+Як бачимо, тільки перші 11 спостережень мають HEX-коди. Отже нам потрібні тільки 2-3, 4-5 та 7-11 рядки. Збережемо їх у змінну `cols`:
+
+```{r}
+#| label: hex-palette-1
+#| eval: false
+
+cols <- hex_code[c(2:3, 5:6, 8:12)]
+```
+
+Тепер ми можемо використати ці кольори для візуалізації земляного покриву:
+
+```{r}
+#| label: hex-palette-2
+#| eval: false
+
+from <- c(1:2, 4:5, 7:11) # <1>
+to <- t(col2rgb(cols)) # <2>
+
+land_cover_vrt <- na.omit(land_cover_vrt) # <3>
+
+land_cover_ua <- terra::subst( # <4>
+    land_cover_vrt,
+    from = from,
+    to = to,
+    names = cols
+)
+```
+
+1. Вибираємо рядки з HEX-кодами кольорів
+2. Перетворюємо HEX-коди кольорів у RGB-коди
+3. Видаляємо пропущені значення
+4. Замінюємо кольори у растровому файлі
+
+Тепер можемо поглянути на отриманий растровий файл:
+
+```{r}
+#| label: land-cover-ua
+#| eval: false
+
+terra::plotRGB(land_cover_ua)
+```
+
+![](img/land_cover_ua_2.png)
+
+# Цифрова модель рельєфу
+
+Для побудови 3D-візуалізації нам знадобиться цифрова модель рельєфу. Завантажимо її за допомогою функції `elevatr::get_elev_raster()`:
+
+```{r}
+#| label: dem
+#| eval: false
+
+elev <- elevatr::get_elev_raster(
+    locations = country_sf, # <1>
+    z = 8, # <2>
+    clip = "locations" # <3>
+)
+```
+
+1. `locations` - векторний файл з кордонами України
+2. `z` - масштаб цифрової моделі рельєфу. Для великих територій [рекомендується](https://github.com/tilezen/joerd/blob/master/docs/data-sources.md#what-is-the-ground-resolution) зменшувати масштаб.
+3. `clip` - обрізка за кордонами України
+
+Для об'єднання растрових файлів земляного покриву та цифрової моделі рельєфу нам необхідно перетворити у відповідності один до одного. Для цього ми використаємо проекцію, яку можна знайти за посиланням <https://epsg.io/> для своєї країни:
+
+```{r}
+#| label: crs-land-cover
+
+crs_lambert <-
+    "+proj=tmerc +lat_0=0 +lon_0=21 +k=1 +x_0=300000 +y_0=0 +ellps=krass +towgs84=24,-121,-76,0,0,0,0 +units=m +no_defs +type=crs"
+```
+
+Тепер ми можемо перетворити цифрову модель рельєфу у відповідність до растрового файлу земляного покриву:
+
+```{r}
+#| label: project-dem
+#| eval: false
+
+land_cover_ua_resampled <- terra::resample(
+    x = land_cover_ua, # <1>
+    y = terra::rast(elev), # <2>
+    method = "near" # <3>
+) %>% 
+    terra::project(crs_lambert) # <4>
+```
+
+1. Растровий файл земляного покриву
+2. Цифрова модель рельєфу
+3. Метод перетворення
+4. Проекція
+
+Подивимось на результат:
+
+```{r}
+#| label: land-cover-ua-resampled
+#| eval: false
+
+terra::plotRGB(land_cover_ua_resampled)
+```
+
+![](img/land_cover_ua_resampled.png)
+
+Збережемо рисунок у файл `land_cover_ua.png` і зчитаємо його за допомогою пакету `png`:
+
+```{r}
+#| label: land-cover-ua-png
+#| eval: false
+
+img_file <- "land_cover_ua.png"
+
+terra::writeRaster(
+    land_cover_ua_resampled,
+    img_file,
+    overwrite = TRUE,
+    NAflag = 255
+)
+
+img <- png::readPNG(img_file)
+```
+
+# Створення 3D-візуалізації
+
+Перш ніж створити 3D-візуалізацію, нам необхідно переконатися, що наша растрова модель має однакову проекцію з цифровою моделлю рельєфу. Також нам потрібно перетворити растрову модель у матрицю, щоб пакет `rayshader` міг працювати з нею:
+
+```{r}
+#| label: land
+#| eval: false
+
+elev_lambert <- elev %>%
+   terra::rast() %>%
+   terra::project(crs_lambert)
+
+elmat <- rayshader::raster_to_matrix(
+   elev_lambert 
+)
+```
+
+Визначимо висоту та ширину растрової моделі:
+
+```{r}
+#| label: img-size
+#| eval: false
+
+h <- nrow(elev_lambert)
+w <- ncol(elev_lambert)
+```
+
+Тепер ми можемо створити 3D-візуалізацію за допомогою пакету `rayshader`:
+
+```{r}
+#| label: rayshader-plot
+#| eval: false
+
+elmat %>% 
+    rayshader::height_shade(
+        texture = colorRampPalette(
+            cols[9]
+        )(256)
+    ) %>% 
+    rayshader::add_overlay(
+        img,
+        alphalayer = 1
+    ) %>% 
+    rayshader::plot_3d(
+        elmat,
+        zscale = 12,
+        solid = FALSE,
+        shadow = TRUE,
+        shadow_darkness = 1,
+        background = "white",
+        windowsize = c(
+            w / 10, h / 10
+        ),
+        zoom = .5,
+        phi = 85,
+        theta = 0
+    )
+
+rayshader::render_camera(
+    zoom = .58
+)
+```
+
+В результаті ми отримаємо 3D-візуалізацію земляного покриву та цифрової моделі рельєфу.
+
+# Рендер рисунку
+
+Тепер ми готові зберегти все у високоякісний рисунок. Збережемо його у файл `3d_land_cover_ua-dark.png` за допомогою функції `rayshader::render_highquality()` і використаємо для цього високоякісну текстуру освітлення, яка збережена у файлі `air_museum_playground_4k.hdr`:
+
+```{r}
+#| label: render-img
+#| eval: false
+
+filename <- "3d_land_cover_ua-dark.png"
+
+rayshader::render_highquality(
+    filename = filename,
+    preview = TRUE,
+    light = FALSE,
+    environment_light = here('air_museum_playground_4k.hdr'),
+    intensity_env = 1,
+    rotate_env = 90,
+    interactive = FALSE,
+    parallel = TRUE,
+    width = w * 1.5,
+    height = h * 1.5
+)
+```
+
+# Збір статистичної інформації
+
+## Парсинг
+
+Також хотілося б зібрати статистичну інформацію про земляний покрив України щоб у подальшому додати її у легенду.
+
+Для цього зберемо інформацію зі сторінки опису даних на сайті [Sentinel-2 10m Land Use/Land Cover Time Series](https://www.arcgis.com/home/item.html?id=cfcb7609de5f478eb7666240902d4d3d). 
+
+Сайт динамічно підтягує контент, тому нам знадобиться пакет `RSelenium` для парсингу даних. Відкриємо вікно браузера та перейдемо на сайт:
+
+```{r}
+#| label: rselenium
+#| eval: false
+
+driver <- rsDriver(browser = "firefox",
+                   chromever = "114.0.5735.90",
+                   verbose = FALSE,
+                   port = free_port())
+
+remDr <- driver$client
+
+remDr$navigate("https://www.arcgis.com/home/item.html?id=cfcb7609de5f478eb7666240902d4d3d")
+```
+
+Тепер можемо знайти елементи сторінки за допомогою CSS-селекторів та зібрати інформацію з таблиці:
+
+```{r}
+#| label: rvest
+#| eval: false
+
+data_table <- remDr$findElement(using = "xpath", '/html/body/div[3]/div/div[2]/div/div[2]/div/main/div[2]/div[2]/div[1]/div/div/div/div[8]/table/tbody')
+```
+
+Тепер можемо зібрати інформацію з таблиці:
+
+```{r}
+#| label: data-table-processing
+#| eval: false
+
+class_tbl <- data_table$getPageSource() %>% 
+  unlist() %>%
+  read_html() %>% 
+  html_table() %>% 
+  .[[1]] %>%
+  row_to_names(row_number = 1) %>% 
+  mutate(Value = as.factor(Value))
+
+class_tbl
+```
+
+```{r}
+#| label: rvest-echo
+#| echo: false
+
+class_tbl <- read_csv("data/class_tbl.csv")
+class_tbl
+```
+
+Зверніть увагу, що змінна `Value` не містить записів `3` та `6`.
+
+## Підрахунок площі
+
+Тепер можемо підрахувати площу кожного класу земляного покриву. На випадок, якщо ми захочемо порахувати площі окремо для кожної області, додамо `id` до змінної `country_sf`:
+
+```{r}
+#| label: add-id
+#| eval: false
+
+country_sf$id <- 1:nrow(country_sf)
+```
+
+Зберемо всі класи земляного покриву у змінну `classes`:
+
+```{r}
+#| label: classes
+#| eval: false
+
+classes <- class_tbl$Value
+```
+
+Проведемо підрахунок статистики для кожного класу земляного покриву за допомогою функції `exactextractr::exact_extract()`:
+
+```{r}
+#| label: class-stats
+#| eval: false
+
+zonal_stats_ukr <- exact_extract(
+  land_cover_vrt,
+  country_sf
+)
+```
+
+Тепер можемо підрахувати пропорції площі кожного класу земляного покриву. Для цього використаємо паралельні обчислення за допомогою пакету `future`:
+
+```{r}
+#| label: class-proportions
+#| eval: false
+
+plan(multisession)
+
+ukraine_multiclass <- future_map_dfr(zonal_stats_ukr, function(x) {
+  as.data.frame(
+    prop.table(
+      table(factor(x[, 1], levels = classes))
+    )
+  )
+})
+```
+
+Об'єднаємо результати з попередньою таблицею, додамо змінну `colors`, яка буде містити палітру кольорів для кожного класу земляного покриву, а також змінну `perc`, яка буде містити відсотове співвідношення площі кожного класу земляного покриву. Відсортуємо результати за спаданням площі та видалимо класи, які не мають значення:
+
+```{r}
+#| label: ukraine-multiclass-sf
+#| eval: false
+
+ukraine_multiclass_sf <- ukraine_multiclass %>% 
+  as_tibble() %>%
+  left_join(
+    class_tbl,
+    by = c("Var1" = "Value")
+  ) %>% 
+  mutate(colors = c(
+    "#419bdf", "#397d49", "#7a87c6", 
+    "#e49635", "#c4281b", "#a59b8f", 
+    "#a8ebff", "#616161", "#e3e2c3"
+  ), .after = Name,
+  perc = scales::percent(Freq / sum(Freq), accuracy = .01, trim = FALSE)) %>% 
+  arrange(desc(Freq)) %>% 
+  filter(!(Name %in% c("Bare ground", 'Snow/Ice', 'Clouds')))
+```
+
+# Збираємо фінальну візуалізацію
+
+## Легенда
+
+Тепер можемо побудувати легенду для нашої візуалізації. Для цього використаємо пакет `ggplot2`:
+
+```{r}
+#| label: legend
+#| eval: false
+
+plot <- ukraine_multiclass_sf %>% 
+  ggplot(aes(x = Freq, y = fct_reorder(Name, Freq))) +
+  geom_col(aes(fill = fct_reorder(Name, Freq))) +
+  geom_text(
+    aes(label = perc), size = 8, hjust = -0.1, vjust = 0.5, family = "Fira Sans", fontface = "bold") +
+  scale_fill_manual(values = rev(ukraine_multiclass_sf$colors)) +
+  theme_void() +
+  coord_cartesian(clip = "off") +
+  scale_x_continuous(expand = c(.01, .01)) +
+  theme(
+    legend.position = "none",
+    axis.text.y = element_text(size = 28, hjust = 1, family = "Georgia"),
+    plot.margin = margin(15, 85, 15, 15))
+
+plot
+```
+
+![](img/land_cover_legend.png)
+
+Збережемо легенду у файл `land_cover_legend.png`:
+
+```{r}
+#| label: save-legend
+#| eval: false
+
+legend_name <- "land_cover_legend.png"
+ggsave(legend_name, plot, width = 10, height = 6)
+```
+
+## Збірка фінальної візуалізації
+
+За допомогою пакету `magick` можемо зберегти всі елементи візуалізації у один файл:
+
+```{r}
+#| label: final-plot
+#| eval: false
+
+lc_img <- magick::image_read(
+  filename
+)
+
+my_legend <- magick::image_read(
+  legend_name
+)
+
+my_legend_scaled <- magick::image_scale(
+  magick::image_background(
+    my_legend, "none"
+  ), 2500
+)
+
+p <- magick::image_composite(
+    magick::image_scale(
+        lc_img, "x7000" 
+    ),
+    my_legend_scaled,
+    gravity = "southwest",
+    offset = "+1000+1000"
+    ) %>% 
+    image_annotate(
+    "Land cover in 2022",
+    size = 150,
+    color = alpha("#e49635", .5),
+    font = "Georgia",
+    gravity = "north",
+    location = "+0+300"
+  ) %>% 
+  image_annotate(
+    "Ukraine",
+    size = 300,
+    color = "#e49635",
+    font = "Georgia",
+    gravity = "north",
+    location = "+0+500"
+  ) %>% 
+  image_annotate(
+    "©2023 Ihor Miroshnychenko (https://aranaur.rbind.io)",
+    size = 100,
+    color = alpha("grey20", .75),
+    font = "Georgia",
+    gravity = "southeast",
+    location = "+100+200"
+  ) %>% 
+  image_annotate(
+    "Data: Esri | Sentinel-2 Land Cover Explorer",
+    size = 100,
+    color = alpha("grey20", .75),
+    font = "Georgia",
+    gravity = "southeast",
+    location = "+100+100"
+  )
+```
+
+Збережемо фінальну візуалізацію у файл `3d_ua_land_cover_final_eng.png`:
+
+```{r}
+#| label: save-final-plot
+#| eval: false
+
+magick::image_write(
+  p, "3d_ua_land_cover_final_eng.png"
+)
+```
+
+В результаті ми отримаємо фінальну візуалізацію земляного покриву України:
+
+[![](img/3d_ua_land_cover_final_eng.png)](https://aranaur.rbind.io/blog/2024/01/img/3d_ua_land_cover_final_eng.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
