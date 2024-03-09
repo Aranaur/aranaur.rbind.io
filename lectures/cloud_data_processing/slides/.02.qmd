@@ -100,7 +100,7 @@ cd data-science-on-gcp
 
 [^4]: Cloud Shell - це мікро-ВМ, яка існує протягом усього часу, поки відкрито вікно браузера, і надає вам термінальний доступ до мікро-ВМ. Закрийте вікно браузера, і мікро-ВМ зникне. ВМ Cloud Shell безкоштовна і постачається з багатьма інструментами, які знадобляться розробникам на Google Cloud Platform. Наприклад, на ній встановлені Python, Git, Google Cloud SDK та Orion (веб-редактор коду). Хоча віртуальна машина Cloud Shell є ефемерною, вона прикріплена до постійного диска, який прив'язаний до вашого облікового запису користувача. Файли, які ви зберігаєте в домашньому каталозі, зберігаються під час різних сеансів Cloud Shell.
 
-## Дослідження даних на GCP
+## Дослідження даних у GCP
 
 ### Дані
 
@@ -147,7 +147,7 @@ cd data-science-on-gcp
 
 За допомогою інструмента розробника браузера подивимось куди звертається веб-сайт, коли ми вводимо запит на завантаження даних. 
 
-Перейдіть за посиланням <> та оберіть опцію "Prezipped File".
+Перейдіть за посиланням <https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FGJ&QO_fu146_anzr=b0-gvzr> та оберіть опцію "Prezipped File".
 
 Відкрийте вкладку "Network" в інструментах розробника браузера та введіть запит на завантаження даних.
 
@@ -256,3 +256,112 @@ gsutil -m cp *.csv gs://fit-cloud-course-dsongcp/flights/raw/
 ```
 
 ## BigQuery
+
+Першим кроком для отримання даних у BigQuery є створення набору даних - набору даних, який є контейнером для таблиць. У проекті можна створити кілька наборів даних. Перейдіть до [веб-консолі](https://console.cloud.google.com/bigquery) і виберіть опцію *Create Dataset*. Потім створіть набір даних з назвою `dsongcp`.
+
+Або використайте командний рядок:
+
+```bash
+bq mk dsongcp
+```
+
+### Завантаження даних
+
+Ми можемо завантажити дані безпосередньо у власне сховище BigQuery за допомогою утиліти командного рядка `bq`:
+
+```bash
+PROJECT=$(gcloud config get-value project)
+BUCKET=${PROJECT}-dsongcp
+bq load --autodetect --source_format=CSV \
+dsongcp.flights_auto \
+gs://${BUCKET}/flights/raw/201501.csv
+```
+
+Ми можемо спробувати зробити запит на дані, щоб знайти середню затримку вильоту та прильоту в найбільш завантажених аеропортах:
+
+```sql
+SELECT
+  ORIGIN,
+  AVG(DepDelay) AS dep_delay,
+  AVG(ArrDelay) AS arr_delay,
+  COUNT(ArrDelay) AS num_flights
+FROM
+  `dsongcp.flights_auto`
+GROUP BY
+  ORIGIN
+ORDER BY num_flights DESC
+LIMIT 10
+```
+
+Автоматичне визначення схеми дозволяє нам завантажити дані без необхідності визначення схеми. Але це може бути не найкращим варіантом для великих наборів даних. В такому випадку краще визначити схему вручну.
+
+Наразі ми мало що знаємо про поля, тому можемо попросити BigQuery обробляти всі стовпці, окрім `FlightDate`, як рядки:
+
+```bash
+SCHEMA=Year:STRING,...,FlightDate:DATE,Reporting_Airline:STRING,...
+```
+
+Крім того, ми можемо розбити дані на партіції за допомогою поля `FlightDate`:
+
+```bash
+--time_partitioning_field=FlightDate --time_partitioning_type=MONTH
+```
+
+Тоді код для завантаження даних у BigQuery буде виглядати наступним чином:
+
+```bash
+PROJECT=$(gcloud config get-value project)
+BUCKET=${PROJECT}-dsongcp
+YEAR=2015
+SCHEMA=Year:STRING,Quarter:STRING,Month:STRING,DayofMonth:STRING,DayOfWeek:STRING,FlightDate:DATE,Reporting_Airline:STRING,DOT_ID_Reporting_Airline:STRING,IATA_CODE_Reporting_Airline:STRING,Tail_Number:STRING,Flight_Number_Reporting_Airline:STRING,OriginAirportID:STRING,OriginAirportSeqID:STRING,OriginCityMarketID:STRING,Origin:STRING,OriginCityName:STRING,OriginState:STRING,OriginStateFips:STRING,OriginStateName:STRING,OriginWac:STRING,DestAirportID:STRING,DestAirportSeqID:STRING,DestCityMarketID:STRING,Dest:STRING,DestCityName:STRING,DestState:STRING,DestStateFips:STRING,DestStateName:STRING,DestWac:STRING,CRSDepTime:STRING,DepTime:STRING,DepDelay:STRING,DepDelayMinutes:STRING,DepDel15:STRING,DepartureDelayGroups:STRING,DepTimeBlk:STRING,TaxiOut:STRING,WheelsOff:STRING,WheelsOn:STRING,TaxiIn:STRING,CRSArrTime:STRING,ArrTime:STRING,ArrDelay:STRING,ArrDelayMinutes:STRING,ArrDel15:STRING,ArrivalDelayGroups:STRING,ArrTimeBlk:STRING,Cancelled:STRING,CancellationCode:STRING,Diverted:STRING,CRSElapsedTime:STRING,ActualElapsedTime:STRING,AirTime:STRING,Flights:STRING,Distance:STRING,DistanceGroup:STRING,CarrierDelay:STRING,WeatherDelay:STRING,NASDelay:STRING,SecurityDelay:STRING,LateAircraftDelay:STRING,FirstDepTime:STRING,TotalAddGTime:STRING,LongestAddGTime:STRING,DivAirportLandings:STRING,DivReachedDest:STRING,DivActualElapsedTime:STRING,DivArrDelay:STRING,DivDistance:STRING,Div1Airport:STRING,Div1AirportID:STRING,Div1AirportSeqID:STRING,Div1WheelsOn:STRING,Div1TotalGTime:STRING,Div1LongestGTime:STRING,Div1WheelsOff:STRING,Div1TailNum:STRING,Div2Airport:STRING,Div2AirportID:STRING,Div2AirportSeqID:STRING,Div2WheelsOn:STRING,Div2TotalGTime:STRING,Div2LongestGTime:STRING,Div2WheelsOff:STRING,Div2TailNum:STRING,Div3Airport:STRING,Div3AirportID:STRING,Div3AirportSeqID:STRING,Div3WheelsOn:STRING,Div3TotalGTime:STRING,Div3LongestGTime:STRING,Div3WheelsOff:STRING,Div3TailNum:STRING,Div4Airport:STRING,Div4AirportID:STRING,Div4AirportSeqID:STRING,Div4WheelsOn:STRING,Div4TotalGTime:STRING,Div4LongestGTime:STRING,Div4WheelsOff:STRING,Div4TailNum:STRING,Div5Airport:STRING,Div5AirportID:STRING,Div5AirportSeqID:STRING,Div5WheelsOn:STRING,Div5TotalGTime:STRING,Div5LongestGTime:STRING,Div5WheelsOff:STRING,Div5TailNum:STRING
+
+
+for MONTH in `seq -w 1 12`; do
+CSVFILE=gs://${BUCKET}/flights/raw/${YEAR}${MONTH}.csv
+bq --project_id $PROJECT \
+load --time_partitioning_field=FlightDate \
+--time_partitioning_type=MONTH \
+--source_format=CSV --ignore_unknown_values \
+--skip_leading_rows=1 --schema=$SCHEMA \
+${PROJECT}:dsongcp.flights_raw\$${YEAR}${MONTH} $CSVFILE
+done
+```
+
+Повний код для завантаження даних у BigQuery міститься у файлі `bqload.sh`.
+
+## Дашборди
+
+### Створення представлень
+
+Представлення - це віртуальні таблиці, які можна використовувати для спрощення складних запитів. Вони не зберігають жодних даних, але можуть бути використані для обмеження доступу до даних, агрегації даних, об'єднання таблиць тощо.
+
+Створимо представлення для затримок вильоту та прильоту:
+
+```sql
+CREATE OR REPLACE VIEW dsongcp.flights AS
+SELECT
+  FlightDate AS FL_DATE,
+  Reporting_Airline AS UNIQUE_CARRIER,
+  OriginAirportSeqID AS ORIGIN_AIRPORT_SEQ_ID,
+  Origin AS ORIGIN,
+  DestAirportSeqID AS DEST_AIRPORT_SEQ_ID,
+  Dest AS DEST,
+  CRSDepTime AS CRS_DEP_TIME,
+  DepTime AS DEP_TIME,
+  CAST(DepDelay AS FLOAT64) AS DEP_DELAY,
+  CAST(TaxiOut AS FLOAT64) AS TAXI_OUT,
+  WheelsOff AS WHEELS_OFF,
+  WheelsOn AS WHEELS_ON,
+  CAST(TaxiIn AS FLOAT64) AS TAXI_IN,
+  CRSArrTime AS CRS_ARR_TIME,
+  ArrTime AS ARR_TIME,
+  CAST(ArrDelay AS FLOAT64) AS ARR_DELAY,
+  IF(Cancelled = '1.00', True, False) AS CANCELLED,
+  IF(Diverted = '1.00', True, False) AS DIVERTED,
+  DISTANCE
+FROM dsongcp.flights_raw;
+```
+
+Тепер можемо приступити до візуалізації даних.
+
+
