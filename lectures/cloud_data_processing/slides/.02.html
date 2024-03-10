@@ -8,7 +8,7 @@
 
 <meta name="author" content="Ігор Мірошниченко">
 
-<title>Google Cloud Console</title>
+<title>GCP: Завантаження даних у BigQuery</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -103,6 +103,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#дашборди" id="toc-дашборди" class="nav-link" data-scroll-target="#дашборди">Дашборди</a>
   <ul class="collapse">
   <li><a href="#створення-представлень" id="toc-створення-представлень" class="nav-link" data-scroll-target="#створення-представлень">Створення представлень</a></li>
+  <li><a href="#перша-візуалізація" id="toc-перша-візуалізація" class="nav-link" data-scroll-target="#перша-візуалізація">Перша візуалізація</a></li>
+  <li><a href="#керування-даними" id="toc-керування-даними" class="nav-link" data-scroll-target="#керування-даними">Керування даними</a></li>
+  <li><a href="#друга-візуалізація" id="toc-друга-візуалізація" class="nav-link" data-scroll-target="#друга-візуалізація">Друга візуалізація</a></li>
+  <li><a href="#третя-візуалізація" id="toc-третя-візуалізація" class="nav-link" data-scroll-target="#третя-візуалізація">Третя візуалізація</a></li>
+  <li><a href="#додаткові-візуалізації" id="toc-додаткові-візуалізації" class="nav-link" data-scroll-target="#додаткові-візуалізації">Додаткові візуалізації</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -111,7 +116,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Google Cloud Console</h1>
+<h1 class="title">GCP: Завантаження даних у BigQuery</h1>
 <p class="subtitle lead">Хмарні технології обробки даних</p>
 </div>
 
@@ -429,7 +434,74 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>  <span class="cf">IF</span>(Diverted <span class="op">=</span> <span class="st">'1.00'</span>, <span class="kw">True</span>, <span class="kw">False</span>) <span class="kw">AS</span> DIVERTED,</span>
 <span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a>  DISTANCE</span>
 <span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> dsongcp.flights_raw;</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>Тепер можемо приступити до візуалізації даних.</p>
+</section>
+<section id="перша-візуалізація" class="level3">
+<h3 class="anchored" data-anchor-id="перша-візуалізація">Перша візуалізація</h3>
+<p>Перейдіть до Looker Studio за посиланням <a href="https://lookerstudio.google.com/" class="uri">https://lookerstudio.google.com/</a> та виберіть опцію “Створити” -&gt; <em>Джерело даних</em>.</p>
+<p>У меню виберіть BigQuery та вкажіть проект та набір даних/представлення, яка Вас цікавить (у нашому випадку це представлення <code>flights</code> з набору даних <code>dsongcp</code>). За необхідності змініть тип даних та інші необхідні маніпуляції з даними і натисніть <em>Створити звіт</em>.</p>
+<p>За замовчуванням Looker видасть базову таблицю та/або графік. За необхідності видаліть все зайве.</p>
+<p>Додайте новий графік за допомогою кнопки <em>Додати діаграму</em> -&gt; <em>Точкова діаграма</em>.</p>
+<p>Поки що проігноруйте <em>Параметр діапазону дат</em> і використайте три характеристики: <em>Параметр</em>, <em>Показник X</em>, <em>Показник X</em>.</p>
+<p>Змініть (за необхідності) <em>Параметр</em> на <code>UNIQUE_CARRIER</code>, <em>Показник X</em> на <code>DEP_DELAY</code>, <em>Показник X</em> на <code>ARR_DELAY</code> і змініть метрику агрегування для X і Y на <em>Середнє</em>. Ми маємо отримати усереднену затримку відправлення та прибуття для різних перевізників.</p>
+<p>Перейдіть на вкладку <em>Стиль</em>, додайте лінію тренду і додайте мітки даних:</p>
+<p><img src="img/looker-01.png" class="img-fluid"></p>
+</section>
+<section id="керування-даними" class="level3">
+<h3 class="anchored" data-anchor-id="керування-даними">Керування даними</h3>
+<p>Додамо можливість контролювати діапазон дат, який відображається на графіку.</p>
+<p>Оберіть меню <em>Додати елемент керування</em> -&gt; <em>Діапазон дат</em> та оберіть місце його розташування. В налаштуваннях меню оберіть <em>Фікосваний</em> діапазон дат і вкажіть початкову дату 1 січня 2015, а кінцеву - 31 грудня 2015.</p>
+<p>Перейдіть у меню <em>Переглянути</em> у верхній частині екрану і спробуйте змінити кінцеву дату на 31 травня 2015:</p>
+<p><img src="img/looker-02.png" class="img-fluid"></p>
+</section>
+<section id="друга-візуалізація" class="level3">
+<h3 class="anchored" data-anchor-id="друга-візуалізація">Друга візуалізація</h3>
+<p>Схоже між часом затримки вильоту та прильоту є деяка кореляція. Але давайте будемо вважати, що рейс затримався, якщо літак прибуває на <strong>15 хвилин пізніше</strong> очікуваного часу. Спробуємо продемонструвати відносний показник затримки.</p>
+<p>Додайте новий графік за допомогою кнопки <em>Додати діаграму</em> -&gt; <em>Кільцева діаграма</em>.</p>
+<p>Нам треба показати співвідношення рейсів із запізненням до рейсів без запізнення. Як нам отримати ці дані?</p>
+<p>В базі даних немає стовпця, який би вказував на загальну кількість вильотів. Однак у Looker Studio є спеціальне значення <code>Record Count</code>, яке ми можемо використовувати як матрику, попередньо змінивши тип агрегації на <code>Кількість</code>.</p>
+<p>Додамо нову змінну <em>Параметр</em> з назвою <code>is_late</code>. Клікніть у поле <em>Параметр</em> -&gt; <em>Додати поле</em>. Дайте назву новій змінній та вкажіть формулу:</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="cf">CASE</span> <span class="cf">WHEN</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>(ARR_DELAY <span class="op">&lt;</span> <span class="dv">15</span>)</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="cf">THEN</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="st">'ON TIME'</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a><span class="cf">ELSE</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="st">'LATE'</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a><span class="cf">END</span></span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><img src="img/looker-03.png" class="img-fluid"></p>
+</section>
+<section id="третя-візуалізація" class="level3">
+<h3 class="anchored" data-anchor-id="третя-візуалізація">Третя візуалізація</h3>
+<p>Додамо ще один графік, який показуватиме затримки для кожного перевізника.</p>
+<p>Додайте новий графік за допомогою кнопки <em>Додати діаграму</em> -&gt; <em>Стовпчаста діаграма</em></p>
+<p>Налаштування:</p>
+<ul>
+<li>Параметр: <code>UNIQUE_CARRIER</code></li>
+<li>Показник X: <code>DEP_DELAY</code></li>
+<li>Показник Y: <code>ARR_DELAY</code></li>
+<li>Агрегація: <code>Середнє</code></li>
+<li>Сортування: <code>UNIQUE_CARRIER</code> (за зростанням)</li>
+</ul>
+<p>Стиль:</p>
+<ul>
+<li>Стовпчики: <code>20</code></li>
+<li>Осі: <code>Одинарна</code></li>
+</ul>
+<p><img src="img/looker-04.png" class="img-fluid"></p>
+</section>
+<section id="додаткові-візуалізації" class="level3">
+<h3 class="anchored" data-anchor-id="додаткові-візуалізації">Додаткові візуалізації</h3>
+<p>Додамо ще декілька схожих візуалізацій, але цього разу з різними порогами затримки вильоту: 10, 15, 20+ хвилин.</p>
+<p>Для цього нам знадобиться створити нові представлення даних:</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode sql code-with-copy"><code class="sourceCode sql"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REPLACE</span> <span class="kw">VIEW</span> dsongcp.delayed_10 <span class="kw">AS</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> dsongcp.flights <span class="kw">WHERE</span> dep_delay <span class="op">&gt;=</span> <span class="dv">10</span>;</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REPLACE</span> <span class="kw">VIEW</span> dsongcp.delayed_15 <span class="kw">AS</span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> dsongcp.flights <span class="kw">WHERE</span> dep_delay <span class="op">&gt;=</span> <span class="dv">15</span>;</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REPLACE</span> <span class="kw">VIEW</span> dsongcp.delayed_20 <span class="kw">AS</span></span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> dsongcp.flights <span class="kw">WHERE</span> dep_delay <span class="op">&gt;=</span> <span class="dv">20</span>;</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><img src="img/looker-05.png" class="img-fluid"></p>
+<p>Які висновки можемо зробити з цих графіків?</p>
 </section>
 </section>
 
