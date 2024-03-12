@@ -1,0 +1,178 @@
+---
+title: "GCP: Python та BigQuery"
+subtitle: "Хмарні технології обробки даних"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка | ФІТ
+# date: today
+# date-format: iso
+from: markdown+emoji
+title-slide-attributes:
+  data-background-iframe: .01_files/libs/colored-particles/index.html
+#   data-background-color: "#eef3f8"
+lang: ua
+footer: 🔗 <a href="https://aranaur.rbind.io/lectures/cloud_data_processing/">Матеріали курсу</a>
+format: 
+  html:
+    toc: true
+    code-line-numbers: false
+    highlight-style: github
+    pdf-separate-fragments: true
+    # fig-height: 7.5
+    fig-width: 15
+    fig-align: center
+    fig-format: svg
+    theme: [default, custom.scss]
+jupyter: python3
+execute: 
+  warning: false
+  echo: true
+---
+
+```{python}
+#| label: setup
+#| include: false
+#| eval: false
+
+# Import libraries
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.stats import norm, uniform, t
+
+from IPython.display import Markdown
+from tabulate import tabulate
+
+# Set seaborn default style
+sns.set_style('whitegrid')
+sns.set_palette('colorblind')
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+# grey_light = "grey70"
+# grey_mid   = "grey50"
+# grey_dark  = "grey20"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+## Вимоги
+
+1. Активувати BigQuery API в консолі GCP
+2. Встановити бібліотеку `google-cloud-bigquery`:
+
+```bash
+pip install --upgrade google-cloud-bigquery
+```
+
+3. Створити сервісний ключ для доступу до BigQuery API та завантажити його на локальний комп'ютер.
+
+## Початок роботи з API
+
+```{python}
+#| label: bigquery-setup
+
+import os
+from google.cloud import bigquery
+
+# Завантаження сервісного ключа
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./data/fit-cloud-course-key.json"
+```
+
+### Створення клієнта
+
+```{python}
+#| label: client
+
+client = bigquery.Client('fit-cloud-course')
+```
+
+### Запити до BigQuery
+
+```{python}
+#| label: query
+
+sql_query = """
+SELECT station_id, name, dockcount
+FROM `bigquery-public-data.san_francisco.bikeshare_stations`
+LIMIT 5
+"""
+```
+
+### Виконання запиту
+
+```{python}
+#| label: execute
+
+query_job = client.query(sql_query)
+
+print(query_job)
+```
+
+### Результати запиту
+
+```{python}
+#| label: results-1
+
+for row in query_job:
+    print(row)
+```
+
+```{python}
+#| label: results-2
+
+for row in query_job:
+    print(row[0], row[1], row[2], sep=" | ")
+```
+
+```{python}
+#| label: results-3
+
+for row in query_job:
+    print(row.station_id, row.name, row.dockcount, sep=" | ")
+```
+
+## Додавання, оновлення, видалення міток за допомогою API BigQuery на Python
+
+### Створення таблиці
+
+```{python}
+#| label: create-table
+
+# Створення посилання на таблицю
+dataset_ref = bigquery.DatasetReference(client.project, 'Staging')
+
+# Створення таблиці
+table_ref = bigquery.TableReference(dataset_ref, 'AZURE')
+```
+
+### Створення міток
+
+```{python}
+#| label: labels
+
+# Створення міток
+labels = {
+    'type': 'social_media',
+    'category': 'cloud_computing'
+}
+
+# Створення таблиці з мітками
+azure_table = client.get_table(table_ref)
+azure_table.labels = labels
+client.update_table(azure_table, ['labels'])
+```
+
+
+
+
+
