@@ -72,9 +72,10 @@ slate      = "#314f4f"
 
 ```bash
 pip install --upgrade google-cloud-bigquery
+pip install db-dtypes
 ```
 
-3. Створити сервісний ключ для доступу до BigQuery API та завантажити його на локальний комп'ютер.
+3. Створити сервісний ключ для доступу до BigQuery API (Role: Basic, Roles: Owner) та завантажити його на локальний комп'ютер.
 
 ## Початок роботи з API
 
@@ -83,6 +84,8 @@ pip install --upgrade google-cloud-bigquery
 
 import os
 from google.cloud import bigquery
+import time
+import pandas as pd
 
 # Завантаження сервісного ключа
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./data/fit-cloud-course-key.json"
@@ -141,18 +144,28 @@ for row in query_job:
     print(row.station_id, row.name, row.dockcount, sep=" | ")
 ```
 
-## Додавання, оновлення, видалення міток за допомогою API BigQuery на Python
+## Мітки даних у BigQuery
+
+Мітка – це пара ключ-значення, яку можна призначити ресурсам Google Cloud BigQuery. Ви можете прикріпити мітку до кожного ресурсу, а потім відфільтрувати ресурси на основі їхніх міток.
+
+Ось кілька типових випадків використання міток:
+
+- **Мітки команди:** `team:research` або `team:analytics`.
+- **Мітки компонентів:** наприклад, `component:redis`, `component:frontend`, `component:ingestта`, `component:dashboard` тощо.
+- **Мітки середовища:** `environment:production` і `environment:test`.
+- **Мітки стану:** `state:active`, `state:readytodelete` і `state:archive`.
+- **Мітки власності:** використовуються для ідентифікації команд, які відповідають за операції, наприклад `team:shopping-cart`.
 
 ### Створення таблиці
 
 ```{python}
-#| label: create-table
+#| label: create-table-1
 
 # Створення посилання на таблицю
-dataset_ref = bigquery.DatasetReference(client.project, 'Staging')
+dataset_ref = bigquery.DatasetReference(client.project, 'dsongcp')
 
 # Створення таблиці
-table_ref = bigquery.TableReference(dataset_ref, 'AZURE')
+table_ref = bigquery.TableReference(dataset_ref, 'flights_auto')
 ```
 
 ### Створення міток
@@ -162,15 +175,259 @@ table_ref = bigquery.TableReference(dataset_ref, 'AZURE')
 
 # Створення міток
 labels = {
-    'type': 'social_media',
-    'category': 'cloud_computing'
+    'type': 'auto',
+    'category': 'transport'
 }
 
 # Створення таблиці з мітками
-azure_table = client.get_table(table_ref)
-azure_table.labels = labels
-client.update_table(azure_table, ['labels'])
+flights_auto_table = client.get_table(table_ref)
+# Додавання міток
+flights_auto_table.labels = labels
+# Оновлення таблиці
+client.update_table(flights_auto_table, ['labels'])
 ```
+
+### Оновлення міток
+
+```{python}
+#| label: update-labels
+
+# Оновлення міток
+new_labels = {
+    'type': 'auto',
+    'category': 'transport',
+    'year': '2015'
+}
+
+flights_auto_table = client.get_table(table_ref)
+flights_auto_table.labels = new_labels
+client.update_table(flights_auto_table, ['labels'])
+```
+
+### Видалення міток
+
+```{python}
+#| label: delete-labels
+
+table = client.get_table(table_ref)
+labels = table.labels
+labels = {k: None for k, v in labels.items()}
+table.labels = labels
+client.update_table(table, ['labels'])
+```
+
+## Додавання/видалення змінних
+
+```{python}
+#| label: columns
+
+# Створення таблиці
+dataset_ref = bigquery.DatasetReference(client.project, 'dsongcp')
+table_ref = bigquery.TableReference(dataset_ref, 'flights_auto')
+bigquery_table = client.get_table(table_ref)
+```
+
+Отримання схеми таблиці:
+
+```{python}
+#| label: schema
+
+schema = bigquery_table.schema
+schema[:5]
+```
+
+Створимо копію схеми:
+
+```{python}
+#| label: copy-schema
+
+new_schema = schema.copy()
+```
+
+Додамо нову змінну у схему:
+
+```{python}
+#| label: add-column
+
+new_schema.append(bigquery.SchemaField('Distance_km', 'FLOAT64', mode='NULLABLE'))
+# Передамо оновлену схему таблиці bigquery_table
+bigquery_table.schema = new_schema
+```
+
+::: callout-note
+Типи даних в BigQuery: <https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types>.
+:::
+
+Тепер зробимо запит на оновлення таблиці:
+
+```{python}
+#| label: update-schema
+
+client.update_table(bigquery_table, ['schema'])
+```
+
+Переглянемо оновлену схему:
+
+```{python}
+#| label: updated-schema
+
+bigquery_table = client.get_table(table_ref)
+schema = bigquery_table.schema
+schema[-5:]
+```
+
+Видалення змінної з схеми:
+
+```{python}
+#| label: delete-column
+
+query_job = client.query("""
+    ALTER TABLE dsongcp.flights_auto
+    DROP COLUMN IF EXISTS Distance_km;
+""")
+```
+
+Іноді запит може займати деякий час на виконання. Щоб перевірити статус запиту, використовуйте метод `query_job.state`:
+
+```{python}
+#| label: query-status
+
+while query_job.state != 'DONE': 
+    print('Запит виконується...')
+    time.sleep(3)
+    query_job.reload()
+print(query_job.result())
+```
+
+## Збереження результатів запиту в таблицю
+
+Напишемо запит, який вибере середню затримку вильоту та прибуття для кожного аеропорту відправлення:
+
+```{python}
+#| label: base-query
+
+sql_query = """
+SELECT
+  ORIGIN,
+  AVG(DepDelay) AS dep_delay,
+  AVG(ArrDelay) AS arr_delay,
+  COUNT(ArrDelay) AS num_flights
+FROM
+  `dsongcp.flights_auto`
+GROUP BY
+  ORIGIN
+ORDER BY num_flights DESC
+LIMIT 10
+"""
+```
+
+Створимо окремий датасет, куди ми збережемо результати запиту:
+
+```{python}
+#| label: create-dataset
+
+dataset_id = client.project + '.dsongcp_results'
+dataset = bigquery.Dataset(dataset_id)
+dataset.location = "US"
+dataset = client.create_dataset(dataset, exists_ok=True)
+print(f"Створено датасет {client.project}.{dataset.dataset_id}")
+```
+
+Визначимо таблицю, в яку ми збережемо результати запиту:
+
+```{python}
+#| label: table-info
+
+project_id = client.project
+dataset_id = 'dsongcp_results'
+table_id = 'flights_delay'
+```
+
+Використаємо метод `from_string()` для створення посилання на таблицю:
+
+```{python}
+#| label: create-table-2
+
+table_ref = bigquery.TableReference.from_string(f"{project_id}.{dataset_id}.{table_id}")
+table_ref
+```
+
+Виконаємо запит та збережемо результати в таблицю:
+
+```{python}
+#| label: save-results
+
+job_config = bigquery.QueryJobConfig(destination=table_ref, write_disposition="WRITE_TRUNCATE")
+query_job = client.query(sql_query, job_config=job_config)
+while query_job.state != 'DONE': 
+    print('Запит виконується...')
+    time.sleep(3)
+    query_job.reload()
+print(query_job.result())
+```
+
+::: callout-note
+Більше про `QueryJobConfig` за посиланням <https://cloud.google.com/python/docs/reference/bigquery/latest/google.cloud.bigquery.job.QueryJobConfig>
+:::
+
+## Запит у DataFrame
+
+Для зручності роботи з даними можна використовувати бібліотеку `pandas`. Для цього використаємо метод `to_dataframe()`:
+
+```{python}
+#| label: to-dataframe
+
+query_job = client.query(sql_query)
+df = query_job.to_dataframe()
+df
+```
+
+## Параметризовані запити
+
+Параметризовані запити дозволяють використовувати змінні в запитах. Це дозволяє виконувати один і той же запит з різними значеннями змінних.
+
+Для цього використовується символ `@` перед змінною в запиті. Визначимо параметр `month` та виконаємо запит:
+
+```{python}
+#| label: query-params
+
+query_params = [
+    bigquery.ScalarQueryParameter("month", "INT64", 1)
+]
+```
+
+```{python}
+#| label: param-query
+
+sql_query = """
+SELECT
+  ORIGIN,
+  AVG(DepDelay) AS dep_delay,
+  AVG(ArrDelay) AS arr_delay,
+  COUNT(ArrDelay) AS num_flights
+FROM
+  `dsongcp.flights_auto`
+WHERE
+  Month = @month
+GROUP BY
+  ORIGIN
+ORDER BY num_flights DESC
+LIMIT 10
+"""
+```
+
+```{python}
+#| label: execute-params
+
+job_config = bigquery.QueryJobConfig(query_parameters=query_params)
+query_job = client.query(sql_query, job_config=job_config)
+df = query_job.to_dataframe()
+df
+```
+
+
+
+
 
 
 
