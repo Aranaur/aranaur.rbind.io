@@ -84,8 +84,11 @@ pip install db-dtypes
 
 import os
 from google.cloud import bigquery
+import google.auth
 import time
 import pandas as pd
+import datetime
+import json
 
 # Завантаження сервісного ключа
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./data/fit-cloud-course-key.json"
@@ -424,6 +427,350 @@ query_job = client.query(sql_query, job_config=job_config)
 df = query_job.to_dataframe()
 df
 ```
+
+У випадку коли потрібно використати зріз по даті:
+
+```{python}
+#| label: date-params
+
+query_params = [
+    bigquery.ScalarQueryParameter("start_date", "DATE", datetime.date(2015, 1, 1)),
+    bigquery.ScalarQueryParameter("end_date", "DATE", datetime.date(2015, 1, 7))
+]
+```
+
+Тоді запит буде виглядати наступним чином:
+
+```{python}
+#| label: date-query
+
+sql_query = """
+SELECT
+  ORIGIN,
+  AVG(DepDelay) AS dep_delay,
+  AVG(ArrDelay) AS arr_delay,
+  COUNT(ArrDelay) AS num_flights
+FROM
+  `dsongcp.flights_auto`
+WHERE
+  FlightDate BETWEEN @start_date AND @end_date
+GROUP BY
+  ORIGIN
+ORDER BY num_flights DESC
+LIMIT 10
+"""
+```
+
+```{python}
+#| label: execute-date
+
+job_config = bigquery.QueryJobConfig(query_parameters=query_params)
+query_job = client.query(sql_query, job_config=job_config)
+df = query_job.to_dataframe()
+df
+```
+
+І третій варіант - позиційні параметри:
+
+```{python}
+#| label: positional-params
+
+query_params = [
+    bigquery.ScalarQueryParameter(None, "FLOAT64", 0),
+    bigquery.ScalarQueryParameter(None, "FLOAT64", 0)
+
+]
+```
+
+```{python}
+#| label: positional-query
+
+sql_query = """
+SELECT
+  ORIGIN,
+  AVG(DepDelay) AS dep_delay,
+  AVG(ArrDelay) AS arr_delay,
+  COUNT(ArrDelay) AS num_flights
+FROM
+  `dsongcp.flights_auto`
+WHERE
+  DepDelay < ? AND ArrDelay < ?
+GROUP BY
+  ORIGIN
+ORDER BY num_flights DESC
+LIMIT 10
+"""
+```
+
+```{python}
+#| label: execute-positional
+
+job_config = bigquery.QueryJobConfig(query_parameters=query_params)
+query_job = client.query(sql_query, job_config=job_config)
+df = query_job.to_dataframe()
+df
+```
+
+Ще один варіант - використанням масивів:
+
+```{python}
+#| label: array-params
+
+query_params = [
+    bigquery.ArrayQueryParameter("ORIGIN", "STRING", ["PHX", "ATL", "LAS"]),
+    bigquery.ScalarQueryParameter("DepDelay", "FLOAT64", 10),
+]
+```
+
+```{python}
+#| label: array-query
+
+sql_query = """
+SELECT
+  ORIGIN,
+  AVG(DepDelay) AS dep_delay,
+  AVG(ArrDelay) AS arr_delay,
+  COUNT(ArrDelay) AS num_flights
+FROM
+  `dsongcp.flights_auto`
+WHERE
+  ORIGIN IN UNNEST(@ORIGIN)
+  AND DepDelay > @DepDelay
+GROUP BY
+  ORIGIN
+ORDER BY num_flights DESC
+"""
+```
+
+```{python}
+#| label: execute-array
+
+job_config = bigquery.QueryJobConfig(query_parameters=query_params)
+query_job = client.query(sql_query, job_config=job_config)
+df = query_job.to_dataframe()
+df
+```
+
+## Таблиця BG -> GC Storage
+
+```{python}
+#| label: storage-setup
+
+client = bigquery.Client('fit-cloud-course')
+dataset_id = 'dsongcp'
+bucket_name = 'fit-cloud-course-dsongcp'
+```
+
+```{python}
+#| label: storage-results
+
+table_ref = bigquery.TableReference.from_string(f"{client.project}.{dataset_id}.flights_auto")
+```
+
+```{python}
+#| label: storage-config
+
+job_config = bigquery.job.ExtractJobConfig()
+# job_config.destination_format = bigquery.DestinationFormat.CSV
+job_config.destination_format = bigquery.DestinationFormat.NEWLINE_DELIMITED_JSON
+```
+
+```{python}
+#| label: storage-execute
+
+destination_uri = f"gs://{bucket_name}/results/flights_delay.json"
+
+extract_job = client.extract_table(
+    table_ref,
+    destination_uri,
+    job_config=job_config,
+    location="US"
+)
+extract_job.result()
+```
+
+## Завантаження даних в BigQuery
+
+### JSON
+
+За необхідності, переведемо дані у плоский формат:
+
+```{python}
+#| label: flatten
+#| eval: false
+
+json_data = json.load(open('./data/orders.json'))
+data_file_path = './data/orders_upload.json'
+
+with open(data_file_path, 'w') as f:
+    f.write('\n'.join(json.dumps(record) for record in json_data))
+```
+
+```{python}
+#| label: upload-setup
+
+dataset_id = 'dsongcp'
+table_id = 'orders'
+data_file_path = './data/orders.json'
+```
+
+```{python}
+#| label: upload-config
+
+job_config = bigquery.LoadJobConfig(
+    schema=[
+        bigquery.SchemaField("order_id", "INT64"),
+        bigquery.SchemaField("creation_time", "DATETIME"),
+        bigquery.SchemaField("product_ids", "INT64", mode="REPEATED"),
+        ],
+    source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+    autodetect=False,    
+    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+)
+```
+
+```{python}
+#| label: upload-execute
+
+table_ref = client.dataset(dataset_id).table(table_id)
+with open(data_file_path, "rb") as source_file:
+    job = client.load_table_from_file(source_file, table_ref, job_config=job_config)
+
+while job.running():
+    print('Завантаження даних...')
+    time.sleep(3)
+print(job.result())
+```
+
+### GC Storage
+
+```{python}
+#| label: storage-upload
+
+bucket_name = 'fit-cloud-course-dsongcp'
+source_uri = f"gs://{bucket_name}/flights/raw/*.csv"
+table_id = 'flights_py'
+```
+
+```{python}
+#| label: storage-config-2
+
+job_config = bigquery.LoadJobConfig(
+    autodetect=True,
+    source_format=bigquery.SourceFormat.CSV,
+    skip_leading_rows=1,
+    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+)
+```
+
+```{python}
+#| label: storage-execute-2
+
+table_ref = client.dataset(dataset_id).table(table_id)
+job = client.load_table_from_uri(
+    source_uri,
+    table_ref,
+    job_config=job_config
+)
+
+while job.running():
+    print('Завантаження даних...')
+    time.sleep(3)
+print(job.result())
+```
+
+### CSV
+
+```{python}
+#| label: csv-upload
+
+dataset_id = 'dsongcp'
+table_id = 'users'
+data_file_path = './data/users.csv'
+
+job_config = bigquery.LoadJobConfig(
+    source_format=bigquery.SourceFormat.CSV,
+    skip_leading_rows=1,
+    autodetect=True,
+    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+)
+
+table_ref = client.dataset(dataset_id).table(table_id)
+with open(data_file_path, "rb") as source_file:
+    job = client.load_table_from_file(source_file, table_ref, job_config=job_config)
+
+while job.running():
+    print('Завантаження даних...')
+    time.sleep(3)
+print(job.result())
+```
+
+```{python}
+#| label: csv-rows-cols
+
+table = client.get_table(table_ref)
+print(f"Таблиця: {table}\nСпостережень: {table.num_rows}\nЗмінних: {len(table.schema)}")
+```
+
+### Google Sheets
+
+Підключаємо Google Drive API.
+Копіюємо email-адресу сервісного акаунта.
+
+```{python}
+#| label: sheets-setup
+
+credentials, project = google.auth.default(
+    scopes=[
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/bigquery"
+    ]
+)
+```
+
+```{python}
+#| label: sheets-config
+
+client = bigquery.Client(credentials=credentials, project=project)
+
+dataset_id = 'dsongcp'
+table_id = 'air_traffic'
+table_ref = client.dataset(dataset_id).table(table_id)
+```
+
+```{python}
+#| label: sheets-execute
+
+table = bigquery.Table(table_ref, schema = [
+    bigquery.SchemaField("Activity_Period", "INT64"),
+    bigquery.SchemaField("Activity_Period_Start_Date", "DATE"),
+    bigquery.SchemaField("Operating_Airline", "STRING"),
+    bigquery.SchemaField("Operating_Airline_IATA_Code", "STRING"),
+    bigquery.SchemaField("Published_Airline", "STRING"),
+    bigquery.SchemaField("Published_Airline_IATA_Code", "STRING"),
+    bigquery.SchemaField("GEO_Summary", "STRING"),
+    bigquery.SchemaField("GEO_Region", "STRING"),
+    bigquery.SchemaField("Activity_Type_Code", "STRING"),
+    bigquery.SchemaField("Price_Category_Code", "STRING"),
+    bigquery.SchemaField("Terminal", "STRING"),
+    bigquery.SchemaField("Boarding_Area", "STRING"),
+    bigquery.SchemaField("Passenger_Count", "INT64"),
+    bigquery.SchemaField("data_as_of", "STRING"),
+    bigquery.SchemaField("data_loaded_at", "STRING")
+])
+
+external_config = bigquery.ExternalConfig("GOOGLE_SHEETS")
+sheet_url = "https://docs.google.com/spreadsheets/d/1vp7bCvxd3R2zciqxc8A4Qoq5DAvqhzfXJnljmG5OOw0/edit?usp=sharing"
+external_config.source_uris = [sheet_url]
+
+options = external_config.google_sheets_options
+options.skip_leading_rows = 1
+options.range = "air_traffic!A:O"
+
+table.external_data_configuration = external_config
+client.create_table(table)
+```
+
 
 
 

@@ -102,6 +102,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#збереження-результатів-запиту-в-таблицю" id="toc-збереження-результатів-запиту-в-таблицю" class="nav-link" data-scroll-target="#збереження-результатів-запиту-в-таблицю">Збереження результатів запиту в таблицю</a></li>
   <li><a href="#запит-у-dataframe" id="toc-запит-у-dataframe" class="nav-link" data-scroll-target="#запит-у-dataframe">Запит у DataFrame</a></li>
   <li><a href="#параметризовані-запити" id="toc-параметризовані-запити" class="nav-link" data-scroll-target="#параметризовані-запити">Параметризовані запити</a></li>
+  <li><a href="#таблиця-bg---gc-storage" id="toc-таблиця-bg---gc-storage" class="nav-link" data-scroll-target="#таблиця-bg---gc-storage">Таблиця BG -&gt; GC Storage</a></li>
+  <li><a href="#завантаження-даних-в-bigquery" id="toc-завантаження-даних-в-bigquery" class="nav-link" data-scroll-target="#завантаження-даних-в-bigquery">Завантаження даних в BigQuery</a>
+  <ul class="collapse">
+  <li><a href="#json" id="toc-json" class="nav-link" data-scroll-target="#json">JSON</a></li>
+  <li><a href="#gc-storage" id="toc-gc-storage" class="nav-link" data-scroll-target="#gc-storage">GC Storage</a></li>
+  <li><a href="#csv" id="toc-csv" class="nav-link" data-scroll-target="#csv">CSV</a></li>
+  <li><a href="#google-sheets" id="toc-google-sheets" class="nav-link" data-scroll-target="#google-sheets">Google Sheets</a></li>
+  </ul></li>
   </ul>
 </nav>
 </div>
@@ -157,11 +165,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div id="bigquery-setup" class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> google.cloud <span class="im">import</span> bigquery</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Завантаження сервісного ключа</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>os.environ[<span class="st">"GOOGLE_APPLICATION_CREDENTIALS"</span>] <span class="op">=</span> <span class="st">"./data/fit-cloud-course-key.json"</span></span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> google.auth</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> datetime</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> json</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Завантаження сервісного ключа</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>os.environ[<span class="st">"GOOGLE_APPLICATION_CREDENTIALS"</span>] <span class="op">=</span> <span class="st">"./data/fit-cloud-course-key.json"</span></span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <section id="створення-клієнта" class="level3">
 <h3 class="anchored" data-anchor-id="створення-клієнта">Створення клієнта</h3>
@@ -186,7 +197,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(query_job)</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>QueryJob&lt;project=fit-cloud-course, location=US, id=97b666b4-29fb-4ebc-9ddc-d349c8bb1ca8&gt;</code></pre>
+<pre><code>QueryJob&lt;project=fit-cloud-course, location=US, id=fea57c57-015c-4e29-9698-b2f5df14c63f&gt;</code></pre>
 </div>
 </div>
 </section>
@@ -263,7 +274,7 @@ Row((3, 'San Jose Civic Center', 15), {'station_id': 0, 'name': 1, 'dockcount': 
 <span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>flights_auto_table.labels <span class="op">=</span> labels</span>
 <span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Оновлення таблиці</span></span>
 <span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>client.update_table(flights_auto_table, [<span class="st">'labels'</span>])</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div id="labels" class="cell-output cell-output-display" data-execution_count="93">
+<div id="labels" class="cell-output cell-output-display" data-execution_count="9">
 <pre><code>Table(TableReference(DatasetReference('fit-cloud-course', 'dsongcp'), 'flights_auto'))</code></pre>
 </div>
 </div>
@@ -281,7 +292,7 @@ Row((3, 'San Jose Civic Center', 15), {'station_id': 0, 'name': 1, 'dockcount': 
 <span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>flights_auto_table <span class="op">=</span> client.get_table(table_ref)</span>
 <span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>flights_auto_table.labels <span class="op">=</span> new_labels</span>
 <span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>client.update_table(flights_auto_table, [<span class="st">'labels'</span>])</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div id="update-labels" class="cell-output cell-output-display" data-execution_count="94">
+<div id="update-labels" class="cell-output cell-output-display" data-execution_count="10">
 <pre><code>Table(TableReference(DatasetReference('fit-cloud-course', 'dsongcp'), 'flights_auto'))</code></pre>
 </div>
 </div>
@@ -294,7 +305,7 @@ Row((3, 'San Jose Civic Center', 15), {'station_id': 0, 'name': 1, 'dockcount': 
 <span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> {k: <span class="va">None</span> <span class="cf">for</span> k, v <span class="kw">in</span> labels.items()}</span>
 <span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>table.labels <span class="op">=</span> labels</span>
 <span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>client.update_table(table, [<span class="st">'labels'</span>])</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div id="delete-labels" class="cell-output cell-output-display" data-execution_count="95">
+<div id="delete-labels" class="cell-output cell-output-display" data-execution_count="11">
 <pre><code>Table(TableReference(DatasetReference('fit-cloud-course', 'dsongcp'), 'flights_auto'))</code></pre>
 </div>
 </div>
@@ -312,7 +323,7 @@ Row((3, 'San Jose Civic Center', 15), {'station_id': 0, 'name': 1, 'dockcount': 
 <div id="cell-schema" class="cell" data-execution_count="14">
 <div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>schema <span class="op">=</span> bigquery_table.schema</span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>schema[:<span class="dv">5</span>]</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div id="schema" class="cell-output cell-output-display" data-execution_count="97">
+<div id="schema" class="cell-output cell-output-display" data-execution_count="13">
 <pre><code>[SchemaField('Year', 'INTEGER', 'NULLABLE', None, None, (), None),
  SchemaField('Quarter', 'INTEGER', 'NULLABLE', None, None, (), None),
  SchemaField('Month', 'INTEGER', 'NULLABLE', None, None, (), None),
@@ -346,7 +357,7 @@ Row((3, 'San Jose Civic Center', 15), {'station_id': 0, 'name': 1, 'dockcount': 
 <p>Тепер зробимо запит на оновлення таблиці:</p>
 <div id="cell-update-schema" class="cell" data-execution_count="17">
 <div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>client.update_table(bigquery_table, [<span class="st">'schema'</span>])</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div id="update-schema" class="cell-output cell-output-display" data-execution_count="100">
+<div id="update-schema" class="cell-output cell-output-display" data-execution_count="16">
 <pre><code>Table(TableReference(DatasetReference('fit-cloud-course', 'dsongcp'), 'flights_auto'))</code></pre>
 </div>
 </div>
@@ -355,7 +366,7 @@ Row((3, 'San Jose Civic Center', 15), {'station_id': 0, 'name': 1, 'dockcount': 
 <div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>bigquery_table <span class="op">=</span> client.get_table(table_ref)</span>
 <span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>schema <span class="op">=</span> bigquery_table.schema</span>
 <span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>schema[<span class="op">-</span><span class="dv">5</span>:]</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div id="updated-schema" class="cell-output cell-output-display" data-execution_count="101">
+<div id="updated-schema" class="cell-output cell-output-display" data-execution_count="17">
 <pre><code>[SchemaField('Div5LongestGTime', 'STRING', 'NULLABLE', None, None, (), None),
  SchemaField('Div5WheelsOff', 'STRING', 'NULLABLE', None, None, (), None),
  SchemaField('Div5TailNum', 'STRING', 'NULLABLE', None, None, (), None),
@@ -379,7 +390,7 @@ Row((3, 'San Jose Civic Center', 15), {'station_id': 0, 'name': 1, 'dockcount': 
 <span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(query_job.result())</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Запит виконується...
-&lt;google.cloud.bigquery.table._EmptyRowIterator object at 0x000001781E2A39D0&gt;</code></pre>
+&lt;google.cloud.bigquery.table._EmptyRowIterator object at 0x0000027F308E1650&gt;</code></pre>
 </div>
 </div>
 </section>
@@ -422,7 +433,7 @@ Row((3, 'San Jose Civic Center', 15), {'station_id': 0, 'name': 1, 'dockcount': 
 <div id="cell-create-table-2" class="cell" data-execution_count="24">
 <div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>table_ref <span class="op">=</span> bigquery.TableReference.from_string(<span class="ss">f"</span><span class="sc">{</span>project_id<span class="sc">}</span><span class="ss">.</span><span class="sc">{</span>dataset_id<span class="sc">}</span><span class="ss">.</span><span class="sc">{</span>table_id<span class="sc">}</span><span class="ss">"</span>)</span>
 <span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>table_ref</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div id="create-table-2" class="cell-output cell-output-display" data-execution_count="107">
+<div id="create-table-2" class="cell-output cell-output-display" data-execution_count="23">
 <pre><code>TableReference(DatasetReference('fit-cloud-course', 'dsongcp_results'), 'flights_delay')</code></pre>
 </div>
 </div>
@@ -437,7 +448,7 @@ Row((3, 'San Jose Civic Center', 15), {'station_id': 0, 'name': 1, 'dockcount': 
 <span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(query_job.result())</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Запит виконується...
-&lt;google.cloud.bigquery.table.RowIterator object at 0x000001781E2FA290&gt;</code></pre>
+&lt;google.cloud.bigquery.table.RowIterator object at 0x0000027F5AC9E8D0&gt;</code></pre>
 </div>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
@@ -461,7 +472,7 @@ Row((3, 'San Jose Civic Center', 15), {'station_id': 0, 'name': 1, 'dockcount': 
 <div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>query_job <span class="op">=</span> client.query(sql_query)</span>
 <span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> query_job.to_dataframe()</span>
 <span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>df</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div id="to-dataframe" class="cell-output cell-output-display" data-execution_count="109">
+<div id="to-dataframe" class="cell-output cell-output-display" data-execution_count="25">
 <div>
 
 
@@ -584,7 +595,7 @@ Row((3, 'San Jose Civic Center', 15), {'station_id': 0, 'name': 1, 'dockcount': 
 <span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>query_job <span class="op">=</span> client.query(sql_query, job_config<span class="op">=</span>job_config)</span>
 <span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> query_job.to_dataframe()</span>
 <span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>df</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div id="execute-params" class="cell-output cell-output-display" data-execution_count="112">
+<div id="execute-params" class="cell-output cell-output-display" data-execution_count="28">
 <div>
 
 
@@ -675,6 +686,524 @@ Row((3, 'San Jose Civic Center', 15), {'station_id': 0, 'name': 1, 'dockcount': 
 </div>
 </div>
 </div>
+<p>У випадку коли потрібно використати зріз по даті:</p>
+<div id="date-params" class="cell" data-execution_count="30">
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>query_params <span class="op">=</span> [</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>    bigquery.ScalarQueryParameter(<span class="st">"start_date"</span>, <span class="st">"DATE"</span>, datetime.date(<span class="dv">2015</span>, <span class="dv">1</span>, <span class="dv">1</span>)),</span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>    bigquery.ScalarQueryParameter(<span class="st">"end_date"</span>, <span class="st">"DATE"</span>, datetime.date(<span class="dv">2015</span>, <span class="dv">1</span>, <span class="dv">7</span>))</span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a>]</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Тоді запит буде виглядати наступним чином:</p>
+<div id="date-query" class="cell" data-execution_count="31">
+<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>sql_query <span class="op">=</span> <span class="st">"""</span></span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a><span class="st">SELECT</span></span>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a><span class="st">  ORIGIN,</span></span>
+<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a><span class="st">  AVG(DepDelay) AS dep_delay,</span></span>
+<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a><span class="st">  AVG(ArrDelay) AS arr_delay,</span></span>
+<span id="cb45-6"><a href="#cb45-6" aria-hidden="true" tabindex="-1"></a><span class="st">  COUNT(ArrDelay) AS num_flights</span></span>
+<span id="cb45-7"><a href="#cb45-7" aria-hidden="true" tabindex="-1"></a><span class="st">FROM</span></span>
+<span id="cb45-8"><a href="#cb45-8" aria-hidden="true" tabindex="-1"></a><span class="st">  `dsongcp.flights_auto`</span></span>
+<span id="cb45-9"><a href="#cb45-9" aria-hidden="true" tabindex="-1"></a><span class="st">WHERE</span></span>
+<span id="cb45-10"><a href="#cb45-10" aria-hidden="true" tabindex="-1"></a><span class="st">  FlightDate BETWEEN @start_date AND @end_date</span></span>
+<span id="cb45-11"><a href="#cb45-11" aria-hidden="true" tabindex="-1"></a><span class="st">GROUP BY</span></span>
+<span id="cb45-12"><a href="#cb45-12" aria-hidden="true" tabindex="-1"></a><span class="st">  ORIGIN</span></span>
+<span id="cb45-13"><a href="#cb45-13" aria-hidden="true" tabindex="-1"></a><span class="st">ORDER BY num_flights DESC</span></span>
+<span id="cb45-14"><a href="#cb45-14" aria-hidden="true" tabindex="-1"></a><span class="st">LIMIT 10</span></span>
+<span id="cb45-15"><a href="#cb45-15" aria-hidden="true" tabindex="-1"></a><span class="st">"""</span></span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="cell-execute-date" class="cell" data-execution_count="32">
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>job_config <span class="op">=</span> bigquery.QueryJobConfig(query_parameters<span class="op">=</span>query_params)</span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>query_job <span class="op">=</span> client.query(sql_query, job_config<span class="op">=</span>job_config)</span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> query_job.to_dataframe()</span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>df</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="execute-date" class="cell-output cell-output-display" data-execution_count="31">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">ORIGIN</th>
+<th data-quarto-table-cell-role="th">dep_delay</th>
+<th data-quarto-table-cell-role="th">arr_delay</th>
+<th data-quarto-table-cell-role="th">num_flights</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>ATL</td>
+<td>13.223205</td>
+<td>6.869232</td>
+<td>6653</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>DFW</td>
+<td>28.783017</td>
+<td>27.239105</td>
+<td>5094</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>ORD</td>
+<td>38.539200</td>
+<td>38.549260</td>
+<td>5065</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>DEN</td>
+<td>34.550181</td>
+<td>33.524051</td>
+<td>4137</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>LAX</td>
+<td>14.595703</td>
+<td>15.126316</td>
+<td>4085</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">5</td>
+<td>IAH</td>
+<td>19.919259</td>
+<td>14.409795</td>
+<td>3165</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">6</td>
+<td>PHX</td>
+<td>14.584003</td>
+<td>14.319293</td>
+<td>3110</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">7</td>
+<td>SFO</td>
+<td>12.263669</td>
+<td>10.925950</td>
+<td>3079</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">8</td>
+<td>LAS</td>
+<td>15.962792</td>
+<td>13.408916</td>
+<td>2602</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">9</td>
+<td>MCO</td>
+<td>21.239204</td>
+<td>17.322841</td>
+<td>2351</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>І третій варіант - позиційні параметри:</p>
+<div id="positional-params" class="cell" data-execution_count="33">
+<div class="sourceCode cell-code" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>query_params <span class="op">=</span> [</span>
+<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a>    bigquery.ScalarQueryParameter(<span class="va">None</span>, <span class="st">"FLOAT64"</span>, <span class="dv">0</span>),</span>
+<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>    bigquery.ScalarQueryParameter(<span class="va">None</span>, <span class="st">"FLOAT64"</span>, <span class="dv">0</span>)</span>
+<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a>]</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="positional-query" class="cell" data-execution_count="34">
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>sql_query <span class="op">=</span> <span class="st">"""</span></span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a><span class="st">SELECT</span></span>
+<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a><span class="st">  ORIGIN,</span></span>
+<span id="cb48-4"><a href="#cb48-4" aria-hidden="true" tabindex="-1"></a><span class="st">  AVG(DepDelay) AS dep_delay,</span></span>
+<span id="cb48-5"><a href="#cb48-5" aria-hidden="true" tabindex="-1"></a><span class="st">  AVG(ArrDelay) AS arr_delay,</span></span>
+<span id="cb48-6"><a href="#cb48-6" aria-hidden="true" tabindex="-1"></a><span class="st">  COUNT(ArrDelay) AS num_flights</span></span>
+<span id="cb48-7"><a href="#cb48-7" aria-hidden="true" tabindex="-1"></a><span class="st">FROM</span></span>
+<span id="cb48-8"><a href="#cb48-8" aria-hidden="true" tabindex="-1"></a><span class="st">  `dsongcp.flights_auto`</span></span>
+<span id="cb48-9"><a href="#cb48-9" aria-hidden="true" tabindex="-1"></a><span class="st">WHERE</span></span>
+<span id="cb48-10"><a href="#cb48-10" aria-hidden="true" tabindex="-1"></a><span class="st">  DepDelay &lt; ? AND ArrDelay &lt; ?</span></span>
+<span id="cb48-11"><a href="#cb48-11" aria-hidden="true" tabindex="-1"></a><span class="st">GROUP BY</span></span>
+<span id="cb48-12"><a href="#cb48-12" aria-hidden="true" tabindex="-1"></a><span class="st">  ORIGIN</span></span>
+<span id="cb48-13"><a href="#cb48-13" aria-hidden="true" tabindex="-1"></a><span class="st">ORDER BY num_flights DESC</span></span>
+<span id="cb48-14"><a href="#cb48-14" aria-hidden="true" tabindex="-1"></a><span class="st">LIMIT 10</span></span>
+<span id="cb48-15"><a href="#cb48-15" aria-hidden="true" tabindex="-1"></a><span class="st">"""</span></span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="cell-execute-positional" class="cell" data-execution_count="35">
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>job_config <span class="op">=</span> bigquery.QueryJobConfig(query_parameters<span class="op">=</span>query_params)</span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>query_job <span class="op">=</span> client.query(sql_query, job_config<span class="op">=</span>job_config)</span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> query_job.to_dataframe()</span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a>df</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="execute-positional" class="cell-output cell-output-display" data-execution_count="34">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">ORIGIN</th>
+<th data-quarto-table-cell-role="th">dep_delay</th>
+<th data-quarto-table-cell-role="th">arr_delay</th>
+<th data-quarto-table-cell-role="th">num_flights</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>ATL</td>
+<td>-3.487487</td>
+<td>-11.962145</td>
+<td>14265</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>DFW</td>
+<td>-4.595339</td>
+<td>-10.509032</td>
+<td>8968</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>ORD</td>
+<td>-4.753784</td>
+<td>-13.876310</td>
+<td>7729</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>LAX</td>
+<td>-5.053177</td>
+<td>-11.830387</td>
+<td>7240</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>DEN</td>
+<td>-4.942687</td>
+<td>-13.282285</td>
+<td>5374</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">5</td>
+<td>PHX</td>
+<td>-4.864400</td>
+<td>-11.197356</td>
+<td>5295</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">6</td>
+<td>SFO</td>
+<td>-5.341159</td>
+<td>-10.963271</td>
+<td>5282</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">7</td>
+<td>IAH</td>
+<td>-4.987881</td>
+<td>-11.642113</td>
+<td>5281</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">8</td>
+<td>LAS</td>
+<td>-5.255193</td>
+<td>-11.990661</td>
+<td>5247</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">9</td>
+<td>SLC</td>
+<td>-5.100784</td>
+<td>-13.151624</td>
+<td>4465</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>Ще один варіант - використанням масивів:</p>
+<div id="array-params" class="cell" data-execution_count="36">
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>query_params <span class="op">=</span> [</span>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>    bigquery.ArrayQueryParameter(<span class="st">"ORIGIN"</span>, <span class="st">"STRING"</span>, [<span class="st">"PHX"</span>, <span class="st">"ATL"</span>, <span class="st">"LAS"</span>]),</span>
+<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a>    bigquery.ScalarQueryParameter(<span class="st">"DepDelay"</span>, <span class="st">"FLOAT64"</span>, <span class="dv">10</span>),</span>
+<span id="cb50-4"><a href="#cb50-4" aria-hidden="true" tabindex="-1"></a>]</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="array-query" class="cell" data-execution_count="37">
+<div class="sourceCode cell-code" id="cb51"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>sql_query <span class="op">=</span> <span class="st">"""</span></span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a><span class="st">SELECT</span></span>
+<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a><span class="st">  ORIGIN,</span></span>
+<span id="cb51-4"><a href="#cb51-4" aria-hidden="true" tabindex="-1"></a><span class="st">  AVG(DepDelay) AS dep_delay,</span></span>
+<span id="cb51-5"><a href="#cb51-5" aria-hidden="true" tabindex="-1"></a><span class="st">  AVG(ArrDelay) AS arr_delay,</span></span>
+<span id="cb51-6"><a href="#cb51-6" aria-hidden="true" tabindex="-1"></a><span class="st">  COUNT(ArrDelay) AS num_flights</span></span>
+<span id="cb51-7"><a href="#cb51-7" aria-hidden="true" tabindex="-1"></a><span class="st">FROM</span></span>
+<span id="cb51-8"><a href="#cb51-8" aria-hidden="true" tabindex="-1"></a><span class="st">  `dsongcp.flights_auto`</span></span>
+<span id="cb51-9"><a href="#cb51-9" aria-hidden="true" tabindex="-1"></a><span class="st">WHERE</span></span>
+<span id="cb51-10"><a href="#cb51-10" aria-hidden="true" tabindex="-1"></a><span class="st">  ORIGIN IN UNNEST(@ORIGIN)</span></span>
+<span id="cb51-11"><a href="#cb51-11" aria-hidden="true" tabindex="-1"></a><span class="st">  AND DepDelay &gt; @DepDelay</span></span>
+<span id="cb51-12"><a href="#cb51-12" aria-hidden="true" tabindex="-1"></a><span class="st">GROUP BY</span></span>
+<span id="cb51-13"><a href="#cb51-13" aria-hidden="true" tabindex="-1"></a><span class="st">  ORIGIN</span></span>
+<span id="cb51-14"><a href="#cb51-14" aria-hidden="true" tabindex="-1"></a><span class="st">ORDER BY num_flights DESC</span></span>
+<span id="cb51-15"><a href="#cb51-15" aria-hidden="true" tabindex="-1"></a><span class="st">"""</span></span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="cell-execute-array" class="cell" data-execution_count="38">
+<div class="sourceCode cell-code" id="cb52"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a>job_config <span class="op">=</span> bigquery.QueryJobConfig(query_parameters<span class="op">=</span>query_params)</span>
+<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a>query_job <span class="op">=</span> client.query(sql_query, job_config<span class="op">=</span>job_config)</span>
+<span id="cb52-3"><a href="#cb52-3" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> query_job.to_dataframe()</span>
+<span id="cb52-4"><a href="#cb52-4" aria-hidden="true" tabindex="-1"></a>df</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="execute-array" class="cell-output cell-output-display" data-execution_count="37">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">ORIGIN</th>
+<th data-quarto-table-cell-role="th">dep_delay</th>
+<th data-quarto-table-cell-role="th">arr_delay</th>
+<th data-quarto-table-cell-role="th">num_flights</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>ATL</td>
+<td>44.575120</td>
+<td>38.036858</td>
+<td>5589</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>PHX</td>
+<td>44.808705</td>
+<td>42.578725</td>
+<td>2839</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>LAS</td>
+<td>46.203759</td>
+<td>42.609581</td>
+<td>2651</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+</section>
+<section id="таблиця-bg---gc-storage" class="level2">
+<h2 class="anchored" data-anchor-id="таблиця-bg---gc-storage">Таблиця BG -&gt; GC Storage</h2>
+<div id="storage-setup" class="cell" data-execution_count="39">
+<div class="sourceCode cell-code" id="cb53"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> bigquery.Client(<span class="st">'fit-cloud-course'</span>)</span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a>dataset_id <span class="op">=</span> <span class="st">'dsongcp'</span></span>
+<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a>bucket_name <span class="op">=</span> <span class="st">'fit-cloud-course-dsongcp'</span></span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="storage-results" class="cell" data-execution_count="40">
+<div class="sourceCode cell-code" id="cb54"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a>table_ref <span class="op">=</span> bigquery.TableReference.from_string(<span class="ss">f"</span><span class="sc">{</span>client<span class="sc">.</span>project<span class="sc">}</span><span class="ss">.</span><span class="sc">{</span>dataset_id<span class="sc">}</span><span class="ss">.flights_auto"</span>)</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="storage-config" class="cell" data-execution_count="41">
+<div class="sourceCode cell-code" id="cb55"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>job_config <span class="op">=</span> bigquery.job.ExtractJobConfig()</span>
+<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a><span class="co"># job_config.destination_format = bigquery.DestinationFormat.CSV</span></span>
+<span id="cb55-3"><a href="#cb55-3" aria-hidden="true" tabindex="-1"></a>job_config.destination_format <span class="op">=</span> bigquery.DestinationFormat.NEWLINE_DELIMITED_JSON</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="cell-storage-execute" class="cell" data-execution_count="42">
+<div class="sourceCode cell-code" id="cb56"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a>destination_uri <span class="op">=</span> <span class="ss">f"gs://</span><span class="sc">{</span>bucket_name<span class="sc">}</span><span class="ss">/results/flights_delay.json"</span></span>
+<span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb56-3"><a href="#cb56-3" aria-hidden="true" tabindex="-1"></a>extract_job <span class="op">=</span> client.extract_table(</span>
+<span id="cb56-4"><a href="#cb56-4" aria-hidden="true" tabindex="-1"></a>    table_ref,</span>
+<span id="cb56-5"><a href="#cb56-5" aria-hidden="true" tabindex="-1"></a>    destination_uri,</span>
+<span id="cb56-6"><a href="#cb56-6" aria-hidden="true" tabindex="-1"></a>    job_config<span class="op">=</span>job_config,</span>
+<span id="cb56-7"><a href="#cb56-7" aria-hidden="true" tabindex="-1"></a>    location<span class="op">=</span><span class="st">"US"</span></span>
+<span id="cb56-8"><a href="#cb56-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb56-9"><a href="#cb56-9" aria-hidden="true" tabindex="-1"></a>extract_job.result()</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="storage-execute" class="cell-output cell-output-display" data-execution_count="41">
+<pre><code>ExtractJob&lt;project=fit-cloud-course, location=US, id=9408068c-307d-4367-84a5-8aecde13a126&gt;</code></pre>
+</div>
+</div>
+</section>
+<section id="завантаження-даних-в-bigquery" class="level2">
+<h2 class="anchored" data-anchor-id="завантаження-даних-в-bigquery">Завантаження даних в BigQuery</h2>
+<section id="json" class="level3">
+<h3 class="anchored" data-anchor-id="json">JSON</h3>
+<p>За необхідності, переведемо дані у плоский формат:</p>
+<div id="flatten" class="cell" data-execution_count="43">
+<div class="sourceCode cell-code" id="cb58"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a>json_data <span class="op">=</span> json.load(<span class="bu">open</span>(<span class="st">'./data/orders.json'</span>))</span>
+<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a>data_file_path <span class="op">=</span> <span class="st">'./data/orders_upload.json'</span></span>
+<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-4"><a href="#cb58-4" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(data_file_path, <span class="st">'w'</span>) <span class="im">as</span> f:</span>
+<span id="cb58-5"><a href="#cb58-5" aria-hidden="true" tabindex="-1"></a>    f.write(<span class="st">'</span><span class="ch">\n</span><span class="st">'</span>.join(json.dumps(record) <span class="cf">for</span> record <span class="kw">in</span> json_data))</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="upload-setup" class="cell" data-execution_count="44">
+<div class="sourceCode cell-code" id="cb59"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a>dataset_id <span class="op">=</span> <span class="st">'dsongcp'</span></span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a>table_id <span class="op">=</span> <span class="st">'orders'</span></span>
+<span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a>data_file_path <span class="op">=</span> <span class="st">'./data/orders.json'</span></span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="upload-config" class="cell" data-execution_count="45">
+<div class="sourceCode cell-code" id="cb60"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a>job_config <span class="op">=</span> bigquery.LoadJobConfig(</span>
+<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a>    schema<span class="op">=</span>[</span>
+<span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a>        bigquery.SchemaField(<span class="st">"order_id"</span>, <span class="st">"INT64"</span>),</span>
+<span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a>        bigquery.SchemaField(<span class="st">"creation_time"</span>, <span class="st">"DATETIME"</span>),</span>
+<span id="cb60-5"><a href="#cb60-5" aria-hidden="true" tabindex="-1"></a>        bigquery.SchemaField(<span class="st">"product_ids"</span>, <span class="st">"INT64"</span>, mode<span class="op">=</span><span class="st">"REPEATED"</span>),</span>
+<span id="cb60-6"><a href="#cb60-6" aria-hidden="true" tabindex="-1"></a>        ],</span>
+<span id="cb60-7"><a href="#cb60-7" aria-hidden="true" tabindex="-1"></a>    source_format<span class="op">=</span>bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,</span>
+<span id="cb60-8"><a href="#cb60-8" aria-hidden="true" tabindex="-1"></a>    autodetect<span class="op">=</span><span class="va">False</span>,    </span>
+<span id="cb60-9"><a href="#cb60-9" aria-hidden="true" tabindex="-1"></a>    write_disposition<span class="op">=</span>bigquery.WriteDisposition.WRITE_TRUNCATE</span>
+<span id="cb60-10"><a href="#cb60-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="upload-execute" class="cell" data-execution_count="46">
+<div class="sourceCode cell-code" id="cb61"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a>table_ref <span class="op">=</span> client.dataset(dataset_id).table(table_id)</span>
+<span id="cb61-2"><a href="#cb61-2" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(data_file_path, <span class="st">"rb"</span>) <span class="im">as</span> source_file:</span>
+<span id="cb61-3"><a href="#cb61-3" aria-hidden="true" tabindex="-1"></a>    job <span class="op">=</span> client.load_table_from_file(source_file, table_ref, job_config<span class="op">=</span>job_config)</span>
+<span id="cb61-4"><a href="#cb61-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb61-5"><a href="#cb61-5" aria-hidden="true" tabindex="-1"></a><span class="cf">while</span> job.running():</span>
+<span id="cb61-6"><a href="#cb61-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'Завантаження даних...'</span>)</span>
+<span id="cb61-7"><a href="#cb61-7" aria-hidden="true" tabindex="-1"></a>    time.sleep(<span class="dv">3</span>)</span>
+<span id="cb61-8"><a href="#cb61-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(job.result())</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Завантаження даних...
+Завантаження даних...
+LoadJob&lt;project=fit-cloud-course, location=US, id=1ab5bddf-b2ee-462d-9eb6-4f77b652b6b9&gt;</code></pre>
+</div>
+</div>
+</section>
+<section id="gc-storage" class="level3">
+<h3 class="anchored" data-anchor-id="gc-storage">GC Storage</h3>
+<div id="storage-upload" class="cell" data-execution_count="47">
+<div class="sourceCode cell-code" id="cb63"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a>bucket_name <span class="op">=</span> <span class="st">'fit-cloud-course-dsongcp'</span></span>
+<span id="cb63-2"><a href="#cb63-2" aria-hidden="true" tabindex="-1"></a>source_uri <span class="op">=</span> <span class="ss">f"gs://</span><span class="sc">{</span>bucket_name<span class="sc">}</span><span class="ss">/flights/raw/*.csv"</span></span>
+<span id="cb63-3"><a href="#cb63-3" aria-hidden="true" tabindex="-1"></a>table_id <span class="op">=</span> <span class="st">'flights_py'</span></span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="storage-config-2" class="cell" data-execution_count="48">
+<div class="sourceCode cell-code" id="cb64"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a>job_config <span class="op">=</span> bigquery.LoadJobConfig(</span>
+<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a>    autodetect<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a>    source_format<span class="op">=</span>bigquery.SourceFormat.CSV,</span>
+<span id="cb64-4"><a href="#cb64-4" aria-hidden="true" tabindex="-1"></a>    skip_leading_rows<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb64-5"><a href="#cb64-5" aria-hidden="true" tabindex="-1"></a>    write_disposition<span class="op">=</span>bigquery.WriteDisposition.WRITE_TRUNCATE</span>
+<span id="cb64-6"><a href="#cb64-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="storage-execute-2" class="cell" data-execution_count="49">
+<div class="sourceCode cell-code" id="cb65"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a>table_ref <span class="op">=</span> client.dataset(dataset_id).table(table_id)</span>
+<span id="cb65-2"><a href="#cb65-2" aria-hidden="true" tabindex="-1"></a>job <span class="op">=</span> client.load_table_from_uri(</span>
+<span id="cb65-3"><a href="#cb65-3" aria-hidden="true" tabindex="-1"></a>    source_uri,</span>
+<span id="cb65-4"><a href="#cb65-4" aria-hidden="true" tabindex="-1"></a>    table_ref,</span>
+<span id="cb65-5"><a href="#cb65-5" aria-hidden="true" tabindex="-1"></a>    job_config<span class="op">=</span>job_config</span>
+<span id="cb65-6"><a href="#cb65-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb65-7"><a href="#cb65-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb65-8"><a href="#cb65-8" aria-hidden="true" tabindex="-1"></a><span class="cf">while</span> job.running():</span>
+<span id="cb65-9"><a href="#cb65-9" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'Завантаження даних...'</span>)</span>
+<span id="cb65-10"><a href="#cb65-10" aria-hidden="true" tabindex="-1"></a>    time.sleep(<span class="dv">3</span>)</span>
+<span id="cb65-11"><a href="#cb65-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(job.result())</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Завантаження даних...
+Завантаження даних...
+Завантаження даних...
+Завантаження даних...
+Завантаження даних...
+Завантаження даних...
+Завантаження даних...
+LoadJob&lt;project=fit-cloud-course, location=US, id=56632121-353c-41da-b7f1-619f36dbafaf&gt;</code></pre>
+</div>
+</div>
+</section>
+<section id="csv" class="level3">
+<h3 class="anchored" data-anchor-id="csv">CSV</h3>
+<div id="csv-upload" class="cell" data-execution_count="50">
+<div class="sourceCode cell-code" id="cb67"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a>dataset_id <span class="op">=</span> <span class="st">'dsongcp'</span></span>
+<span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a>table_id <span class="op">=</span> <span class="st">'users'</span></span>
+<span id="cb67-3"><a href="#cb67-3" aria-hidden="true" tabindex="-1"></a>data_file_path <span class="op">=</span> <span class="st">'./data/users.csv'</span></span>
+<span id="cb67-4"><a href="#cb67-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-5"><a href="#cb67-5" aria-hidden="true" tabindex="-1"></a>job_config <span class="op">=</span> bigquery.LoadJobConfig(</span>
+<span id="cb67-6"><a href="#cb67-6" aria-hidden="true" tabindex="-1"></a>    source_format<span class="op">=</span>bigquery.SourceFormat.CSV,</span>
+<span id="cb67-7"><a href="#cb67-7" aria-hidden="true" tabindex="-1"></a>    skip_leading_rows<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb67-8"><a href="#cb67-8" aria-hidden="true" tabindex="-1"></a>    autodetect<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb67-9"><a href="#cb67-9" aria-hidden="true" tabindex="-1"></a>    write_disposition<span class="op">=</span>bigquery.WriteDisposition.WRITE_TRUNCATE</span>
+<span id="cb67-10"><a href="#cb67-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb67-11"><a href="#cb67-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-12"><a href="#cb67-12" aria-hidden="true" tabindex="-1"></a>table_ref <span class="op">=</span> client.dataset(dataset_id).table(table_id)</span>
+<span id="cb67-13"><a href="#cb67-13" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(data_file_path, <span class="st">"rb"</span>) <span class="im">as</span> source_file:</span>
+<span id="cb67-14"><a href="#cb67-14" aria-hidden="true" tabindex="-1"></a>    job <span class="op">=</span> client.load_table_from_file(source_file, table_ref, job_config<span class="op">=</span>job_config)</span>
+<span id="cb67-15"><a href="#cb67-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-16"><a href="#cb67-16" aria-hidden="true" tabindex="-1"></a><span class="cf">while</span> job.running():</span>
+<span id="cb67-17"><a href="#cb67-17" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">'Завантаження даних...'</span>)</span>
+<span id="cb67-18"><a href="#cb67-18" aria-hidden="true" tabindex="-1"></a>    time.sleep(<span class="dv">3</span>)</span>
+<span id="cb67-19"><a href="#cb67-19" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(job.result())</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Завантаження даних...
+Завантаження даних...
+LoadJob&lt;project=fit-cloud-course, location=US, id=e5678975-716f-4aef-be7f-00acf8554500&gt;</code></pre>
+</div>
+</div>
+<div id="csv-rows-cols" class="cell" data-execution_count="51">
+<div class="sourceCode cell-code" id="cb69"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a>table <span class="op">=</span> client.get_table(table_ref)</span>
+<span id="cb69-2"><a href="#cb69-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Таблиця: </span><span class="sc">{</span>table<span class="sc">}</span><span class="ch">\n</span><span class="ss">Спостережень: </span><span class="sc">{</span>table<span class="sc">.</span>num_rows<span class="sc">}</span><span class="ch">\n</span><span class="ss">Змінних: </span><span class="sc">{</span><span class="bu">len</span>(table.schema)<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Таблиця: fit-cloud-course.dsongcp.users
+Спостережень: 20331
+Змінних: 3</code></pre>
+</div>
+</div>
+</section>
+<section id="google-sheets" class="level3">
+<h3 class="anchored" data-anchor-id="google-sheets">Google Sheets</h3>
+<p>Підключаємо Google Drive API. Копіюємо email-адресу сервісного акаунта.</p>
+<div id="sheets-setup" class="cell" data-execution_count="52">
+<div class="sourceCode cell-code" id="cb71"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a>credentials, project <span class="op">=</span> google.auth.default(</span>
+<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a>    scopes<span class="op">=</span>[</span>
+<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a>      <span class="st">"https://www.googleapis.com/auth/drive"</span>,</span>
+<span id="cb71-4"><a href="#cb71-4" aria-hidden="true" tabindex="-1"></a>      <span class="st">"https://www.googleapis.com/auth/bigquery"</span></span>
+<span id="cb71-5"><a href="#cb71-5" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb71-6"><a href="#cb71-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="sheets-config" class="cell" data-execution_count="53">
+<div class="sourceCode cell-code" id="cb72"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> bigquery.Client(credentials<span class="op">=</span>credentials, project<span class="op">=</span>project)</span>
+<span id="cb72-2"><a href="#cb72-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-3"><a href="#cb72-3" aria-hidden="true" tabindex="-1"></a>dataset_id <span class="op">=</span> <span class="st">'dsongcp'</span></span>
+<span id="cb72-4"><a href="#cb72-4" aria-hidden="true" tabindex="-1"></a>table_id <span class="op">=</span> <span class="st">'air_traffic'</span></span>
+<span id="cb72-5"><a href="#cb72-5" aria-hidden="true" tabindex="-1"></a>table_ref <span class="op">=</span> client.dataset(dataset_id).table(table_id)</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="cell-sheets-execute" class="cell" data-execution_count="54">
+<div class="sourceCode cell-code" id="cb73"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a>table <span class="op">=</span> bigquery.Table(table_ref, schema <span class="op">=</span> [</span>
+<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"Activity_Period"</span>, <span class="st">"INT64"</span>),</span>
+<span id="cb73-3"><a href="#cb73-3" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"Activity_Period_Start_Date"</span>, <span class="st">"DATE"</span>),</span>
+<span id="cb73-4"><a href="#cb73-4" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"Operating_Airline"</span>, <span class="st">"STRING"</span>),</span>
+<span id="cb73-5"><a href="#cb73-5" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"Operating_Airline_IATA_Code"</span>, <span class="st">"STRING"</span>),</span>
+<span id="cb73-6"><a href="#cb73-6" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"Published_Airline"</span>, <span class="st">"STRING"</span>),</span>
+<span id="cb73-7"><a href="#cb73-7" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"Published_Airline_IATA_Code"</span>, <span class="st">"STRING"</span>),</span>
+<span id="cb73-8"><a href="#cb73-8" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"GEO_Summary"</span>, <span class="st">"STRING"</span>),</span>
+<span id="cb73-9"><a href="#cb73-9" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"GEO_Region"</span>, <span class="st">"STRING"</span>),</span>
+<span id="cb73-10"><a href="#cb73-10" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"Activity_Type_Code"</span>, <span class="st">"STRING"</span>),</span>
+<span id="cb73-11"><a href="#cb73-11" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"Price_Category_Code"</span>, <span class="st">"STRING"</span>),</span>
+<span id="cb73-12"><a href="#cb73-12" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"Terminal"</span>, <span class="st">"STRING"</span>),</span>
+<span id="cb73-13"><a href="#cb73-13" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"Boarding_Area"</span>, <span class="st">"STRING"</span>),</span>
+<span id="cb73-14"><a href="#cb73-14" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"Passenger_Count"</span>, <span class="st">"INT64"</span>),</span>
+<span id="cb73-15"><a href="#cb73-15" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"data_as_of"</span>, <span class="st">"STRING"</span>),</span>
+<span id="cb73-16"><a href="#cb73-16" aria-hidden="true" tabindex="-1"></a>    bigquery.SchemaField(<span class="st">"data_loaded_at"</span>, <span class="st">"STRING"</span>)</span>
+<span id="cb73-17"><a href="#cb73-17" aria-hidden="true" tabindex="-1"></a>])</span>
+<span id="cb73-18"><a href="#cb73-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-19"><a href="#cb73-19" aria-hidden="true" tabindex="-1"></a>external_config <span class="op">=</span> bigquery.ExternalConfig(<span class="st">"GOOGLE_SHEETS"</span>)</span>
+<span id="cb73-20"><a href="#cb73-20" aria-hidden="true" tabindex="-1"></a>sheet_url <span class="op">=</span> <span class="st">"https://docs.google.com/spreadsheets/d/1vp7bCvxd3R2zciqxc8A4Qoq5DAvqhzfXJnljmG5OOw0/edit?usp=sharing"</span></span>
+<span id="cb73-21"><a href="#cb73-21" aria-hidden="true" tabindex="-1"></a>external_config.source_uris <span class="op">=</span> [sheet_url]</span>
+<span id="cb73-22"><a href="#cb73-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-23"><a href="#cb73-23" aria-hidden="true" tabindex="-1"></a>options <span class="op">=</span> external_config.google_sheets_options</span>
+<span id="cb73-24"><a href="#cb73-24" aria-hidden="true" tabindex="-1"></a>options.skip_leading_rows <span class="op">=</span> <span class="dv">1</span></span>
+<span id="cb73-25"><a href="#cb73-25" aria-hidden="true" tabindex="-1"></a>options.<span class="bu">range</span> <span class="op">=</span> <span class="st">"air_traffic!A:O"</span></span>
+<span id="cb73-26"><a href="#cb73-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-27"><a href="#cb73-27" aria-hidden="true" tabindex="-1"></a>table.external_data_configuration <span class="op">=</span> external_config</span>
+<span id="cb73-28"><a href="#cb73-28" aria-hidden="true" tabindex="-1"></a>client.create_table(table)</span></code><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="sheets-execute" class="cell-output cell-output-display" data-execution_count="52">
+<pre><code>Table(TableReference(DatasetReference('fit-cloud-course', 'dsongcp'), 'air_traffic'))</code></pre>
+</div>
+</div>
+</section>
 </section>
 
 </main>
