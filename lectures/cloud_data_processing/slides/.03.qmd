@@ -72,6 +72,7 @@ slate      = "#314f4f"
 
 ```bash
 pip install --upgrade google-cloud-bigquery
+pip install google-cloud-bigquery-datatransfer
 pip install db-dtypes
 ```
 
@@ -83,7 +84,7 @@ pip install db-dtypes
 #| label: bigquery-setup
 
 import os
-from google.cloud import bigquery
+from google.cloud import bigquery, bigquery_datatransfer
 import google.auth
 import time
 import pandas as pd
@@ -145,6 +146,188 @@ for row in query_job:
 
 for row in query_job:
     print(row.station_id, row.name, row.dockcount, sep=" | ")
+```
+
+## Завантаження даних в BigQuery
+
+### JSON
+
+За необхідності, переведемо дані у плоский формат:
+
+```{python}
+#| label: flatten
+#| eval: false
+
+json_data = json.load(open('./data/orders.json'))
+data_file_path = './data/orders_upload.json'
+
+with open(data_file_path, 'w') as f:
+    f.write('\n'.join(json.dumps(record) for record in json_data))
+```
+
+```{python}
+#| label: upload-setup
+
+dataset_id = 'dsongcp'
+table_id = 'orders'
+data_file_path = './data/orders.json'
+```
+
+```{python}
+#| label: upload-config
+
+job_config = bigquery.LoadJobConfig(
+    schema=[
+        bigquery.SchemaField("order_id", "INT64"),
+        bigquery.SchemaField("creation_time", "DATETIME"),
+        bigquery.SchemaField("product_ids", "INT64", mode="REPEATED"),
+        ],
+    source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+    autodetect=False,    
+    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+)
+```
+
+```{python}
+#| label: upload-execute
+
+table_ref = client.dataset(dataset_id).table(table_id)
+with open(data_file_path, "rb") as source_file:
+    job = client.load_table_from_file(source_file, table_ref, job_config=job_config)
+
+while job.running():
+    print('Завантаження даних...')
+    time.sleep(3)
+print(job.result())
+```
+
+### GC Storage
+
+```{python}
+#| label: storage-upload
+
+bucket_name = 'fit-cloud-course-dsongcp'
+source_uri = f"gs://{bucket_name}/flights/raw/*.csv"
+table_id = 'flights_py'
+```
+
+```{python}
+#| label: storage-config-2
+
+job_config = bigquery.LoadJobConfig(
+    autodetect=True,
+    source_format=bigquery.SourceFormat.CSV,
+    skip_leading_rows=1,
+    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+)
+```
+
+```{python}
+#| label: storage-execute-2
+
+table_ref = client.dataset(dataset_id).table(table_id)
+job = client.load_table_from_uri(
+    source_uri,
+    table_ref,
+    job_config=job_config
+)
+
+while job.running():
+    print('Завантаження даних...')
+    time.sleep(3)
+print(job.result())
+```
+
+### CSV
+
+```{python}
+#| label: csv-upload
+
+dataset_id = 'dsongcp'
+table_id = 'users'
+data_file_path = './data/users.csv'
+
+job_config = bigquery.LoadJobConfig(
+    source_format=bigquery.SourceFormat.CSV,
+    skip_leading_rows=1,
+    autodetect=True,
+    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+)
+
+table_ref = client.dataset(dataset_id).table(table_id)
+with open(data_file_path, "rb") as source_file:
+    job = client.load_table_from_file(source_file, table_ref, job_config=job_config)
+
+while job.running():
+    print('Завантаження даних...')
+    time.sleep(3)
+print(job.result())
+```
+
+```{python}
+#| label: csv-rows-cols
+
+table = client.get_table(table_ref)
+print(f"Таблиця: {table}\nСпостережень: {table.num_rows}\nЗмінних: {len(table.schema)}")
+```
+
+### Google Sheets
+
+Підключаємо Google Drive API.
+Копіюємо email-адресу сервісного акаунта.
+
+```{python}
+#| label: sheets-setup
+
+credentials, project = google.auth.default(
+    scopes=[
+      "https://www.googleapis.com/auth/drive",
+      "https://www.googleapis.com/auth/bigquery"
+    ]
+)
+```
+
+```{python}
+#| label: sheets-config
+
+client = bigquery.Client(credentials=credentials, project=project)
+
+dataset_id = 'dsongcp'
+table_id = 'air_traffic'
+table_ref = client.dataset(dataset_id).table(table_id)
+```
+
+```{python}
+#| label: sheets-execute
+
+table = bigquery.Table(table_ref, schema = [
+    bigquery.SchemaField("Activity_Period", "INT64"),
+    bigquery.SchemaField("Activity_Period_Start_Date", "DATE"),
+    bigquery.SchemaField("Operating_Airline", "STRING"),
+    bigquery.SchemaField("Operating_Airline_IATA_Code", "STRING"),
+    bigquery.SchemaField("Published_Airline", "STRING"),
+    bigquery.SchemaField("Published_Airline_IATA_Code", "STRING"),
+    bigquery.SchemaField("GEO_Summary", "STRING"),
+    bigquery.SchemaField("GEO_Region", "STRING"),
+    bigquery.SchemaField("Activity_Type_Code", "STRING"),
+    bigquery.SchemaField("Price_Category_Code", "STRING"),
+    bigquery.SchemaField("Terminal", "STRING"),
+    bigquery.SchemaField("Boarding_Area", "STRING"),
+    bigquery.SchemaField("Passenger_Count", "INT64"),
+    bigquery.SchemaField("data_as_of", "STRING"),
+    bigquery.SchemaField("data_loaded_at", "STRING")
+])
+
+external_config = bigquery.ExternalConfig("GOOGLE_SHEETS")
+sheet_url = "https://docs.google.com/spreadsheets/d/1vp7bCvxd3R2zciqxc8A4Qoq5DAvqhzfXJnljmG5OOw0/edit?usp=sharing"
+external_config.source_uris = [sheet_url]
+
+options = external_config.google_sheets_options
+options.skip_leading_rows = 1
+options.range = "air_traffic!A:O"
+
+table.external_data_configuration = external_config
+client.create_table(table)
 ```
 
 ## Мітки даних у BigQuery
@@ -589,194 +772,106 @@ extract_job = client.extract_table(
 extract_job.result()
 ```
 
-## Завантаження даних в BigQuery
+## Робота з датасетами
 
-### JSON
+Підключіть **BigQuery Data Transfer API**.
 
-За необхідності, переведемо дані у плоский формат:
-
-```{python}
-#| label: flatten
-#| eval: false
-
-json_data = json.load(open('./data/orders.json'))
-data_file_path = './data/orders_upload.json'
-
-with open(data_file_path, 'w') as f:
-    f.write('\n'.join(json.dumps(record) for record in json_data))
-```
+Створимо клас `DatasetManager` для роботи з датасетами:
 
 ```{python}
-#| label: upload-setup
+#| label: dataset-manager
 
-dataset_id = 'dsongcp'
-table_id = 'orders'
-data_file_path = './data/orders.json'
+class DatasetManager:
+    def __init__(self, client):
+        self.client = client
+
+    def delete_dataset(self, dataset_id):
+        self.client.delete_dataset(dataset_id, not_found_ok=True, delete_contents=True)
+
+    def create_dataset(self, dataset_id, location='US'):
+        dataset = bigquery.Dataset(dataset_id)
+        dataset.location = location
+        dataset_ = self.client.create_dataset(dataset, timeout=30)
+        print(f"Датасет {self.client.project}.{dataset.dataset_id} створено")
+        return dataset_
+
+    def list_dataset(self):
+        datasets = self.client.list_datasets()
+        return [dataset.dataset_id for dataset in datasets]
+
+    def copy_dataset(self, source_project_id, source_dataset_id, destination_project_id, destination_dataset_id, display_name):
+        """
+        Посилання:
+        https://cloud.google.com/bigquery-transfer/docs/reference/datatransfer/rest/v1/projects.transferConfigs
+
+        Надати доступ до IAM:
+        https://cloud.google.com/bigquery/docs/enable-transfer-service#grant_bigqueryadmin_access
+
+        Зауважте:
+        - це також призведе до переміщення таблиць.
+        - підключіть BigQuery Data Transfer API.
+        """
+        transfer_client = bigquery_datatransfer.DataTransferServiceClient()
+        transfer_config = bigquery_datatransfer.TransferConfig(
+            destination_dataset_id=destination_dataset_id,
+            display_name=display_name,
+            data_source_id="cross_region_copy", # 
+            params={
+                "source_project_id": source_project_id,
+                "source_dataset_id": source_dataset_id,
+            },
+        )
+        transfer_config = transfer_client.create_transfer_config(
+            parent=transfer_client.common_project_path(destination_project_id),
+            transfer_config=transfer_config,
+        )
+        print(f"Створено конфігурацію передачі: {transfer_config.name}")
 ```
+
+Ініціалізуємо клієнт та клас:
 
 ```{python}
-#| label: upload-config
+#| label: dataset-init
 
-job_config = bigquery.LoadJobConfig(
-    schema=[
-        bigquery.SchemaField("order_id", "INT64"),
-        bigquery.SchemaField("creation_time", "DATETIME"),
-        bigquery.SchemaField("product_ids", "INT64", mode="REPEATED"),
-        ],
-    source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
-    autodetect=False,    
-    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
-)
+client = bigquery.Client('fit-cloud-course')
+dataset_manager = DatasetManager(client)
 ```
+
+Виведемо список датасетів:
 
 ```{python}
-#| label: upload-execute
+#| label: list-datasets
 
-table_ref = client.dataset(dataset_id).table(table_id)
-with open(data_file_path, "rb") as source_file:
-    job = client.load_table_from_file(source_file, table_ref, job_config=job_config)
-
-while job.running():
-    print('Завантаження даних...')
-    time.sleep(3)
-print(job.result())
+dataset_manager.list_dataset()
 ```
 
-### GC Storage
+Створимо новий датасет:
 
 ```{python}
-#| label: storage-upload
+#| label: create-dataset-2
 
-bucket_name = 'fit-cloud-course-dsongcp'
-source_uri = f"gs://{bucket_name}/flights/raw/*.csv"
-table_id = 'flights_py'
+dataset_name = f'{client.project}.ny_taxi_trips'
+dataset = dataset_manager.create_dataset(dataset_name)
 ```
+
+Скопіюємо датасет:
 
 ```{python}
-#| label: storage-config-2
+#| label: copy-dataset
 
-job_config = bigquery.LoadJobConfig(
-    autodetect=True,
-    source_format=bigquery.SourceFormat.CSV,
-    skip_leading_rows=1,
-    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
-)
+source_project_id = 'bigquery-public-data'
+source_dataset_id = 'new_york_taxi_trips'
+destination_project_id = client.project
+destination_dataset_id = 'ny_taxi_trips'
+display_name = 'NY Taxi Trips'
+
+dataset_manager.copy_dataset(source_project_id, source_dataset_id, destination_project_id, destination_dataset_id, display_name)
 ```
+
+Видалимо датасет:
 
 ```{python}
-#| label: storage-execute-2
+#| label: delete-dataset
 
-table_ref = client.dataset(dataset_id).table(table_id)
-job = client.load_table_from_uri(
-    source_uri,
-    table_ref,
-    job_config=job_config
-)
-
-while job.running():
-    print('Завантаження даних...')
-    time.sleep(3)
-print(job.result())
+dataset_manager.delete_dataset(dataset_name)
 ```
-
-### CSV
-
-```{python}
-#| label: csv-upload
-
-dataset_id = 'dsongcp'
-table_id = 'users'
-data_file_path = './data/users.csv'
-
-job_config = bigquery.LoadJobConfig(
-    source_format=bigquery.SourceFormat.CSV,
-    skip_leading_rows=1,
-    autodetect=True,
-    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
-)
-
-table_ref = client.dataset(dataset_id).table(table_id)
-with open(data_file_path, "rb") as source_file:
-    job = client.load_table_from_file(source_file, table_ref, job_config=job_config)
-
-while job.running():
-    print('Завантаження даних...')
-    time.sleep(3)
-print(job.result())
-```
-
-```{python}
-#| label: csv-rows-cols
-
-table = client.get_table(table_ref)
-print(f"Таблиця: {table}\nСпостережень: {table.num_rows}\nЗмінних: {len(table.schema)}")
-```
-
-### Google Sheets
-
-Підключаємо Google Drive API.
-Копіюємо email-адресу сервісного акаунта.
-
-```{python}
-#| label: sheets-setup
-
-credentials, project = google.auth.default(
-    scopes=[
-      "https://www.googleapis.com/auth/drive",
-      "https://www.googleapis.com/auth/bigquery"
-    ]
-)
-```
-
-```{python}
-#| label: sheets-config
-
-client = bigquery.Client(credentials=credentials, project=project)
-
-dataset_id = 'dsongcp'
-table_id = 'air_traffic'
-table_ref = client.dataset(dataset_id).table(table_id)
-```
-
-```{python}
-#| label: sheets-execute
-
-table = bigquery.Table(table_ref, schema = [
-    bigquery.SchemaField("Activity_Period", "INT64"),
-    bigquery.SchemaField("Activity_Period_Start_Date", "DATE"),
-    bigquery.SchemaField("Operating_Airline", "STRING"),
-    bigquery.SchemaField("Operating_Airline_IATA_Code", "STRING"),
-    bigquery.SchemaField("Published_Airline", "STRING"),
-    bigquery.SchemaField("Published_Airline_IATA_Code", "STRING"),
-    bigquery.SchemaField("GEO_Summary", "STRING"),
-    bigquery.SchemaField("GEO_Region", "STRING"),
-    bigquery.SchemaField("Activity_Type_Code", "STRING"),
-    bigquery.SchemaField("Price_Category_Code", "STRING"),
-    bigquery.SchemaField("Terminal", "STRING"),
-    bigquery.SchemaField("Boarding_Area", "STRING"),
-    bigquery.SchemaField("Passenger_Count", "INT64"),
-    bigquery.SchemaField("data_as_of", "STRING"),
-    bigquery.SchemaField("data_loaded_at", "STRING")
-])
-
-external_config = bigquery.ExternalConfig("GOOGLE_SHEETS")
-sheet_url = "https://docs.google.com/spreadsheets/d/1vp7bCvxd3R2zciqxc8A4Qoq5DAvqhzfXJnljmG5OOw0/edit?usp=sharing"
-external_config.source_uris = [sheet_url]
-
-options = external_config.google_sheets_options
-options.skip_leading_rows = 1
-options.range = "air_traffic!A:O"
-
-table.external_data_configuration = external_config
-client.create_table(table)
-```
-
-
-
-
-
-
-
-
-
-
