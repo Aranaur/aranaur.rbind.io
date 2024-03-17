@@ -1,0 +1,147 @@
+---
+title: Лабораторна робота №1
+subtitle: Хмарні технології обробки даних
+subject: Знайомство з BigQuery
+lang: ua
+---
+
+```{python}
+#| include: false
+
+import pandas as pd
+```
+
+Найближчі кілька лабораторних робіт ми будемо працювати з даними, які представляють сервіс з доставки продуктів. Тому дуже важливо розібратися у них. Всього буде 6 таблиць:
+
+- `courier_actions` - дії кур'єрів
+- `couriers` - дані про кур'єрів
+- `orders` - дані про замовлення
+- `products` - дані про продукти
+- `user_actions` - дії користувачів
+- `users` - дані про користувачів
+
+::: callout-important
+[Посилання на дані](https://github.com/Aranaur/aranaur.rbind.io/tree/main/lectures/cloud_data_processing/labs/2024/data/bq)
+:::
+
+# 1. Обліковий запис Google Cloud Platform
+
+- Створіть проєкт в Google Cloud Platform (GCP)[^gcp], наприклад `cloud-course-IAV-21`.
+
+[^gcp]: Назва проєкту повинна бути унікальною в межах GCP.
+
+# 2. Дані
+
+- Створіть набір даних (dataset) в BigQuery, наприклад `food_delivery`.
+- Завантажте дані в таблиці відповідно до назви файлів. Використайте наступні схеми для створення таблиць:
+    - `courier_actions`:
+        + `courier_id` - INT64, id кур'єра
+        + `order_id` - INT64, id замовлення
+        + `action` - STRING, дія кур'єра із замовленням
+        + `time` - DATETIME, час виконання дії
+    - `couriers`:
+        + `courier_id` - INT64, id кур'єра
+        + `bitrh_day` - DATE, дата народження
+        + `sex` - STRING, стать
+    - `orders`[^orders]:
+        + `order_id` - INT64, id замовлення
+        + `creation_time` - DATETIME, час створення замовлення
+        + `product_ids` - INT64, REPEATED, id продуктів у замовленні
+    - `products`:
+        + `product_id` - INT64, id продукту
+        + `name` - STRING, назва продукту
+        + `price` - FLOAT64, ціна продукту
+    - `user_actions`:
+        + `user_id` - INT64, id користувача
+        + `order_id` - INT64, id замовлення
+        + `action` - STRING, дія користувача із замовленням
+        + `time` - DATETIME, час виконання дії
+    - `users`:
+        + `user_id` - INT64, id користувача
+        + `bitrh_day` - DATE, дата народження
+        + `sex` - STRING, стать
+
+[^orders]: Зверніть увагу, що для завантаження даних в таблицю `products` використовується JSON-файл. Це пояснюється тим, що в таблиці є поле `product_ids`, яке містить масив значень (CSV не підтримує масиви).
+
+::: {.callout-caution collapse="true"}
+## Приклади даних
+
+Для кращого розуміння наводжу зрізи даних з кожної таблиці.
+
+- `courier_actions`:
+
+```{python}
+#| label: courier_actions
+#| echo: false
+
+pd.read_csv('data/bq/courier_actions.csv', index_col=None).sample(5).style.hide()
+```
+
+- `couriers`:
+
+```{python}
+#| label: couriers
+#| echo: false
+
+pd.read_csv('data/bq/couriers.csv').sample(5).style.hide()
+```
+
+- `orders`:
+
+```{python}
+#| label: orders
+#| echo: false
+
+pd.read_json('data/bq/orders.json', lines=True).sample(5).style.hide()
+```
+
+- `products`:
+
+```{python}
+#| label: products
+#| echo: false
+
+pd.read_csv('data/bq/products.csv').sample(5).style.hide()
+```
+
+- `user_actions`:
+
+```{python}
+#| label: user_actions
+#| echo: false
+
+pd.read_csv('data/bq/user_actions.csv').sample(5).style.hide()
+```
+
+- `users`:
+
+```{python}
+#| label: users
+#| echo: false
+
+pd.read_csv('data/bq/users.csv').sample(5).style.hide()
+```
+
+:::
+
+## 3. Запити
+
+Створіть запити для вирішення наступних завдань:
+
+1. Який товар має найдовшу назву?
+2. Які користувачі зробили найбільше замовлень?
+3. Підвищить ціну на 5% тільки на товари, вартість яких перевищує 100 одиниць. Ціну решти товарів залиште без змін. Також не підвищуйте ціну на ікру (*caviar*), яка й так коштує 800 одиниць. Виведіть id та найменування всіх товарів, їх стару та нову ціну.
+4. Розрахуйте вік наймолодшого[^min-age] кур'єра з таблиці `couriers`.
+5. Використовуючи функцію `DATE_TRUNC`, порахуйте, скільки замовлень було зроблено та скільки було скасовано кожного місяця. Розрахунки проводьте за таблицею `user_actions`.
+6. За таблицями `orders` та `courier_actions` визначте id десяти замовлень, які доставляли найдовше.
+
+[^min-age]: Вік розраховується на момент виконання запиту.
+
+::: callout-note
+Документація до операторів та функцій BigQuery: [https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators](https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators)
+:::
+
+
+::: {.callout-important}
+- **Дедлайн** здачі роботи: **26.03.2024**
+:::
