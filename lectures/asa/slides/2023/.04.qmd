@@ -1,0 +1,1410 @@
+---
+title: "Гетероскедастичність"
+subtitle: "Прикладний статистичний аналіз"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка | ФІТ
+# date: today
+# date-format: iso
+from: markdown+emoji
+title-slide-attributes:
+  data-background-iframe: .04_files/libs/colored-particles/index.html
+#   data-background-color: "#eef3f8"
+language: _language-ua.yml
+footer: 🔗 <a href="https://aranaur.rbind.io/lectures/asa/">Матеріали курсу</a>
+format: 
+  revealjs:
+    transition: fade
+    chalkboard: true
+    logo: img/fit.png
+    code-line-numbers: false
+    slide-number: c/t
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    pdf-separate-fragments: true
+    # fig-height: 7.5
+    # fig-width: 15
+    fig-align: center
+    fig-format: svg
+    theme: [default, custom.scss]
+# jupyter: python3
+execute: 
+  warning: false
+  echo: true
+  # cache: true
+
+---
+
+```{python}
+#| label: setup-python
+#| include: false
+
+# Import libraries
+import numpy as np
+import pandas as pd
+import hashlib
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from IPython.display import Markdown
+from tabulate import tabulate
+
+# Set seaborn default style
+sns.set_style('whitegrid')
+sns.set_palette('colorblind')
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+# grey_light = "grey70"
+# grey_mid   = "grey50"
+# grey_dark  = "grey20"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+```{r}
+#| label: setup
+#| include: false
+
+library(pacman)
+p_load(broom, latex2exp, ggplot2, ggthemes, viridis, extrafont,  dplyr,  magrittr, knitr, parallel, fontawesome)
+
+# Define pink color
+red_pink = "#e64173"
+grey_light = "grey70"
+grey_mid = "grey50"
+grey_dark = "grey20"
+
+# A blank theme for ggplot
+theme_empty = theme_bw() + theme(
+  line = element_blank(),
+  rect = element_blank(),
+  strip.text = element_blank(),
+  axis.text = element_blank(),
+  plot.title = element_blank(),
+  axis.title = element_blank(),
+  plot.margin = structure(c(0, 0, -0.5, -1), unit = "lines", valid.unit = 3L, class = "unit"),
+  legend.position = "none"
+)
+theme_simple = theme_bw() + theme(
+  line = element_blank(),
+  panel.grid = element_blank(),
+  rect = element_blank(),
+  strip.text = element_blank(),
+  axis.text.x = element_text(size = 18, family = "STIXGeneral"),
+  axis.text.y = element_blank(),
+  axis.ticks = element_blank(),
+  plot.title = element_blank(),
+  axis.title = element_blank(),
+  # plot.margin = structure(c(0, 0, -1, -1), unit = "lines", valid.unit = 3L, class = "unit"),
+  legend.position = "none"
+)
+theme_axes_math = theme_void() + theme(
+  text = element_text(family = "MathJax_Math"),
+  axis.title = element_text(size = 22),
+  axis.title.x = element_text(hjust = .95, margin = margin(0.15, 0, 0, 0, unit = "lines")),
+  axis.title.y = element_text(vjust = .95, margin = margin(0, 0.15, 0, 0, unit = "lines")),
+  axis.line = element_line(
+    color = "grey70",
+    size = 0.25,
+    arrow = arrow(angle = 30, length = unit(0.15, "inches")
+  )),
+  plot.margin = structure(c(1, 0, 1, 0), unit = "lines", valid.unit = 3L, class = "unit"),
+  legend.position = "none"
+)
+theme_axes_serif = theme_void() + theme(
+  text = element_text(family = "MathJax_Main"),
+  axis.title = element_text(size = 22),
+  axis.title.x = element_text(hjust = .95, margin = margin(0.15, 0, 0, 0, unit = "lines")),
+  axis.title.y = element_text(vjust = .95, margin = margin(0, 0.15, 0, 0, unit = "lines")),
+  axis.line = element_line(
+    color = "grey70",
+    size = 0.25,
+    arrow = arrow(angle = 30, length = unit(0.15, "inches")
+  )),
+  plot.margin = structure(c(1, 0, 1, 0), unit = "lines", valid.unit = 3L, class = "unit"),
+  legend.position = "none"
+)
+theme_axes = theme_void() + theme(
+  text = element_text(family = "Fira Sans Book"),
+  axis.title = element_text(size = 18),
+  axis.title.x = element_text(hjust = .95, margin = margin(0.15, 0, 0, 0, unit = "lines")),
+  axis.title.y = element_text(vjust = .95, margin = margin(0, 0.15, 0, 0, unit = "lines")),
+  axis.line = element_line(
+    color = grey_light,
+    size = 0.25,
+    arrow = arrow(angle = 30, length = unit(0.15, "inches")
+  )),
+  plot.margin = structure(c(1, 0, 1, 0), unit = "lines", valid.unit = 3L, class = "unit"),
+  legend.position = "none"
+)
+```
+
+# Теоретичний мінімум {background-color="#eef3f8"}
+
+## Розподіл $\chi^2$
+
+Розподіл $\chi^2$ — це лише ще один приклад звичайного (іменованого) розподілу (наприклад, нормального розподілу, розподілу $t$ і розподілу $F$).
+
+Форма розподілу $\chi^2$ залежить від одного параметра:
+
+- Ми будемо називати цей параметр $k$
+- Наша тестова статистика буде залежати від $k$ *ступенів свободи*.
+
+---
+
+## Розподіл $\chi^2$
+
+Три приклади $\chi_k^2$: $\color{#314f4f}{k = 1}$, $\color{#e64173}{k = 2}$ і $\color{orange}{k = 9}$
+
+```{r, chisq1, echo = F, dev = "svg", fig.height = 5.5}
+ggplot(data = tibble(x = c(0, 20)), aes(x)) +
+  geom_area(
+    stat = "function", fun = dchisq, args = list(df = 2),
+    fill = "darkslategrey", alpha = 0.3
+  ) +
+  stat_function(
+    fun = dchisq, args = list(df = 2), n = 1e3,
+    color = "darkslategrey"
+  ) +
+  geom_area(
+    stat = "function", fun = dchisq, args = list(df = 3),
+    fill = red_pink, alpha = 0.3
+  ) +
+  stat_function(
+    fun = dchisq, args = list(df = 3), n = 1e3,
+    color = red_pink
+  ) +
+  geom_area(
+    stat = "function", fun = dchisq, args = list(df = 9),
+    fill = "orange", alpha = 0.3
+  ) +
+  stat_function(
+    fun = dchisq, args = list(df = 9), n = 1e3,
+    color = "orange"
+  ) +
+  labs(x = "x", y = "f") +
+  theme_axes_math
+```
+
+---
+
+## Розподіл $\chi^2$
+
+Імовірність спостереження більш екстремальної тестової статистики $\widehat{\text{LM}}$ під H~0~
+
+```{r, chisq2, echo = F, dev = "svg", fig.height = 5.5}
+ggplot(data = tibble(x = c(0, 8)), aes(x)) +
+  geom_area(
+    stat = "function", fun = dchisq, args = list(df = 2),
+    fill = "darkslategrey", alpha = 0.05
+  ) +
+  geom_area(
+    stat = "function", fun = dchisq, args = list(df = 2),
+    fill = red_pink, alpha = 0.85,
+    xlim = c(5, 8)
+  ) +
+  stat_function(
+    fun = dchisq, args = list(df = 2), n = 1e3,
+    color = "darkslategrey"
+  ) +
+  geom_vline(xintercept = 5, color = grey_dark, size = 0.5, linetype = "dotted") +
+  annotate("text", x = 5, y = 1.55 * dchisq(5, df = 2), label = TeX("$\\widehat{LM}$"), family = "MathJax_Main", size = 7) +
+  labs(x = "x", y = "f") +
+  theme_axes_math
+```
+
+# Гетероскедастичність
+
+## Гетероскедастичність
+
+Давайте згадаємо **поточні МНК припущення**
+
+. . .
+
+1. Наша вибірка ($x_k$ та $y_i$) була [випадковим чином]{.hi} відібрана з сукупності.
+
+. . .
+
+2. $y$ є [лінійною функцією]{.hi} $\beta_k$ і $u_i$.
+
+. . .
+
+3. У нашій вибірці немає ідеальної [мультиколінеарності]{.hi}.
+
+. . .
+
+4. Пояснювальні змінні є [екзогенними]{.hi}: $\mathop{\boldsymbol{E}}\left[ u \middle| X \right] = 0 \left(\implies \mathop{\boldsymbol{E}}\left[ u \right] = 0\right)$.
+
+. . .
+
+5. Збурення мають [постійну дисперсію]{.hi} $\sigma^2$ і [нульова коваріація]{.hi}, _тобто_,
+   - $\mathop{\boldsymbol{E}}\left[ u_i^2 \middle| X \right] = \mathop{\text{Var}} \left( u_i \middle| X \right) = \sigma^2 \implies \mathop{\text{Var}} \left( u_i \right) = \sigma^2$
+   - $\mathop{\text{Cov}} \left( u_i, \, u_j \middle| X \right) = \mathop{\boldsymbol{E}}\left[ u_i u_j \middle| X \right] = 0$ для $i\neq j$
+
+. . .
+
+6. Збурення походять від [нормального]{.hi} розподілу, _тобто_, $u_i \overset{\text{iid}}{\sim} \mathop{\text{N}}\left( 0, \sigma^2 \right)$.
+
+---
+
+## Гетероскедастичність
+
+Сьогодні ми зосереджуємось на припущенні \#5:
+
+> 5. Збурення мають [постійну дисперсію]{.hi} $\sigma^2$ і [нульова коваріація]{.hi}, _тобто_,
+   - $\mathop{\boldsymbol{E}}\left[ u_i^2 \middle| X \right] = \mathop{\text{Var}} \left( u_i \middle| X \right) = \sigma^2 \implies \mathop{\text{Var}} \left( u_i \right) = \sigma^2$
+   - $\mathop{\text{Cov}} \left( u_i, \, u_j \middle| X \right) = \mathop{\boldsymbol{E}}\left[ u_i u_j \middle| X \right] = 0$ для $i\neq j$
+
+. . .
+
+Зокрема, ми зосередимося на припущенні [постійної дисперсії]{.hi} (також відомому як *гомоскедастичність*).
+
+. . .
+
+**Порушення цього припущення:**
+
+[Гетероскедастичність:]{.hi} $\mathop{\text{Var}} \left( u_i \right) = \sigma^2_i$ і $\sigma^2_i \neq \sigma^2_j$ для деяких $i\neq j$ .
+
+. . .
+
+Іншими словами: наші збурення мають різні відхилення.
+
+---
+
+## Гетероскедастичність
+
+Класичний приклад гетероскедастичності: воронка
+
+Дисперсія $u$ зростає разом із $x$
+
+```{r, het ex1, dev = "svg", echo = F, fig.height = 5.5}
+set.seed(12345)
+ggplot(data = tibble(
+  x = runif(1e3, -3, 3),
+  e = rnorm(1e3, 0, sd = 4 + 1.5 * x)
+), aes(x = x, y = e)) +
+geom_point(color = "darkslategrey", size = 2.75, alpha = 0.5) +
+labs(x = "x", y = "u") +
+theme_axes_math
+```
+
+---
+
+## Гетероскедастичність
+
+Інший приклад гетероскедастичності: (подвійна воронка?)
+
+Дисперсія $u$ зростає на крайніх значеннях $x$
+
+```{r, het ex2 , dev = "svg", echo = F, fig.height = 5.5}
+set.seed(12345)
+ggplot(data = tibble(
+  x = runif(1e3, -3, 3),
+  e = rnorm(1e3, 0, sd = 2 + x^2)
+), aes(x = x, y = e)) +
+geom_point(color = "darkslategrey", size = 2.75, alpha = 0.5) +
+labs(x = "x", y = "u") +
+theme_axes_math
+```
+
+---
+
+## Гетероскедастичність
+
+Інший приклад гетероскедастичності
+
+Різні групові дисперсії $u$ 
+
+```{r, het ex3 , dev = "svg", echo = F, fig.height = 5.5}
+set.seed(12345)
+ggplot(data = tibble(
+  g = sample(c(F,T), 1e3, replace = T),
+  x = runif(1e3, -3, 3),
+  e = rnorm(1e3, 0, sd = 0.5 + 2 * g)
+), aes(x = x, y = e, color = g, shape = g, alpha = g)) +
+geom_point(size = 2.75) +
+scale_color_manual(values = c("darkslategrey", red_pink)) +
+scale_shape_manual(values = c(16, 1)) +
+scale_alpha_manual(values = c(0.5, 0.8)) +
+labs(x = "x", y = "u") +
+theme_axes_math
+```
+
+---
+
+## Гетероскедастичність
+
+[Гетероскедастичність]{.hi} присутня, коли дисперсія $u$ змінюється з будь-якою комбінацією наших пояснювальних змінних $x_1$ до $x_k$ (далі: $X$).
+
+. . .
+
+Це дуже поширене явище на практиці.
+
+. . .
+
+[Чому вона нам важлива:]{.hi} Гетероскедастичність показує нам, як незначні порушення наших припущень можуть вплинути на ефективність МНК.
+
+---
+
+## Наслідки
+
+Отже, які наслідки гетероскедастичності? Зміщення? Неефективність?
+
+По-перше, давайте перевіримо, чи це має наслідки для незміщенності МНК
+
+. . .
+
+**Нагадування~1~:** незміщенність МНК означає $\mathop{\boldsymbol{E}}\left[ \hat{\beta}_k \middle| X \right] = \beta_k$ для всіх $k$.
+
+. . .
+
+**Нагадування~2~:** раніше ми показували $\hat{\beta}_1 = \dfrac{\sum_i\left(y_i-\overline{y}\right)\left(x_i-\overline{x}\right)}{\sum_i\left(x_i -\overline{x}\right)^2}$
+
+. . .
+
+Це насправді допоможе нам переписати цю оцінку як
+
+$$ \hat{\beta}_1 = \beta_1 + \dfrac{\sum_i \left( x_i - \overline{x} \right) u_i}{\sum_i \left( x_i - \overline{x} \right)^2} $$
+
+---
+
+## Наслідки
+
+**Доведення:** Припускаємо, що $y_i = \beta_0 + \beta_1 x_i + u_i$
+
+$$
+\begin{aligned}
+  \hat{\beta}_1
+  &= \dfrac{\sum_i\left(y_i-\overline{y}\right)\left(x_i-\overline{x}\right)}{\sum_i\left(x_i -\overline{x}\right)^2} \\
+  &= \dfrac{\sum_i\left(\left[ \beta_0 + \beta_1 x_i + u_i \right]- \left[ \beta_0 + \beta_1 \overline{x} + \overline{u} \right] \right)\left(x_i-\overline{x}\right)}{\sum_i\left(x_i -\overline{x}\right)^2} \\
+  &= \dfrac{\sum_i\left(\beta_1 \left[ x_i - \overline{x} \right] + \left[u_i - \overline{u}\right]  \right)\left(x_i-\overline{x}\right)}{\sum_i\left(x_i -\overline{x}\right)^2} \\
+  &= \dfrac{\sum_i\left(\beta_1 \left[ x_i - \overline{x} \right]^2 + \left[ x_i - \overline{x} \right] \left[u_i - \overline{u}\right]\right)}{\sum_i\left(x_i -\overline{x}\right)^2} \\
+  &= \beta_1 + \dfrac{\sum_i\left(x_i - \overline{x}\right) \left(u_i - \overline{u}\right)}{\sum_i\left(x_i -\overline{x}\right)^2}
+\end{aligned}
+$$
+
+---
+
+## Наслідки
+
+$$
+\begin{aligned}
+  \hat{\beta}_1
+  &= \cdots = \beta_1 + \dfrac{\sum_i\left(x_i - \overline{x}\right) \left(u_i - \overline{u}\right)}{\sum_i\left(x_i -\overline{x}\right)^2} \\
+  &= \beta_1 + \dfrac{\sum_i\left(x_i - \overline{x}\right) u_i - \overline{u} \sum_i\left(x_i - \overline{x}\right)}{\sum_i\left(x_i -\overline{x}\right)^2} \\
+  &= \beta_1 + \dfrac{\sum_i\left(x_i - \overline{x}\right) u_i - \overline{u} \left(\sum_i x_i - \sum_i \overline{x}\right)}{\sum_i\left(x_i -\overline{x}\right)^2} \\
+  &= \beta_1 + \dfrac{\sum_i\left(x_i - \overline{x}\right) u_i - \overline{u} \left(\sum_i x_i - n \overline{x}\right)}{\sum_i\left(x_i -\overline{x}\right)^2} \\
+  &= \beta_1 + \dfrac{\sum_i\left(x_i - \overline{x}\right) u_i - \overline{u} \color{#e64173}{\left(\sum_i x_i - \sum_i x_i\right)}}{\sum_i\left(x_i -\overline{x}\right)^2} \\
+  &= \beta_1 + \dfrac{\sum_i\left(x_i - \overline{x}\right) u_i}{\sum_i\left(x_i -\overline{x}\right)^2} \quad \text{😅}
+\end{aligned}
+$$
+
+---
+
+## Наслідки: зміщення
+
+Тепер ми хочемо побачити, чи гетероскедастичність зміщує оцінку МНК для $\beta_1$.
+
+. . .
+
+$$
+\begin{aligned}
+  \mathop{\boldsymbol{E}}\left[ \hat{\beta}_1 \middle| X \right]
+  &= \mathop{\boldsymbol{E}}\left[ \beta_1 + \dfrac{\sum_i\left(x_i - \overline{x}\right) u_i}{\sum_i\left(x_i -\overline{x}\right)^2} \middle| X \right] \\[0.5em]
+  &= \beta_1 + \mathop{\boldsymbol{E}}\left[ \dfrac{\sum_i\left(x_i - \overline{x}\right) u_i}{\sum_i\left(x_i -\overline{x}\right)^2} \middle| X \right] \\[0.5em]
+  &= \beta_1 + \dfrac{\sum_i\left(x_i - \overline{x}\right)}{\sum_i\left(x_i -\overline{x}\right)^2} \color{#e64173}{\underbrace{\mathop{\boldsymbol{E}}\left[ u_i \middle| X \right]}_{=0}} \\[0.5em]
+  &= \beta_1
+\end{aligned}
+$$
+
+. . .
+
+Фух... [МНК все ще незміщенні]{.hi} для $\beta_k$.
+
+---
+
+## Наслідки: ефективність
+
+**Ефективність** і **інтерпретованість** МНК не витримують гетероскедастичності.
+
+- За наявності гетероскедастичності МНК [не є більше найефективнішим]{.hi} (найкращий) лінійним незміщеним оцінювачем.
+
+. . .
+
+- Було б більш інформативним (ефективнішим) [зважити спостереження]{.hi} обернено до їхньої дисперсії $u_i$.
+
+   - Низька вага спостереженням з високою дисперсією $u_i$.
+
+   - Висока вага спостереженням з низькою дисперсією $u_i$.
+
+   - Тепер у вас є ідея зважених найменших квадратів (ЗМНК, WLS)
+
+---
+
+## Наслідки: інтерпретованість
+
+За наявності гетероскедастичності [стандартні помилки МНК є зміщенними]{.hi} .
+
+- Неправильні довірчі інтервали
+
+- Проблеми для перевірки гіпотез (як $t$, так і $F$ тести)
+
+---
+
+## Рішення
+
+1. **Тести** для визначення наявності гетероскедастичності.
+
+2. **Засоби захисту** для (1) ефективності та (2) інтерпретованісті
+
+---
+
+## Тестування гетероскедастичності
+
+Хоча у нас *можливо* є рішення для гетероскедастичності, ефективність наших оцінювачів залежить від наявності гетероскедастичності.
+
+1. **Тест Гольдфельда-Квандта**
+
+2. **Тест Уайта**
+
+3. **Тест Бройша — Пагана**
+
+. . .
+
+Кожен із цих тестів зосереджується на тому факті, що ми можемо [використовувати залишки МНК]{.hi} $\color{#e64173}{e_i}$ [для оцінки популяції]{.hi} $\color{#e64173}{u_i}$.
+
+# Тест Гольдфельда-Квандта
+
+## Тест Гольдфельда-Квандта
+
+Зосереджується на конкретному типі гетероскедастичності: чи відрізняється дисперсія $u_i$ [між двома групами]{.hi}.
+
+Пам'ятаєте, як ми використовували наші залишки для оцінки $\sigma^2$?
+
+$$ s^2 = \dfrac{\text{SSE}}{n-1} = \dfrac{\sum_i e_i^2}{n-1} $$
+
+Ми використаємо цю саму ідею, щоб визначити, чи є докази того, що наші дві групи відрізняються дисперсіями своїх збурень, фактично порівнюючи $s^2_1$ і $s^2_2$ від наших двох груп.
+
+---
+
+## Тест Гольдфельда-Квандта
+
+### Алгоритм
+
+1. Упорядкуйте свої спостереження за $x$
+
+2. Розділіть дані на дві групи розміром n^⭑^
+   - G~1~: перша третина
+   - G~2~: остання третина
+
+3. Побудуйте окремі регресії $y$ від $x$ для G~1~ і G~2~
+
+4. Розрахуйте SSE~1~ і SSE~2~
+
+5. Обчисліть статистику тесту G-Q
+
+---
+
+## Статистика Гольдфельда-Квандта
+
+$$F_{\left(n^{\star}-k,\, n^{\star}-k\right)} = \dfrac{\text{SSE}_2/(n^\star-k)}{\text{SSE}_1/(n^\star-k)} = \dfrac{\text{SSE}_2}{\text{SSE}_1}$$
+
+відповідає $F$ розподілу (за нульовою гіпотезою) із ступенями свободи $n^{\star}-k$ і $n^{\star}-k$[^1].
+
+::: {.callout-note}
+- Тест G-Q вимагає, щоб збурення відповідали нормальним розподілам.
+- G-Q передбачає дуже специфічний тип/форму гетероскедастичності.
+- Дуже добре працює, якщо ми знаємо форму потенційної гетероскедастичності.
+:::
+
+[^1]: Голдфельд і Квандт запропонували розрахунок $n^{\star}$ з виразу $(3/8)n$. $k$ це кількість оцінених параметрів (_тобто_, $\hat{\beta}_j$).
+
+---
+
+## Візуалізація тесту Гольдфельда-Квандта
+
+```{r, gq1a, echo = F, dev = "svg", fig.height = 4}
+set.seed(12345)
+# Data
+gq_df = tibble(
+  x = runif(1e3, -3, 3),
+  e = rnorm(1e3, 0, sd = 4 + 1.5 * x),
+  y = 1 + 3 * x + e
+)
+# Quantiles
+gq_x = quantile(gq_df$x, probs = c(3/8, 5/8))
+# Regressions
+sse1 = lm(y ~ x, data = gq_df %>% filter(x < gq_x[1])) %>%
+  residuals() %>% raise_to_power(2) %>% sum()
+sse2 = lm(y ~ x, data = gq_df %>% filter(x > gq_x[2])) %>%
+  residuals() %>% raise_to_power(2) %>% sum()
+ggplot(data = gq_df, aes(x = x, y = e)) +
+geom_point(color = "darkslategrey", size = 2.75, alpha = 0.5) +
+labs(x = "x", y = "u") +
+theme_axes_math
+```
+
+---
+
+## Візуалізація тесту Гольдфельда-Квандта
+
+```{r, gq1b, echo = F, dev = "svg", fig.height = 4}
+ggplot(data = gq_df, aes(
+  x = x, y = e,
+  color = cut(x, c(-Inf, gq_x, Inf)),
+  alpha = cut(x, c(-Inf, gq_x, Inf)),
+  shape = cut(x, c(-Inf, gq_x, Inf))
+)) +
+geom_vline(
+  xintercept = gq_x,
+  color = grey_mid,
+  size = 0.25
+) +
+geom_point(size = 2.75) +
+labs(x = "x", y = "u") +
+scale_color_manual(values = c("darkslategrey", grey_mid, red_pink)) +
+scale_shape_manual(values = c(19, 1, 19)) +
+scale_alpha_manual(values = c(0.5, 0.8, 0.6)) +
+theme_axes_math
+```
+
+$F_{375,\,375} = \dfrac{\color{#e64173}{\text{SSE}_2 = `r format(round(sse2, 1), nsmall = 0L, big.mark = ",")`}}{\color{#314f4f}{\text{SSE}_1 = `r format(round(sse1, 1), nsmall = 0L, big.mark = ",")`}} \approx `r format(round(sse2/sse1, 1), nsmall = 0L, big.mark = ",")` \implies$ *p*-value $< 0.001$
+
+$\therefore$ Ми відхиляємо H~0~: $\sigma^2_1 = \sigma^2_2$ і робимо висновок про наявність статистично значущих доказів гетероскедастичності.
+
+---
+
+## Проблеми тесту Гольдфельда-Квандта
+
+```{r, gq2a, echo = F, dev = "svg", fig.height = 4}
+set.seed(12345)
+# Data
+gq2_df = tibble(
+  x = runif(1e3, -3, 3),
+  e = rnorm(1e3, 0, sd = 2 + x^2),
+  y = 1 + 3 * x + e
+)
+# Quantiles
+gq_x = quantile(gq2_df$x, probs = c(3/8, 5/8))
+# Regressions
+sse1b = lm(y ~ x, data = gq2_df %>% filter(x < gq_x[1])) %>%
+  residuals() %>% raise_to_power(2) %>% sum()
+sse2b = lm(y ~ x, data = gq2_df %>% filter(x > gq_x[2])) %>%
+  residuals() %>% raise_to_power(2) %>% sum()
+ggplot(data = gq2_df, aes(
+  x = x, y = e
+)) +
+geom_point(color = "darkslategrey", size = 2.75, alpha = 0.5, shape = 19) +
+labs(x = "x", y = "u") +
+theme_axes_math
+```
+
+---
+
+## Проблеми тесту Гольдфельда-Квандта
+
+```{r, gq2b, echo = F, dev = "svg", fig.height = 4}
+ggplot(data = gq2_df, aes(
+  x = x, y = e,
+  color = cut(x, c(-Inf, gq_x, Inf)),
+  alpha = cut(x, c(-Inf, gq_x, Inf)),
+  shape = cut(x, c(-Inf, gq_x, Inf))
+)) +
+geom_vline(
+  xintercept = gq_x,
+  color = grey_mid,
+  size = 0.25
+) +
+geom_point(size = 2.75) +
+labs(x = "x", y = "u") +
+scale_color_manual(values = c("darkslategrey", grey_mid, red_pink)) +
+scale_shape_manual(values = c(19, 1, 19)) +
+scale_alpha_manual(values = c(0.5, 0.8, 0.6)) +
+theme_axes_math
+```
+
+$F_{375,\,375} = \dfrac{\color{#e64173}{\text{SSE}_2 = `r format(round(sse2b, 1), nsmall = 0L, big.mark = ",")`}}{\color{#314f4f}{\text{SSE}_1 = `r format(round(sse1b, 1), nsmall = 0L, big.mark = ",")`}} \approx `r format(round(sse2b/sse1b, 1), nsmall = 0L, big.mark = ",")` \implies$ *p*-value $\approx `r round(pf(sse2b/sse1b, 375, 375, lower.tail = F), 3)`$
+
+$\thorefore$ Нам не вдається відхилити H~0~: $\sigma^2_1 = \sigma^2_2$, хоча гетероскедастичність очевидно присутня.
+
+# Тест Уайта
+
+## Тест Уайта
+
+**Бройш і Паган (1981)** намагалися вирішити цю проблему надто конкретної функціональної форми гетероскедастичності.
+
+- Регресія $e_i^2$ від $X = \left[ 1,\, x_1,\, x_2,\, \ldots,\, x_k \right]$ і перевірка спільної значущості.
+- Дозволяє даним показати, чи або як дисперсія $u_i$ корелює з $X$.
+- Якщо $\sigma_i^2$ корелює з $X$, то ми маємо гетероскедастичність.
+
+. . .
+
+Однак ми насправді хочемо знати, чи
+
+$$\sigma_1^2 = \sigma_2^2 = \cdots = \sigma_n^2$$
+
+---
+
+## Тест Уайта
+
+Для досягнення цієї мети Гел Уайт скористався тим фактом, що ми можемо [замінити вимогу гомоскедастичності слабшим припущенням]{.hi}:
+
+- **Старе припущення:** $\mathop{\text{Var}} \left( u_i \middle| X \right) = \sigma^2$
+
+- **Нове припущення:** $u^2$ *некорельовані* з пояснювальними змінними (_тобто_, $x_j$ для всіх $j$), їхніми квадратами (_тобто_, $x_j^2 $), а також взаємодії першого ступеня (_тобто_, $x_j x_h$).
+
+. . .
+
+Це нове припущення легше перевірити (*підказка:* регресія).
+
+---
+
+## Алгоритм тесту Уайта
+
+1\. Регресія y на x~1~, x~2~, …, x~k~. Зберегти залишки e.
+
+2\. Регресія квадратів залишків для всіх пояснювальних змінних, їхніх квадратів і взаємодій.
+
+$$e^2 = \alpha_0 + \sum_{h=1}^k \alpha_h x_h + \sum_{j=1}^k \alpha_{k+j} x_j^2 + \sum_{\ell = 1}^{k-1} \sum_{m = \ell + 1}^k \alpha_{\ell,m} x_\ell x_m + v_i$$
+
+3\. Запис R~e~^2^.
+
+4\. Обчисліть тестову статистику для перевірки H~0~: $\alpha_p = 0$ для всіх $p\neq0$.
+
+---
+
+## Статистика тесту Уайта
+
+$$ \text{LM} = n \times R_e^2 \qquad \text{де H}_0,\, \text{LM} \overset{\text{d}}{\sim} \chi_k^2 $$
+
+де $R^2_e$ походить від регресії $e^2$ на пояснювальні змінні, їхні квадрати та їхні взаємодії.
+
+$$ e^2 = \alpha_0 + \underbrace{\sum_{h=1}^k \alpha_h x_h}_{\text{Поясн. змінні}} + \underbrace{\sum_{j=1}^k \alpha_{k+j} x_j^2}_{\text{Квадратична форма}} + \underbrace{\sum_{\ell = 1}^{k-1} \sum_{m = \ell + 1}^k \alpha_{\ell,m} x_\ell x_m}_{\text{Взаємодія}} + v_i $$
+
+::: {.callout-note}
+$k$ (для нашого $\chi_k^2$) дорівнює кількості оцінених параметрів у наведеній вище регресії ($\alpha_j$), за винятком $\left( \alpha_0 \right)$.
+:::
+
+---
+
+## Приклад тесту Уайта
+
+*Приклад:* Розглянемо модель[^†] $y = \beta_0 + \beta_1 x_1 + \beta_2 x_2 + \beta_3 x_3 + u$
+
+[^†]: Щоб спростити позначення тут, я відкидаю індекси $i$.
+
+**Крок 1:** Оцініть модель; отримати залишки $(e)$.
+
+**Крок 2:** Регресія $e^2$ від пояснювальних змінних, квадратів та взаємодії.
+
+$$
+\begin{aligned}
+  e^2 =
+  &\alpha_0 + \alpha_1 x_1 + \alpha_2 x_2 + \alpha_3 x_3 + \alpha_4 x_1^2 + \alpha_5 x_2^2 + \alpha_6 x_3^2 \\
+  &+ \alpha_7 x_1 x_2 + \alpha_8 x_1 x_3 + \alpha_9 x_2 x_3 + v
+\end{aligned}
+$$
+
+Запишіть R^2^ із цього рівняння (назвіть його $R_e^2$).
+
+**Крок 3:** Перевірте H~0~: $\alpha_1 = \alpha_2 = \cdots = \alpha_9 = 0$ за допомогою $\text{LM} = n R^2_e \overset{\text{d} }{\sim} \chi_9^2$.
+
+---
+
+## Приклад тесту Уайта
+
+```{r, white1, echo = F, dev = "svg", fig.height = 4}
+set.seed(12345)
+# Data
+bp_df = tibble(
+  x = runif(1e3, -3, 3),
+  e = rnorm(1e3, 0, sd = 2 + x^2),
+  y = 1 + 3 * x + e
+)
+
+lm_bp1 = lm(residuals(lm(y ~ x, bp_df))^2 ~ 1 + bp_df$x) %>%
+  summary() %$% r.squared %>% multiply_by(1e3)
+lm_bp2 = lm(residuals(lm(y ~ x, bp_df))^2 ~ 1 + bp_df$x + I(bp_df$x^2)) %>%
+  summary() %$% r.squared %>% multiply_by(1e3)
+
+# The figure
+ggplot(data = bp_df, aes(x = x, y = e)) +
+geom_point(size = 2.75, color = "darkslategrey", alpha = 0.5) +
+labs(x = "x", y = "u") +
+theme_axes_math
+```
+
+Тест Уайта для цієї простої лінійної регресії.
+
+$$
+\begin{aligned}
+ e_i^2 &= \hat{\alpha}_0 + \hat{\alpha}_1 x_{1i} \color{#e64173}{+ \hat{\alpha}_2 x^2_{1i}} & \widehat{\text{LM}} &= `r round(lm_bp2, 2)` &\mathit{p}\text{-value} < 0.001
+\end{aligned}
+$$
+
+# Приклади
+
+## Тестування гетероскедастичності
+
+**Мета:** Оцінити зв’язок між стандартизованими результатами тестування (залежна змінна) і (1) співвідношенням студент/викладач і (2) доходом, _тобто_,
+
+$$ \left(\text{Test score}\right)_i = \beta_0 + \beta_1 \text{Ratio}_{i} + \beta_2 \text{Income}_{i} + u_i \tag{1} $$
+
+**Потенційна проблема:** Гетероскедастичність... і ми не знаємо $u_i$.
+
+**Рішення:**
+
+1. Оцініть співвідношення в $(1)$ за допомогою МНК.
+2. Тест на гетероскедастичність.
+   - Гольдфельд-Квандт
+   - Уайта
+   
+---
+
+## Тестування гетероскедастичності
+
+Ми будемо використовувати дані тестування з набору даних `Caschool` в пакеті `Ecdat`.
+
+```{r, ex data}
+# Завантаження пакетів
+library(pacman)
+p_load(tidyverse, Ecdat)
+# Відбір та перейменування змінних, створення нового набору даних
+test_df  <- select(Caschool, test_score = testscr, ratio = str, income = avginc)
+# Формат тіббл
+test_df <- as_tibble(test_df)
+# Перші 2 рядки
+head(test_df, 2)
+```
+
+---
+
+## Тестування гетероскедастичності
+
+Почнемо з оцінки нашої моделі
+
+$$ \left(\text{Test score}\right)_i = \beta_0 + \beta_1 \text{Ratio}_{i} + \beta_2 \text{Income}_{i} + u_i $$
+
+```{r, ex gq1}
+# Оцінювання моделі
+est_model = lm(test_score ~ ratio + income, data = test_df)
+# Вивід результату
+tidy(est_model)
+```
+
+---
+
+## Тестування гетероскедастичності
+
+Тепер давайте подивимося, що говорять залишки про гетероскедастичність
+
+```{r, ex gq2}
+# Додамо залишки до даних
+test_df$e = residuals(est_model)
+```
+
+```{r, gq3, echo = F, dev = "svg", fig.height = 4.25}
+# Plot residuals against income
+plot1 = ggplot(data = test_df, aes(x = income, y = e)) +
+  geom_point(size = 2.5, alpha = 0.5, color = red_pink) +
+  labs(x = "Income", y = TeX("\\textit{e}")) +
+  theme_axes_serif
+# Plot residuals against student-teacher ratio
+plot2 = ggplot(data = test_df, aes(x = ratio, y = e)) +
+  geom_point(size = 2.5, alpha = 0.5, color = "darkslategrey") +
+  labs(x = "Student-to-teacher ratio", y = TeX("\\textit{e}")) +
+  theme_axes_serif
+# The grid
+gridExtra::grid.arrange(plot1, plot2, nrow = 1)
+```
+
+---
+
+## Тестування гетероскедастичності: [G-Q]{.hi}
+
+Дохід виглядає потенційно гетероскедастичним; давайте перевіримо через Goldfeld-Quandt.
+
+```{r, ex gq4, eval = F}
+# Впорядковуємо дані
+test_df = arrange(test_df, income)
+```
+
+---
+
+## Тестування гетероскедастичності: [G-Q]{.hi}
+
+Дохід виглядає потенційно гетероскедастичним; давайте перевіримо через Goldfeld-Quandt.
+
+```{r, ex gq5, eval = F}
+# Впорядковуємо дані
+test_df = arrange(test_df, income)
+# Переоцінюємо модель для останніх і перших 158 спостережень
+est_model1 = lm(test_score ~ ratio + income, data = tail(test_df, 158))
+est_model2 = lm(test_score ~ ratio + income, data = head(test_df, 158))
+```
+
+---
+
+## Тестування гетероскедастичності: [G-Q]{.hi}
+
+Дохід виглядає потенційно гетероскедастичним; давайте перевіримо через Goldfeld-Quandt.
+
+```{r, ex gq6}
+# Впорядковуємо дані
+test_df = arrange(test_df, income)
+# Переоцінюємо модель для останніх і перших 158 спостережень
+est_model1 = lm(test_score ~ ratio + income, data = tail(test_df, 158))
+est_model2 = lm(test_score ~ ratio + income, data = head(test_df, 158))
+# Беремо залишки від кожної регресії
+e_model1 = residuals(est_model1)
+e_model2 = residuals(est_model2)
+```
+
+---
+
+## Тестування гетероскедастичності: [G-Q]{.hi}
+
+Дохід виглядає потенційно гетероскедастичним; давайте перевіримо через Goldfeld-Quandt.
+
+```{r, ex gq7}
+# Впорядковуємо дані
+test_df = arrange(test_df, income)
+# Переоцінюємо модель для останніх і перших 158 спостережень
+est_model1 = lm(test_score ~ ratio + income, data = tail(test_df, 158))
+est_model2 = lm(test_score ~ ratio + income, data = head(test_df, 158))
+# Розраховуємо SSE для кожної регресії
+sse_model1 = sum(e_model1^2)
+sse_model1
+sse_model2 = sum(e_model2^2)
+sse_model2
+```
+
+---
+
+## Тестування гетероскедастичності: [G-Q]{.hi}
+
+Розраховуємо статистику:
+
+$F_{n^\star-k,\,n^\star-k} = \dfrac{\text{SSE}_2}{\text{SSE}_1}$
+
+. . .
+
+$\approx\dfrac{`r round(sse_model2, 2) %>% format(big.mark = ",")`}{`r round(sse_model1, 2) %>% format(big.mark = ",")`}$
+
+. . .
+
+$\approx`r round(sse_model2/sse_model1, 2)`$
+
+. . .
+
+$F_{158-3,\,158-3}$
+
+. . .
+
+```{r, ex gq8}
+# G-Q статистика
+(f_gq = sse_model2/sse_model1)
+```
+
+. . .
+
+```{r, ex gq9}
+# p-value
+pf(q = f_gq, df1 = 158-3, df2 = 158-3, lower.tail = F)
+```
+
+---
+
+## Тестування гетероскедастичності: [G-Q]{.hi}
+
+Критерій статистики Гольдфельда-Квандта та його розподіл
+
+```{r, ex gq10, echo = F, dev = "svg", fig.height = 5}
+ggplot(data = tibble(x = c(0, f_gq * 1.3)), aes(x)) +
+  geom_area(
+    stat = "function", fun = df, args = list(df1 = 158, df2 = 158),
+    fill = "darkslategrey", alpha = 0.05
+  ) +
+  geom_area(
+    stat = "function", fun = df, args = list(df1 = 158, df2 = 158),
+    fill = red_pink, alpha = 0.85,
+    xlim = c(f_gq, f_gq * 1.3)
+  ) +
+  stat_function(
+    fun = df, args = list(df1 = 158, df2 = 158), n = 1e3,
+    color = "darkslategrey"
+  ) +
+  geom_vline(xintercept = f_gq, color = grey_dark, size = 0.5, linetype = "dotted") +
+  annotate(
+    "text", x = f_gq, y = 5 * df(f_gq, df1 = 158, df2 = 158),
+    label = TeX("$\\widehat{F}=1.53$"),
+    family = "MathJax_Main", size = 7
+  ) +
+  labs(x = "x", y = "f") +
+  theme_axes_math
+```
+
+---
+
+## Тестування гетероскедастичності: [G-Q]{.hi}
+
+Зібравши все разом:
+
+H~0~: $\sigma_1^2 = \sigma_2^2$ * проти* H~A~: $\sigma_1^2 \neq \sigma_2^2$
+
+Статистика тесту Голдфельда-Квандта: $F \approx `r round(f_gq, 2)`$
+
+*p*-значення $\approx `r round(pf(q = f_gq, df1 = 158-3, df2 = 158-3, lower.tail = F), 5)`$
+
+∴ Відхилити H~0~ (*p*-значення менше 0,05).
+
+**Висновок:** Є статистично значущі докази того, що $\sigma_1^2 \neq \sigma_2^2$. Таким чином, ми знаходимо статистично значущі докази гетероскедастичності (на 5-відсотковому рівні значущості).
+
+---
+
+## Тестування гетероскедастичності: [G-Q]{.hi}
+
+Що, якби ми вирішили зосередитися на співвідношенні кількості студентів і викладачів?
+
+. . .
+
+```{r, ex gq11}
+# Впорядкування
+test_df = arrange(test_df, ratio)
+# Моделі
+est_model3 = lm(test_score ~ ratio + income, data = tail(test_df, 158))
+est_model4 = lm(test_score ~ ratio + income, data = head(test_df, 158))
+# Залишки
+e_model3 = residuals(est_model3)
+e_model4 = residuals(est_model4)
+# SSE
+(sse_model3 = sum(e_model3^2))
+(sse_model4 = sum(e_model4^2))
+```
+
+---
+
+## Тестування гетероскедастичності: [G-Q]{.hi}
+
+$F_{n^\star-k,\,n^\star-k} = \dfrac{\text{SSE}_4}{\text{SSE}_3} \approx\dfrac{`r round(sse_model4, 2) %>% format(big.mark = ",")`}{`r round(sse_model3, 2) %>% format(big.mark = ",")`} \approx`r round(sse_model4 / sse_model3, 2)`$
+
+яке має *p*-значення приблизно `r round(pf(sse_model4 / sse_model3, 158-3, 158-3, lower.tail = F), 4)`.
+
+. . .
+
+∴ Ми б не змогли відхилити H~0~, дійшовши висновку, що нам не вдалося знайти статистично значущі докази гетероскедастичності.
+
+---
+
+## Тестування гетероскедастичності: [Уайт]{.hi}
+
+Давайте перевіримо ту саму модель і дані за допомогою тесту Уайта.
+
+*Нагадуємо:* ми зберегли наші залишки як `e` у нашому наборі даних, _тобто_,
+
+```{r, white recall, eval = F}
+# Модель
+est_model = lm(test_score ~ ratio + income, data = test_df)
+# Залишки
+test_df$e = residuals(est_model)
+```
+
+---
+
+## Тестування гетероскедастичності: [Уайт]{.hi}
+
+[**Тест Уайта** додає змынны в квадраті та взаємодії]{.pink} до початкової специфікації регресії (права сторона)
+
+$$
+\begin{align}
+ \color{#314f4f}{u_{i}^2} =& \color{#314f4f}{\alpha_{0} + \alpha_{1} \text{Ratio}_{i} + \alpha_{2} \text{Income}_{i} } \\
+ &+ \color{#e64173}{\alpha_{3} \text{Ratio}_{i}^2 + \alpha_{4} \text{Income}_{i}^2 + \alpha_{5} \text{Ratio}_{i}\times\text{Income}_{i}} \\
+ &+ \color{#314f4f}{w_{i}}
+\end{align}
+$$
+
+[**White test**]{.pink} перевіряє нульову гіпотезу
+<br>[H~0~:]{.pink} $\color{#e64173}{\alpha_1 = \alpha_2 = \alpha_3 = \alpha_4 = \alpha_5 = 0}$
+
+---
+
+## Тестування гетероскедастичності: [Уайт]{.hi}
+
+::: {.callout-note}
+`R` має нотацію квадратичних форм і взаємодій у `lm()`:
+
+- **Квадратні форми** використовують `I()`, _наприклад_, `lm(y ~ I(x^2))`
+
+- **Взаємодії** використовують `:` між змінними, _наприклад_, `lm(y ~ x1:x2)`
+
+*Приклад:* Регресія `y` до квадратичного від `x1` і `x2`:
+
+```{r, ex quad, eval = F}
+lm(y ~ x1 + x2 + I(x1^2) + I(x2^2) + x1:x2, data = pretend_df)
+```
+:::
+
+---
+
+## Тестування гетероскедастичності: [Уайт]{.hi}
+
+**Крок 1:** Регресія $e_i^2$ на 1^st^ ступені, 2^nd^ ступінь і взаємодії
+
+```{r, ex white1, eval = F}
+# Модель з квадратами і взаємодіями 
+white_model = lm(
+  I(e^2) ~ ratio + income + I(ratio^2) + I(income^2) + ratio:income,
+  data = test_df
+)
+# R-squared
+(white_r2 = summary(white_model)$r.squared)
+```
+
+---
+
+## Тестування гетероскедастичності: [Уайт]{.hi}
+
+**Крок 2:** Зберіть $R_e^2$ з регресії.
+
+```{r, ex white2, eval = T}
+# Модель з квадратами і взаємодіями 
+white_model = lm(
+  I(e^2) ~ ratio + income + I(ratio^2) + I(income^2) + ratio:income,
+  data = test_df
+)
+# R-squared
+(white_r2 = summary(white_model)$r.squared)
+```
+
+---
+
+## Тестування гетероскедастичності: [Уайт]{.hi}
+
+**Крок 3:** Обчисліть статистику тесту Уайта $\text{LM} = n \times R_e^2 \approx 420 \times `r round(white_r2, 3)`$
+
+```{r, ex white3, eval = T}
+# Модель з квадратами і взаємодіями 
+white_model = lm(
+  I(e^2) ~ ratio + income + I(ratio^2) + I(income^2) + ratio:income,
+  data = test_df
+)
+# R-squared
+white_r2 = summary(white_model)$r.squared
+# White test statistic
+(white_stat = 420 * white_r2)
+```
+
+---
+
+## Тестування гетероскедастичності: [Уайт]{.hi}
+
+**Крок 4:** Обчисліть *p*-значення (де $\text{LM} \overset{d}{\sim} \chi_k^2$); тут $k=5$
+
+```{r, ex white4, eval = T}
+# Модель з квадратами і взаємодіями 
+white_model = lm(
+  I(e^2) ~ ratio + income + I(ratio^2) + I(income^2) + ratio:income,
+  data = test_df
+)
+# R-squared
+white_r2 = summary(white_model)$r.squared
+# White test statistic
+white_stat = 420 * white_r2
+# p-value
+pchisq(q = white_stat, df = 5, lower.tail = F)
+```
+
+---
+
+## Тестування гетероскедастичності: [Уайт]{.hi}
+
+Тепер все разом:
+
+. . .
+
+H~0~: $\alpha_1 = \alpha_2 = \alpha_3 = \alpha_4 = \alpha_5 = 0$
+. . .
+ *vs.* H~A~: $\alpha_i \neq 0$ для $i \in \{1,\, 2,\,\ldots,\, 5\}$
+. . .
+$$
+\begin{align}
+u_i^2 =& \alpha_0 + \alpha_1 \text{Ratio}_i + \alpha_2 \text{Income}_i \\
+&+ \alpha_3 \text{Ratio}_i^2 + \alpha_4 \text{Income}_i^2 \\
+&+ \alpha_5 \text{Ratio}_i \times \text{Income}_i + w_i
+\end{align}
+$$
+
+. . .
+
+Наша статистика білого тесту: $\text{LM} = n \times R_e^2 \approx 420 \times `r round(white_r2, 3)` \approx `r round(white_stat, 2)`$
+
+. . .
+
+За розподілом $\chi_5^2$ цей $\widehat{\text{LM}}$ має *p*-значення менше 0,001.
+
+. . .
+
+∴ Ми [відхиляємо H~0~]{.hi} і робимо висновок про наявність [статистично значущих доказів гетероскедастичності]{.hi} (на 5-відсотковому рівні).
+
+---
+
+## Тестування гетероскедастичності: [Уайт]{.hi}
+
+Статистика тесту Уайта та її розподіл
+
+```{r, ex white plot, echo = F, dev = "svg", fig.height = 5}
+ggplot(data = tibble(x = c(0, white_stat * 1.1)), aes(x)) +
+  geom_area(
+    stat = "function", fun = dchisq, args = list(df = 5),
+    fill = "darkslategrey", alpha = 0.05
+  ) +
+  geom_area(
+    stat = "function", fun = dchisq, args = list(df = 5),
+    fill = red_pink, alpha = 0.85,
+    xlim = c(white_stat, white_stat * 1.1)
+  ) +
+  stat_function(
+    fun = dchisq, args = list(df = 5), n = 1e3,
+    color = "darkslategrey"
+  ) +
+  geom_vline(xintercept = white_stat, color = grey_dark, size = 0.5, linetype = "dotted") +
+  annotate(
+    "text", x = white_stat, y = 0.01,
+    label = TeX("$\\widehat{LM}=30.8$"),
+    family = "MathJax_Main", size = 7,
+    hjust = 0.5
+  ) +
+  labs(x = "x", y = "f") +
+  theme_axes_math
+```
+
+# Тест Бройша — Пагана
+
+## Тест Бройша — Пагана
+
+Бройша і Паган (1981) намагалися вирішити цю проблему занадто конкретної функціональної форми гетероскедастичності.
+
+- Дозволяє даним показати, чи/як дисперсія $u_i$ корелює з $X$.
+
+- Якщо $\sigma_i^2$ корелює з $X$, то ми маємо гетероскедастичність.
+
+- БудуЄ регресію $e_i^2$ від $X = \left[ 1,\, x_1,\, x_2,\, \ldots,\, x_k \right]$ і перевіряє спільну значущість.
+
+---
+
+## Алгоритм тесту Бройша — Пагана
+
+1\. Регресія y до intercept, x~1~, x~2~, …, x~k~.
+
+2\. Запис залишків e.
+
+3\. Регресія e^2^ до intercept, x~1~, x~2~, …, x~k~.
+
+$$ e_i^2 = \alpha_0 + \alpha_1 x_{1i} + \alpha_2 x_{2i} + \cdots + \alpha_k x_{ki} + v_i $$
+
+4\. Запис R^2^.
+
+5\. Тест гіпотези H~0~: $\alpha_1 = \alpha_2 = \cdots = \alpha_k = 0$
+
+---
+
+## Статистика тесту Бройша — Пагана
+
+Статистика тесту B-P
+
+$$ \text{LM} = n \times R^2_{e} $$
+
+де $R^2_e$ — $R^2$ з регресії
+
+$$ e_i^2 = \alpha_0 + \alpha_1 x_{1i} + \alpha_2 x_{2i} + \cdots + \alpha_k x_{ki} + v_i $$
+
+$\text{LM}$ асимптотично розподіляється як $\chi^2_k$.
+
+. . .
+
+Ця тестова статистика перевіряє H~0~: $\alpha_1 = \alpha_2 = \cdots = \alpha_k = 0$.
+
+Відхилення нульової гіпотези означає доказ гетероскедастичності.
+
+---
+
+## Тест Бройша — Пагана
+
+**Проблема:** ми все ще припускаємо досить обмежену [функціональну форму]{.hi} між нашими пояснювальними змінними $X$ і дисперсіями наших збурень $\sigma^2_i$.
+
+. . .
+
+**Результат:** B-P *може* все ще пропускати досить прості форми гетероскедастичності.
+
+---
+
+## Тест Бройша — Пагана
+
+Тест Брейша-Пейгана все ще [чутливий до функціональної форми]{.hi}.
+
+```{r, bp1, echo = F, dev = "svg", fig.height = 3.75}
+set.seed(12345)
+# Data
+bp_df = tibble(
+  x = runif(1e3, -3, 3),
+  e = rnorm(1e3, 0, sd = 2 + x^2),
+  y = 1 + 3 * x + e
+)
+# Regressions
+lm_bp1 = lm(residuals(lm(y ~ x, bp_df))^2 ~ 1 + bp_df$x) %>%
+  summary() %$% r.squared %>% multiply_by(1e3)
+lm_bp2 = lm(residuals(lm(y ~ x, bp_df))^2 ~ 1 + bp_df$x + I(bp_df$x^2)) %>%
+  summary() %$% r.squared %>% multiply_by(1e3)
+# The figure
+ggplot(data = bp_df, aes(x = x, y = e)) +
+geom_point(size = 2.75, color = "darkslategrey", alpha = 0.5) +
+labs(x = "x", y = "u") +
+theme_axes_math
+```
+
+$$
+\begin{aligned}
+  e_i^2 &= \hat{\alpha}_0 + \hat{\alpha}_1 x_{1i} & \widehat{\text{LM}} &= `r round(lm_bp1, 2)` &\mathit{p}\text{-value} \approx `r round(pchisq(lm_bp1, 1, lower.tail = F), 3)` \\
+  e_i^2 &= \hat{\alpha}_0 + \hat{\alpha}_1 x_{1i} \color{#e64173}{+ \hat{\alpha}_2 x^2_{1i}} & \widehat{\text{LM}} &= `r round(lm_bp2, 2)` &\mathit{p}\text{-value} < 0.001
+\end{aligned}
+$$
+
+---
+
+## Приклад тесту Бройша — Пагана
+
+Давайте перевіримо ту ж модель з B-P.
+
+*Нагадуємо:* ми зберегли наші залишки як `e` у нашому наборі даних, _тобто_,
+
+```{r, bp recall, eval = F}
+test_df$e = residuals(est_model)
+```
+
+---
+
+## Приклад тесту Бройша — Пагана
+
+У B-P ми спочатку будуємо модель $e_i^2$ від пояснювальних змінних,
+
+```{r, ex bp1}
+# модель квадрату залишків
+bp_model = lm(I(e^2) ~ ratio + income, data = test_df)
+```
+
+---
+
+## Приклад тесту Бройша — Пагана
+
+У B-P ми спочатку будуємо модель $e_i^2$ від пояснювальних змінних,
+
+```{r, ex bp2}
+# модель квадрату залишків
+bp_model = lm(I(e^2) ~ ratio + income, data = test_df)
+# R-квадрат
+bp_r2 = summary(bp_model)$r.squared
+bp_r2
+```
+
+---
+
+## Приклад тесту Бройша — Пагана
+
+Статистика тесту Бройша-Пагана є
+
+$\text{LM} = n \times R^2_e$
+
+$\approx 420 \times `r bp_r2 %>% round(7) %>% format(nsmall = 7, scientific = F)`$
+
+$\approx `r round(nrow(test_df) * bp_r2, 4)`$
+
+який ми перевіряємо на розподілі $\chi_k^2$ (тут: $k=2$)
+
+. . .
+
+```{r, ex bp3}
+# B-P test
+bp_stat = 420 * bp_r2
+# p-value
+pchisq(q = bp_stat, df = 2, lower.tail = F)
+```
+
+---
+
+## Приклад тесту Бройша — Пагана
+
+H~0~: $\alpha_1 = \alpha_2 = 0$ *порівняно з* H~A~: $\alpha_1 \neq 0$ та/або $\alpha_2 \neq 0$
+
+для моделі $u_i^2 = \alpha_0 + \alpha_1 \text{Ratio}_i + \alpha_2 \text{Income}_i + w_i$
+
+. . .
+
+Статистика тесту: $\widehat{\text{LM}} \approx `r round(bp_stat, 3)`$
+
+. . .
+
+*p*-value $\approx `r pchisq(q = bp_stat, df = 2, lower.tail = F) %>% round(3)`$
+
+. . .
+
+∴ Не вдалося відхилити H~0~ (*p*-value більше 0,05)
+
+. . .
+
+**Висновок:** Ми не знаходимо статистично значущих доказів гетероскедастичності (Ми не знаходимо доказів *лінійного* зв’язку між $u_i^2$ і пояснювальними змінними.)
+
+---
+
+## Приклад тесту Бройша — Пагана
+
+```{r, ex bp plot, echo = F, dev = "svg", fig.height = 5}
+ggplot(data = tibble(x = c(0, 7)), aes(x)) +
+  geom_area(
+    stat = "function", fun = dchisq, args = list(df = 2),
+    fill = "darkslategrey", alpha = 0.05
+  ) +
+  geom_area(
+    stat = "function", fun = dchisq, args = list(df = 2),
+    fill = red_pink, alpha = 0.85,
+    xlim = c(bp_stat, 7)
+  ) +
+  stat_function(
+    fun = dchisq, args = list(df = 2), n = 1e3,
+    color = "darkslategrey"
+  ) +
+  geom_vline(xintercept = bp_stat, color = grey_dark, size = 0.5, linetype = "dotted") +
+  annotate(
+    "text", x = bp_stat, y = 5 * dchisq(bp_stat, df = 2),
+    label = TeX("$\\widehat{LM}=0.014$"),
+    family = "MathJax_Main", size = 7,
+    hjust = 0
+  ) +
+  labs(x = "x", y = "f") +
+  theme_axes_math
+```
+
+# Дякую за увагу! {background-color="#eef3f8"}
+
+<br>
+<br>
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
+
+{{< iconify mdi github >}} [aranaur](https://github.com/Aranaur)
+
+{{< iconify mdi envelope >}} <ihor.miroshnychenko@knu.ua>
+
+{{< iconify mdi linkedin >}} [ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
