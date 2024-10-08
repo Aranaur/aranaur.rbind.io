@@ -1,0 +1,1128 @@
+---
+title: "Статистичний критерій"
+subtitle: "Прикладний статистичний аналіз"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка, ФІТ
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .01_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: <a href="https://aranaur.rbind.io/lectures/asa/">🔗Прикладний статистичний аналіз</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    # center: true
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    # controls-layout: bottom-right
+    chalkboard: true
+    logo: fit.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    # fig-width: 9
+    # fig-height: 5
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+  # gfm:
+  #   mermaid-format: png
+preload-iframes: true
+jupyter: python3
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Import libraries
+from scipy.stats import (
+    binom
+)
+import numpy as numpy
+from seaborn import distplot
+from matplotlib import pyplot
+import seaborn
+import random
+
+import sys
+
+# Import libraries
+# import numpy as numpy
+import pandas as pd
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+
+from IPython.display import Markdown
+from tabulate import tabulate
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Про мене {.unnumbered .unlisted .tiny}
+
+::: columns
+::: {.column width="40%"}
+![](img/miv.png){width="60%"}
+:::
+
+::: {.column width="40%"}
+-   Мірошниченко Ігор Вікторович
+-   кандидат економічних наук, доцент
+-   доцент кафедри технологій управління, ФІТ, КНУ імені Тараса Шевченка
+-   доцент кафедри математичного моделювання та статистики, ІІТЕ, КНЕУ
+-   викладач Київської школи економіки
+-   викладач Міжнародного інституту бізнесу (MBA)
+:::
+:::
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
+
+# DataCamp Group {.unnumbered .unlisted}
+
+![](img/datacamp-logo.png)
+
+## DataCamp Group {.unlisted}
+
+::: columns
+::: column
+![](img/datacamp-1.png)
+:::
+
+::: column
+![](img/datacamp-2.png)
+:::
+:::
+
+---
+
+## DataCamp Group {.unlisted .smaller}
+
+::: columns
+::: {.column width="60%"}
+![](img/datacamp-cert.png)
+:::
+
+::: {.column width="40%"}
+**Як долучитися?**
+
+1.  Зареєструйтесь на [DataCamp](http://datacamp.com)
+2.  Приєднатися до телеграм-каналу {{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof/53)
+3.  Приєднайтесь до класу за [посиланням](https://www.datacamp.com/groups/shared_links/bf4d3ee6fd2b417c0501831087a6f1a3f149532beb4dae7d8cf5f228cc78da8e)
+:::
+:::
+
+. . .
+
+::: callout-note
+Клас буде активний **до 11 жовтня 2024 року**, після чого буде буде відкрито наступний потік. Слідкуйте за оновленнями.
+:::
+
+# Статистичний критерій {background-iframe=".01_files/libs/colored-particles/index.html"}
+
+## Startup ідея
+
+{{< iconify emojione department-store >}} Доставляємо товар з магазинів до дому
+
+{{< iconify mdi courier-check >}} Вартість доставки --- 100₴
+
+{{< iconify mdi courier-fast >}} Вартість роботи кур'єра --- 50₴
+
+. . .
+
+\
+
+Але користувачі можуть відмовитися від замовлення.
+
+. . .
+
+\
+
+Інвестори готові допомогти, якщо шанс відмови **< 50%**.
+
+Що робити?
+
+. . .
+
+<center>[Провести експеримент!]{.hi}</center>
+
+## Проводимо експеримент
+
+- Знайшли 30 клієнтів
+- 19 оплатили замовлення
+
+. . .
+
+\
+
+<center>**Але чи достатньо цього, щоб довести успішність нашого бізнесу?**</center>
+
+## Модель та спостереження
+
+Ми не можемо протестувати продукт на всіх, але можемо зібрати вибірку з генеральної сукупності та поспостерігати частку успіхів.
+
+. . .
+
+1. Аудиторія, яка скористається нашим сервісом --- **генеральна сукупність**, $\xi \sim \text{Bernoulli}(\mu)$.
+2. Частка успішних операцій --- $\mu$.
+3. Вибірка з генеральної сукупності --- $\xi_1, \xi_2, \ldots, \xi_{30}$.
+
+## Постановка задачі {.tiny}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+1. Визначаємо гіпотези:
+    - $H_0: \mu = 50%$
+    - $H_1: \mu > 50%$
+
+2. Визначаємо статистику критерію:
+
+$Q = \xi_1 + \xi_2 + \ldots + \xi_{30} \underset{H_0}{\sim} \text{Binomial}(30, 0.5)$
+
+3. Визначаємо критерій:
+
+:::{.border}
+  - якщо $Q \geq 21$: [відхиляємо $H_0$]{.green}
+  - інакше: [не відхиляємо $H_0$]{.red}
+:::
+
+:::
+
+::: {.column width="50%" .fragment fragment-index=2}
+Але чому саме 21?
+
+```{python}
+#| label: pmf-q-plot
+#| echo: false
+
+binom_h0 = binom(
+    n=30, # кількість випробувань
+    p=0.5 # ймовірність успіху
+)
+
+# координата
+x_grid = numpy.arange(1, 31)
+# висота стовпців на графіку
+probs = binom_h0.pmf(x_grid)
+
+pyplot.figure(figsize=(16, 8))
+
+# будуємо вертикальні стовпці від 0 до ймовірності
+pyplot.vlines(x_grid, 0, probs, linewidth=15.0, color=turquoise, label='PMF, $Binom(30, 0.5)$')
+# окремо зобразимо критичну область критерію
+crit_reg = x_grid >= 21
+pyplot.vlines(x_grid[crit_reg], 0, probs[crit_reg], linewidth=15.0, label='Critical region for S')
+# додамо відсоток до кожного стовпця
+for i in range(19, 24, 1):
+    pyplot.text(x_grid[i], probs[i], f'{probs[i] * 100:.1f}%', fontsize=12, ha='center', va='bottom')
+pyplot.title('Біноміальний розподіл', fontsize=20)
+pyplot.xlabel('Кількість успіхів', fontsize=18)
+pyplot.ylabel('PMF Q \n $H_0$', fontsize=18, rotation=0, labelpad=30)
+pyplot.legend(fontsize=18)
+pyplot.show()
+```
+
+4. Визначаємо статистичну значущість:
+- $\alpha$ --- статистична значущість критерію, 5%.
+- **FPR** (False Positive Rate, частота хибнопозитивних спрацьовувань) --- ймовірність відхилення $H_0$ при її дійсності.
+
+$FPR \leq \alpha$
+:::
+
+::::
+
+. . .
+
+$$FPR = 1.3\% + 0.5\% + 0.2\% + 0.1\% \approx 2.1\% < 5\%$$
+
+## 21 vs. 20 {.smaller}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+```{python}
+#| label: pmf-q-plot-21
+#| echo: false
+
+pyplot.figure(figsize=(16, 8))
+pyplot.vlines(x_grid, 0, probs, linewidth=15.0, color=turquoise, label='PMF, $Binom(30, 0.5)$')
+crit_reg = x_grid >= 21
+pyplot.vlines(x_grid[crit_reg], 0, probs[crit_reg], linewidth=15.0, label='Critical region for S')
+for i in range(19, 24, 1):
+    pyplot.text(x_grid[i], probs[i], f'{probs[i] * 100:.1f}%', fontsize=12, ha='center', va='bottom')
+pyplot.title('Біноміальний розподіл, $Q \geq 21$', fontsize=20)
+pyplot.xlabel('Кількість успіхів', fontsize=18)
+pyplot.ylabel('PMF Q \n $H_0$', fontsize=18, rotation=0, labelpad=30)
+pyplot.legend(fontsize=18)
+pyplot.show()
+```
+
+
+:::
+
+::: {.column width="50%"}
+```{python}
+#| label: pmf-q-plot-20
+#| echo: false
+
+pyplot.figure(figsize=(16, 8))
+pyplot.vlines(x_grid, 0, probs, linewidth=15.0, color=turquoise, label='PMF, $Binom(30, 0.5)$')
+crit_reg = x_grid >= 20
+pyplot.vlines(x_grid[crit_reg], 0, probs[crit_reg], linewidth=15.0, label='Critical region for S')
+for i in range(19, 24, 1):
+    pyplot.text(x_grid[i], probs[i], f'{probs[i] * 100:.1f}%', fontsize=12, ha='center', va='bottom')
+pyplot.title('Біноміальний розподіл, $Q \geq 20$', fontsize=20)
+pyplot.xlabel('Кількість успіхів', fontsize=18)
+pyplot.ylabel('PMF Q \n $H_0$', fontsize=18, rotation=0, labelpad=30)
+pyplot.legend(fontsize=18)
+pyplot.show()
+```
+
+:::
+
+::::
+
+$FPR_{21} = 1.3\% + 0.5\% + 0.2\% + 0.1\% \approx 2.1\% < 5\%$
+
+$FPR_{20} = 2.8\% + 1.3\% + 0.5\% + 0.2\% + 0.1\% \approx 4.9\% < 5\%$
+
+. . .
+
+::: {.callout-tip icon="false"}
+## Рішення
+
+  - якщо $Q \geq 20$: [відхиляємо $H_0$]{.green}
+  - інакше: [не відхиляємо $H_0$]{.red}
+:::
+
+## То яке рішення?
+
+{{< iconify emojione department-store >}} Доставляємо товар з магазинів до дому
+
+{{< iconify mdi courier-check >}} Вартість доставки --- 100₴
+
+{{< iconify mdi courier-fast >}} Вартість роботи кур'єра --- 50₴
+
+. . .
+
+- Знайшли 30 клієнтів
+- 19 оплатили замовлення
+
+. . .
+
+\
+
+<center>[В нас не має достатньо доказів, щоб відхиляємо $H_0$.]{.hi}</center>
+
+# Статистичний критерій та Python {background-iframe=".01_files/libs/colored-particles/index.html"}
+
+## Біноміальний розподіл
+
+1. Статистика $Q$ має біноміальний розподіл: $Q \sim \text{Binomial}(30, 0.5)$.
+
+```{python}
+#| label: binom-pmf
+
+from scipy.stats import binom
+
+binom_h0 = binom(
+    n=30, # кількість випробувань
+    p=0.5 # ймовірність успіху
+)
+```
+
+2. Функція ймовірності дискретного розподілу $p_{\xi}(x)$ --- ймовірність того, що випадкова величина $\xi$ прийме значення $x$.
+
+:::: {.columns}
+
+::: {.column width="25%"}
+```{python}
+#| label: pmf-q-10
+
+binom_h0.pmf(10)
+```
+:::
+
+::: {.column width="25%"}
+```{python}
+#| label: pmf-q-15
+
+binom_h0.pmf(15)
+```
+:::
+
+::: {.column width="25%"}
+```{python}
+#| label: pmf-q-14
+
+binom_h0.pmf(14)
+```
+:::
+
+::: {.column width="25%"}
+```{python}
+#| label: pmf-q-16
+
+binom_h0.pmf(16)
+```
+:::
+
+::::
+
+---
+
+```{python}
+#| label: pmf-q-plot-python
+#| output-location: slide
+
+import numpy as numpy
+
+# координата
+x_grid = numpy.arange(1, 31)
+# висота стовпців на графіку
+probs = binom_h0.pmf(x_grid)
+
+pyplot.figure(figsize=(16, 8))
+
+# будуємо вертикальні стовпці від 0 до ймовірності
+pyplot.vlines(x_grid, 0, probs, linewidth=15.0, color='lightblue', label='PMF, $Binom(0.5, 30)$')
+# окремо зобразимо критичну область критерію
+crit_reg = x_grid >= 20
+pyplot.vlines(x_grid[crit_reg], 0, probs[crit_reg], linewidth=15.0, label='Critical region for S')
+
+pyplot.title('Біноміальний розподіл', fontsize=20)
+pyplot.legend(fontsize=18)
+pyplot.show()
+```
+
+## Ймовірність критичної області
+
+Рахуємо суму ймовірностей успіхів в критичній області.
+
+```{python}
+#| label: pmf-q-20
+
+numpy.sum(probs[crit_reg])
+```
+
+\
+
+А якщо $Q \geq 19$?
+
+```{python}
+#| label: pmf-q-19
+
+crit_reg = x_grid >= 19
+numpy.sum(probs[crit_reg])
+```
+
+\
+
+Тоді ймовірність помилки вже навіть більша 10%, що зовсім нам не підходить.
+
+## Кумулятивна функція розподілу
+
+Кумулятивна функція розподілу $F_{\xi}(x) = P(\xi \leq x)$ --- ймовірність того, що випадкова величина $\xi$ прийме значення не більше $x$.
+
+У Python це функція `cdf` (cumulative distribution function)
+
+```{python}
+#| label: cdf-q-19
+
+binom_h0.cdf(19)
+```
+
+\
+
+Ймовірність отримати 19 або менше успіхів у нашому завданні $\geq 95$. А оскільки $P(\xi \leq 19) + P(\xi \geq 21) = 1$, можемо обчислити рівень значущості нашого критерію.
+
+```{python}
+#| label: cdf-q-one
+
+1 - binom_h0.cdf(19)
+```
+
+## Квантиль {.smaller}
+
+Щоб вибрати критичну область для критерію, ми хотіли б знайти точку, площа стовпців праворуч від якої була б $5\%$. Тобто площа стовпців ліворуч --- $95\%$. Така точка називається *квантилем*.
+$$u_p(\xi) = \{x | F_{\xi}(x) = p\}$$
+
+Але при $p = 0.95$ і нашому біноміальному розподілі, такої точки немає. Ми з'ясували, що є точка, праворуч від якої площа $0.494$, а в наступної вже $0.1$. Щоб визначити квантиль у цьому випадку, модифікуємо визначення:
+
+\
+
+Квантиль $u_p(\xi) = \{x | F_{\xi}(x) \geq p\}$ --- величина, яку $\xi$ не перевищує з імовірністю хоча б $p$.
+
+## Квантиль: приклад {.smaller}
+
+Для величини $\xi \sim Bin(30, 0.5)$ порахуємо $0.95$-квантиль. Розв'яжемо завдання просто підбором.
+
+:::: {.columns}
+
+::: {.column width="50%"}
+$$P(\xi \leq 18) \approx 0.9$$
+
+$$P(\xi \leq 19) \approx 0.951$$
+
+$$P(\xi \leq 20) \approx 0.97$$
+:::
+
+::: {.column width="50%"}
+
+```{python}
+#| label: quantile-q-95-18
+
+binom_h0.cdf(18)
+```
+
+\
+
+```{python}
+#| label: quantile-q-95-19
+
+binom_h0.cdf(19)
+```
+
+\
+
+```{python}
+#| label: quantile-q-95-20
+
+binom_h0.cdf(20)
+```
+:::
+
+::::
+
+\
+
+У Python квантиль можна порахувати через функцію `ppf` (*percent point function*)
+
+```{python}
+#| label: quantile-q-95
+
+binom_h0.ppf(0.95)
+```
+
+## Власна функція критерію {.smaller}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+Як тепер підібрати $C$ для будь-яких $n, \mu$ та будь-якого рівня значущості $\alpha$?
+
+1. Потрібно знайти $C$, таке що $P(Q \geq C) \leq \alpha$.
+2. Тобто потрібно $P(Q < C) \geq 1 - \alpha$
+3. $Q$ приймає тільки цілі значення: $P(Q \leq C - 1) \geq 1 - \alpha$, або $P(Q \leq C) \geq 1 - \alpha$. 
+4. Отже, з визначення квантилі, $C - 1 = u_{1 - \alpha}$
+5. Значить $C = u_{1 - \alpha} + 1$ 
+:::
+
+::: {.column width="50%" .fragment}
+
+```{python}
+#| label: custom-crit
+
+def make_binom_criterion(n, mu=0.5, alpha=0.05):
+    '''Будує критерій для задачі з доставкою
+    
+    Параметри:
+        n: кількість доставок в експерименті
+        mu: ймовірність успіху в нульовій гіпотезі
+        alpha: рівень значущості критерію
+        
+    Повертає:
+        C для критерію S = {Q >= C}
+    '''
+    binom_h0 = binom(n=n, p=mu)
+    q = binom_h0.ppf(1 - alpha)
+    return q + 1
+```
+:::
+
+::::
+
+## Власна функція критерію: приклад
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{python}
+#| label: custom-crit-eval
+#| eval: false
+
+def make_binom_criterion(n, mu=0.5, alpha=0.05):
+    '''Будує критерій для задачі з доставкою
+    
+    Параметри:
+        n: кількість доставок в експерименті
+        mu: ймовірність успіху в нульовій гіпотезі
+        alpha: рівень значущості критерію
+        
+    Повертає:
+        C для критерію S = {Q >= C}
+    '''
+    binom_h0 = binom(n=n, p=mu)
+    q = binom_h0.ppf(1 - alpha)
+    return q + 1
+```
+:::
+
+::: {.column width="50%"}
+
+```{python}
+#| label: custom-crit-func
+
+print(r'Якщо Q >=', make_binom_criterion(
+    n=30,
+    mu=0.5,
+    alpha=0.05
+), 'тоді відхиляємо H0')
+```
+:::
+
+::::
+
+\
+
+Критичне значення $C = 20$, тоді критерій виглядає так:
+
+$$S = \{Q \geq 20\}$$
+
+## Додатковий приклад
+
+- Кількість доставок --- 50
+- Достатня ймовірність успіху --- 0.1, тобто якщо робота кур'єра коштує 100₴, то вартість доставки --- 1000₴
+
+```{python}
+#| label: binom-50
+
+binom_h0 = binom(
+    n=50, # кількість випробувань
+    p=0.1 # ймовірність успіху
+)
+
+numpy.random.seed(2024)
+
+for _ in range(3):
+    print(binom_h0.rvs(1))
+```
+
+---
+
+
+
+```{python}
+#| label: binom-50-plot
+#| echo: false
+
+# координата
+x_grid = numpy.arange(1, 31)
+probs = binom_h0.pmf(x_grid)
+pyplot.figure(figsize=(16, 8))
+pyplot.vlines(x_grid, 0, probs, linewidth=15.0, color='lightblue', label='PMF, $Binom(0.1, 50)$')
+pyplot.title('Біноміальний розподіл', fontsize=20)
+pyplot.legend(fontsize=18)
+pyplot.show()
+```
+
+---
+
+::: {.tiny}
+
+```{python}
+#| label: custom-crit-func-50
+
+print(r'Якщо Q >=', make_binom_criterion(
+    n=50,
+    mu=0.1,
+    alpha=0.05
+), 'тоді відхиляємо H0')
+```
+
+
+```{python}
+#| label: custom-crit-func-50-plot
+#| echo: false
+#| fig-align: center
+
+# координата
+x_grid = numpy.arange(1, 31)
+# висота стовпців на графіку
+probs = binom_h0.pmf(x_grid)
+
+pyplot.figure(figsize=(10, 6))
+
+# будуємо вертикальні стовпці від 0 до ймовірності
+pyplot.vlines(x_grid, 0, probs, linewidth=15.0, color=turquoise, label='PMF, $Binom(50, 0.1)$')
+# окремо зобразимо критичну область критерію
+crit_reg = x_grid >= 10
+pyplot.vlines(x_grid[crit_reg], 0, probs[crit_reg], linewidth=15.0, label='Critical region for S')
+# додамо відсоток до кожного стовпця
+for i in range(8, 13, 1):
+    pyplot.text(x_grid[i], probs[i], f'{probs[i] * 100:.1f}%', fontsize=12, ha='center', va='bottom')
+pyplot.title('Біноміальний розподіл', fontsize=20)
+pyplot.xlabel('Кількість успіхів', fontsize=18)
+pyplot.ylabel('PMF Q \n $H_0$', fontsize=18, rotation=0, labelpad=30)
+pyplot.legend(fontsize=18)
+pyplot.show()
+```
+
+
+```{python}
+#| label: custom-crit-func-50-FPR
+
+numpy.sum(probs[crit_reg])
+```
+
+:::
+
+# $p$-значення {background-iframe=".01_files/libs/colored-particles/index.html"}
+
+## $p$-значення {.smaller}
+
+$p$-значення (*$p$-value*) --- ймовірність отримати результат, який більш екстремальний, ніж наші спостереження, при умові, що нульова гіпотеза $H_0$ справджується.
+
+
+:::: {.columns}
+
+::: {.column width="40%"}
+```{mermaid}
+%%| echo: false
+%%| label: mermaid-binom
+
+graph TD
+    A["n = 30 \n H0: μ = 0.5 \n H1: μ > 0.5 \n α = 0.05"] --> B["Якщо Q >= 20: \n відхиляємо H0"]
+
+```
+:::
+
+::: {.column width="60%" .fragment}
+
+```{python}
+#| label: p-value-new
+#| echo: false
+
+binom_h0 = binom(
+    n=30, # кількість випробувань
+    p=0.5 # ймовірність успіху
+)
+
+# координата
+x_grid = numpy.arange(1, 31)
+# висота стовпців на графіку
+probs = binom_h0.pmf(x_grid)
+
+pyplot.figure(figsize=(16, 8))
+
+# будуємо вертикальні стовпці від 0 до ймовірності
+pyplot.vlines(x_grid, 0, probs, linewidth=15.0, color=turquoise, label='PMF, $Binom(30, 0.5)$')
+# окремо зобразимо критичну область критерію
+crit_reg = x_grid >= 20
+pyplot.vlines(x_grid[17], 0, probs[17], linewidth=15.0, label='Нове значення $Q = 17$')
+pyplot.vlines(x_grid[crit_reg], 0, probs[crit_reg], linewidth=15.0, label='Critical region for S', colors=red)
+pyplot.title('Біноміальний розподіл', fontsize=20)
+pyplot.xlabel('Кількість успіхів', fontsize=18)
+pyplot.ylabel('PMF Q \n $H_0$', fontsize=18, rotation=0, labelpad=30)
+pyplot.legend(fontsize=18)
+pyplot.show()
+```
+
+:::
+
+::::
+
+. . .
+
+
+- $p > \alpha \equiv$ $q$ поза критичною областю $\equiv$ не відхиляємо $H_0$.
+- $p \leq \alpha \equiv$ $q$ в критичній області $\equiv$ відхиляємо $H_0$.
+
+---
+
+
+
+::: {.callout-important icon="false"}
+## Статистичний критерій для всіх!
+<center>Якщо $p$-значення $\leq \alpha$: відхиляємо $H_0$.<br><br> Інакше: не відхиляємо $H_0$.</center>
+:::
+
+---
+
+```{python}
+#| label: p-value-calc
+#| echo: false
+
+C = 20 # критичне значення
+qs = [10, 19, 20, 23] # різні реалізації статистики
+
+fig, axes = pyplot.subplots(2, 2, figsize=(16, 8))
+
+for q, ax in zip(qs, axes.flatten()):
+    ax.set_title(f'$q = {q}$' + ('[наш експеримент]' if q == 19 else ''))
+    # будуємо вертикальні стовпці від 0 до ймовірності
+    ax.vlines(x_grid, 0, probs, linewidth=8.0, color=turquoise, label='PMF, $Binom(0.5, 30)$')
+    # окремо зобразимо критичну область критерію
+    crit_reg = x_grid >= 20
+    ax.vlines(x_grid[crit_reg], 0, probs[crit_reg], linewidth=8.0, label='Critical region for S')
+
+    # порахуємо площу більш екстремальних значень
+    pvalue = 1 - binom_h0.cdf(q - 1)
+    # зобразимо такі ж і більш екстремальні значення на графіку
+    more_extremal = x_grid >= q
+    ax.vlines(
+        x_grid[more_extremal], 0, probs[more_extremal], linewidth=3.0, color='red',
+        label='q або більш екстремальне значення pvalue: {:.3f}'.format(pvalue)
+    )
+    ax.text(x_grid[q-1], probs[q-1], f'{q}', fontsize=12, ha='center', va='bottom')
+    ax.legend()
+
+pyplot.suptitle('P-значення для різних q', fontsize=20)
+pyplot.show()
+```
+
+## $p$-значення в Python {.smaller}
+
+```{python}
+#| label: deff-p-value
+
+def pvalue_binom(n, mu, q):
+    '''Обчислює p-значення для біноміального розподілу (доставка)
+    
+    Параметри:
+        n: кількість випробувань
+        mu: ймовірність успіху в нульовій гіпотезі
+        q: кількість успіхів
+            
+    Повертає:
+        p-значення
+    '''
+    binom_h0 = binom(n=n, p=mu)
+    return 1 - binom_h0.cdf(q - 1)
+```
+
+\
+
+```{python}
+#| label: p-value-calc-2
+
+print(f'p-значення = {pvalue_binom(30, 0.5, 19):.3f} {"<= 0.05" if pvalue_binom(30, 0.5, 19) <= 0.05 else ">= 0.05"}')
+```
+
+\
+
+```{python}
+#| label: p-value-calc-3
+
+print(f'p-значення = {pvalue_binom(50, 0.1, 11):.3f} {"<= 0.05" if pvalue_binom(50, 0.1, 11) <= 0.05 else ">= 0.05"}')
+```
+
+# Двосторонній критерій {background-iframe=".01_files/libs/colored-particles/index.html"}
+
+## Двосторонній критерій
+
+:::: {.columns}
+
+::: {.column width="60%"}
+Чи впливає колір авто на дотримання ПДР?
+:::
+
+::: {.column width="40%"}
+- $Q = \xi_1 + \xi_2 + \ldots + \xi_{n}$
+- $H_0: \mu = 0.5$
+- [$H_1: \mu \neq 0.5$]{.hi}
+- $\alpha = 0.05$
+:::
+
+::::
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{python}
+#| label: binom-two-sided
+#| echo: false
+#| fig-align: center
+
+C = 6
+
+pyplot.figure(figsize=(16, 8))
+
+# строим вертикальные столбцы от 0 до вероятности
+pyplot.vlines(x_grid, 0, probs, linewidth=15.0, color='turquoise', label='PMF, $Binom(0.5, 30)$')
+# отдельно изобразим критическую области критерия
+crit_reg = numpy.abs(x_grid - 15) >= C
+pyplot.vlines(x_grid[crit_reg], 0, probs[crit_reg], linewidth=15.0, label='Critical region for S')
+
+rejection_prob = probs[crit_reg].sum()
+pyplot.text(x_grid[20], probs[20], f'21', fontsize=12, ha='center', va='bottom')
+pyplot.text(x_grid[8], probs[8], f'9', fontsize=12, ha='center', va='bottom')
+# pyplot.title('Two-sided criteria, C = {}, critical region proba = {:.3f}'.format(C, rejection_prob), fontsize=20)
+pyplot.legend(fontsize=18)
+pyplot.show()
+```
+:::
+
+::: {.column width="50%"}
+Якщо $q \geq 21$ або $q \leq 9$, то відхиляємо $H_0$.
+:::
+
+::::
+
+<!-- ## Критична область {.smaller}
+
+```{python}
+#| label: binom-two-sided-2
+#| echo: false
+#| fig-align: center
+
+C = 6
+
+pyplot.figure(figsize=(16, 8))
+
+# строим вертикальные столбцы от 0 до вероятности
+pyplot.vlines(x_grid, 0, probs, linewidth=15.0, color='turquoise', label='PMF, $Binom(0.5, 30)$')
+# отдельно изобразим критическую области критерия
+crit_reg = numpy.abs(x_grid - 15) >= C
+pyplot.vlines(x_grid[crit_reg], 0, probs[crit_reg], linewidth=15.0, label='Critical region for S')
+
+rejection_prob = probs[crit_reg].sum()
+pyplot.text(x_grid[20], probs[20], f'21', fontsize=12, ha='center', va='bottom')
+pyplot.text(x_grid[8], probs[8], f'9', fontsize=12, ha='center', va='bottom')
+# pyplot.title('Two-sided criteria, C = {}, critical region proba = {:.3f}'.format(C, rejection_prob), fontsize=20)
+pyplot.legend(fontsize=18)
+pyplot.show()
+```
+
+З картинки видно, що якщо тепер відкидати відхилення при $q \geq 21$, тоді треба відхиляти і при $q \leq 9$, а отже загальна площа стовпців буде вже приблизно $0.1$. -->
+
+## $p$-значення для двостороннього критерію {.smaller}
+
+Критерій має вигляд $$S = \{|Q(\xi) - 15|\ \geq C\}$$
+
+```{python}
+#| label: p-value-two-sided-def
+
+def pvalue_two_sided_sum(n, q):
+    '''Обчислює pvalue для задачі з доставкою для mu = 0.5 і двосторонньої альтернативи
+    
+    Параметри:
+        n: кількість доставок в експерименті
+        q: кількість успішних доставок
+        
+    Повертає:
+        pvalue для критерію S = {|Q - 15| >= C}
+    '''
+    binom_h0 = binom(n=n, p=0.5)
+    diff = numpy.abs(q - 15)
+    # дивимося більш екстремальні відхилення з правого боку
+    right_sq = 1 - binom_h0.cdf(15 + diff - 1)
+    # дивимося більш екстремальні відхилення з лівого боку
+    left_sq = binom_h0.cdf(15 - diff)
+    return left_sq + right_sq # або просто 2 * right_sq для симетричного розподілу
+```
+
+\
+
+```{python}
+#| label: p-value-two-sided-calc
+
+pvalue_two_sided_sum(30, 21)
+```
+
+## Несиметричний розподіл {.smaller}
+
+```{python}
+#| label: binom-asym
+
+binom_h0_nonsym = binom(
+    n=30, # кількість випробувань
+    p=0.8 # ймовірність успіху
+)
+```
+
+```{python}
+#| label: binom-asym-plot
+#| echo: false
+#| fig-align: center
+
+pyplot.figure(figsize=(16, 8))
+
+# рахуємо ймовірності значень суми
+probs = binom_h0_nonsym.pmf(x_grid)
+# будуємо вертикальні стовпці від 0 до ймовірності
+pyplot.vlines(x_grid, 0, probs, linewidth=15.0, color=turquoise, label='PMF, $Binom(0.8, 30)$')
+
+pyplot.title('Біноміальний розподіл', fontsize=20)
+pyplot.legend(fontsize=18)
+pyplot.show()
+```
+
+Для того, щоб побудувати двосторонній критерій, потрібно знайти ліворуч та праворуч області, площа яких становить не більше, ніж $\frac{\alpha}{2}$.
+
+<!-- $$P(Q(\xi) \leq C) \leq \frac{\alpha}{2}$$ -->
+
+## Несиметричний розподіл: критична область
+
+```{python}
+#| label: binom-asym-crit
+
+def two_sided_criterion_nonsym(n, mu, alpha):
+    '''Будує двосторонній критерій для несиметричної задачі з доставкою
+    
+    Параметри:
+        n: кількість доставок в експерименті
+        mu: імовірність успіху в нульовій гіпотезі
+        alpha: рівень значущості критерію
+        
+    Повертає:
+        C1, C2 для критерію S = {Q <= C1 або Q >= C2}
+    '''
+    binom_h0 = binom(n=n, p=mu)
+    
+    # аналогічно односторонньому критерію
+    c2 = binom_h0.ppf(1 - alpha/2) + 1
+        
+    # за викладками вище
+    c1 = binom_h0.ppf(alpha/2) - 1
+    
+    return c1, c2
+```
+
+\
+
+```{python}
+#| label: binom-asym-crit-calc
+
+c1, c2 = two_sided_criterion_nonsym(30, 0.8, 0.05)
+c1, c2
+```
+
+## Несиметричний розподіл: критерій {.smaller}
+
+Отже, наш критерій для перевірки гіпотези
+
+$$H_0: \mu = 0.8$$
+$$H_1: \mu \neq 0.8$$
+
+виглядає так:
+
+$$S = \{Q(\xi) \leq 18\} \cup \{Q(\xi) \geq 29\}$$
+
+```{python}
+#| label: binom-asym-crit-plot
+#| echo: false
+#| fig-align: center
+
+pyplot.figure(figsize=(16, 8))
+
+# рахуємо ймовірності значень суми
+probs = binom_h0_nonsym.pmf(x_grid)
+# будуємо вертикальні стовпці від 0 до ймовірності
+pyplot.vlines(x_grid, 0, probs, linewidth=15.0, color=turquoise, label='PMF, $Binom(0.5, 30)$')
+# окремо зобразимо критичну область критерію
+crit_reg = (x_grid >= 29) | (x_grid <= 18)
+pyplot.vlines(x_grid[crit_reg], 0, probs[crit_reg], linewidth=15.0, label='Critical region for S')
+
+pyplot.title('Біноміальний розподіл', fontsize=20)
+pyplot.legend(fontsize=18, loc='upper left')
+pyplot.show()
+```
+
+## Несиметричний розподіл: $p$-значення {.smaller}
+
+Цей критерій --- об'єднання двох критеріїв рівня значущості $\frac{\alpha}{2}$, для кожного з яких можна порахувати $p$-значення. 
+
+Позначимо їх як $p_1, p_2$. 
+
+Перший критерій відкидається при $p_1 \leqslant \frac{\alpha}{2}$, другий при $p_2 \leqslant \frac{\alpha}{2}$.
+
+А наш об'єднаний, коли виконано одну з цих умов, тобто
+
+$$ 2p_1 \leqslant \alpha \vee 2p_2 \leqslant \alpha \Leftrightarrow 2 \cdot \min(p_1, p_2) \leqslant \alpha $$
+
+## Несиметричний розподіл: $p$-значення Python {.smaller}
+
+```{python}
+#| label: p-value-asym-def
+
+def pvalue_two_sided(n, q, mu=0.5):
+    '''Обчислює pvalue для двосторонньої альтернативи в задачі з доставкою
+    
+    Параметри:
+        n: кількість доставок в експерименті
+        q: кількість успішних доставок
+        mu: ймовірність успіху при H0
+        
+    Повертає:
+        pvalue для двостороннього критерію
+    '''
+    binom_h0 = binom(n=n, p=mu)
+    # рахуємо для лівої частини
+    pvalue_left = binom_h0.cdf(q)
+    # рахуємо для правої частини
+    pvalue_right = 1 - binom_h0.cdf(q - 1)
+    # обчислюємо формулу
+    return 2 * min(pvalue_left, pvalue_right)
+```
+
+\
+
+```{python}
+#| label: p-value-asym-calc
+
+pvalue_two_sided(n=30, q=28, mu=0.8)
+```
+
+Видно, що $p$-значення $> 0.05$, отже, на рівні значущості $0.05$ навіть $28$ успіхів недостатньо, щоб відкинути ймовірність успіху в $80\%$.
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".01_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/asa/)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
