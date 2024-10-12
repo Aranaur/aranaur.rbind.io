@@ -1,0 +1,404 @@
+---
+title: "Статистична потужність"
+subtitle: "Прикладний статистичний аналіз"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка, ФІТ
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .02_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: <a href="https://aranaur.rbind.io/lectures/asa/">🔗Прикладний статистичний аналіз</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    # center: true
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    # controls-layout: bottom-right
+    chalkboard: true
+    logo: fit.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    # fig-width: 9
+    # fig-height: 5
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+  # gfm:
+  #   mermaid-format: png
+preload-iframes: true
+jupyter: python3
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Import libraries
+from scipy.stats import (
+    binom
+)
+import numpy as numpy
+from seaborn import distplot
+from matplotlib import pyplot
+import seaborn
+import random
+from tqdm.notebook import tqdm
+
+from IPython.display import Markdown
+from tabulate import tabulate
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Потужність статистичного критерію {background-iframe=".02_files/libs/colored-particles/index.html"}
+
+## Хибно-негативна помилка {.smaller}
+
+Раніше ми звертали увагу тільки на $\alpha$ --- **рівень значущості**. 
+
+Цей параметр контролює ймовірність виявлення **помилки I роду** (*FPR, хибно-позитивна помилка*): відхилення $H_0$, коли вона насправді вірна.
+
+**В термінах бізнесу:** в яку кількість неефективних проєктів ми готові вкладати ресурси?
+
+. . .
+
+<center>[Чи можемо ми мінімізувати цю помилку?]{.hi}</center>
+
+. . .
+
+Так! Для цього достатньо ніколи не відкидати $H_0$ 
+
+$$
+S \equiv 0, \alpha = 0
+$$
+
+. . .
+
+Якщо є помилка I роду, то є і **помилка II роду** --- **хибно-негативна помилка** (*FNR*): приймаємо $H_0$, коли насправді вірною є $H_1$.
+
+**В термінах бізнесу:** яку кількість ефективних проєктів ми готові впустити?
+
+$$
+\beta = \text{FNR} = \mathbb{P}(S=0|H_1)
+$$
+
+## Критерій для пори року ❄️☀️ {.tiny}
+
+$$
+H_0: \text{на вулиці літо}
+$$
+
+$$
+H_1: \text{на вулиці не літо}
+$$
+
+. . .
+
+$$
+\begin{equation}
+Q = \begin{cases}
+1, & \text{якщо на вулиці йде сніг} \\
+0, & \text{інакше}
+\end{cases}
+\end{equation}
+$$
+
+. . .
+
+$$
+\begin{equation}
+S = Q = \begin{cases}
+1, & \text{якщо }Q = 1, \text{ відхиляємо } H_0 \\
+0, & \text{якщо }Q = 0, \text{ не відхиляємо } H_0
+\end{cases}
+\end{equation}
+$$
+
+. . .
+
+$$
+\alpha = \text{FPR} = \mathbb{P}(\text{йде сніг}|\text{зараз літо}) < 0.001
+$$
+
+$$
+\beta = \text{FNR} = \mathbb{P}(\text{не йде сніг}|\text{зараз не літо}) > 0.9
+$$
+
+. . .
+
+Як бачимо, критерій доволі марний.
+
+. . .
+
+[Потужність статистичного критерію]{.hi} (*power, True Positive Rate, істинно-позитивне значення*) --- це ймовірність правильно відхилити $H_0$, коли вона істинно є хибною, тобто здатність виявити ефект, якщо він дійсно існує.
+
+$$
+\text{Power} = 1 - \beta = \mathbb{P}(S=1|H_1)
+$$
+
+. . .
+
+У нашому прикладі: $\text{Power} = 1 - 0.9 = 0.1$
+
+## Потужність {.tiny}
+
+:::: {.columns}
+
+::: {.column width="65%"}
+Згадаємо задачу про доставку:
+
+$H_0: \mu = 0.5 \\H_1: \mu > 0.5 \\Q = \text{кількість підтверджених замовлень} \\\alpha = 0.05 \\ S = \{Q \geq 20\}$
+:::
+
+::: {.column width="35%" .fragment}
+
+```{python}
+#| label: power-h0
+#| echo: false
+
+binom_h0 = binom(
+    n=30,
+    p=0.5
+)
+
+x_grid = numpy.arange(1, 31)
+probs = binom_h0.pmf(x_grid)
+
+pyplot.figure(figsize=(16, 8))
+
+pyplot.vlines(x_grid, 0, probs, linewidth=15.0, color=turquoise, label='PMF, $Binom(30, 0.5)$')
+crit_reg = x_grid >= 20
+pyplot.vlines(x_grid[crit_reg], 0, probs[crit_reg], linewidth=15.0, label='Critical region for S')
+pyplot.title('Біноміальний розподіл', fontsize=20)
+pyplot.xlabel('Кількість успіхів', fontsize=18)
+pyplot.ylabel('', fontsize=18, rotation=0, labelpad=30)
+pyplot.legend(fontsize=18)
+pyplot.show()
+```
+:::
+
+::::
+
+. . .
+
+:::: {.columns}
+
+::: {.column width="65%"}
+Припустимо, що вірна $H_1$: $\mu = 0.6$
+:::
+
+::: {.column width="35%" .fragment}
+```{python}
+#| label: power-h1
+#| echo: false
+
+binom_alternative = binom(
+    n=30,
+    p=0.6
+)
+
+x_grid = numpy.arange(1, 31)
+probs = binom_alternative.pmf(x_grid)
+
+pyplot.figure(figsize=(16, 8))
+
+pyplot.vlines(x_grid, 0, probs, linewidth=15.0, color=turquoise, label='PMF, $Binom(30, 0.6)$')
+crit_reg = x_grid >= 20
+pyplot.vlines(x_grid[crit_reg], 0, probs[crit_reg], linewidth=15.0, label='Critical region for S')
+pyplot.title('Біноміальний розподіл', fontsize=20)
+pyplot.xlabel('Кількість успіхів', fontsize=18)
+pyplot.ylabel('', fontsize=18, rotation=0, labelpad=30)
+pyplot.legend(fontsize=18)
+pyplot.show()
+```
+:::
+
+::::
+
+. . .
+
+$$\text{Power} = \mathbb{P}(Q \geq 20|\mu = 0.6)$$
+
+---
+
+$$\text{Power} = \mathbb{P}(Q \geq 20|\mu = 0.6)$$
+
+```{python}
+#| label: power
+#| echo: false
+#| fig-align: center
+
+x_grid = numpy.arange(1, 31)
+crit_reg = x_grid >= 20
+
+pyplot.figure(figsize=(16, 8))
+
+# будуємо розподіл при H0 і критичну область
+probs_h0 = binom_h0.pmf(x_grid)
+pyplot.vlines(x_grid, 0, probs_h0, linewidth=15.0, color=navy, label='PMF, $Binom(0.5, 30)$ $H_0$', alpha=0.5)
+
+# будуємо розподіл при mu > 0.5
+probs_alternative = binom_alternative.pmf(x_grid)
+pyplot.vlines(x_grid, 0, probs_alternative, linewidth=15.0, color=turquoise, label='PMF, $Binom(0.6, 30)$ $H_1$')
+pyplot.vlines(x_grid[crit_reg], 0, probs_alternative[crit_reg], linewidth=15.0, label='Rejection of H0', color='red')
+
+pyplot.title('Біноміальний розподіл', fontsize=20)
+pyplot.legend(fontsize=18)
+pyplot.show()
+```
+
+```{python}
+#| label: power-value
+#| echo: false
+
+critical_value = 20
+power = 1 - binom(n=30, p=0.6).cdf(critical_value - 1)
+fpr   = 1 - binom(n=30, p=0.5).cdf(critical_value - 1)
+
+print('False Positive Rate is {:.1%}'.format(fpr))
+print('Power is {:.1%}'.format(power))
+```
+
+[Видно, що потужність близько $30\%$. Це доволі маленьке значення, адже якщо наш продукт прибутковий, то ми побачимо це за допомогою нашого тесту лише з ймовірністю в $30$ відсотків. **Ми легко можемо пропустити ефект.**]{.tiny}
+
+## Python та потужність {.smaller}
+
+```{python}
+#| label: power-def
+
+def get_stat_power(N, mu_h0, mu_alternative, alpha):
+    '''Обчислює статистичну потужність критерію для біноміального розподілу
+    
+    Параметри:
+        N - кількість бернуллієвських експериментів (розмір вибірки)
+        mu_h0 - імовірність успіху в нульовій гіпотезі
+        mu_alternative - передбачувана ймовірність успіху в експерименті
+        alpha - рівень значущості критерію
+    '''
+    binom_h0 = binom(n=N, p=mu_h0)
+    binom_alternative = binom(n=N, p=mu_alternative)
+
+    # обчислюємо критичне значення
+    critical_value = binom_h0.ppf(1 - alpha) + 1
+    # обчислюємо потужність за формулою
+    return 1 - binom_alternative.cdf(critical_value - 1) 
+```
+
+\
+
+```{python}
+#| label: power-example-30
+
+get_stat_power(N=30, mu_h0=0.5,mu_alternative=0.6, alpha=0.05)
+```
+
+Подивимося, що буде, якщо ми проведемо експеримент на 300 клієнтах.
+
+```{python}
+#| label: power-example-300
+
+get_stat_power(N=300, mu_h0=0.5,mu_alternative=0.6, alpha=0.05)
+```
+
+## Python та потужність {.smaller}
+
+Прийнято вважати, що прийнятною для роботи потужністю вважається $80\%$.
+
+Подивимося, як змінюється потужність при зростанні розміру вибірки, і скільки потрібно провести експериментів, щоб детектувати ефект при $\mu=0.6$ в $80\%$ випадків.
+
+```{python}
+#| label: power-example-80
+#| fig-align: center
+#| code-fold: true
+
+n_grid = numpy.arange(10, 600, 10)
+# можемо обчислити 
+power = get_stat_power(n_grid, 0.5, 0.6, alpha=0.05)
+
+pyplot.figure(figsize=(12, 7))
+pyplot.title('Потужність для $\mu = 0,6$', fontsize=18)
+pyplot.xlabel('Кількість пробних поставок', fontsize=15)
+pyplot.ylabel('Потужність', fontsize=15)
+
+pyplot.plot(n_grid, power)
+pyplot.axhline(0.8, ls='--', color='red', label='Power = 80%')
+
+# рахуємо мінімальний розмір вибірки для потужності у 80% 
+min_n = n_grid[power >= 0.8].min()
+pyplot.axvline(min_n, ls='--', color='white', label=f'N = {min_n}')
+
+pyplot.legend(fontsize=15)
+pyplot.show()
+```
+
+## Python та потужність {.smaller}
+
+А що, якщо ми хочемо детектувати ще менший ефект? Наприклад, якщо хочемо відкидати гіпотезу при $\mu = 0.51$. Часто поліпшення ймовірності успіху на $1\%$ може бути значущим для продукту, тому це питання не позбавлене сенсу.
+
+```{python}
+#| label: power-example-51
+#| fig-align: center
+#| code-fold: true
+
+n_grid = numpy.arange(10, 30000, 59)
+
+power = get_stat_power(n_grid, 0.5, 0.51, alpha=0.05)
+
+pyplot.figure(figsize=(12, 7))
+pyplot.title('Потужність для $\mu = 0.51$', fontsize=18)
+pyplot.xlabel('Кількість пробних поставок', fontsize=15)
+pyplot.ylabel('Потужність', fontsize=15)
+
+pyplot.plot(n_grid, power)
+pyplot.axhline(0.8, ls='--', color='red', label='Power = 80%')
+
+# рахуємо мінімальний розмір вибірки для потужності у 80% 
+min_n = n_grid[power >= 0.8].min()
+pyplot.axvline(min_n, ls='--', color='white', label=f'N = {min_n}')
+
+pyplot.legend(fontsize=15)
+pyplot.show()
+```
+
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".02_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/asa/)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
