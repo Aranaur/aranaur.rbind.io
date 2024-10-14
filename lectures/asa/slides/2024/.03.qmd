@@ -1,0 +1,544 @@
+---
+title: "$Z$-критерій"
+subtitle: "Прикладний статистичний аналіз"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка, ФІТ
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .03_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: <a href="https://aranaur.rbind.io/lectures/asa/">🔗Прикладний статистичний аналіз</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    # center: true
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    # controls-layout: bottom-right
+    chalkboard: true
+    logo: fit.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    # fig-width: 9
+    # fig-height: 5
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+  # gfm:
+  #   mermaid-format: png
+preload-iframes: true
+jupyter: python3
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Import libraries
+from scipy.stats import (
+    norm, binom, expon
+)
+import numpy as numpy
+from seaborn import distplot
+from matplotlib import pyplot
+import seaborn
+import random
+
+from IPython.display import Markdown
+from tabulate import tabulate
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Критерії порівняння середніх {background-iframe=".03_files/libs/colored-particles/index.html"}
+
+## Навіщо аналізувати середні?
+
+1. Приріст виручки. 
+    - Якщо зростає сумарне значення $\rightarrow$ зростає середнє значення. Тому це завдання можна переформулювати як зростання середнього чека, або ARPU.
+2. Збільшення числа покупок.
+3. Зменшення відтоку користувачів.
+
+Аналіз середнього значення є одним із найпопулярніших завдань у роботі аналітика, тому дуже важливо вміти його вирішувати.
+
+Далі, для виведення всіх критеріїв нам потрібен [нормальний розподіл]{.hi}. *Потому що саме цьому розподілу підпорядковується середнє вибірок*.
+
+## Нормальний розподіл {.tiny}
+
+[Нормальний розподіл]{.hi} $\xi \sim \mathcal{N}(\mu, \sigma^2)$ --- неперервний розподіл, у якому щільність спадає зі збільшенням відстані від $\mu$ за експонентою квадрата.
+
+$$
+f(x) = \frac{1}{\sigma\sqrt{2\pi}} \exp^{-\frac{1}{2}\left(\frac{x-\mu}{\sigma}\right)^2}
+$$
+
+де
+
+- $\mu$ --- параметр зміщення: наскільки центр зсунутий відносно 0
+- $\sigma^2$ --- параметр масштабу: наскільки «пологим» буде графік розподілу
+
+```{python}
+#| label: normal_distribution-plot
+#| echo: false
+#| fig-align: center
+
+# Parameters
+params = [
+    (0, 0.2),
+    (0, 1),
+    (0, 5),
+    (-2, 0.5)
+]
+
+# Create figure
+fig, ax = pyplot.subplots(figsize=(10, 6))
+
+# Plot
+for mu, sigma in params:
+    x = numpy.linspace(-4, 4, 1000)
+    y = (1 / (sigma * numpy.sqrt(2 * numpy.pi))) * numpy.exp(-0.5 * ((x - mu) / sigma) ** 2)
+    ax.plot(x, y, label=f"$\mu={mu}, \sigma={sigma}$")
+
+# Add legend
+ax.legend()
+
+# Show plot
+pyplot.show()
+```
+
+## Python та нормальний розподіл
+
+Нехай ми хочемо задати розподіл $\mathcal{N}(\mu, \sigma^2)$. Для цього є [клас](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.norm.html) `norm`. 
+
+*Параметри ініціалізації*
+
+- `loc` --- це $\mu$
+- `scale` --- це $\sigma$, або **стандартне відхилення**. [Не дисперсія!]{.red}
+
+Методи класу:
+
+- `norm().cdf(x)` --- функція розподілу в точці x. $P(\xi \leq x)$
+- `norm().ppf(q)` --- отримати квантиль розподілу
+- `norm().pdf(x)` --- отримати щільність розподілу в точці x.
+
+## Python та нормальний розподіл
+
+```{python}
+#| label: normal-distribution-cumulative
+
+# ініціалізація
+stand_norm = norm(loc=0, scale=1)
+
+# кумулятивна функція розподілу
+print(f"P(X <= 2)  = {stand_norm.cdf(x=2)}")
+print(f"или так {norm(loc=0, scale=1).cdf(x=2)}")
+# можна вказувати масиви
+print(f"[P(X <= 2), P(X <= -1)] = {stand_norm.cdf([2, -1])}")
+```
+
+\
+
+```{python}
+#| label: normal-distribution-percent
+
+# квантиль
+print(f"quantile 0.975 = {stand_norm.ppf(0.975)}")
+```
+
+\
+
+```{python}
+#| label: normal-distribution-probability
+
+# щільність
+print(f"pdf(0) = {stand_norm.pdf(0)}")
+```
+
+## Python та нормальний розподіл
+
+```{python}
+#| label: normal-distribution-plot
+#| fig-align: center
+#| code-fold: true
+
+numpy.random.seed(2024)
+
+check_distr = norm(loc=0, scale=2)
+x = numpy.linspace(-8, 8, 1000) # розставить на рівних відстанях одна від одної 1000 точок від -8 до 8
+pdf = check_distr.pdf(x)
+cdf = check_distr.cdf(x)
+sample = check_distr.rvs(10000)
+
+pyplot.figure(figsize=(22, 5))
+
+pyplot.subplot(1, 2, 1)
+pyplot.title('Візуалізація щільності', fontsize=12, color='white')
+pyplot.hist(sample, bins='auto', density=True, alpha=0.6, label='згенеровані значення') # rvs
+pyplot.plot(x, pdf, label='щільність розподілу') # pdf
+pyplot.legend(fontsize=12)
+pyplot.subplot(1, 2, 2)
+pyplot.plot(x, cdf) # cdf
+pyplot.show()
+```
+
+## Властивості нормального розподілу
+
+1. $\xi_1 \sim \mathcal{N}(\mu_1, \sigma_1^2),\ \xi_2 \sim \mathcal{N}(\mu_2, \sigma_2^2) \Rightarrow \\ \xi_1 + \xi_2 \sim \mathcal{N}(\mu_1 + \mu_2, \sigma_1^2 + \sigma_2^2)$[^1]
+<br><br>
+
+2. $a \xi_1 \sim \mathcal{N}(a\mu_1, a^2\sigma_1^2)$
+
+[^1]: [Доведення](https://en.wikipedia.org/wiki/Sum_of_normally_distributed_random_variables#:~:text=This%20means%20that%20the%20sum,squares%20of%20the%20standard%20deviations)
+
+## Python та перша властивість нормального розподілу
+
+```{python}
+#| label: normal-distribution-sum
+
+# приклади
+first_mean = 3
+first_var = 4
+
+second_mean = -1
+second_var = 2
+
+first_dist = norm(loc=first_mean, scale=numpy.sqrt(first_var))
+second_dist = norm(loc=second_mean, scale=numpy.sqrt(second_var))
+# Важливо scale=numpy.sqrt(first_var + second_var)
+checking_sum_distr = norm(loc=first_mean + second_mean, scale=numpy.sqrt(first_var + second_var))
+```
+
+1. Згенеруємо вибірку з 1 і 2 розподілів та підсумуємо їх.
+2. Далі, побудуємо емпіричну щільність розподілу та порівняємо її зі справжньою на графіку.
+
+## Python та перша властивість нормального розподілу
+
+```{python}
+#| label: normal-distribution-sum-plot
+#| fig-align: center
+#| code-fold: true
+#| 
+
+first_sample = first_dist.rvs(10000)
+second_sample = second_dist.rvs(10000)
+sum_sample = first_sample + second_sample
+
+x = numpy.linspace(-8, 12, 1000)
+
+pyplot.figure(figsize=(10, 5))
+pyplot.title('Перевірка розподілів', fontsize=12)
+# Ця функція будує як гісторгамму значень, так і емпіричний розподіл
+distplot(sum_sample, label='Емпіричний розподіл')
+pyplot.plot(x, checking_sum_distr.pdf(x), label='Перевірюваний розподіл')
+pyplot.legend(fontsize=12)
+pyplot.xlabel('X', fontsize=12)
+pyplot.ylabel('Щільність', fontsize=12)
+pyplot.show()
+```
+
+## Центральна гранична теорема {.smaller}
+
+Нехай $\xi_1, ..., \xi_n$ --- **незалежно** однаково розподілені випадкові величини, в яких існують мат. сподівання та дисперсія: 
+
+- $E [\xi_i] = \mu < \infty$
+- $Var[\xi_i] = \sigma^2 < \infty$. 
+
+Тоді $\sqrt{n}\dfrac{\overline \xi - \mu}{\sqrt{\sigma^2}}$ [сходиться за розподілом](https://en.wikipedia.org/wiki/Convergence_in_distribution) до $\mathcal{N}(0, 1)$.
+
+## Центральна гранична теорема {.tiny}
+
+- $\xi$ --- випадкова величина з невідомим розподілом.
+- $\mathbb{E}(\xi) = \mu$ --- математичне сподівання.
+- $\text{Var}(\xi) = \sigma^2$ --- дисперсія.
+
+. . .
+
+<br>
+
+- $\sum_{i=1}^n \xi_i \sim \mathcal{N}(n\mu, n\sigma^2)$
+
+. . .
+
+- $\frac{\sum_{i=1}^n \xi_i}{n} = \bar{\xi} \sim \mathcal{N}(\mu, \frac{\sigma^2}{n})$
+
+. . .
+
+Приведемо цей результат до стандартного нормального розподілу: віднімемо математичне сподівання та поділимо на $\frac{\sigma}{\sqrt{n}}$.
+
+- $\bar{\xi} - \mu \sim \mathcal{N}(0, \frac{\sigma^2}{n})$
+
+. . .
+
+[$$\sqrt{n} \frac{\bar{\xi} - \mu}{\sigma} \sim \mathcal{N}(0, 1)$$]{.hi}
+
+::: {.callout-note icon=false}
+Випадкові величини можуть бути слабко залежні одна від одної і злегка по-різному розподілені. Центральна гранична теорема все ще буде [правильною](https://en.wikipedia.org/wiki/Stable_distribution#A_generalized_central_limit_theorem).
+:::
+
+## Візуалізація ЦГТ {.tiny .scrollable}
+
+Генеруємо $N$ вибірок по $M$ елементів у кожній:
+
+- По кожній вибірці треба порахувати нормовану середню за $M$ елементами.
+- У підсумку ми отримаємо вибірку з N елементів.
+- Вона і має бути з нормального розподілу.
+
+```{python}
+#| label: central-limit-theorem-generate
+#| code-fold: true
+
+def visualize_CLT(sample_generator, expected_value, variance):
+    """
+        Функція-візуалізатор ЦГТ. Будує:
+            - гісторгаму статистики ЦГТ,
+            - емпіричну щільність,
+            - щільність нормального розподілу.
+        Параметри:
+            - sample_generator: функція-генератор вибірки. Не приймає нічого на вхід
+            - expected_value: мат. сподівання вибірки
+            - variance: дисперсія вибірки
+    """
+
+    numpy.random.seed(2024)
+    N = 5000
+    clt_sample = []
+    for _ in range(N):
+        # генеруємо N разів вибірку
+        sample = sample_generator()
+
+        # рахуємо статистику з ЦГТ
+        sample_size = len(sample)
+        statistic = numpy.sqrt(sample_size) * (numpy.mean(sample) - expected_value) / numpy.sqrt(variance)
+
+        #зберігаємо
+        clt_sample.append(statistic)
+
+    x = numpy.linspace(-4, 4, 1000)
+    pyplot.figure(figsize=(10, 5))
+    pyplot.title('Розподіл середніх значень', fontsize=12)
+    seaborn.distplot(clt_sample, label='Емпіричний розподіл')
+    pyplot.plot(x, norm().pdf(x), label='$\mathcal{N}(0, 1)$')
+    pyplot.legend(fontsize=12)
+    pyplot.xlabel('X', fontsize=12)
+    pyplot.ylabel('Щільність', fontsize=12)
+    pyplot.show()
+```
+
+## Візуалізація ЦГТ: біноміальний розподіл {.tiny}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{python}
+#| label: central-limit-theorem-binomial
+#| fig-align: center
+
+def binom_generator(p, n, size):
+    return binom(p=p, n=n).rvs(size)
+
+p = 0.01
+n = 20
+size = 5000
+
+# ми обертаємо binom_generator в lambda, щоб функція не приймала параметри на вхід
+visualize_CLT(lambda: binom_generator(p, n, size), 
+              expected_value = p * n, 
+              variance = n * p * (1 - p)
+             )
+```
+
+<center>😊</center>
+
+
+:::
+
+::: {.column width="50%"}
+```{python}
+#| label: central-limit-theorem-binomial-small
+#| fig-align: center
+
+def binom_generator(p, n, size):
+    return binom(p=p, n=n).rvs(size)
+
+p = 0.01
+n = 20
+size = 40
+
+# ми обертаємо binom_generator в lambda, щоб функція не приймала параметри на вхід
+visualize_CLT(lambda: binom_generator(p, n, size), 
+              expected_value = p * n, 
+              variance = n * p * (1 - p)
+             )
+```
+
+<center>🤨</center>
+:::
+
+::::
+
+## Візуалізація ЦГТ: експоненційний розподіл {.tiny}
+
+```{python}
+#| label: central-limit-theorem-exponential
+#| fig-align: center
+#| code-fold: true
+
+def expon_generator(expected_value, size):
+    return expon(scale=expected_value).rvs(size)
+
+expected_value = 24
+size = 400
+
+visualize_CLT(lambda: expon_generator(expected_value, size), 
+              expected_value=expected_value, variance=expected_value ** 2)
+```
+
+## Еквівалентні формулювання ЦПТ
+
+$$\begin{align}
+\sqrt{n}\dfrac{\overline \xi - \mu}{\sqrt{\sigma^2}} &\sim \mathcal{N}(0, 1) \stackrel{вл. 2}{\Leftrightarrow}\\
+\overline \xi - \mu &\sim \mathcal{N}\left(0, \dfrac{\sigma^2}{n} \right) \Leftrightarrow\\
+\dfrac{\underset{i=1}{\overset{n}{\sum}} \xi_i}{n} &\sim \mathcal{N}\left(\mu, \dfrac{\sigma^2}{n} \right) \Leftrightarrow\\
+\underset{i=1}{\overset{n}{\sum}} \xi_i &\sim \mathcal{N}\left(n \cdot \mu, n \cdot \sigma^2 \right)
+\end{align}$$
+
+# $Z$-критерій Фішера {background-iframe=".02_files/libs/colored-particles/index.html"}
+
+## 📈 Задача 🚚: [біноміальний розподіл]{.hi-slate} {.smaller}
+
+- $T(X^n) = \underset{i=1}{\overset{n}{\sum}} X_i,\ T \overset{H_0}{\sim} \text{Binom} (n, \mu_0)$
+- Нехай реалізація $T(X^n) = t$. Тоді 
+- $\text{p-value} = P_{H_0}(T(X^n) \geq t) = 1 - P_{H_0}(T(X^n) < t)$
+- Або, якщо переписати мовою Python `p-value = 1 - binom.cdf(t - 1, n, mu0)`
+
+```{python}
+#| label: binomial-p-value
+
+def get_pvalue_by_old_logic(n, mu0, t):
+    return 1 - binom.cdf(t-1, n=n, p=mu0)
+
+n = 30
+mu0 = 0.5
+t = 19
+
+old_p_value = get_pvalue_by_old_logic(n, mu0, t)
+print(f"p-значення, отримане за старою, коректною формулою: {old_p_value}")
+```
+
+## 📈 Задача 🚚: [нормальний розподіл]{.hi} {.smaller}
+
+- За досить великого розміру вибірки $\underset{i=1}{\overset{n}{\sum}} X_i \sim \mathcal{N}\left(n \cdot \mu_0, n \cdot \sigma^2 \right)$,
+- $X_i \overset{H_0}{\sim} \text{Bernoulli} (\mu_0)$
+- $\sigma^2 = \mu_0 \cdot (1 - \mu_0)$
+- $\text{p-значення} = P_{H_0}(T(X^n) \geq t)$. 
+
+Або `p-value = 1 - norm(loc=sum_mu, scale=sum_std).cdf(t)`. 
+
+При цьому цього разу ми дивимося статистику не в точці t-1, як робили раніше, а в точці t. **Так як у нас неперервний розподіл, то нам не потрібно віднімати 1**:
+
+- у разі нормального розподілу: $P(T(X^n) \geq t) = P(T(X^n) > t) = 1 - P(T(X^n) \leq t)$;
+- у разі біноміального розподілу: $P(T(X^n) \geq t) = 1 - P(T(X^n) \leq t - 1)$.
+
+## 📈 Задача 🚚: [нормальний розподіл]{.hi} {.smaller}
+
+```{python}
+#| label: normal-p-value
+
+def get_pvalue_by_normal_approx(n, mu0, t):
+    sum_mu = n * mu0
+    sum_variance = n * mu0 * (1 - mu0)
+    sum_std = numpy.sqrt(sum_variance)
+
+    return 1 - norm(loc=sum_mu, scale=sum_std).cdf(t)
+
+normal_dist_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+print(f"p-value, отримане з наближення нормальним розподілом: {normal_dist_p_value}")
+```
+
+<br><br>
+
+```{python}
+#| label: normal-p-value-large
+
+n = 3000
+mu0 = 0.5
+t = 1544
+
+old_p_value = get_pvalue_by_old_logic(n, mu0, t)
+print(f"p-value, отримане за старою, коректною формулою: {old_p_value}")
+normal_dist_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+print(f"p-value, отримане з наближення нормальним розподілом: {normal_dist_p_value}")
+```
+
+## $Z$-критерій Фішера {.smaller}
+
+$H_0: \mu = \mu_0\ vs.\ H_1: \mu > \mu_0$
+
+- Статистика $Z(X) = \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{\sigma^2}}$
+- За досить великого розміру вибірки $Z(X) \overset{H_0}{\sim} \mathcal{N}(0, 1)$ (за ЦГТ)
+- Односторонній критерій: $\left\{Z(X) \geq z_{1 - \alpha} \right\}$
+    - p-value = $1 - \Phi(z)$, де $z$ --- реалізація статистики $Z(X)$, $\Phi(z)$ --- функція розподілу $\mathcal{N}(0, 1)$
+- Двосторонній критерій: $\left\{Z(X) \geq z_{1 - \frac{\alpha}{2}} \right\} \bigcup \left\{Z(X) \leq -z_{1 - \frac{\alpha}{2}} \right\}$
+    - p-value = $2\cdot \min \left[{\Phi(z), 1 - \Phi(z)} \right]$, де $z$ --- реалізація статистики $Z(X)$
+
+## Python та $Z$-критерій Фішера
+
+```{python}
+#| label: z-test
+
+def z_criterion_pvalue(sample_mean, sample_size, mu0, variance):
+    Z_statistic = numpy.sqrt(sample_size) * (sample_mean - mu0) / numpy.sqrt(variance)
+    return 1 - norm().cdf(Z_statistic)
+
+n = 30
+t = 19
+mu0 = 0.5
+variance = mu0 * (1 - mu0)
+
+old_p_value = get_pvalue_by_old_logic(n, mu0, t)
+print(f"p-значення, отримане за старою, коректною формулою: {old_p_value}")
+normal_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+print(f"p-значення, отримане з наближення нормальним розподілом: {normal_p_value}")
+z_pvalue = z_criterion_pvalue(t/n, n, mu0, variance)
+print(f"Z-тест p-value: {z_pvalue}")
+```
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".02_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/asa/)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
