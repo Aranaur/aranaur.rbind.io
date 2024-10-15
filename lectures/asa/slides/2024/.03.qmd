@@ -84,8 +84,6 @@ slate      = "#314f4f"
 2. Збільшення числа покупок.
 3. Зменшення відтоку користувачів.
 
-Аналіз середнього значення є одним із найпопулярніших завдань у роботі аналітика, тому дуже важливо вміти його вирішувати.
-
 Далі, для виведення всіх критеріїв нам потрібен [нормальний розподіл]{.hi}. *Потому що саме цьому розподілу підпорядковується середнє вибірок*.
 
 ## Нормальний розподіл {.tiny}
@@ -145,7 +143,7 @@ pyplot.show()
 - `norm().ppf(q)` --- отримати квантиль розподілу
 - `norm().pdf(x)` --- отримати щільність розподілу в точці x.
 
-## Python та нормальний розподіл
+## Python та нормальний розподіл {.smaller}
 
 ```{python}
 #| label: normal-distribution-cumulative
@@ -196,7 +194,7 @@ sample = check_distr.rvs(10000)
 pyplot.figure(figsize=(22, 5))
 
 pyplot.subplot(1, 2, 1)
-pyplot.title('Візуалізація щільності', fontsize=12, color='white')
+pyplot.title('Візуалізація щільності', fontsize=12, color=slate)
 pyplot.hist(sample, bins='auto', density=True, alpha=0.6, label='згенеровані значення') # rvs
 pyplot.plot(x, pdf, label='щільність розподілу') # pdf
 pyplot.legend(fontsize=12)
@@ -417,6 +415,16 @@ visualize_CLT(lambda: expon_generator(expected_value, size),
               expected_value=expected_value, variance=expected_value ** 2)
 ```
 
+---
+
+<iframe id="clt-example" src="https://aranaur-clt.hf.space/" style="border: none; width: 100%; height: 100%" frameborder="0">
+
+</iframe>
+
+::: footer
+[:hugs: Hugging Face: Центральна гранична теорема](https://huggingface.co/spaces/aranaur/CLT)
+:::
+
 ## Еквівалентні формулювання ЦПТ
 
 $$\begin{align}
@@ -426,12 +434,12 @@ $$\begin{align}
 \underset{i=1}{\overset{n}{\sum}} \xi_i &\sim \mathcal{N}\left(n \cdot \mu, n \cdot \sigma^2 \right)
 \end{align}$$
 
-# $Z$-критерій Фішера {background-iframe=".02_files/libs/colored-particles/index.html"}
+# $Z$-критерій Фішера {background-iframe=".03_files/libs/colored-particles/index.html"}
 
 ## 📈 Задача 🚚: [біноміальний розподіл]{.hi-slate} {.smaller}
 
 - $T(X^n) = \underset{i=1}{\overset{n}{\sum}} X_i,\ T \overset{H_0}{\sim} \text{Binom} (n, \mu_0)$
-- Нехай реалізація $T(X^n) = t$. Тоді 
+- Нехай реалізація $T(X^n) = t$. Минулого разу 19.
 - $\text{p-value} = P_{H_0}(T(X^n) \geq t) = 1 - P_{H_0}(T(X^n) < t)$
 - Або, якщо переписати мовою Python `p-value = 1 - binom.cdf(t - 1, n, mu0)`
 
@@ -462,6 +470,31 @@ print(f"p-значення, отримане за старою, коректно
 
 - у разі нормального розподілу: $P(T(X^n) \geq t) = P(T(X^n) > t) = 1 - P(T(X^n) \leq t)$;
 - у разі біноміального розподілу: $P(T(X^n) \geq t) = 1 - P(T(X^n) \leq t - 1)$.
+
+## Біноміальний vs. нормальний розподіл {.smaller}
+
+```{python}
+#| label: binomial-vs-normal
+#| fig-align: center
+#| echo: false
+
+n = 30
+mu0 = 0.5
+t = 19
+
+x = numpy.arange(0, 30)
+binom_pmf = binom.pmf(x, n, mu0)
+norm_pmf = norm(loc=n*mu0, scale=numpy.sqrt(n*mu0*(1-mu0))).pdf(x)
+
+pyplot.figure(figsize=(10, 5))
+pyplot.title('Біноміальний vs. нормальний розподіл', fontsize=12)
+pyplot.bar(x, binom_pmf, alpha=0.6, label='Біноміальний розподіл')
+pyplot.plot(x, norm_pmf, label='Нормальний розподіл')
+pyplot.legend(fontsize=12)
+pyplot.xlabel('X', fontsize=12)
+pyplot.ylabel('Щільність', fontsize=12)
+pyplot.show()
+```
 
 ## 📈 Задача 🚚: [нормальний розподіл]{.hi} {.smaller}
 
@@ -505,10 +538,10 @@ $H_0: \mu = \mu_0\ vs.\ H_1: \mu > \mu_0$
 - Двосторонній критерій: $\left\{Z(X) \geq z_{1 - \frac{\alpha}{2}} \right\} \bigcup \left\{Z(X) \leq -z_{1 - \frac{\alpha}{2}} \right\}$
     - p-value = $2\cdot \min \left[{\Phi(z), 1 - \Phi(z)} \right]$, де $z$ --- реалізація статистики $Z(X)$
 
-## Python та $Z$-критерій Фішера
+## Python та $Z$-критерій Фішера: мала вибірка
 
 ```{python}
-#| label: z-test
+#| label: z-test-small
 
 def z_criterion_pvalue(sample_mean, sample_size, mu0, variance):
     Z_statistic = numpy.sqrt(sample_size) * (sample_mean - mu0) / numpy.sqrt(variance)
@@ -527,7 +560,246 @@ z_pvalue = z_criterion_pvalue(t/n, n, mu0, variance)
 print(f"Z-тест p-value: {z_pvalue}")
 ```
 
-# Дякую за увагу! {.unnumbered .unlisted background-iframe=".02_files/libs/colored-particles/index.html"}
+## Python та $Z$-критерій Фішера: більша вибірка
+
+```{python}
+#| label: z-test-large
+
+def z_criterion_pvalue(sample_mean, sample_size, mu0, variance):
+    Z_statistic = numpy.sqrt(sample_size) * (sample_mean - mu0) / numpy.sqrt(variance)
+    return 1 - norm().cdf(Z_statistic)
+
+n = 3000
+t = 1544
+mu0 = 0.5
+variance = mu0 * (1 - mu0)
+
+old_p_value = get_pvalue_by_old_logic(n, mu0, t)
+print(f"p-значення, отримане за старою, коректною формулою: {old_p_value}")
+normal_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+print(f"p-значення, отримане з наближення нормальним розподілом: {normal_p_value}")
+z_pvalue = z_criterion_pvalue(t/n, n, mu0, variance)
+print(f"Z-тест p-value: {z_pvalue}")
+```
+
+## Поправка на неперервність {.tiny}
+
+> Чи можна уточнити результати $Z$-тесту для біноміального розподілу за малих розмірів вибірок?
+
+- $Z$-тест: $p$-значення = 0.07
+- Точний $p$-значення = 0.10
+
+Для початку давайте візуалізуємо функцію `p-value(t)` критеріїв, описаних вище: 
+
+- `p-value` критерію, заснованого на нормальному наближенні
+    - тут проста формула: треба реалізувати `1 - norm.cdf(t)`
+- `p-value` біноміального критерію. Порахуємо його у 2 випадках:
+    - t &mdash; неціле число. Розглянемо на прикладі
+        - Нехай `t=19.5`. 
+        p-value $= P(T(X) \geq t) = P(T(X) \geq 19.5) = 1 - P(T(X) < 19.5) =|P(T(X) = 19.5) = 0|= 1 - P(T(X) \leq 19.5)$. Зауважимо, що остання ймовірність &mdash; функція розподілу. Тому
+            - `p-value = 1 - binom.cdf(t, n, mu0)`
+    - t &mdash; ціле число.
+        - Нехай `t=19`. p-value $= P(T(X) \geq t) = P(T(X) \geq 19) = 1 - P(T(X) < 19) = 1 - P(T(X) \leq 18)$. 
+            - `p-value = 1 - binom.cdf(t-1, n, mu0)`
+            - а також `p-value(t) = 1 - binom.cdf(t-a, n, mu0) = p-value(t-a)`, де `0 < a < 1`. Наприклад, `p-value(19) = p-value(18.9)`.
+    - Тобто, щоб зобразити біноміальне p-value, треба зобразити функцію `p-value = 1 - binom.cdf(t, n, mu0)`. Значення p-value у цілих точках лежатимуть на правих кінцях вертикальних відрізків.
+
+## Поправка на неперервність {.tiny}
+
+```{python}
+#| label: continuity-correction-def
+#| code-fold: true
+#| fig-align: center
+
+def cmp_pvalue_binom_and_norm(n, mu0, t, add_to_x=0):
+    """
+        Функція для порівняння функцій pvalue у біноміального критерію і нормальної апроксимації.
+        Будує графіки:
+            - binom pvalue
+            - norm pvalue
+            - великими крапками позначено pvalue у точці t, отримані 2 способами.
+        Параметри:
+            - n: кількість значень у вибірці
+            - mu0: конверсія за умови коректності нульової гіпотези
+            - t: кількість доставок з оплатою
+            - add_to_x: параметр для додавання до T(X) у нормальному розподілі.
+    """
+
+    x_axis = numpy.linspace(0, n, 1000)
+    dots_to_show = numpy.arange(0, n + 1, 1)
+    # параметри нормального розподілу
+    sum_mu = n * mu0
+    sum_variance = n * mu0 * (1 - mu0)
+    sum_std = numpy.sqrt(sum_variance)
+
+    # самі розподіли
+    binom_dist = binom(n=n, p=mu0)
+    norm_dist = norm(loc=sum_mu, scale=sum_std)
+
+    pyplot.figure(figsize=(20, 7))
+    pyplot.title('Порівняння p-value: біноміального і нормального', fontsize=12)
+    # будуємо красивий дискретний бернулліївський розподіл
+    # спочатку горизонтальні лінії
+    pyplot.hlines(1 - binom_dist.cdf(x_axis[:-1]), x_axis[:-1],
+                x_axis[1:], color=slate, linestyle='-')
+    # вертикальні лінії, яких насправді немає
+    pyplot.vlines(x_axis[:-1], 1 - binom_dist.cdf(x_axis[:-1]), 1 - binom_dist.cdf(x_axis[1:]),
+                color=slate, linestyle=':')
+    # дискретні точки в розподілі
+    pyplot.scatter(dots_to_show, 1 - binom_dist.cdf(dots_to_show-1), color=slate, 
+                alpha=1, linewidths=0.5,
+                label=f'Binom pvalue = 1-binom.cdf(x-1)')
+    # pvalue через біноміальний розподіл
+    pyplot.scatter(t, 1 - binom_dist.cdf(t - 1), color=slate, marker='o',
+                alpha=1, s=100, label=f'binom p-value({t})')
+    # нормальний розподіл, що апроксимує, нормальний розподіл
+    add_str = "" if add_to_x == 0 else f"{add_to_x}"
+    pyplot.plot(x_axis, 1 - norm_dist.cdf(x_axis + add_to_x), color=red_pink, alpha=0.5,
+             label=f'Normal pvalue = 1-norm.cdf(x{add_str})')
+    # pvalue через нормальний розподіл
+    pyplot.scatter(t, 1 - norm_dist.cdf(t + add_to_x), color=red_pink, 
+                alpha=1, marker='o', s=100, label=f'norm p-value({t})')
+
+    pyplot.legend(fontsize=12)
+    pyplot.xlabel('t', fontsize=12)
+    pyplot.ylabel('p-value', fontsize=12)
+    pyplot.show()
+
+cmp_pvalue_binom_and_norm(30, 0.5, 15)
+```
+
+- $p_{\text{binom}} > p_{\text{norm}}$
+- При збільшенні розміру вибірки ці значення збігаються.
+
+## Поправка на неперервність {.tiny}
+
+```{python}
+#| label: continuity-correction-difference-1
+
+n = 20
+t = 10
+
+old_p_value = get_pvalue_by_old_logic(n, mu0, t)
+print(f"p-value, отримане за старою, коректною формулою: {old_p_value}")
+normal_dist_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+print(f"p-value, отримане з наближення нормальним розподілом: {normal_dist_p_value}")
+print(f"Різниця: {round(abs(old_p_value - normal_dist_p_value), 3)}")
+```
+
+<br>
+
+```{python}
+#| label: continuity-correction-difference-2
+
+# При зростанні t
+n = 20
+t = 14
+
+old_p_value = get_pvalue_by_old_logic(n, mu0, t)
+print(f"p-value, отримане за старою, коректною формулою: {old_p_value}")
+normal_dist_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+print(f"p-value, отримане з наближення нормальним розподілом: {normal_dist_p_value}")
+print(f"Різниця: {round(abs(old_p_value - normal_dist_p_value), 3)}")
+```
+
+<br>
+
+```{python}
+#| label: continuity-correction-difference-3
+
+# При зростанні n
+n = 200
+t = 100
+
+old_p_value = get_pvalue_by_old_logic(n, mu0, t)
+print(f"p-value, отримане за старою, коректною формулою: {old_p_value}")
+normal_dist_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+print(f"p-value, отримане з наближення нормальним розподілом: {normal_dist_p_value}")
+print(f"Різниця: {round(abs(old_p_value - normal_dist_p_value), 3)}")
+```
+
+## Поправка на неперервність
+
+$$F_{\text{new}}(x) = F_{\text{old}}(x - 0.5)$$ 
+
+```{python}
+#| label: continuity-correction-correction
+#| fig-align: center
+
+cmp_pvalue_binom_and_norm(30, 0.5, 15, add_to_x=-0.5)
+```
+
+## Поправка на неперервність {.smaller}
+
+```{python}
+#| label: continuity-correction-def-2
+
+def get_pvalue_by_normal_approx_with_addition(n, mu0, t):
+    sum_mu = n * mu0
+    sum_variance = n * mu0 * (1 - mu0)
+    sum_std = numpy.sqrt(sum_variance)
+
+    return 1 - norm(loc=sum_mu, scale=sum_std).cdf(t - 0.5)
+```
+<br>
+
+```{python}
+#| label: continuity-correction-difference-4
+
+n = 30
+mu0 = 0.5
+t = 19
+
+old_p_value = get_pvalue_by_old_logic(n, mu0, t)
+print(f"p-value, отримане за старою, коректною формулою: {old_p_value}")
+normal_dist_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+print(f"p-value, отримане з наближення нормальним розподілом: {normal_dist_p_value}")
+normal_with_add_p_value = get_pvalue_by_normal_approx_with_addition(n, mu0, t)
+print(f"p-value, отримане з наближення нормальним розподілом із поправкою: {normal_with_add_p_value}")
+```
+
+## Поправка та критерій Фішера {.smaller}
+
+```{python}
+#| label: z-test-small-cc
+
+def z_criterion_pvalue(sample_mean, sample_size, mu0, variance, use_continuity_correction=False):
+    if use_continuity_correction:
+        # коригуємо значення суми, як робили це раніше
+        sample_mean = (sample_mean * sample_size - 1/2) / sample_size
+    Z_statistic = numpy.sqrt(sample_size) * (sample_mean - mu0) / numpy.sqrt(variance)
+    return 1 - norm().cdf(Z_statistic) 
+```
+
+Переглянемо результати для малої вибірки:
+
+```{python}
+#| label: z-test-small-cc-results
+
+n = 30
+t = 19
+mu0 = 0.5
+variance = mu0 * (1 - mu0)
+
+old_p_value = get_pvalue_by_old_logic(n, mu0, t)
+print(f"p-value, отримане за старою, коректною формулою: {old_p_value}")
+normal_with_add_p_value = get_pvalue_by_normal_approx_with_addition(n, mu0, t)
+print(f"p-value, отримане з наближення нормальним розподілом із поправкою: {normal_with_add_p_value}")
+z_pvalue = z_criterion_pvalue(t/n, n, mu0, variance, use_continuity_correction=True)
+print(f"Z-тест p-value: {z_pvalue}")
+```
+
+## Підсумок
+
+У цьому занятті ми:
+
+- Пригадали, що таке нормальний розподіл і які в нього є властивості.
+- Згадали, як формулюється Центральна гранична теорема і як її можна використовувати.
+- Дізналися про $Z$-критерій Фішера і розв'язали за його допомогою задачу про конверсії.
+    - Крім того, на практиці побачили, що таке поправка на неперервність і навіщо вона потрібна.
+    - Єдине але: [в цьому критерії потрібно знати дисперсію вибірки. Але на практиці вона не завжди відома]{.hi}.
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".03_files/libs/colored-particles/index.html"}
 
 <br> <br>
 
