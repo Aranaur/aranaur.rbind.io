@@ -1,0 +1,792 @@
+---
+title: "$t$-критерій Ст'юдента"
+subtitle: "Прикладний статистичний аналіз"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка, ФІТ
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .04_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: <a href="https://aranaur.rbind.io/lectures/asa/">🔗Прикладний статистичний аналіз</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    # center: true
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    # controls-layout: bottom-right
+    chalkboard: true
+    logo: fit.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    # fig-width: 9
+    # fig-height: 5
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+  # gfm:
+  #   mermaid-format: png
+preload-iframes: true
+jupyter: python3
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Import libraries
+from scipy.stats import (
+    norm, binom, expon, t, chi2, pareto, ttest_1samp, ttest_ind, sem
+)
+from statsmodels.stats.api import CompareMeans, DescrStatsW
+from statsmodels.stats.proportion import proportion_confint
+import numpy as numpy
+from seaborn import distplot
+from matplotlib import pyplot
+import seaborn
+
+from IPython.display import Markdown
+from tabulate import tabulate
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# $t'$-тест {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## 📈 Задача {.smaller}
+
+> У нашій компанії хочуть перейти з однієї СУБД на іншу. Головним критерієм для переходу є «витрачений час у добі на завантаження нових даних». Якщо раніше для щоденного оновлення бази було потрібно в середньому 10 годин, то хочеться знайти нову СУБД, у якій усе це відбуватиметься швидше, ніж за 7 годин.
+>
+> Для цього було прийнято рішення перенести всі дані на нову тестовану СУБД. Протягом одного тижня щодня ми порахуємо час завантаження даних, і якщо в середньому на оновлення витрачатиметься менше 7 годин, то ми повністю перейдемо на нову СУБД. Ваше завдання придумати, як перевірити гіпотезу про те, що нова СУБД краща за стару.
+
+Вийшла вибірка:
+
+- `[6.9, 6.45, 6.32, 6.88, 6.19, 7.13, 6.76]` --- час завантаження в нову БД по днях у годинах.
+
+## 📊 Гіпотеза
+
+- $X_1, X_2, ..., X_7$ --- час завантаження в годинах нових даних у СУБД за кожен день експерименту
+- $X$ з нормального розподілу.
+
+```{python}
+#| label: data-gen
+
+X = numpy.array([6.9, 6.45, 6.32, 6.88, 6.09, 7.13, 6.76])
+print(f"Середній час завантаження в СУБД: {round(numpy.mean(X), 2)}")
+```
+
+- $H_0: \bar{X} \geq 7$ vs. $H_1: \bar{X} < 7$
+
+## 📐 $Z$-критерій
+
+- Статистика $Z(X) = \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{\sigma^2}}$
+
+. . .
+
+Тоді треба лише порахувати таку статистику: $$\sqrt{n}\dfrac{\overline X - 7}{\sqrt{\sigma^2}} \overset{H_0}{\sim} \mathcal{N}(0, 1)$$
+
+. . .
+
+::: {.callout-important}
+Але є одна проблема: [ми не знаємо $\sigma^2$!]{.hi}
+:::
+
+## 📐 $t'$-тест {.smaller}
+
+$\widehat{\sigma^2} =S^2 = \dfrac{1}{n - 1}\underset{i=1}{\overset{n}{\sum}}(X_i - \overline X)^2$
+
+. . .
+
+```{python}
+#| label: sigma-hat
+
+# ddof = 1 -- Це означає, що ділимо не на n, а на n-1 у формулі вище
+print(f"Оцінка sigma^2: {numpy.var(X, ddof=1)}")
+```
+
+. . .
+
+Давайте введемо новий критерій $t$-критерій, у якому ми підставимо:
+
+- $T(X) := \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{S^2}}$
+- $T(X) \overset{H_0}{\sim} \mathcal{N}(0, 1)$ 🤨
+
+. . .
+
+> Залишилося перевірити: Чи правда, що при $H_0$ розподіл статистики T --- стандартний нормальний?
+
+## 📊 Розподіл статистики
+
+- Ми $M$ раз генеруємо вибірку $X$ і порахуємо щоразу статистику $T(X)$.
+- У підсумку ми отримаємо вибірку розміру $M$ для $T(X)$ і зможемо побудувати гістограму розподілу. 
+- Окремо побудуємо розподіл $\mathcal{N}(0, 1)$. 
+- Якщо емпіричний розподіл візуально збіжиться з теоретичним нормальним, значить, усе добре. А якщо ні, то так просто ми не можемо замінити $\sigma^2$ на $S^2$.
+    - Додатково подивимося, що буде, якщо замінити $T(X)$ на $Z(X)$.
+
+## 🐍 Python та 📊 Розподіл статистики {.smaller}
+
+```{python}
+#| label: t-test-sim-def
+
+def sample_statistics(number_of_experiments, statistic_function, sample_size, sample_distr):
+    """
+        Функція для генерації вибірки деякої статистики statistic_function, побудованої за вибіркою з розподілу sample_distr.
+        Повертає вибірку розміру number_of_experiments для statistic_function.
+
+        Параметри:
+            - number_of_experiments: кількість експериментів, у кожному з яких ми порахуємо statistic_function
+            - statistic_function: статистика, яка приймає на вхід вибірку з розподілу sample_distr
+            - sample_size: розмір вибірки, яка подається на вхід statistic_function
+            - sample_distr: розподіл початкової вибірки, за якою рахується статистика
+    """
+
+    statistic_sample = []
+    for _ in range(number_of_experiments):
+        # генеруємо number_of_experiments раз вибірку
+        sample = sample_distr.rvs(sample_size)
+
+        # рахуємо статистику
+        statistic = statistic_function(sample)
+
+        # зберігаємо
+        statistic_sample.append(statistic)
+    return statistic_sample
+```
+
+## 🐍 Python та 📊 Розподіл статистики {.tiny}
+
+```{python}
+#| label: t-test-sim-run
+#| code-fold: true
+#| fig-align: center
+
+numpy.random.seed(8)
+
+sample_size = 7
+M = 100000
+sample_distr = norm(loc=5, scale=3) # Нехай вибірка з цього розподілу
+
+T_X = lambda sample: numpy.sqrt(sample_size) * (numpy.mean(sample) - sample_distr.mean()) / numpy.sqrt(numpy.var(sample, ddof=1)) # або numpy.std
+Z_X = lambda sample: numpy.sqrt(sample_size) * (numpy.mean(sample) - sample_distr.mean()) / sample_distr.std()
+samples = {
+    "T(X)": sample_statistics(
+    number_of_experiments=M, statistic_function=T_X,
+    sample_size=sample_size, sample_distr=sample_distr),
+
+    "Z(X)": sample_statistics(
+    number_of_experiments=M, statistic_function=Z_X,
+    sample_size=sample_size, sample_distr=sample_distr)
+}
+
+
+pyplot.figure(figsize=(22, 5))
+
+for i, name in enumerate(["T(X)", "Z(X)"]):
+    pyplot.subplot(1, 2, i + 1)
+    current_sample = samples[name]
+    l_bound, r_bound = numpy.quantile(current_sample, [0.001, 0.999])
+
+    x = numpy.linspace(l_bound, r_bound, 1000)
+    pyplot.title(f'Розподіл статистики {name}, sample size={sample_size}', fontsize=12)
+    distplot(current_sample, label='Емпіричний розподіл')
+    pyplot.plot(x, norm(0, 1).pdf(x), label='$\mathcal{N}(0, 1)$')
+    pyplot.legend(fontsize=12)
+    pyplot.xlabel(f'{name}', fontsize=12)
+    pyplot.xlim((l_bound, r_bound))
+    pyplot.ylabel('Щільність', fontsize=12)
+    pyplot.grid(linewidth=0.2)
+
+pyplot.show()
+```
+
+::: {.callout-important icon=false}
+- $Z$-test тут працює: $\sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{\sigma^2}} \sim \mathcal{N}(0, 1)$.
+- Але ось для $T(X)$ це не так! [Вони відрізняються! А значить $t'$-критерій не підходить для початкової задачі!]{.hi}
+:::
+
+## 📝 Чому так вийшло? {.smaller}
+
+$S^2$ --- це випадкова величина!
+
+Давайте подивимося на розподіл $\sqrt{S^2}$ на все тому ж нормальному розподілі.
+
+```{python}
+#| label: sigma-hat-sim
+#| code-fold: true
+#| fig-align: center
+
+numpy.random.seed(42)
+
+S2 = lambda sample: numpy.std(sample, ddof=1)
+S2_sample = sample_statistics(
+    number_of_experiments=M, statistic_function=S2,
+    sample_size=sample_size, sample_distr=sample_distr
+)
+
+pyplot.figure(figsize=(10, 5))
+pyplot.title('Розподіл $\sqrt{S^2}$', fontsize=12)
+distplot(S2_sample, label='Емпіричний розподіл')
+pyplot.legend(fontsize=12)
+pyplot.xlabel('$\sqrt{S^2}$', fontsize=12)
+pyplot.ylabel('Щільність розподілу', fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.show()
+```
+
+::: {.callout-note icon=false}
+## Висновок
+
+$T(X) \overset{H_0}{\nsim} \mathcal{N}(0, 1)$ 😭
+:::
+
+## Який розподіл має $T(X)$? {.tiny40}
+
+1. Нехай $X_1 \ldots X_n \sim \mathcal{N}(\mu, \sigma^2)$
+
+2. Нехай $\xi_1 \ldots \xi_n \sim \mathcal{N}(0, 1)$. Тоді $\eta=\xi_1^2 +\ ... +\xi_n^2 \sim \chi^2_n$, &mdash; [**$\chi^2$ розподіл з $n$ ступенями свободи**](https://en.wikipedia.org/wiki/Chi-squared_distribution).
+    - Тоді $\underset{i=1}{\overset{n}{\sum}}\left(\xi_i - \overline \xi \right)^2 \sim \chi^2_{n-1}$. [Дов-ня](https://en.wikipedia.org/wiki/Cochran%27s_theorem) 🫠
+
+    - $S^2_X = \dfrac{1}{n - 1}\underset{i=1}{\overset{n}{\sum}}(X_i - \overline X)^2$
+
+    - $\xi_i := \dfrac{X_i - \mu}{\sigma} \sim \mathcal{N}(0, 1)$. Тоді $S^2_{\xi} = \dfrac{1}{\sigma^2}S^2_X$.
+
+    - А отже $\dfrac{(n - 1)\cdot S^2_X}{\sigma^2} = \underset{i=1}{\overset{n}{\sum}}\left(\xi_i - \overline \xi \right)^2 \sim \chi^2_{n-1}$
+
+3. Нехай $\xi \sim \mathcal{N}(0, 1), \eta \sim \chi^2_k$ і $\xi$ з $\eta$ незалежні. Тоді статистика $\zeta = \dfrac{\xi}{\sqrt{\eta/k}} \sim t_{k}$ &mdash; з [розподілу Ст'юдента](https://en.wikipedia.org/wiki/Student%27s_t-distribution) з $k$ ступенями свободи.
+
+    - $\xi := \sqrt{n}\dfrac{\overline X - \mu_0}{\sigma} \sim \mathcal{N}(0, 1)$
+    - $\eta := \dfrac{(n - 1)\cdot S^2_X}{\sigma^2} \sim \chi^2_{n-1}$
+    - $\xi$ і $\eta$ [незалежні](https://math.stackexchange.com/questions/4165803/overlinex-and-s2-are-independent)
+    - Тоді
+$$
+\begin{align}
+T = \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{S^2}} = \frac{\sqrt{n}\dfrac{\overline X - \mu_0}{\sigma}}{\sqrt{\dfrac{(n - 1)\cdot S^2_X}{(n - 1)\sigma^2}}} = \dfrac{\xi}{\sqrt{\dfrac{\eta}{n-1}}} \sim t_{n - 1}
+\end{align}
+$$
+
+## 📈 Задача та 📐 $t$-тест {.smaller}
+
+$T = \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{S^2}} \sim t_{n - 1}$ --- взята з розподілу Ст'юдента з $n - 1$ ступенем свободи.
+
+<br>
+
+```{python}
+#| label: t-test-data
+
+X = numpy.array([6.9, 6.45, 6.32, 6.88, 6.09, 7.13, 6.76])
+t_stat = numpy.sqrt(sample_size) * (numpy.mean(X) - 7) / numpy.sqrt(numpy.var(X, ddof=1))
+print(f"t-статистика: {round(t_stat, 2)}")
+```
+
+<br>
+
+```{python}
+#| label: t-test-p-value
+
+p_value = t.cdf(t_stat, df=sample_size - 1)
+print(f"p-значення: {round(p_value, 4)}")
+```
+
+<br>
+
+```{python}
+#| label: ttest_1samp
+
+ttest_1samp(X, 7, alternative='less')
+```
+
+# Довірчі інтервали {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## 📊 Довірчий інтервал для середнього: варіант 1 {.tiny}
+
+[Довірчий інтервал]{.hi} --- множина $m$: тест не відхиляє $H_0: \mu = m$ на рівні значущості $\alpha$.
+
+- Нехай $\mu$ --- істинне середнє вибірки. Ми також знаємо, що за $H_0: \sqrt{n}\dfrac{\overline X - m}{\sqrt{S^2}} \sim t_{n - 1}$.
+
+- Нас цікавлять такі $m$, що: $\left\{-t_{n-1, 1 - \frac{\alpha}{2}} < \sqrt{n}\dfrac{\overline X - m}{\sqrt{S^2}} < t_{n-1, 1 - \frac{\alpha}{2}} \right\}$, у цьому випадку критерій не відкинеться.
+
+- Розпишемо, щоб у центрі залишилося тільки $m$:
+
+$$\left\{\overline X - \dfrac{t_{n - 1, 1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}} < m < \overline X + \dfrac{t_{n - 1, 1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}}\right\}$$
+
+- Тоді довірчий інтервал:
+
+$$CI_{\mu} = \left(\overline X \pm \dfrac{t_{n - 1, 1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}} \right),$$ 
+
+де $S^2 = \dfrac{1}{n - 1}\underset{i=1}{\overset{n}{\sum}}(X_i - \overline X)^2$
+
+## 📊 Довірчий інтервал для середнього: варіант 2 {.tiny}
+
+[Класичне визначення](https://en.wikipedia.org/wiki/Confidence_interval#Definition) довірчого інтервалу:
+
+> Довірчим інтервалом для параметра $\theta$ рівня довіри $1 - \alpha$ є пара статистик $L(X), R(X)$, таких, що $P(L(X) < \theta < R(X)) = 1 - \alpha$.
+
+$$
+\begin{align}
+&T(X) = \sqrt{n}\dfrac{\overline X - \mu}{\sqrt{S^2}} \sim t_{n - 1} \Rightarrow \\
+&P\left(-t_{n - 1, 1-\alpha/2} < \sqrt{n}\dfrac{\overline X - \mu}{\sqrt{S^2}} < t_{n - 1, 1-\alpha/2} \right) = 1 - \alpha \Leftrightarrow \\
+&P\left(\overline X - \dfrac{t_{n - 1, 1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}}  < \mu < \overline X + \dfrac{t_{n - 1, 1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}} \right) = 1 - \alpha
+\end{align}
+$$
+
+- Тоді довірчий інтервал:
+
+$$CI_{\mu} = \left(\overline X \pm \dfrac{t_{n - 1, 1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}} \right)$$
+
+## 🐍 Python та 📊 довірчий інтервал
+
+```{python}
+#| label: ci
+
+sample = norm(loc=10, scale=2).rvs(100)
+
+# sem -- стандартна помилка середнього, sem = sqrt(S^2)/sqrt(n)
+left_bound, right_bound = t.interval(confidence=0.95, loc=numpy.mean(sample), df=len(sample)-1, scale=sem(sample))
+print(f"CI = [{round(left_bound, 2)}, {round(right_bound, 2)}]")
+```
+
+<br>
+
+📈 Задача
+```{python}
+#| label: ci-data
+
+X = numpy.array([6.9, 6.45, 6.32, 6.88, 6.09, 7.13, 6.76])
+left_bound, right_bound = t.interval(confidence=0.95, loc=numpy.mean(X), df=len(X)-1, scale=sem(X))
+print(f"CI = [{round(left_bound, 2)}, {round(right_bound, 2)}]")
+```
+
+# $t$-тест та невідомий розподіл {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## 📊 Задача {.tiny}
+
+> Ви придумали ідею для стартапу, де кур'єри збирають замовлення для клієнтів і відвозять їм додому. Маржа від замовлення у вашому стартапі --- X ₴, а вартість роботи кур'єра --- 1k ₴. Специфіка вашого стартапу така, що є великий ризик повернення без оплати. З урахуванням вартостей, інвестори готові проспонсорувати вам інфраструктуру і залучення клієнтів, якщо ви покажете, що у вас буде прибуток.
+
+> З даних у вас є принесені гроші від кожного користувача. Іноді позитивна величина, іноді негативна.
+
+- $X_1, X_2, \dots X_N$ --- вибірка прибутку від користувача.
+- $H_0$: $E \overline{X} \leq 0$ vs. $H_1: E \overline{X} > 0$
+
+Дані:
+
+```{python}
+#| label: profit-data
+
+profits = numpy.loadtxt('data/profit_from_user.out', delimiter=',')
+print(profits[:100])
+```
+
+## 📊 Задача {.tiny}
+
+```{python}
+#| label: profit-avg
+
+print(f"average profit = {profits.mean()}")
+print(f"n = {profits.shape[0]}")
+```
+
+<br>
+
+```{python}
+#| label: profit-distplot
+
+seaborn.distplot(profits)
+pyplot.grid(linewidth=0.2)
+```
+
+- Початкова вибірка не з нормального розподілу
+- Вибірка досить велика: не 7 елементів, а вже 5000.
+
+[Чи можемо ми використати нормальний розподіл для наближення?]{.hi}
+
+## $t$-тест та наближення {.tiny40}
+
+1. Будемо розглядати ту саму статистику $T = \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{S^2}}$
+2. $\xi := \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{\sigma^2}} \stackrel{d}{\rightarrow} \mathcal{N}(0, 1)$. За ЦГТ збіжність є тільки за [розподілом](https://en.wikipedia.org/wiki/Convergence_in_distribution).
+3. тоді $T = \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{S^2}} = \xi \cdot \sqrt{\dfrac{\sigma^2}{S^2}}$. Позначимо $\phi := \sqrt{\dfrac{\sigma^2}{S^2}}$
+    - Пам'ятаєте, на початку лекції було сказано, що $S^2$ &mdash; найкраща оцінка для дисперсії? По-іншому це можна записати так: $S^2$ [збігається за ймовірністю](https://en.wikipedia.org/wiki/Convergence_of_random_variables#Convergence_in_probability) до $\sigma^2$. Тобто $S^2 \stackrel{p}{\rightarrow} \sigma^2$
+    - А в цьому випадку існує [теорема](https://en.wikipedia.org/wiki/Continuous_mapping_theorem), яка стверджує, що $\phi = \dfrac{\sigma^2}{S^2}  \stackrel{p}{\rightarrow} 1$.
+4. $T = \xi \cdot \phi$.
+    - $\xi \stackrel{d}{\rightarrow} \mathcal{N}(0, 1)$
+    - $\phi \stackrel{p}{\rightarrow} 1$
+    - І тут набуває чинності ще одна [теорема](https://en.wikipedia.org/wiki/Slutsky%27s_theorem): $T = \xi \cdot \phi \stackrel{d}{\rightarrow} 1\cdot \mathcal{N}(0, 1)$. Та сама збіжність, що й у ЦГТ!
+    - Тобто статистика $T$ так само нормально розподілена!
+
+[Отже, якщо вибірка велика, то ми можемо вважати, що $T(X) \overset{H_0}{\sim} \mathcal{N}(0, 1)$.]{.hi}
+
+## 🐍 Python та перевірка {.tiny40}
+
+Перевіримо наш критерій на великих вибірках:
+
+```{python}
+#| label: sim-t-test
+#| code-fold: true
+#| fig-align: center
+
+numpy.random.seed(8)
+
+sample_size=2000
+M = 10000
+sample_distr = expon(loc=5, scale=300)
+
+T_X = lambda sample: numpy.sqrt(sample_size) * (numpy.mean(sample) - sample_distr.mean()) / numpy.std(sample, ddof=1)
+T_sample = sample_statistics(
+    number_of_experiments=M, statistic_function=T_X,
+    sample_size=sample_size, sample_distr=sample_distr)
+
+pyplot.figure(figsize=(10, 5))
+l_bound, r_bound = numpy.quantile(T_sample, [0.001, 0.999])
+
+
+x = numpy.linspace(l_bound, r_bound, 1000)
+pyplot.title(f'Розподіл статистики T(X), sample size={sample_size}', fontsize=12)
+distplot(T_sample, label='Емпіричний розподіл')
+pyplot.plot(x, norm(0, 1).pdf(x), label='Експоненціальний розподіл')
+pyplot.legend(fontsize=12)
+pyplot.xlabel(f'{name}', fontsize=12)
+pyplot.xlim((l_bound, r_bound))
+pyplot.ylabel('Щільність', fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.show()
+```
+
+Ми бачимо, що розподіли збіглися!
+
+## 🐍 Python та перевірка {.tiny40}
+
+А на нормальному розподілі, де вперше були відмінності на маленькій вибірці?
+
+```{python}
+#| label: sim-t-test-norm
+#| code-fold: true
+#| fig-align: center
+
+numpy.random.seed(8)
+
+sample_size=2000
+M = 30000
+sample_distr = norm(loc=5, scale=300)
+
+T_X = lambda sample: numpy.sqrt(sample_size) * (numpy.mean(sample) - sample_distr.mean()) / numpy.std(sample, ddof=1)
+T_sample = sample_statistics(
+    number_of_experiments=M, statistic_function=T_X,
+    sample_size=sample_size, sample_distr=sample_distr)
+
+pyplot.figure(figsize=(10, 5))
+l_bound, r_bound = numpy.quantile(T_sample, [0.001, 0.999])
+
+
+x = numpy.linspace(l_bound, r_bound, 1000)
+pyplot.title(f'Розподіл статистики T(X), sample size={sample_size}', fontsize=12)
+distplot(T_sample, label='Емпіричний розподіл')
+pyplot.plot(x, norm(0, 1).pdf(x), label='$\mathcal{N}(0, 1)$')
+pyplot.legend(fontsize=12)
+pyplot.xlabel(f'{name}', fontsize=12)
+pyplot.xlim((l_bound, r_bound))
+pyplot.ylabel('Щільність', fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.show()
+```
+
+Тобто першого разу нам не пощастило, що розмір вибірки був маленьким
+
+## Довірчий інтервал {.tiny}
+
+$$CI_{\mu} = \left(\overline X \pm \dfrac{z_{1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}} \right)$$
+
+```{python}
+#| label: ci-expon
+
+sample = expon(scale=300).rvs(2000) # E sample = scale = 300
+left_bound, right_bound = norm.interval(confidence=0.95, loc=numpy.mean(sample), scale=sem(sample))
+print(f"CI = [{round(left_bound, 2)}, {round(right_bound, 2)}]")
+```
+
+<br>
+
+- 📊 Задача
+
+```{python}
+#| label: ci-profit
+
+left_bound, right_bound = norm.interval(confidence=0.95, loc=numpy.mean(profits), scale=sem(profits))
+print(f"CI = [{round(left_bound, 2)}, {round(right_bound, 2)}]")
+```
+
+Так, виручка позитивна! Значить ми знайшли інвесторів для нашого стартапу 🫡
+
+## $t'$-тест vs. $t$-тест {.tiny40}
+
+Для початку визначимося, коли який критерій краще використовувати?
+
+1. Якщо вибірка розміру 60, то вже $t_{59} \approx \mathcal{N}(0, 1)$.
+    - Подивимося на розподіли Стьюдента і нормального:
+
+```{python}
+#| label: t-dist
+#| output-location: column
+
+df = 59
+t_dist = t(df=df)
+z_dist = norm(loc=0, scale=1)
+
+x = numpy.linspace(-3, 3, 100)
+pyplot.figure(figsize=(10, 5))
+pyplot.title(f'Щільність розподілу статистики T і N', fontsize=12)
+pyplot.plot(x, z_dist.pdf(x), label='N(0, 1)')
+pyplot.plot(x, t_dist.pdf(x), label=f't(df={df})')
+pyplot.legend(fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.show()
+```
+
+- Ми бачимо, що ці 2 розподіли візуально повністю збігаються, тому неважливо, як порахувати: статистика $T\sim \mathcal{N}(0, 1)$ або $T\sim t_n$.
+- Але це не означає, що з N=60 T-test/T'-test працюють коректно! Якщо вибірка не з нормального розподілу, вони обидва можуть все ще помилятися.
+
+## $t'$-тест vs. $t$-тест {.tiny40}
+
+2. Якщо вибірка менше 60, то безпечніше використовувати t-test, ніж t'-test.
+    - **У T-test FPR завжди буде меншим, ніж у T'-test**.
+        - На FPR впливає відсоток випадків `pvalue < alpha`. У t-test pvalue $\geq$ t'-test pvalue.
+        - `pvalue = t_distr.cdf(x)` або `pvalue = norm_dist.cdf(x)`. Тож чим важчий хвіст у розподілу, тим більше p-value. А тепер подивимося на прикладі:
+
+```{python}
+#| label: t-test-vs-tprime
+#| output-location: column
+
+df_array = [2, 5, 10, 20]
+x = numpy.linspace(-3, 3, 100)
+
+pyplot.figure(figsize=(10, 5))
+pyplot.title(f'CDF розподілів T та N', fontsize=12)
+for df in df_array:
+    t_dist = t(df=df)
+    pyplot.plot(x, t_dist.cdf(x), label=f't(df={df})')
+
+z_dist = norm(loc=0, scale=1)
+pyplot.plot(x, z_dist.cdf(x), c=red_pink, label='N(0, 1)')
+pyplot.legend(fontsize=12)
+pyplot.xlabel('X', fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.show()
+```
+
+Розподіл Стьюдента з нескінченністю ступенів свободи --- це нормальний розподіл: $t_{\infty} = \mathcal{N}(0, 1)$. Тому `norm(0, 1).cdf(x) = t_distr(df=infinity).cdf(x) < t_distr(df=N).cdf(x)`.
+
+## Висновки
+
+Ми бачимо, що ми скрізь можемо використовувати $t$-test (а $t'$-test не завжди), і в разі маленьких вибірок він безпечніший. **Тому $t$-test і став набагато популярнішим, ніж $t'$-test**. Але $t'$-test на практиці може бути теж корисний:
+
+- Не треба думати під час реалізації про ступені свободи.
+- Написати такий критерій на SQL буде набагато простіше: ви можете використовувати табличні значення в коді, щоб зрозуміти, чи відхиляється критерій.
+- Робити різні теоретичні обчислення простіше.
+- У ньому складніше помилитися під час реалізації.
+
+# Двовибірковий $t$-тест. Задача AB-тестування {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## 📊 Задача
+
+> У нас на сайті є послуги просування. Ми хочемо почати давати на них знижки, щоб залучити більше людей і почати більше заробляти. Для цього було вирішено провести AB тест:
+> Одній половині користувачів ми не видали знижок, а в другій половині ми видали знижки всім новим користувачам. Треба зрозуміти, чи стали ми більше заробляти?
+
+Цього разу у нас 2 вибірки $A$ --- контроль, і $B$ --- тест.
+
+## 📊 Задача {.tiny40}
+
+$$H_0: \mathbb{E} A = \mathbb{E} B \; \text{vs.} \; H_1: \mathbb{E}A < \mathbb{E} B$$
+
+:::: {.columns}
+
+::: {.column width="50%"}
+1. **Обидві вибірки нормальні**. 
+
+Тоді є 2 критерії залежно від наших знань про дисперсію:
+
+- $\sigma^2_A = \sigma^2_B$.
+    
+    Тоді:
+
+    - $S^2_{full} = \dfrac{(N - 1)S^2_A + (M - 1)S^2_B}{N + M - 2}$, де N, M - розмір контролю і тесту відповідно. А критерій має такий вигляд:
+    - $T(A, B) = \dfrac{\overline A - \overline B}{S^2_{full}\sqrt{1/N + 1/M}} \overset{H_0}{\sim} T_{n + m - 2}$
+   
+- $\sigma^2_A \neq \sigma^2_B$.
+    
+    Тоді:
+    
+    - $T(A, B) = \dfrac{\overline A - \overline B}{\sqrt{S^2_{A}/N + S^2_{B}/M}} \overset{H_0}{\sim} T_{v}$
+    - де $v = \dfrac{\left(\dfrac{S^2_{A}}{N} + \dfrac{S^2_{B}}{M} \right)^2}{\left(\dfrac{(S^2_{A})^2}{N^2(N - 1)} + \dfrac{(S^2_{B})^2}{M^2(M-1)} \right)}$
+:::
+
+::: {.column width="50%"}
+2. **Хоч би 1 вибірка ненормальна**. 
+
+Тоді в бій вступає нормальна апроксимація при великому розмірі вибірок, критерій T'-test:
+
+- $T(A, B) = \dfrac{\overline A - \overline B}{\sqrt{S^2_{A}/N + S^2_{B}/M}} \overset{H_0}{\sim} \mathcal{N}(0, 1)$
+:::
+
+::::
+
+## 🐍 Python та Двовибірковий $t$-тест {.tiny}
+
+- `scipy.stats.ttest_ind` --- 2-вибірковий t-test [критерій](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.ttest_ind.html#scipy.stats.ttest_ind)
+- `CompareMeans` --- [клас](https://www.statsmodels.org/stable/generated/statsmodels.stats.weightstats.CompareMeans.html) для побудови довірчих інтервалів у t-test.
+
+```{python}
+#| label: ttest_ind-sim
+#| output-location: column
+
+numpy.random.seed(42)
+X = expon(scale=1100).rvs(1000)
+Y = norm(loc=980, scale=30).rvs(1000)
+
+ttest_ind(X, Y, equal_var=False, alternative='greater')
+```
+
+<br>
+
+```{python}
+#| label: ttest_ind-sim-norm
+
+ttest_ind(X, Y, equal_var=False, alternative='greater').pvalue
+```
+
+<br>
+
+```{python}
+#| label: ttest_ind-ci
+
+# Довірчий інтервал
+
+cm = CompareMeans(DescrStatsW(X), DescrStatsW(Y))
+print(cm.tconfint_diff(usevar='unequal'))
+```
+
+# MDE для $t$-тесту. {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## Згадуємо MDE {.tiny}
+
+**MDE** --- це таке істинне значення ефекту, що наш шанс його виявити дорівнює $1-\beta$ при використанні нашого критерію.
+
+Від чого залежить MDE?
+
+- Помилка 1 роду, або $\alpha$.
+    - Наприклад, за $\alpha = 1$ ми знайдемо ефект і за розміру вибірки, що дорівнює 1 (ми просто завжди відкидатимемо 0 гіпотезу). А за $\alpha = 0$ ми ніколи не задетектуємо ефект.
+- Потужність, або $1 - \beta$.
+    - Випливає із самого визначення
+- Від шуму в даних, або від дисперсії.
+    - Що більш галасливі дані, як ми знаємо, то ширший довірчий інтервал. А отже, складніше точно передбачити рамки для істинного ефекту, тому і MDE буде більшим.
+- Від розміру вибірки.
+    - Нас цікавить не просто дисперсія в даних, а дисперсія середнього значення: вона за тією самою логікою має бути якомога меншою. А що таке дисперсія середнього? Це $\dfrac{\sigma^2}{N}$, тому MDE також залежить від розміру вибірки.
+
+## 📊 Задача {.tiny}
+
+Для початку визначимося з гіпотезою, що перевіряється: 
+
+- $H_0: \mu_0 = 0\ vs. \ H_1: \mu_0 > 0$
+
+Позначимо
+
+- $S^2_{\mu} := \dfrac{S^2}{N}$ &mdash; оцінка дисперсії середнього значення.
+- $S_{\mu} = \sqrt{\dfrac{S^2}{N}}$ &mdash; оцінка стандартного відхилення середнього значення, або SEM.
+
+Тепер ми знаємо, що
+
+- $\overline X \sim \mathcal{N}(\mu, S^2_{\mu})$
+
+Нам треба знайти $MDE=m$, таке, що:
+
+- якщо $\overline X \sim \mathcal{N}(m, S^2_{\mu})$, то в $1-\beta$ відсотку випадків для нього відкинеться критерій. Перевіряємо потужність (зелена площа на графіку).
+- якщо $\overline X \sim \mathcal{N}(0, S^2_{\mu})$, то критерій відкинеться для нього в $\alpha$ відсотків випадків. Перевіряємо FPR (червона площа на графіку).
+
+---
+
+![](img/mde.png){fig-align=center}
+
+$$\text{MDE} = (z_{1 - \alpha} + z_{1 - \beta}) \cdot \sqrt{\dfrac{S^2}{N}}$$
+
+де $z_{1 - \alpha}$ та $z_{1 - \beta}$ --- квантилі розподілу $\mathcal{N}(0, 1)$.
+
+## 🐍 Python та MDE {.smaller}
+
+$N = 1000$, $\alpha=5$%, $1-\beta=80$%, а як дізнатися $S^2$?
+
+На практиці є 3 способи:
+
+- Оцінити на історичних даних. У цьому випадку це не підходить, тому що раніше стартапу не було.
+- Оцінити за схожими даними.
+- Якось теоретично оцінити. Найгірший спосіб, який працює, якщо перші 2 не допомагають.
+
+```{python}
+#| label: mde
+
+N = 1000
+S2 = numpy.var(profits)
+alpha = 0.05
+beta = 1 - 0.8
+
+MDE = (norm().ppf(1-alpha) + norm().ppf(1 - beta)) * numpy.sqrt(S2/N)
+print(f"MDE при N={N}: {MDE}")
+```
+
+## MDE та розмір вибірки {.smaller}
+
+Для нас це занадто великий MDE: хочеться, щоб він був $\leq$ 100, ми припускаємо, що це ймовірніший істинний ефект, виходячи з досвіду.
+
+Давайте тепер розв'яжемо зворотну задачу: Ми знаємо MDE = 100, $\alpha=5$%, $1-\beta=80$%, $S^2$, чому дорівнює $N$? Виведемо його з формули MDE:
+
+$N = \left(\dfrac{z_{1 - \alpha} + z_{1 - \beta}}{\text{MDE}}\right)^2 S^2$
+
+```{python}
+#| label: n-mde
+
+S2 = numpy.var(profits)
+alpha = 0.05
+beta = 1 - 0.8
+mde = 100
+
+N = ((norm().ppf(1-alpha) + norm().ppf(1 - beta)) / mde)**2 * S2
+N = int(N) + 1
+print(f'Мінімальний розмір вибірки: {N}')
+```
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".04_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/asa/)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
