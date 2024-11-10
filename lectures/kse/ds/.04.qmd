@@ -1,0 +1,1437 @@
+---
+title: "Quarto: reproducible publishing"
+subtitle: "Descriptive Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .04_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=2554">🔗Descriptive Statistics (AI27)</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Hello Quarto {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## Quarto ...
+
+-   is a new, open-source, scientific, and technical publishing system
+-   aims to make the process of creating and collaborating dramatically better
+
+![Artwork from "Hello, Quarto" keynote by Julia Lowndes and Mine Çetinkaya-Rundel, presented at RStudio Conference 2022. Illustrated by Allison Horst.](images/horst_quarto_schematic.png){fig-alt="A schematic representing the multi-language input (e.g. Python, R, Observable, Julia) and multi-format output (e.g. PDF, html, Word documents, and more) versatility of Quarto." fig-align="center"}
+
+## Quarto
+
+With Quarto you can weave together narrative text and code to produce elegantly formatted output as documents, web pages, blog posts, books and more.
+
+. . .
+
+<br>
+
+*just like R Markdown...*
+
+. . .
+
+<br>
+
+but not *just like* it, there's more to it...
+
+## Quarto ... {.center auto-animate="true"}
+
+**unifies** + **extends** the R Markdown ecosystem
+
+## Quarto ... {.center auto-animate="true"}
+
+**unifies** + **extends** the R Markdown ecosystem
+
+<br>
+
+**unifies** for people who love R Markdown
+
+## Quarto ... {.center auto-animate="true"}
+
+**unifies** + **extends** the R Markdown ecosystem
+
+<br>
+
+**unifies** for people who love R Markdown
+
+**extends** for people who don't know R Markdown
+
+## Quarto unifies + extends R Markdown
+
+::: incremental
+-   Consistent implementation of attractive and handy features across outputs: tabsets, code-folding, syntax highlighting, etc.
+-   More accessible defaults as well as better support for accessibility
+-   Guardrails, particularly helpful for new learners: YAML completion, informative syntax errors, etc.
+-   Support for other languages like Python, Julia, Observable, and more via Jupyter engine for executable code chunks.
+:::
+
+## A tour of Quarto {.smaller}
+
+::: {.hand-green style="text-align: center;"}
+Sit back and enjoy! ... or follow along with `hello-penguins.qmd`.
+:::
+
+::: {.our-turn .small}
+-   Running individual cells
+-   Rendering a document
+-   Editing with source editor and visual editor
+-   Inserting images and lightbox effect
+-   Inserting tables
+-   Customizing formats: `pdf`, `docx`, `revealjs`
+-   Customizing format options: `code-fold`, `toc`
+-   Code cells: labels, alt-text, execution options (`echo`, `warning`)
+-   Cross referencing figures and tables, with and without the visual editor
+:::
+
+## Your turn {.smaller}
+
+:::::: your-turn
+::::: columns
+::: column
+**Option 1:** {{< fa cloud >}} Start the project `1-rmarkdown-quarto`.
+:::
+
+::: column
+**Option 2:** {{< fa folder >}} Launch the project in `1-rmarkdown-quarto`.
+:::
+:::::
+
+------------------------------------------------------------------------
+
+-   Open `hello-penguins.qmd` in RStudio and with the visual editor.
+-   Render the document.
+-   Update your name and re-render.
+-   Inspect components of the document and make one more update and re-render.
+-   Compare notes with neighbors about updates you've made and note any aspects of the document that are not clear after the tour and your first interaction with it.
+::::::
+
+# Quarto CLI {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## Revisit: What is Quarto? {.tiny}
+
+Quarto is a command line interface (CLI) that renders plain text formats (`.qmd`, `.rmd`, `.md`) OR mixed formats (`.ipynb`/Jupyter notebook) into static PDF/Word/HTML reports, books, websites, presentations and more.
+
+``` {.bash code-line-numbers="|1|4|12|17|18"}
+mine$ quarto --help
+
+Usage:   quarto
+Version: 1.5.56
+
+Description:
+
+  Quarto CLI
+
+Options:
+
+  -h, --help     - Show this help.                            
+  -V, --version  - Show the version number for this program.  
+
+Commands:
+
+  render     [input] [args...]     - Render files or projects to various document types.
+  preview    [file] [args...]      - Render and preview a document or website project.  
+  serve      [input]               - Serve a Shiny interactive document.                
+  create     [type] [commands...]  - Create a Quarto project or extension               
+  use        <type> [target]       - Automate document or project setup tasks.          
+  add        <extension>           - Add an extension to this folder or project         
+  update     [target...]           - Updates an extension or global dependency.         
+  remove     [target...]           - Removes an extension.                              
+  convert    <input>               - Convert documents to alternate representations.    
+  pandoc     [args...]             - Run the version of Pandoc embedded within Quarto.  
+  typst      [args...]             - Run the version of Typst embedded within Quarto.   
+  run        [script] [args...]    - Run a TypeScript, R, Python, or Lua script.        
+  install    [target...]           - Installs a global dependency (TinyTex or Chromium).
+  uninstall  [tool]                - Removes an extension.                              
+  tools                            - Display the status of Quarto installed dependencies
+  publish    [provider] [path]     - Publish a document or project to a provider.       
+  check      [target]              - Verify correct functioning of Quarto installation. 
+  help       [command]             - Show this help or the help of a sub-command. 
+```
+
+## Quarto, more than *just* `knitr`
+
+. . .
+
+We learned from 10 years of literate programming with `knitr` + `rmarkdown`
+
+![](images/qmd-knitr.png)
+
+## Quarto, more than *just* `knitr`
+
+![](images/qmd-jupyter.png)
+
+## Quarto: More than *just* `knitr`
+
+![](images/jupyter-alone.png)
+
+## Under the hood
+
+::: incremental
+-   `knitr` or `jupyter` evaluates R/Python/Julia code and returns a `.md` file along with the evaluated code
+-   Quarto applies Lua filters + CSS/LaTeX which is then evaluated alongside the `.md` file by Pandoc and converted to a final output format
+:::
+
+## Aside: Lua filters {.smaller}
+
+-   Here is an example of a Lua filter that converts strong emphasis to small caps, from <https://pandoc.org/lua-filters.html>:
+
+``` lua
+return {
+  {
+    Strong = function (elem)
+      return pandoc.SmallCaps(elem.c)
+    end,
+  }
+}
+```
+
+. . .
+
+-   Lua filters written by R/Python/Julia developers should be interchangeable between formats - not language specific!
+
+. . .
+
+-   We won't go into the details of writing Lua filters in this workshop, and you don't need to worry about learning about Lua filters unless you're working on extending Quarto.
+
+## From the comfort of your own workspace
+
+::: r-stack
+![](https://quarto.org/docs/tools/images/jupyterlab-preview.png){.fragment fig-alt="A screenshot of a Quarto document rendered inside JupyterLab" height="600"}
+
+![](https://quarto.org/docs/computations/images/python-vscode.png){.fragment fig-alt="A screenshot of a Quarto document rendered inside VSCode" height="600"}
+
+![](https://quarto.org/docs/tools/images/rstudio-preview.png){.fragment fig-alt="A screenshot of a Quarto document rendered inside RStudio" height="600"}
+
+![](images/positron.png){.fragment fig-alt="A screenshot of a Quarto document rendered inside Positron" height="600"}
+:::
+
+# Navigating within RStudio {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## Quarto workflow
+
+Rendering a Quarto file in RStudio via the Render button calls `quarto render` in a **background job**, preventing Quarto rendering from cluttering up the R console, and gives you and easy way to stop:
+
+![](images/background-job.png){fig-align="center" width="800"}
+
+## Rendering
+
+1.  Option 1: In RStudio as a background job, and preview the output.
+
+. . .
+
+2.  Option 2: In the Terminal via `quarto render`:
+
+```{bash}
+#| eval: false
+#| echo: true
+
+quarto render document.qmd # defaults to html
+quarto render document.qmd --to pdf
+quarto render document.qmd --to docx
+```
+
+. . .
+
+3.  Option 3: In the R console, via the `quarto` R package:
+
+```{r}
+#| eval: false
+#| echo: true
+
+library(quarto)
+
+quarto_render("document.qmd") # defaults to html
+quarto_render("document.qmd", output_format = "pdf")
+```
+
+## Your turn {.smaller}
+
+:::::: your-turn
+::::: columns
+::: column
+**Option 1:** {{< fa cloud >}} Start the project `1-rmarkdown-quarto`.
+:::
+
+::: column
+**Option 2:** {{< fa folder >}} Launch the project in `1-rmarkdown-quarto`.
+:::
+:::::
+
+------------------------------------------------------------------------
+
+-   Open the last .qmd file you were working on in RStudio.
+-   Compare behavior of rendering with
+    -   RStudio \> Render,
+    -   using the CLI with `quarto render`, and
+    -   in the R console via `quarto::quarto_render()`.
+-   If you're an RStudio user, brainstorm why you might still want to know about the other two ways of rendering Quarto documents.
+::::::
+
+
+# Quarto formats {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## One install, "Batteries included" {.smaller}
+
+-   Quarto comes **"batteries included"** straight out of the box:
+
+    -   HTML reports and websites
+
+    -   PDF reports
+
+    -   MS Office (Word, Powerpoint)
+
+    -   Presentations (Powerpoint, Beamer, `revealjs`)
+
+    -   Books
+
+    -   Manuscripts
+
+    -   ...
+
+. . .
+
+-   Any language, *exact* same approach and syntax
+
+## Many Quarto formats {.smaller}
+
+| Feature | Quarto |
+|------------------|------------------------------------------------------|
+| Basic Formats | [html](https://quarto.org/docs/output-formats/html-basics.html), [pdf](https://quarto.org/docs/output-formats/pdf-basics.html), [docx](https://quarto.org/docs/output-formats/ms-word.html), [typst](https://quarto.org/docs/output-formats/typst.html) |
+| Beamer | [beamer](https://quarto.org/docs/presentations/beamer.html) |
+| PowerPoint | [pptx](https://quarto.org/docs/presentations/powerpoint.html) |
+| HTML Slides | [revealjs](https://quarto.org/docs/presentations/revealjs/) |
+| Advanced Layout | [Quarto Article Layout](https://quarto.org/docs/authoring/article-layout.html) |
+| Cross References | [Quarto Crossrefs](https://quarto.org/docs/authoring/cross-references.html) |
+| Websites & Blogs | [Quarto Websites](https://quarto.org/docs/websites/), [Quarto Blogs](https://quarto.org/docs/websites/website-blog.html) |
+| Books | [Quarto Books](https://quarto.org/docs/books/) |
+| Interactivity | [Quarto Interactive Documents](https://quarto.org/docs/interactive/shiny/) |
+| Journal Articles | [Journal Articles](https://quarto.org/docs/journals/index.html) |
+| Dashboards | [Quarto Dashboards](https://quarto.org/docs/dashboards/) |
+
+: {tbl-colwidths="\[25,75\]"}
+
+## Your turn {.smaller}
+
+:::::: your-turn
+::::: columns
+::: column
+**Option 1:** {{< fa cloud >}} Start the project `1-rmarkdown-quarto`.
+:::
+
+::: column
+**Option 2:** {{< fa folder >}} Launch the project in `1-rmarkdown-quarto`.
+:::
+:::::
+
+------------------------------------------------------------------------
+
+Go to File \> New File \> Quarto document to create a Quarto document with HTML output. Render the document, which will ask you to give it a name -- you can use `my-first-document.qmd`.
+
+Use the visual editor for the next steps.
+
+-   Add a title and your name as the author.
+-   Create two sections, one with fact you want to learn and your favorite thing about R.
+-   Add a table of contents.
+-   **Stretch goal:** Change the html theme to `sketchy`.
+::::::
+
+## One last thing!
+
+::: your-turn
+Where does the name "Quarto" come from?
+:::
+
+. . .
+
+```{=html}
+<iframe src="https://en.wikipedia.org/wiki/Quarto" title = "Quarto on Wikipedia" frameborder="1" height="400" width="900"></iframe>
+```
+
+::: aside
+Source: <https://en.wikipedia.org/wiki/Quarto>
+:::
+
+## Your turn {.smaller}
+
+:::::: your-turn
+::::: columns
+::: column
+**Option 1:** {{< fa cloud >}} Start the project `2-documents-slides`.
+:::
+
+::: column
+**Option 2:** {{< fa folder >}} Launch the project in `2-documents-slides`.
+:::
+:::::
+::::::
+
+# Anatomy of a Quarto document {#quarto-anatomy background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## Components
+
+1.  Metadata: YAML
+
+2.  Text: Markdown
+
+3.  Code: Executed via `knitr` or `jupyter`
+
+. . .
+
+**Weave it all together**, and you have beautiful, powerful, and useful outputs!
+
+## Literate programming {.smaller}
+
+Literate programming is writing out the program logic in a human language with included (separated by a primitive markup) code snippets and macros.
+
+````         
+---
+title: "ggplot2 demo"
+date: "4/28/2023"
+format: html
+---
+
+## MPG
+
+There is a relationship between city and highway mileage.
+
+```{{r}}
+#| label: fig-mpg
+
+library(ggplot2)
+
+ggplot(mpg, aes(x = cty, y = hwy)) + 
+  geom_point() + 
+  geom_smooth(method = "loess")
+```
+````
+
+::: aside
+Source: <https://en.wikipedia.org/wiki/Literate_programming>
+:::
+
+# Metadata {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## YAML
+
+"Yet Another Markup Language" or "YAML Ain't Markup Language" is used to provide document level metadata.
+
+``` yaml
+---
+key: value
+---
+```
+
+## Output options
+
+``` yaml
+---
+format: something
+---
+```
+
+. . .
+
+<br>
+
+``` yaml
+---
+format: html
+---
+```
+
+``` yaml
+---
+format: pdf
+---
+```
+
+``` yaml
+---
+format: revealjs
+---
+```
+
+## Output option arguments
+
+Indentation matters!
+
+``` yaml
+---
+format: 
+  html:
+    toc: true
+    code-fold: true
+---
+```
+
+## YAML validation {.smaller}
+
+-   Invalid: No space after `:`
+
+``` yaml
+---
+format:html
+---
+```
+
+-   Invalid: Read as missing
+
+``` yaml
+---
+format:
+html
+---
+```
+
+-   Valid, but needs next object
+
+``` yaml
+---
+format: 
+  html:
+---
+```
+
+## YAML validation {.smaller}
+
+There are multiple ways of formatting valid YAML:
+
+-   Valid: There's a space after `:`
+
+``` yaml
+format: html
+```
+
+-   Valid: There are 2 spaces a new line and no trailing `:`
+
+``` yaml
+format:
+  html
+```
+
+-   Valid: `format: html` with selections made with proper indentation
+
+``` yaml
+format: 
+  html:
+    toc: true
+```
+
+## Why YAML?
+
+To avoid manually typing out all the options, every time when rendering via the CLI:
+
+. . .
+
+``` bash
+quarto render document.qmd --to html
+```
+
+<br>
+
+. . .
+
+``` bash
+quarto render document.qmd --to html -M code-fold:true
+```
+
+<br>
+
+. . .
+
+``` bash
+quarto render document.qmd --to html -M code-fold:true -P alpha:0.2 -P ratio:0.3
+```
+
+## Quarto linting
+
+Lint, or a linter, is a static code analysis tool used to flag programming errors, bugs, stylistic errors and suspicious constructs.
+
+<br>
+
+::::: columns
+::: {.column width="50%"}
+![](images/lint-rstudio.png)
+:::
+
+::: {.column width="50%"}
+![](images/lint-vscode.png)
+:::
+:::::
+
+::: aside
+Source: <https://en.wikipedia.org/wiki/Lint_(software)>
+:::
+
+## Quarto YAML Intelligence
+
+RStudio + VSCode provide rich tab-completion - start a word and tab to complete, or <kbd>`Ctrl + space`</kbd> to see all available options.
+
+<br>
+
+![](images/quarto-tab-complete.png){fig-align="center" width="600"}
+
+## Your turn
+
+:::::: your-turn
+::::: columns
+::: column
+**Option 1:** {{< fa cloud >}} Start the project `2-documents-slides`.
+:::
+
+::: column
+**Option 2:** {{< fa folder >}} Launch the project in `2-documents-slides`.
+:::
+:::::
+::::::
+
+::: your-turn
+-   Open `hello-penguins.qmd` in RStudio.
+-   Try <kbd>`Ctrl + space`</kbd> to see the available YAML options.
+-   Try out the tab-completion of any options you remember.
+-   You can use the [HTML reference](https://quarto.org/docs/reference/formats/html.html) as needed.
+:::
+
+
+## List of valid YAML fields
+
+-   Many YAML fields are common across various outputs
+
+-   But also each output type has its own set of valid YAML fields and options
+
+-   Definitive list: [quarto.org/docs/reference/formats/html](https://quarto.org/docs/reference/formats/html.html)
+
+# Text {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## Text Formatting
+
++-------------------------------+-------------------------------+
+| Markdown Syntax               | Output                        |
++===============================+===============================+
+| ```                           | *italics* and **bold**        |
+| *italics* and **bold**        |                               |
+| ```                           |                               |
++-------------------------------+-------------------------------+
+| ```                           | superscript^2^ / subscript~2~ |
+| superscript^2^ / subscript~2~ |                               |
+| ```                           |                               |
++-------------------------------+-------------------------------+
+| ```                           | ~~strikethrough~~             |
+| ~~strikethrough~~             |                               |
+| ```                           |                               |
++-------------------------------+-------------------------------+
+| ```                           | `verbatim code`               |
+| `verbatim code`               |                               |
+| ```                           |                               |
++-------------------------------+-------------------------------+
+
+: {tbl-colwidths="\[50,50\]"}
+
+## Headings {.smaller}
+
++-----------------+-----------------+
+| Markdown Syntax | Output          |
++=================+=================+
+| ```             | # Header 1      |
+| # Header 1      |                 |
+| ```             |                 |
++-----------------+-----------------+
+| ```             | ## Header 2     |
+| ## Header 2     |                 |
+| ```             |                 |
++-----------------+-----------------+
+| ```             | ### Header 3    |
+| ### Header 3    |                 |
+| ```             |                 |
++-----------------+-----------------+
+| ```             | #### Header 4   |
+| #### Header 4   |                 |
+| ```             |                 |
++-----------------+-----------------+
+| ```             | ##### Header 5  |
+| ##### Header 5  |                 |
+| ```             |                 |
++-----------------+-----------------+
+| ```             | ###### Header 6 |
+| ###### Header 6 |                 |
+| ```             |                 |
++-----------------+-----------------+
+
+: {tbl-colwidths="\[50,50\]"}
+
+## Links {.smaller}
+
+There are several types of "links" or hyperlinks.
+
+**Markdown**
+
+``` {.markdown .code-overflow-wrap}
+You can embed [named hyperlinks](https://quarto.org/),
+direct urls like <https://quarto.org/>, and links to 
+[other places](#quarto-anatomy) in 
+the document. 
+
+The syntax is similar for embedding an
+inline image: ![Penguins playing with ball](images/penguins-quarto-ball.png).
+```
+
+**Output**
+
+You can embed [named hyperlinks](https://quarto.org/), direct urls like <https://quarto.org/>, and links to [other places](#quarto-anatomy) in the document.
+
+The syntax is similar for embedding an inline image: ![Penguins playing with ball](images/penguins-quarto-ball.png){style="width:250px;"}.
+
+## Lists {.smaller}
+
+Unordered list:
+
+::::: columns
+::: {.column width="50%"}
+**Markdown:**
+
+``` markdown
+-   unordered list         
+    -   sub-item 1         
+    -   sub-item 1         
+        -   sub-sub-item 1 
+```
+:::
+
+::: {.column .fragment width="50%" fragment-index="1"}
+**Output**
+
+-   unordered list
+    -   sub-item 1\
+    -   sub-item 1
+        -   sub-sub-item 1
+:::
+:::::
+
+Ordered list:
+
+::::: columns
+::: {.column width="50%"}
+**Markdown:**
+
+``` markdown
+1. ordered list            
+2. item 2                  
+    i. sub-item 1          
+         A.  sub-sub-item 1
+```
+:::
+
+::: {.column .fragment width="50%" fragment-index="2"}
+**Output**
+
+1.  ordered list\
+2.  item 2
+    i.  sub-item 1
+        A.  sub-sub-item 1
+:::
+:::::
+
+## Quotes {.smaller}
+
+**Markdown:**
+
+``` markdown
+> Let us change our traditional attitude to the construction of programs: Instead of imagining that our main task is to instruct a computer what to do, let us concentrate rather on explaining to human beings what we want a computer to do. 
+> - Donald Knuth, Literate Programming
+```
+
+. . .
+
+**Output:**
+
+> Let us change our traditional attitude to the construction of programs: Instead of imagining that our main task is to instruct a computer what to do, let us concentrate rather on explaining to human beings what we want a computer to do. - Donald Knuth, Literate Programming
+
+::: aside
+"Literate Programming", The Computer Journal 27 (1984), p. 97. (Reprinted in Literate Programming, 1992, p. 99.) Literate Programming (1984)
+:::
+
+## Your turn
+
+::: your-turn
+-   Skim the previous slides. Share one new that's new to you with your neighbor.
+-   Open `markdown-syntax.qmd` in RStudio.
+-   Follow the instructions in the document.
+:::
+
+## Divs and spans {.smaller}
+
+Pandoc, and therefore Quarto, can parse ["fenced div blocks"](https://pandoc.org/MANUAL.html#divs-and-spans):
+
+. . .
+
+-   You can think of a `:::` **div** as a HTML `<div>` but it can also apply in specific situations to content in PDF:
+
+``` markdown
+::: {style="border-left:10px solid red"}
+This content can be styled with a border
+:::
+```
+
+::: {style="border-left:10px solid red"}
+This content can be styled with a border
+:::
+
+. . .
+
+-   `[text]{.class}` **span**s can be thought of a `<span .class>Text</span>` but again are a bit more transferable if using Pandoc/Quarto native attributes.
+
+``` markdown
+This is text with [special]{style="color:red;"} formatting.
+```
+
+This is text with [special]{style="color:red;"} formatting.
+
+## Divs with pre-defined classes
+
+These can often apply between formats:
+
+**Single class**: Two equivalent syntaxes
+
+::::: columns
+::: column
+No `{`, and no `.`:
+
+``` markdown
+::: unnumbered
+Text
+:::
+```
+:::
+
+::: column
+`{` and `.`:
+
+``` markdown
+::: {.unnumbered}
+Text
+:::
+```
+:::
+:::::
+
+**Multiple classes**: use `{` and `.`, separate with spaces
+
+``` markdown
+::: {.unnumbered .unlisted}
+Text
+:::
+```
+
+## Callouts
+
+```         
+::: callout-note
+Note that there are five types of callouts, including: 
+`note`, `tip`, `warning`, `caution`, and `important`.
+:::
+```
+
+::: callout-note
+Note that there are five types of callouts, including: `note`, `tip`, `warning`, `caution`, and `important`.
+:::
+
+## More callouts {.smaller}
+
+::: callout-warning
+Callouts provide a simple way to attract attention, for example, to this warning.
+:::
+
+::: callout-important
+Danger, callouts will really improve your writing.
+:::
+
+::: callout-caution
+Here is something under construction.
+:::
+
+::: callout-tip
+## Caption
+
+Tip with caption.
+:::
+
+## Your turn
+
+::: your-turn
+-   Open `callout-boxes.qmd` and render the document.
+-   Using the visual editor, change the type of the first callouts box and then re-render. Also play with the options to change its appearance.
+-   Add a caption to the second callout box.
+-   Make the third callout box collapsible. Then, switch over to the source editor to inspect the markdown code.
+-   Change the format to PDF and re-render.
+:::
+
+
+## Footnotes
+
+Pandoc supports numbering and formatting footnotes.
+
+## Inline footnotes
+
+```         
+Here is an inline note.^[Inlines notes are easier to write,
+since you don't have to pick an identifier and move down to
+type the note.]
+```
+
+Here is an inline note.[^1]
+
+[^1]: Inlines notes are easier to write, since you don't have to pick an identifier and move down to type the note.
+
+## Inline footnotes
+
+```         
+Here is an footnore reference[^1]
+
+[^1]: This can be easy in some situations when you have a really long note or
+don't want to inline complex outputs.
+```
+
+. . .
+
+Here is an footnote reference[^2]
+
+[^2]: This can be easy in some situations when you have a really long note or don't want to inline complex outputs.
+
+. . .
+
+Notice in both situations that the footnote is placed at the bottom of the page in presentations, whereas in a document it would be hoverable or at the end of the document.
+
+# Code {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## Anatomy of a code chunk
+
+::::: columns
+::: {.column width="50%"}
+```{r}
+#| label: penguin-stuff
+#| message: false
+#| echo: fenced
+#| output: false
+
+library(tidyverse)
+library(palmerpenguins)
+
+penguins |> 
+  distinct(species)
+```
+:::
+
+::: {.column .fragment width="50%"}
+-   Has 3x backticks on each end
+-   Engine (`r`) is indicated between curly braces `{r}`
+-   Options stated with the `#|` (hashpipe): `#| option1: value`
+:::
+:::::
+
+Available code cell options: <https://quarto.org/docs/reference/cells/cells-knitr.html>
+
+## Code, who is it for?
+
+::: incremental
+-   The way you display code is very different for different contexts.
+-   In a teaching scenario like today, I *really* want to display code.
+-   In a business, you may want to have a data-science facing output which displays the source code AND a stakeholder-facing output which hides the code.
+:::
+
+## Code
+
+If you simply want code formatting but don't want to execute the code:
+
+-   Option 1: Use 3x back ticks + the language ```` ```r ````
+
+````         
+```r
+head(penguins)
+```
+````
+
+. . .
+
+-   Option 2: Add `eval: false` as chunk option
+
+```{r}
+#| eval: false
+#| echo: fenced
+
+head(penguins)
+```
+
+## Showing and hiding code with `echo`
+
+-   The `echo` option shows the code when set to `true` and hides it when set to `false`.
+
+-   If you want to both execute the code and return the full code including backticks (like in a teaching scenario) `echo: fenced` is your friend!
+
+::::: columns
+::: column
+Source:
+
+```{{{r}}}
+#| echo: fenced
+
+1 + 1
+```
+:::
+
+::: column
+Output:
+
+```{r}
+#| echo: fenced
+
+1 + 1
+```
+:::
+:::::
+
+## Tables and figures
+
+-   In reproducible reports and manuscripts, the most commonly included code outputs are **tables** and **figures**.
+
+-   So they get their own special sections in our deep dive!
+
+# Tables {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## Markdown tables
+
+**Markdown:**
+
+``` markdown
+| Right | Left | Default | Center |
+|------:|:-----|---------|:------:|
+|   12  |  12  |    12   |    12  |
+|  123  |  123 |   123   |   123  |
+|    1  |    1 |     1   |     1  |
+```
+
+. . .
+
+**Output:**
+
+| Right | Left | Default | Center |
+|------:|:-----|---------|:------:|
+|    12 | 12   | 12      |   12   |
+|   123 | 123  | 123     |  123   |
+|     1 | 1    | 1       |   1    |
+
+## Grid tables
+
+**Markdown:**
+
+``` markdown
++---------------+---------------+--------------------+
+| Fruit         | Price         | Advantages         |
++===============+===============+====================+
+| Bananas       | $1.34         | - built-in wrapper |
+|               |               | - bright color     |
++---------------+---------------+--------------------+
+| Oranges       | $2.10         | - cures scurvy     |
+|               |               | - tasty            |
++---------------+---------------+--------------------+
+
+: Sample grid table.
+```
+
+## Grid tables
+
+**Output:**
+
++---------------+---------------+----------------------+
+| Fruit         | Price         | Advantages           |
++===============+===============+======================+
+| Bananas       | \$1.34        | -   built-in wrapper |
+|               |               | -   bright color     |
++---------------+---------------+----------------------+
+| Oranges       | \$2.10        | -   cures scurvy     |
+|               |               | -   tasty            |
++---------------+---------------+----------------------+
+
+: Sample grid table.
+
+## Grid tables: Alignment
+
+-   Alignments can be specified as with pipe tables, by putting colons at the boundaries of the separator line after the header:
+
+```         
++---------------+---------------+--------------------+
+| Right         | Left          | Centered           |
++==============:+:==============+:==================:+
+| Bananas       | $1.34         | built-in wrapper   |
++---------------+---------------+--------------------+
+```
+
+. . .
+
+-   For headerless tables, the colons go on the top line instead:
+
+```         
++--------------:+:--------------+:------------------:+
+| Right         | Left          | Centered           |
++---------------+---------------+--------------------+
+```
+
+## Grid tables: Authoring
+
+-   Note that grid tables are quite awkward to write with a plain text editor because unlike pipe tables, the column indicators must align.
+
+-   The Visual Editor can assist in making these tables!
+
+## Tables from code {.smaller}
+
+The **knitr** package can turn data frames into tables with `knitr::kable()`:
+
+```{r}
+library(knitr)
+
+head(penguins) |> 
+  kable()
+```
+
+## Tables from code {.smaller}
+
+If you want fancier tables, try the **gt** package and [all that it offers](https://gt.rstudio.com/)!
+
+```{r}
+#| output-location: column-fragment
+
+library(gt)
+
+head(penguins) |> 
+  gt() |>
+  tab_style(
+    style = list(
+      cell_fill(color = "pink"),
+      cell_text(style = "italic")
+      ),
+    locations = cells_body(
+      columns = bill_length_mm,
+      rows = bill_length_mm > 40
+    )
+  )
+```
+
+# Figures {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## Markdown figures
+
+```         
+![Penguins playing with a Quarto ball](images/penguins-quarto-ball.png)
+```
+
+![Penguins playing with a Quarto ball](images/penguins-quarto-ball.png)
+
+## Markdown figures with options
+
+::::: columns
+::: {.column width="50%"}
+```         
+![Penguins playing with a Quarto ball](images/penguins-quarto-ball.png){fig-align="left"}
+```
+
+![](images/penguins-quarto-ball.png)
+:::
+
+::: {.column width="50%"}
+```         
+![](images/penguins-quarto-ball.png){fig-align="right" fig-alt="Illustration of two penguins playing with a Quarto ball."}
+```
+
+![](images/penguins-quarto-ball.png){fig-align="right" fig-alt="Illustration of two penguins playing with a Quarto ball."}
+:::
+:::::
+
+## Subfigures
+
+**Markdown:**
+
+```         
+::: {#fig-penguins layout-ncol=2}
+
+![Blue penguin](images/blue-penguin.png){#fig-blue width="250px"}
+
+![Orange penguin](images/orange-penguin.png){#fig-orange width="250px"}
+
+Two penguins
+
+:::
+```
+
+## Subfigures
+
+**Output:**
+
+::: {#fig-penguins layout-ncol="2"}
+![Blue penguin](images/blue-penguin.png){#fig-blue width="250px"}
+
+![Orange penguin](images/orange-penguin.png){#fig-sleep width="250px"}
+
+Two penguins
+:::
+
+## Figure divs
+
+**Markdown:**
+
+``` code
+::: {#fig-penguin}
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/q3uXXh1sHcI"></iframe>
+
+Baby penguin tries to make friends
+:::
+```
+
+## Figure divs
+
+**Output:**
+
+::: {#fig-penguin-youtube}
+<iframe width="560" height="315" src="https://www.youtube.com/embed/q3uXXh1sHcI">
+
+</iframe>
+
+Baby penguin tries to make friends
+:::
+
+::: {.callout-note appearance="minimal"}
+Last paragraph in the div block is used as the figure caption.
+:::
+
+## Finding the figures to include
+
+In places like markdown, YAML, or the command line/shell/terminal, you'll need to use **absolute** or **relative** file paths:
+
+. . .
+
+-   Absolute = BAD: `"/Users/mine/quarto-asa-nebraska"` - Whose computer will this work on?
+
+. . .
+
+-   Relative = BETTER:
+
+    -   `"../` = up one directory, `../../` = up two directories, etc.
+    -   `/..` or `/` = start from `root` directory of your current computer
+
+## Figures from code
+
+```{r}
+#| fig-width: 6
+#| fig-asp: 0.618
+#| echo: fenced
+
+ggplot(penguins, aes(x = species, fill = species)) +
+  geom_bar(show.legend = FALSE)
+```
+
+# Cross references {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## Cross references
+
+-   Help readers to navigate your document with numbered references and hyperlinks to entities like figures and tables.
+
+-   Cross referencing steps:
+
+    -   Add a caption to your figure or table.
+    -   Give an id to your figure or table, starting with `fig-` or `tbl-`.
+    -   Refer to it with `@fig-...` or `@tbl-...`.
+
+## Figure cross references {.smaller}
+
+The presence of the caption (`Blue penguin`) and label (`#fig-blue-penguin`) make this figure referenceable:
+
+**Markdown:**
+
+``` markdown
+See @fig-blue-penguin for a cute blue penguin.
+![Blue penguin](images/blue-penguin.png){#fig-blue-penguin}
+```
+
+**Output:**
+
+See @fig-blue-penguin for a cute blue penguin.
+
+![Blue penguin](images/blue-penguin.png){#fig-blue-penguin fig-alt="A blue penguin" width="200"}
+
+## Table cross references {.smaller}
+
+The presence of the caption (`A few penguins`) and label (`#tbl-penguins`) make this table referenceable:
+
+::::: columns
+::: {.column width="50%"}
+**Markdown:**
+
+```` markdown
+See @tbl-penguins for data on a few penguins.
+
+```{{r}}
+#| label: tbl-penguins
+#| tbl-cap: A few penguins
+
+head(penguins) |> 
+  gt()
+```
+````
+:::
+
+::: {.column width="50%"}
+**Output:**
+
+See @tbl-penguins for data on a few penguins.
+
+```{r}
+#| label: tbl-penguins
+#| tbl-cap: A few penguins
+
+head(penguins) |> 
+  gt()
+```
+:::
+:::::
+
+## Your turn
+
+::: your-turn
+-   Open `tables-figures.qmd`.
+-   Follow the instructions in the document, then exchange one new thing you've learned with your neighbor.
+:::
+
+
+# Quarto presentations {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## Components
+
+1.  Metadata: YAML
+
+2.  Text: Markdown
+
+3.  Code: Executed via `knitr` or `jupyter`
+
+. . .
+
+**Weave it all together**, and you have a beautiful, functional slide deck!
+
+## Our turn {.smaller}
+
+::: our-turn
+Let's build a presentation together from `hello-penguins-slides.qmd` and showcase the following features of Quarto presentations:
+
+-   Hierarchy, headers, and document outline
+
+-   Incremental lists
+
+-   Columns
+
+-   Code, output location, code highlighting
+
+-   Logo and footer
+
+-   Making things fit on a slide
+
+-   Chalkboard
+
+-   Publishing your presentation to Quarto Pub
+:::
+
+## Your turn
+
+::: your-turn
+Pick up where we left off and
+
+-   Change the [transition style](https://quarto.org/docs/presentations/revealjs/advanced.html#slide-transitions) between slides
+
+-   Change the [slide size](https://quarto.org/docs/presentations/revealjs/advanced.html#presentation-size)
+
+-   Add [slide numbers](https://quarto.org/docs/presentations/revealjs/presenting.html#slide-numbers)
+:::
+
+## Our turn
+
+::: our-turn
+Let's continue building our a presentation together from `hello-penguins-slides.qmd` and showcase the following features of Quarto presentations:
+
+-   Fragments
+
+-   Title slide attributes
+:::
+
+# Wrap up {background-iframe=".04_files/libs/colored-particles/index.html" .unnumbered .unlisted}
+
+## Quarto presentation formats
+
+-   [`revealjs`](https://quarto.org/docs/presentations/revealjs) - essentially the replacement for `xaringan`, but with Pandoc-native syntax
+
+-   `beamer` for LaTeX slides
+
+-   PowerPoint for when you *have to* collaborate via MS Office
+
+
+# Questions? {.unnumbered .unlisted background-iframe=".04_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=2554)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
