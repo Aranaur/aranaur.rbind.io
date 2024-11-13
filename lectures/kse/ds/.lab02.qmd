@@ -1,0 +1,159 @@
+---
+title: "Lab 02"
+subtitle: "Descriptive Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+format:
+  html: 
+    highlight-style: github
+    theme: [default, custom.scss]
+    toc: true
+    toc-depth: 2
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+---
+
+The goal of this lab is to effectively visualize data and create reproducible reports with Quarto.
+
+For all visualizations you create, b sure to include informative titles for the plot, axes, and legend!
+
+# Packages
+
+In this lab we will work with the tidyverse packages, which is a collection of packages for doing data analysis in a "tidy" way.
+
+```{r}
+#| label: load-packages
+#| message: false
+
+library(tidyverse) 
+```
+
+# Part 1: Nobel laureates
+
+The dataset for this lab can be found in the following [link](https://aranaur.rbind.io/datasets/nobel/).
+
+The descriptions of the variables are as follows:
+
+1.  `id`: ID number
+2.  `firstname`: First name of laureate
+3.  `surname`: Surname
+4.  `year`: Year prize won
+5.  `category`: Category of prize
+6.  `affiliation`: Affiliation of laureate
+7.  `city`: City of laureate in prize year
+8.  `country`: Country of laureate in prize year
+9.  `born_date`: Birth date of laureate
+10. `died_date`: Death date of laureate
+11. `gender`: Gender of laureate
+12. `born_city`: City where laureate was born
+13. `born_country`: Country where laureate was born
+14. `born_country_code`: Code of country where laureate was born
+15. `died_city`: City where laureate died
+16. `died_country`: Country where laureate died
+17. `died_country_code`: Code of country where laureate died
+18. `overall_motivation`: Overall motivation for recognition
+19. `share`: Number of other winners award is shared with
+20. `motivation`: Motivation for recognition
+
+In a few cases the name of the city/country changed after laureate was given (e.g. in 1975 Bosnia and Herzegovina was called the Socialist Federative Republic of Yugoslavia). In these cases the variables below reflect a different name than their counterparts without the suffix `_original`.
+
+21. `born_country_original`: Original country where laureate was born
+22. `born_city_original`: Original city where laureate was born
+23. `died_country_original`: Original country where laureate died
+24. `died_city_original`: Original city where laureate died
+25. `city_original`: Original city where laureate lived at the time of winning the award
+26. `country_original`: Original country where laureate lived at the time of winning the award
+
+## Exercise 1
+
+::: exercise
+How many observations and how many variables are in the dataset? Use inline code to answer this question. What does each row represent?
+:::
+
+## Exercise 2
+
+::: exercise
+Create a new data frame called `nobel_living` that filters for
+
+-   laureates for whom `country` is available: `!is.na(country)`
+-   laureates who are people as opposed to organizations, i.e., organizations are denoted with `"org"` as their `gender`: `gender != "org"`
+-   laureates who are still alive, i.e., their `died_date` is `NA`: `is.na(died_date)`
+
+Confirm that once you have filtered for these characteristics you are left with a data frame with `r nrow(nobel_living)` observations, once again using inline code.
+:::
+
+<br>
+
+> Most living Nobel laureates were based in the US when they won their prizes
+
+... says the Buzzfeed article. Let's see if that's true.
+
+First, we'll create a new variable to identify whether the laureate was in the US when they won their prize. We'll use the `mutate()` function for this. The following pipeline mutates the `nobel_living` data frame by adding a new variable called `country_us`. We use an if statement to create this variable. The first argument in the `if_else()` function we're using to write this if statement is the condition we're testing for. If `country` is equal to `"USA"`, we set `country_us` to `"USA"`. If not, we set the `country_us` to `"Other"`.
+
+```{r}
+nobel_living <- nobel_living |>
+  mutate(
+    country_us = if_else(country == "USA", "USA", "Other")
+  )
+```
+
+Next, we will limit our analysis to only the following categories: Physics, Medicine, Chemistry, and Economics.
+
+```{r}
+nobel_living_science <- nobel_living |>
+  filter(category %in% c("Physics", "Medicine", "Chemistry", "Economics"))
+```
+
+For the following exercises, work with the `nobel_living_science` data frame you created above. This means you'll need to define this data frame in your Quarto document, even though the next exercise doesn't explicitly ask you to do so.
+
+## Exercise 3
+
+::: exercise
+Create a faceted bar plot visualizing the relationship between the category of prize and whether the laureate was in the US when they won the nobel prize. Interpret your visualization, and say a few words about whether the Buzzfeed headline is supported by the data.
+
+-   Your visualization should be faceted by category.
+-   For each facet you should have two bars, one for winners in the US and one for Other.
+-   Flip the coordinates so the bars are horizontal, not vertical.
+:::
+
+## Exercise 4
+
+Next, let's investigate, of those US-based Nobel laureates, what proportion were born in other countries.
+
+::: exercise
+Create a new variable called `born_country_us` in `nobel_living_science` that has the value `"USA"` if the laureate is born in the US, and `"Other"` otherwise. How many of the winners are born in the US?
+:::
+
+## Exercise 5
+
+::: exercise
+Add a second variable to your visualization from Exercise 3 based on whether the laureate was born in the US or not.
+
+Create two visualizations with this new variable added:
+
+-   Plot 1: Segmented frequency bar plot
+-   Plot 2: Segmented relative frequency bar plot (*Hint:* Add `position = "fill"` to `geom_bar()`.)
+
+Here are some instructions that apply to both of these visualizations:
+
+-   Your final visualization should contain a facet for each category.
+-   Within each facet, there should be two bars for whether the laureate won the award in the US or not.
+-   Each bar should have segments for whether the laureate was born in the US or not.
+
+Which of these visualizations is a better fit for answering the following question: "Do the data appear to support Buzzfeed's claim that of those US-based Nobel laureates, many were born in other countries?" First, state which plot you're using to answer the question. Then, answer the question, explaining your reasoning in 1-2 sentences.
+:::
+
+## Exercise 6
+
+::: exercise
+In a single pipeline, filter the `nobel_living_science` data frame for laureates who won their prize in the US, but were born outside of the US, and then create a frequency table (with the `count()` function) for their birth country (`born_country`) and arrange the resulting data frame in descending order of number of observations for each country. Which country is the most common?
+:::
+
+# Grading
+
+- **Submission of Lab Report:** A complete and accurate submission of the lab assignment in the required format [(1 point)]{.hi}.
+- **Understanding of Code and Correct Use of Methods:** Evaluation of your understanding of the code you submit and the appropriateness of the methods used in your solution [(2 point)]{.hi}.
+- **Verbal Defense of the Lab:** An oral explanation of your solution to verify your understanding of the concepts and methods used. You may be asked to explain the logic of your code, the interpretation of results, or to make minor modifications to your solution during the defense [(2 point)]{.hi}.
