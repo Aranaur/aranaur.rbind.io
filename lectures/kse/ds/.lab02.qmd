@@ -28,12 +28,27 @@ In this lab we will work with the tidyverse packages, which is a collection of p
 #| label: load-packages
 #| message: false
 
-library(tidyverse) 
+library(tidyverse)
+```
+
+```{r}
+#| label: setup
+#| include: false
+library(openintro)
+library(scales)
+library(patchwork)
 ```
 
 # Part 1: Nobel laureates
 
 The dataset for this lab can be found in the following [link](https://aranaur.rbind.io/datasets/nobel/).
+
+```{r}
+#| label: load-data
+#| include: false
+
+nobel <- read_csv("https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/nobel/nobel.csv")
+```
 
 The descriptions of the variables are as follows:
 
@@ -69,18 +84,27 @@ In a few cases the name of the city/country changed after laureate was given (e.
 
 ## Exercise 1
 
-::: exercise
+::: border
 How many observations and how many variables are in the dataset? Use inline code to answer this question. What does each row represent?
 :::
 
 ## Exercise 2
 
-::: exercise
+There are some observations in this dataset that we will exclude from our analysis to match the [Buzzfeed](https://www.buzzfeednews.com/) results.
+
+::: border
 Create a new data frame called `nobel_living` that filters for
 
 -   laureates for whom `country` is available: `!is.na(country)`
 -   laureates who are people as opposed to organizations, i.e., organizations are denoted with `"org"` as their `gender`: `gender != "org"`
 -   laureates who are still alive, i.e., their `died_date` is `NA`: `is.na(died_date)`
+
+```{r}
+#| echo: false
+
+nobel_living <- nobel |>
+  filter(!is.na(country) & gender != "org" & is.na(died_date))
+```
 
 Confirm that once you have filtered for these characteristics you are left with a data frame with `r nrow(nobel_living)` observations, once again using inline code.
 :::
@@ -89,29 +113,33 @@ Confirm that once you have filtered for these characteristics you are left with 
 
 > Most living Nobel laureates were based in the US when they won their prizes
 
-... says the Buzzfeed article. Let's see if that's true.
+... says the [Buzzfeed article](https://www.buzzfeednews.com/article/peteraldhous/immigration-and-science). Let's see if that's true.
 
-First, we'll create a new variable to identify whether the laureate was in the US when they won their prize. We'll use the `mutate()` function for this. The following pipeline mutates the `nobel_living` data frame by adding a new variable called `country_us`. We use an if statement to create this variable. The first argument in the `if_else()` function we're using to write this if statement is the condition we're testing for. If `country` is equal to `"USA"`, we set `country_us` to `"USA"`. If not, we set the `country_us` to `"Other"`.
+First, we'll create a new variable to identify whether the laureate was in the US when they won their prize. Mutates the `nobel_living` data frame by adding a new variable called `country_us`. Use an if statement to create this variable. If `country` is equal to `"USA"`, we set `country_us` to `"USA"`. If not, we set the `country_us` to `"Other"`.
 
 ```{r}
+#| echo: false
+
 nobel_living <- nobel_living |>
   mutate(
     country_us = if_else(country == "USA", "USA", "Other")
   )
 ```
 
-Next, we will limit our analysis to only the following categories: Physics, Medicine, Chemistry, and Economics.
+Next, we will limit our analysis to only the following categories: `Physics`, `Medicine`, `Chemistry`, and `Economics`. Create a new data frame called `nobel_living_science` that filters for these categories.
 
 ```{r}
+#| echo: false
+
 nobel_living_science <- nobel_living |>
   filter(category %in% c("Physics", "Medicine", "Chemistry", "Economics"))
 ```
 
-For the following exercises, work with the `nobel_living_science` data frame you created above. This means you'll need to define this data frame in your Quarto document, even though the next exercise doesn't explicitly ask you to do so.
+For the following borders, work with the `nobel_living_science` data frame you created above. This means you'll need to define this data frame in your Quarto document, even though the next border doesn't explicitly ask you to do so.
 
 ## Exercise 3
 
-::: exercise
+::: border
 Create a faceted bar plot visualizing the relationship between the category of prize and whether the laureate was in the US when they won the nobel prize. Interpret your visualization, and say a few words about whether the Buzzfeed headline is supported by the data.
 
 -   Your visualization should be faceted by category.
@@ -123,13 +151,13 @@ Create a faceted bar plot visualizing the relationship between the category of p
 
 Next, let's investigate, of those US-based Nobel laureates, what proportion were born in other countries.
 
-::: exercise
+::: border
 Create a new variable called `born_country_us` in `nobel_living_science` that has the value `"USA"` if the laureate is born in the US, and `"Other"` otherwise. How many of the winners are born in the US?
 :::
 
 ## Exercise 5
 
-::: exercise
+::: border
 Add a second variable to your visualization from Exercise 3 based on whether the laureate was born in the US or not.
 
 Create two visualizations with this new variable added:
@@ -148,11 +176,169 @@ Which of these visualizations is a better fit for answering the following questi
 
 ## Exercise 6
 
-::: exercise
+::: border
 In a single pipeline, filter the `nobel_living_science` data frame for laureates who won their prize in the US, but were born outside of the US, and then create a frequency table (with the `count()` function) for their birth country (`born_country`) and arrange the resulting data frame in descending order of number of observations for each country. Which country is the most common?
 :::
 
-# Grading
+# Part 2: IMS Exercises
+
+The borders in this section do not require code. Make sure to answer the questions in full sentences.
+
+## Exercise 7
+
+::: border
+**Raise taxes.** A random sample of registered voters nationally were asked whether they think it's better to raise taxes on the rich or raise taxes on the poor.
+    The survey also collected information on the political party affiliation of the respondents.
+
+```{r}
+#| fig-asp: 0.35
+#| out-width: 95%
+#| echo: false
+raise_taxes_survey <- tribble(
+      ~"Opinion", ~"Democrat", ~"Republican", ~"Independent/Other",
+      "Raise taxes on the rich", 91, 47, 49,
+      "Raise taxes on the poor", 4, 10, 11,
+      "Not sure", 5, 43, 40
+    )
+
+raise_taxes_survey |>
+      pivot_longer(
+        cols = -Opinion,
+        names_to = "Party",
+        values_to = "Proportion"
+      ) |>
+      mutate(Opinion = fct_relevel(
+        Opinion,
+        "Raise taxes on the rich",
+        "Raise taxes on the poor",
+        "Not sure"
+      )) |>
+      ggplot(aes(y = Party, x = Proportion, fill = Opinion)) +
+      geom_col() +
+      scale_fill_manual(
+        values = c(IMSCOL["blue", "full"], IMSCOL["red", "full"], IMSCOL["lgray", "full"]),
+        labels = label_wrap_gen(width = 20)
+      ) +
+      scale_x_continuous(labels = label_percent(scale = 1)) +
+      labs(x = NULL) +
+      guides(fill = guide_legend(reverse = TRUE)) +
+      theme_minimal(base_size = 13)
+```
+
+a.  Based on the stacked bar plot shown above, do views on raising taxes and political affiliation appear to be associated?
+        Explain your reasoning.
+
+b.  Conjecture other possible variables that might explain the potential association between these two variables.
+:::
+
+## Exercise 8
+
+::: border
+**Office productivity.** Office productivity is relatively low when the employees feel no stress about their work or job security.
+However, high levels of stress can also lead to reduced employee productivity.
+Sketch a plot to represent the relationship between stress and productivity.
+:::
+
+## Exercise 9
+
+::: border
+**Distributions and appropriate statistics.** For each of the following, state whether you expect the distribution to be symmetric, right skewed, or left skewed.
+Also specify whether the mean or median would best represent a typical observation in the data, and whether the variability of observations would be best represented using the standard deviation or IQR.
+Explain your reasoning.
+
+a.  Number of pets per household.
+
+b.  Distance to work, i.e., number of miles between work and home.
+
+c.  Heights of adult males.
+
+d.  Age at death.
+
+e.  Exam grade on an easy test.
+:::
+
+## Exercise 10
+
+::: border
+**NYC marathon winners.** The histogram and box plots below show the distribution of finishing times for male and female (combined) winners of the New York City Marathon between 1970 and 2023.
+
+```{r}
+#| fig-asp: 0.5
+#| echo: false
+p_hist <- ggplot(nyc_marathon, aes(x = time_hrs)) +
+      geom_histogram(binwidth = 0.05) +
+      labs(x = "Marathon time", y = "Count") +
+      scale_x_continuous(limits = c(2, 3.2), breaks = seq(2, 3.2, 0.4))
+
+p_box <- ggplot(nyc_marathon, aes(x = time_hrs)) +
+      geom_boxplot(outlier.alpha = 0.8) +
+      labs(x = "Marathon time") +
+      theme(
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        axis.text.y = element_blank()
+      ) +
+      scale_x_continuous(limits = c(2, 3.2), breaks = seq(2, 3.2, 0.4))
+
+p_hist / p_box
+```
+
+a.  What features of the distribution are apparent in the histogram and not the box plot? What features are apparent in the box plot but not in the histogram?
+
+b.  What may be the reason for the [bimodal distribution](https://en.wikipedia.org/wiki/Multimodal_distribution)? Explain.
+
+c.  Compare the distribution of marathon times for men and women based on the box plot shown below.
+
+```{r}
+#| out-width: 95%
+#| fig-asp: 0.4
+#| echo: false
+ggplot(nyc_marathon, aes(x = time_hrs, y = division, color = division)) +
+      geom_boxplot(outlier.alpha = 0.8, show.legend = FALSE) +
+      labs(x = "Marathon time", y = NULL) +
+      scale_x_continuous(limits = c(2, 3.2), breaks = seq(2, 3.2, 0.4)) +
+      scale_color_manual(values = c(IMSCOL["blue","full"], IMSCOL["red","full"]))
+```
+
+d.  The time series plot shown below is another way to look at these data. Describe what is visible in this plot but not in the others.
+
+```{r}
+#| out-width: 95%
+#| fig-asp: 0.4
+#| echo: false
+ggplot(nyc_marathon, aes(x = year, y = time_hrs, 
+                             color = division, shape = division)) +
+      geom_point(size = 2) +
+      labs(y = "Marathon time", x = "Year") +
+      scale_color_manual(values = c(IMSCOL["blue","full"], IMSCOL["red","full"]))
+```
+:::
+
+# Wrap up
+
+## Submitting
+
+::: callout-important
+Before you proceed, first, make sure that you have updated the document YAML with your name! Then, render your document one last time, for good measure.
+:::
+
+To submit your assignment to Moodle, follow these steps:
+
+- Render your Quarto document to PDF/MS Word with next YAML header:
+
+```yaml
+---
+title: "Lab 2"
+subtitle: "Descriptive Statistics"
+author: "Your Name"
+institute: Kyiv School of Economics
+format: pdf # or docx
+---
+```
+
+- Upload the file to the course Moodle page.
+
+## Grading
 
 - **Submission of Lab Report:** A complete and accurate submission of the lab assignment in the required format [(1 point)]{.hi}.
 - **Understanding of Code and Correct Use of Methods:** Evaluation of your understanding of the code you submit and the appropriateness of the methods used in your solution [(2 point)]{.hi}.
