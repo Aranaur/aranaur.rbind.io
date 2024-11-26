@@ -1,0 +1,641 @@
+---
+title: "API and Web Scraping"
+subtitle: "Descriptive Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .05_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=2554">🔗Descriptive Statistics (AI27)</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Software requirements {background-iframe=".05_files/libs/colored-particles/index.html"}
+
+## External software
+
+Today we'll be using [SelectorGadget](https://selectorgadget.com/), which is a Chrome extension that makes it easy to discover CSS selectors.  (Install the extension directly [here](https://chrome.google.com/webstore/detail/selectorgadget/mhjhnkcfbdhnjickkkdbjoemdmbfginb).) Please note that SelectorGadget is only available for Chrome. If you prefer using Firefox, then you can try [ScrapeMate](https://addons.mozilla.org/en-US/firefox/addon/scrapemate/).
+
+## R packages
+
+```{r}
+#| label: load-packages
+#| warning: false
+#| message: false
+
+# Load necessary packages
+if (!require("pacman")) install.packages("pacman")
+
+pacman::p_load(tidyverse, rvest, janitor, httr2,
+              jsonlite, hrbrthemes, timeperiodsR,
+              listviewer, RSelenium, netstat)
+```
+
+# Webscraping basics {background-iframe=".05_files/libs/colored-particles/index.html"}
+
+---
+
+There are actually two ways that web content gets rendered in a browser: 
+
+1. Server-side
+2. Client side
+
+You can read [here](https://www.codeconquest.com/website/client-side-vs-server-side/) for more details (including example scripts).
+
+## 1. Server-side {.smaller}
+
+- The scripts that "build" the website are not run on our computer, but rather on a host server that sends down all of the HTML code.
+  - E.g. Wikipedia tables are already populated with all of the information --- numbers, dates, etc. --- that we see in our browser.
+- In other words, the information that we see in our browser has already been processed by the host server. 
+- You can think of this information being embeded directly in the webpage's HTML.
+- **Webscraping challenges:** Finding the correct CSS (or Xpath) "selectors". Iterating through dynamic webpages (e.g. "Next page" and "Show More" tabs).
+- **Key concepts:** CSS, Xpath, HTML
+
+## 2. Client-side {.smaller}
+
+- The website contains an empty template of HTML and CSS. 
+  - E.g. It might contain a "skeleton" table without any values.
+- However, when we actually visit the page URL, our browser sends a *request* to the host server.
+- If everything is okay (e.g. our request is valid), then the server sends a *response* script, which our browser executes and uses to populate the HTML template with the specific information that we want.
+- **Webscraping challenges:** Finding the "API endpoints" can be tricky, since these are sometimes hidden from view.
+- **Key concepts:** APIs, API endpoints
+
+## Webscraping: A Mix of Art and Science
+
+- Requires adaptability: methods vary across websites and can change over time.
+- If you see it in your browser, you can scrape it!
+
+## Caveat: Ethical Considerations
+Just because you can scrape data doesn’t mean you should. While scraping public data is legal (per hiQ Labs vs LinkedIn), it’s essential to act responsibly:
+
+- Avoid overwhelming servers with excessive requests.
+- Be mindful of safeguards against suspected malicious activity.
+
+**Mantra:** *Be nice to the web.*
+
+## Webscraping with rvest
+
+`rvest` ([link](https://rvest.tidyverse.org/)): A tidyverse-inspired R package for server-side webscraping, similar to Python's Beautiful Soup.
+
+**Key Requirement:**
+
+Understand CSS selectors to effectively extract data from webpages.
+
+## CSS & SelectorGadget: Student Presentation
+
+**CSS (Cascading Style Sheets):** Defines how HTML elements are styled and displayed.
+
+**Key Concepts:**
+
+- Properties: The "how" (e.g., font, color, layout).
+- Selectors: The "what" (e.g., `.h1` for headers, `.h2` for sub-headers).
+
+**SelectorGadget:** A tool to identify CSS selectors for isolating desired webpage content.
+
+➡️ Recommended: Review the SelectorGadget [vignette](https://cran.r-project.org/web/packages/rvest/vignettes/rvest.html) before proceeding.
+
+# Application 1: Wikipedia {background-iframe=".05_files/libs/colored-particles/index.html"}
+
+## Application 1: Scraping Wikipedia
+
+**Task:** Scrape the Wikipedia page on the Men's 100 metres world record progression.
+
+Steps:
+
+1. Explore the Page:
+    - Identify the structure and objects (e.g., tables).
+    - Note the number of tables, column similarities, row/column spans, etc.
+2. Load the Page into R:
+    - Use `rvest::read_html()` to read the entire page for further analysis.
+
+## Application 1: Scraping Wikipedia {.smaller}
+
+```{r}
+#| label: wiki-read-html
+
+url <- "http://en.wikipedia.org/wiki/Men%27s_100_metres_world_record_progression"
+m100 <- read_html(url)
+m100
+```
+
+The page is read as an [XML](https://en.wikipedia.org/wiki/XML) document, which includes everything required to render the Wikipedia page—similar to viewing a full LaTeX document when you only need specific tables.
+
+**Key Insight:**
+
+XML structures provide access to all elements of a webpage, but our goal is to extract only the relevant data (e.g., specific tables).
+
+➡️ Next step: Isolate the tables using CSS selectors or dedicated functions.
+
+## Table 1: Pre-IAAF (1881--1912) {.tiny}
+
+**Step 1: Identify the Table’s CSS Selector**
+
+Use **SelectorGadget** to pinpoint the unique CSS selector for the desired table. This tool helps isolate the table’s content by visually highlighting the relevant elements on the webpage.
+
+**Step 2: Extract the Table in R**
+
+Once the CSS selector is identified, use `rvest` functions to extract the data.
+
+![](img/wiki.gif){fig-align="center"}
+
+## Table 1: Pre-IAAF (1881--1912)
+
+```{r}
+#| label: wiki-table1
+
+pre_iaaf <- 
+  m100 %>%
+  html_element("#mw-content-text > div.mw-content-ltr.mw-parser-output > table:nth-child(11)") %>% 
+  html_table() %>% 
+  clean_names() %>%         
+  mutate(date = mdy(date))
+
+pre_iaaf
+```
+
+## Alternative: Using Browser Inspection Tools {.smaller}
+
+If SelectorGadget isn’t available or feels cumbersome, try using your browser’s “Inspect Element” feature for precise CSS selector identification.
+
+**Example (Google Chrome):**
+
+1. Open Inspect Console:
+    - Shortcut: **Ctrl+Shift+I** (Windows) or **Cmd+Option+I** (Mac).
+    - Or right-click on the webpage and select **“Inspect”**.
+2. Locate the Element:
+    - Hover over elements in the console to highlight them on the page.
+3. Copy the CSS Selector:
+    - Right-click the highlighted element.
+    - Select **Copy -> Copy selector**.
+
+This method provides a quick and precise way to extract CSS selectors without additional tools.
+
+## Alternative: Using Browser Inspection Tools
+
+![](img/wiki2.gif){fig-align="center"}
+
+## Challenge
+
+**Steps:**
+
+1. Extract the Next Two Tables:
+    Use SelectorGadget or browser inspection to identify their CSS selectors.
+2. Combine Tables:
+    Bind the extracted tables with the first table into a single data frame.
+3. Visualize Record Progression:
+    Use `ggplot2` to plot the progression over time.
+
+# Application 2: Rozetka {background-iframe=".05_files/libs/colored-particles/index.html"}
+
+## Extract the text
+
+```{r}
+#| label: rozetka-read-html
+
+base_url <- "https://rozetka.com.ua/kompyuternie-kolonki/c4671536/seller=rozetka/"
+rozetka <- read_html(base_url)
+
+rozetka
+```
+
+<br>
+
+#### Identifying CSS Selectors for Relevant Information
+
+After iterative clicking with SelectorGadget, the relevant CSS selectors for the desired elements on this page are:
+
+- `.goods-tile__price-value`: Price
+- `.goods-tile__title`: Title
+
+## Extract the text
+
+```{r}
+#| label: rozetka-extract
+
+speakers <- 
+  rozetka %>% 
+  html_elements(".goods-tile__price-value, .goods-tile__title")
+
+html_table(speakers[1:5])
+```
+
+## Extract the text
+
+Instead, we’ll parse it as simple text via `html_text()`. This will yield a vector of strings, which I’ll re-assign the same speakers object.
+
+```{r}
+#| label: rozetka-extract2
+
+speakers <- html_text(speakers)
+head(speakers, 20)
+```
+
+## Coercing to a data frame
+
+```{r}
+#| label: rozetka-df
+
+speakers %>% 
+  matrix(nrow = 2) %>%
+  t() %>%
+  as_tibble() %>% 
+  head()
+```
+
+## Automating the process
+
+Let's automate the process of extracting data from multiple pages.
+
+```{r}
+#| label: rozetka-automate1
+
+pages <- paste0("page=", 1:3, ";")
+pages
+```
+
+## Custom function {.tiny}
+
+```{r}
+#| label: rozetka-automate2
+#| eval: true
+
+speakers_scrape <- 
+  function(x) {
+    cat("Scraping page", x, "\n")
+    url = paste0(
+      'https://rozetka.com.ua/kompyuternie-kolonki/c4671536/',
+      x,
+      'sell_status=available;tip-238871=akusticheskaya-sistema'
+      )
+    speakers <- 
+      read_html(url) %>% 
+      html_elements(".goods-tile__price-value , .goods-tile__title") %>% 
+      html_text() %>% 
+      matrix(nrow = 2) %>% 
+      t() %>% 
+      as_tibble()
+    Sys.sleep(1) # будемо чемними :)
+    return(speakers)
+  }
+
+speakers_rozetka <- 
+  lapply(pages, speakers_scrape) %>% 
+  bind_rows()
+
+speakers_rozetka_tbl <- speakers_rozetka %>% 
+  rename(title = V1,
+         price = V2) %>% 
+  mutate(title = title %>% str_replace_all('Акустична система', '') %>% str_trim(),
+         price = price %>% str_replace('₴', '') %>% str_replace_all('[^ -~]+', "") %>% as.numeric() # remove non-ASCII characters and convert to numeric
+         )
+
+speakers_rozetka_tbl
+```
+
+# Client-side and APIs {background-iframe=".05_files/libs/colored-particles/index.html"}
+
+## Student Presentation: APIs {.smaller}
+
+APIs (Application Programming Interfaces) are sets of rules that enable different software applications to interact and share data. Here are key concepts:
+
+- **Server:** A computer running an API.
+- **Client:** A program that exchanges data with the server via the API.
+- **Protocol:** The communication rules (e.g., HTTP).
+- **Methods:** Actions like GET (retrieve), POST, PUT, DELETE used by the client to interact with the server.
+- **Requests:** What the client asks the server to do.
+- **Response:** The server’s reply, which includes a status code, header (meta-info), and body (the actual content).
+
+For more details, check out [An Introduction to APIs](https://zapier.com/resources/guides/apis) by Zapier.
+
+## API Endpoints
+
+API endpoints are URLs that provide direct access to data from a server’s API database. While they resemble normal website URLs, they return data in formats like [JSON](https://en.wikipedia.org/wiki/JSON) or [XML](https://en.wikipedia.org/wiki/XML) instead of rich HTML content.
+
+- **API Endpoints:** URLs that specify where to access data from an API.
+- **Data Formats:** When you visit an API endpoint, you’ll see structured data in formats like JSON or XML.
+- **What to Know:** While the data might seem unformatted, it’s structured and can be easily read into programming languages like R, Python, or Julia.
+
+# Application 1: Trees of New York City {background-iframe=".05_files/libs/colored-particles/index.html"}
+
+## NYC Trees: Introduction
+
+NYC Open Data provides a wealth of public data from various city agencies. You can access datasets on topics ranging from arrests to city job postings and street trees.
+
+For this example, we'll download data from the 2015 NYC Street Tree Census:
+
+1. **Visit the Web Page:** Open the [NYC Open Data](https://data.cityofnewyork.us/Environment/2015-Street-Tree-Census-Tree-Data/uvpi-gqnh/about_data) page in your browser.
+2. **Find the API Tab:** Locate and click the API tab.
+3. **Copy the API Endpoint:** Copy the [URL](https://data.cityofnewyork.us/resource/uvpi-gqnh.json) provided in the popup.
+4. *Optional:* Paste the endpoint into your browser to view the data in JSON format. (Use the JSONView extension for better readability.)
+
+## NYC Trees: Extracting Data
+
+```{r}
+#| label: nyc-trees
+
+nyc_trees <- 
+  fromJSON("https://data.cityofnewyork.us/resource/uvpi-gqnh.json") %>%
+  as_tibble()
+nyc_trees
+```
+
+## API Data Limits
+
+The full NYC Street Tree Census contains nearly 700,000 trees, but the API defaults to returning only 1,000 rows. For our example, we’ve downloaded a small sample.
+
+If you want to access more data, you can override the limit by adding `?$limit=LIMIT` to the API endpoint. For example:
+
+To read the first 5 rows: `...?$limit=5`
+Check the API documentation for more options and details on how to fetch larger datasets.
+
+```{r}
+#| label: nyc-trees-limit
+#| eval: false
+
+fromJSON("https://data.cityofnewyork.us/resource/nwxe-4ae8.json?$limit=5")
+```
+
+## NYC Trees: Visualization
+
+```{r}
+#| label: nyc-trees-plot
+#| fig-align: center
+#| output-location: slide
+
+nyc_trees %>% 
+  select(longitude, latitude, stump_diam, spc_common, spc_latin, tree_id) %>% 
+  mutate_at(vars(longitude:stump_diam), as.numeric) %>% 
+  ggplot(aes(x=longitude, y=latitude, size=stump_diam)) + 
+  geom_point(alpha=0.5) +
+  scale_size_continuous(name = "Stump diameter") +
+  labs(
+    x = "Longitude", y = "Latitude",
+    title = "Sample of New York City trees",
+    caption = "Source: NYC Open Data"
+    )
+```
+
+# Application 2: FRED data {background-iframe=".05_files/libs/colored-particles/index.html"}
+
+## Get the API key
+
+1. Register at the [FRED website](https://fred.stlouisfed.org/).
+2. Go to [API keys](https://research.stlouisfed.org/useraccount/apikey) and generate a new key[^api].
+3. Copy the key to your clipboard.
+
+[^api]: You will need to describe the application or program you intend to write.
+
+## FRED data: Real GNP
+
+<iframe src="https://fred.stlouisfed.org/graph/graph-landing.php?g=yo2J&width=1200&height=475" scrolling="no" frameborder="0" style="overflow:hidden; width:1200px; height:525px;" allowTransparency="true" loading="lazy"  data-external="1"></iframe>
+
+## FRED data: API Endpoint
+
+As with all APIs, a good place to start is the [FRED API developer docs](https://fred.stlouisfed.org/docs/api/fred/).
+
+If you read through these, you’d see that the endpoint path we’re interested in is [series/observations](https://fred.stlouisfed.org/docs/api/fred/series_observations.html):
+
+- **file_type:** “json” (Not required, but our preferred type of output.)
+- **series_id:** “GNPCA” (Required. The data series that we want.)
+- **api_key:** “YOUR_API_KEY” (Required. Go and fetch/copy your key now.)
+
+Head over to `https://api.stlouisfed.org/fred/series/observations?series_id=GNPCA&api_key=YOUR_API_KEY&file_type=json`, replacing “`YOUR_API_KEY`” with your actual key.
+
+## FRED data: Extracting Data
+
+```{r}
+#| label: fred-data2
+#| output-location: slide
+
+library(httr2)
+
+req <- request("https://api.stlouisfed.org/fred/")
+
+resp <- req %>%
+  req_url_path_append("series", "observations") %>%
+  req_url_query(
+    series_id = "GNPCA",
+    api_key = Sys.getenv("FRED_API_KEY"), # usethis::edit_r_environ()
+    file_type = "json"
+   ) %>% 
+    req_perform()
+
+fred <- resp %>% 
+  resp_body_json()
+
+jsonedit(fred, mode = "view")
+```
+
+## FRED data: Extracting Data
+
+```{r}
+#| label: fred-data3
+
+fred_tbl <- 
+  fred$observations %>% 
+  bind_rows()
+
+fred_tbl
+```
+
+## FRED data: Visualization
+
+```{r}
+#| label: fred-plot
+#| output-location: slide
+#| fig-align: center
+
+fred_tbl %>%
+  mutate(across(realtime_start:date, ymd)) %>%
+  mutate(value = as.numeric(value))  %>% 
+  ggplot(aes(date, value)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    x="Date", y="2012 USD (Billions)",
+    title="US Real Gross National Product", caption="Source: FRED"
+    )
+```
+
+# Application 3: World rugby rankings {background-iframe=".05_files/libs/colored-particles/index.html"}
+
+## Locating the hidden API endpoint {.smaller}
+
+- Start by inspecting the page. (Ctr+Shift+I in Chrome. Ctrl+Shift+Q in Firefox.)
+- Head to the Network tab at the top of the inspect element panel.
+- Click on the XHR button.
+- Refresh the page (Ctrl+R). This will allow us to see all the web traffic coming to and from the page in our inspect panel.
+- Our task now is to scroll these different traffic links and see which one contains the information that we’re after.
+- The top traffic link item references a URL called <https://api.wr-rims-prod.pulselive.com/rugby/v3/rankings/mru?language=en>.
+- Click on this item and open up the Preview tab.
+- In this case, we can see what looks to be the first row of the rankings table (“South Africa”, etc.)
+
+## World rugby rankings: Extracting data
+
+```{r}
+endpoint <- "https://api.wr-rims-prod.pulselive.com/rugby/v3/rankings/mru?language=en"
+rugby <- fromJSON(endpoint)
+str(rugby)
+```
+
+## World rugby rankings: Extracting data
+
+```{r}
+#| label: rugby-data
+
+rankings <- 
+  bind_cols(
+    rugby$entries$team,
+    rugby$entries %>% select(pts:previousPos)
+  ) %>%
+  clean_names() %>%
+  select(-c(id, alt_id, annotations)) %>% ## Ці колонки не додають особливого інтересу
+  select(pos, pts, everything()) %>% ## Змініть порядок решти стовпців
+  as_tibble()
+
+rankings
+```
+
+## BONUS: Get and plot the rankings history
+
+```{r}
+#| label: rugby-bonus
+
+start_date <- ymd("2004-01-01")
+end_date <- floor_date(today(), unit="years")
+dates <- seq(start_date, end_date, by="years")
+## Отримайте найближчий понеділок до 1 січня, щоб збігтися з датами випуску рейтингу.
+dates <- floor_date(dates, "week", week_start = getOption("lubridate.week.start", 1))
+dates
+```
+
+## BONUS: Custom function
+
+```{r}
+#| label: rugby-bonus2
+
+rugby_scrape <- 
+  function(x) {
+    # cat("Scraping date", x, "\n") # Uncomment this line to see the progress
+    endpoint = paste0("https://api.wr-rims-prod.pulselive.com/rugby/v3/rankings/mru?language=en&date=", x)
+    rugby = fromJSON(endpoint)
+    rankings =
+      bind_cols(
+        rugby$entries$team,
+        rugby$entries %>% select(pts:previousPos)
+      ) %>%
+      clean_names() %>%
+      mutate(date = x) %>%
+      select(-c(id, alt_id, annotations)) %>% 
+      select(date, pos, pts, everything()) %>%
+      as_tibble()
+    Sys.sleep(1)
+    return(rankings)
+  }
+```
+
+## BONUS: Automating the process
+
+```{r}
+#| label: rugby-bonus3
+
+rankings_history <- 
+  lapply(dates, rugby_scrape) %>%
+  bind_rows()
+rankings_history
+```
+
+## BONUS: Plot the rankings history
+
+```{r}
+#| label: rugby-bonus4
+#| output-location: slide
+#| fig-align: center
+#| fig-width: 10
+
+teams <- c("NZL", "IRE", "ENG", "JPN")
+team_cols <- c("NZL"="black", "IRE"="#4DAF4A", "ENG"="#377EB8", "JPN" = "red")
+
+rankings_history %>%
+  ggplot(aes(x=date, y=pts, group=abbreviation)) +
+  geom_line(col = "grey") + 
+  geom_line(
+    data = rankings_history %>% filter(abbreviation %in% teams), 
+    aes(col=fct_reorder2(abbreviation, date, pts)),
+    lwd = 1
+  ) +
+  scale_color_manual(values = team_cols) +
+  labs(
+    x = "Date", y = "Points", 
+    title = "International rugby rankings", caption = "Source: World Rugby"
+  ) +
+  theme(legend.title = element_blank())
+```
+
+
+
+# Questions? {.unnumbered .unlisted background-iframe=".05_files/libs/colored-particles/index.html"}
+
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=2554)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
