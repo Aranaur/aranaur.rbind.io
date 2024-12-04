@@ -1,0 +1,828 @@
+---
+title: "$t$-test"
+subtitle: "Descriptive Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .08_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=2554">🔗Descriptive Statistics (AI27)</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    fig-width: 22
+    fig-height: 6
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# $t$-test {background-iframe=".08_files/libs/colored-particles/index.html"}
+
+## 📈 Task {.smaller}
+
+> Our company wants to switch from one DBMS to another. The main criterion for the transition is “the time spent per day loading new data.” If previously it took an average of 10 hours to update the database on a daily basis, we want to find a new DBMS that will do it faster than 7 hours.
+>
+> To do this, we decided to transfer all the data to the new database under test. During one week, we will calculate the data loading time every day, and if the average time for updating is less than 7 hours, then we will completely switch to the new DBMS. Your task is to come up with a way to test the hypothesis that the new DBMS is better than the old one.
+
+The sample is:
+
+- `[6.9, 6.45, 6.32, 6.88, 6.19, 7.13, 6.76]` --- the time to load into the new database by day in hours.
+
+## 📊 Hypothesis
+
+- $X_1, X_2, ..., X_7$ --- the time of loading new data into the DBMS in hours for each day of the experiment
+- $X$ from the normal distribution.
+
+```{r}
+#| label: data-gen
+
+X = c(6.9, 6.45, 6.32, 6.88, 6.09, 7.13, 6.76)
+cat("Average time of loading into the DBMS:" , mean(X) |> round(2), "hours")
+```
+
+- $H_0: \bar{X} \geq 7$ vs. $H_1: \bar{X} < 7$
+
+## 📐 $Z$-test
+
+- The statistic $Z(X) = \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{\sigma^2}}$
+
+. . .
+
+Then you just need to calculate the following statistics: $$\sqrt{n}\dfrac{\overline X - 7}{\sqrt{\sigma^2}} \overset{H_0}{\sim} \mathcal{N}(0, 1)$$
+
+. . .
+
+::: {.callout-important}
+But there's one problem: [we don't know $\sigma^2$!]{.hi}
+:::
+
+## 📐 $t'$-test {.smaller}
+
+$\widehat{\sigma^2} =S^2 = \dfrac{1}{n - 1}\underset{i=1}{\overset{n}{\sum}}(X_i - \overline X)^2$
+
+. . .
+
+```{r}
+#| label: sigma-hat
+
+cat("Sample variance: ", var(X))
+```
+
+. . .
+
+Let's introduce a new criterion, the $t$-test, in which we substitute:
+
+- $T(X) := \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{S^2}}$
+- $T(X) \overset{H_0}{\sim} \mathcal{N}(0, 1)$ 🤨
+
+. . .
+
+> It remains to be seen: Is it true that at $H_0$ the distribution of the statistic T is standard normal?
+
+## 📊 Distribution of statistics
+
+- We will generate a sample $X$ $M$ times and calculate the statistic $T(X)$ each time.
+- As a result, we will get a sample of size $M$ for $T(X)$ and can draw a histogram of the distribution. 
+- We will also plot the distribution $\mathcal{N}(0, 1)$ separately. 
+- If the empirical distribution visually coincides with the theoretical normal distribution, then everything is fine. If not, then we cannot simply replace $\sigma^2$ with $S^2$.
+    - Additionally, let's see what happens if we replace $T(X)$ with $Z(X)$.
+
+## R and 📊 Statistics distribution {.smaller}
+
+```{r}
+#| label: t-test-sim-def
+
+M <- 100000
+sample_size <- 7
+
+plot_data <- tibble(
+  T_X = map_dbl(1:M, ~ {
+    sample <- rnorm(sample_size, mean = 5, sd = 3)
+    sqrt(sample_size) * (mean(sample) - 5) / sqrt(var(sample))
+  }),
+  Z_X = map_dbl(1:M, ~ {
+    sample <- rnorm(sample_size, mean = 5, sd = 3)
+    sqrt(sample_size) * (mean(sample) - 5) / 3
+  })
+) %>% 
+  pivot_longer(everything(), names_to = "Statistic", values_to = "Value")
+
+plot_data
+```
+
+## R and 📊 Statistics distribution {.smaller}
+
+```{r}
+#| label: t-test-sim-run
+#| code-fold: true
+#| fig-align: center
+#| fig-width: 22
+#| fig-height: 5
+
+plot_data %>% 
+    ggplot(aes(x = Value, group = Statistic)) +
+    geom_histogram(aes(y = ..density..), bins = 30, fill = "skyblue", alpha = 0.6) +
+    geom_density(aes(color = blue), size = 1) +
+    stat_function(aes(color = red), fun = dnorm, args = list(mean = 0, sd = 1), size = 1) +
+    facet_wrap(~ Statistic, scales = "free") +
+    labs(
+      title = "Distribution of statistics T(X) and Z(X)",
+      x = "Value",
+      y = "Density",
+      color = "Distribution"
+    ) +
+    theme_minimal() +
+    xlim(quantile(plot_data$Value, 0.001), quantile(plot_data$Value, 0.999)) +
+    scale_color_manual(values = c(red, blue), labels = c("Theoretical", "Empirical"))
+```
+
+::: {.callout-important icon=false}
+- The $Z$-test works here: $\sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{\sigma^2}} \sim \mathcal{N}(0, 1)$.
+- But this is not the case for $T(X)$! [They are different! So the $t'$-test is not suitable for the original problem!]{.hi}
+:::
+
+## 📝 Why did it happen? {.smaller}
+
+$S^2$ is a random variable!
+
+Let's look at the distribution of $\sqrt{S^2}$ on the same normal distribution.
+
+```{r}
+#| label: sigma-hat-sim
+#| code-fold: true
+#| fig-align: center
+
+sigma_hat <- map_dbl(1:M, ~ {
+  sample <- rnorm(sample_size, mean = 5, sd = 3)
+  sqrt(var(sample))
+})
+
+tibble(Sigma_hat = sigma_hat) %>% 
+  ggplot(aes(x = Sigma_hat)) +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "skyblue", alpha = 0.6) +
+  geom_density(aes(color = blue), size = 1) +
+  labs(
+    title = "Distribution of the sample standard deviation",
+    x = "Value",
+    y = "Density",
+    color = "Distribution"
+  ) +
+  theme_minimal() +
+  xlim(quantile(sigma_hat, 0.001), quantile(sigma_hat, 0.999)) +
+  scale_color_manual(values = c(red, blue), labels = c("Theoretical", "Empirical"))
+```
+
+::: {.callout-note icon=false}
+## Conclusion.
+
+$T(X) \overset{H_0}{\nsim} \mathcal{N}(0, 1)$ 😭
+:::
+
+## What is the distribution of $T(X)$? {.tiny40}
+
+1. Let $X_1 \ldots X_n \sim \mathcal{N}(\mu, \sigma^2)$
+
+2. Let $\xi_1 \ldots \xi_n \sim \mathcal{N}(0, 1)$. Then $\eta=\xi_1^2 +\ ... +\xi_n^2 \sim \chi^2_n$, &mdash; [**$\chi^2$ distribution with $n$ degrees of freedom**](https://en.wikipedia.org/wiki/Chi-squared_distribution).
+    - Then $\underset{i=1}{\overset{n}{\sum}}\left(\xi_i - \overline \xi \right)^2 \sim \chi^2_{n-1}$. [Proof](https://en.wikipedia.org/wiki/Cochran%27s_theorem) 🫠
+
+    - $S^2_X = \dfrac{1}{n - 1}\underset{i=1}{\overset{n}{\sum}}(X_i - \overline X)^2$
+
+    - $\xi_i := \dfrac{X_i - \mu}{\sigma} \sim \mathcal{N}(0, 1)$. Then $S^2_{\xi} = \dfrac{1}{\sigma^2}S^2_X$.
+
+    - So $\dfrac{(n - 1)\cdot S^2_X}{\sigma^2} = \underset{i=1}{\overset{n}{\sum}}\left(\xi_i - \overline \xi \right)^2 \sim \chi^2_{n-1}$.
+
+3. Let $\xi \sim \mathcal{N}(0, 1), \eta \sim \chi^2_k$ and $\xi$ with $\eta$ be independent. Then the statistic $\zeta = \dfrac{\xi}{\sqrt{\eta/k}} \sim t_{k}$ &mdash; from the [Student's distribution](https://en.wikipedia.org/wiki/Student%27s_t-distribution) with $k$ degrees of freedom.
+
+    - $\xi := \sqrt{n}\dfrac{\overline X - \mu_0}{\sigma} \sim \mathcal{N}(0, 1)$
+    - $\eta := \dfrac{(n - 1)\cdot S^2_X}{\sigma^2} \sim \chi^2_{n-1}$
+    - $\xi$ and $\eta$ are [independent](https://math.stackexchange.com/questions/4165803/overlinex-and-s2-are-independent)
+    - Then
+
+$$
+\begin{align}
+T = \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{S^2}} = \frac{\sqrt{n}\dfrac{\overline X - \mu_0}{\sigma}}{\sqrt{\dfrac{(n - 1)\cdot S^2_X}{(n - 1)\sigma^2}}} = \dfrac{\xi}{\sqrt{\dfrac{\eta}{n-1}}} \sim t_{n - 1}
+\end{align}
+$$
+
+## 📈 Problem and 📐 $t$-test {.smaller}
+
+$T = \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{S^2}} \sim t_{n - 1}$ --- taken from a Student's distribution with $n - 1$ degrees of freedom.
+
+<br>
+
+```{r}
+#| label: t-test-data
+#| output-location: column
+
+X = c(6.9, 6.45, 6.32, 6.88, 6.09, 7.13, 6.76)
+t_stat = sqrt(7) * (mean(X) - 7) / sqrt(var(X))
+cat("t-statistic:", t_stat |> round(2))
+```
+
+<br>
+
+```{r}
+#| label: t-test-p-value
+#| output-location: column
+
+p_value = pt(t_stat, df = sample_size - 1)
+cat("p-value:", p_value |> round(4))
+```
+
+<br>
+
+```{r}
+#| label: t.test
+#| output-location: column
+
+t.test(X, mu = 7, alternative = "less")
+```
+
+# Confidence intervals {background-iframe=".08_files/libs/colored-particles/index.html"}
+
+## 📊 Confidence interval for the mean: option 1 {.tiny}
+
+[Confidence interval]{.hi} --- set $m$: the test does not reject $H_0: \mu = m$ at the significance level $\alpha$.
+
+- Let $\mu$ be the true mean of the sample. We also know that for $H_0: \sqrt{n}\dfrac{\overline X - m}{\sqrt{S^2}} \sim t_{n - 1}$.
+
+- We are interested in $m$ such that: $\left\{-t_{n-1, 1 - \frac{\alpha}{2}} < \sqrt{n}\dfrac{\overline X - m}{\sqrt{S^2}} < t_{n-1, 1 - \frac{\alpha}{2}} \right\}$, in which case the criterion will not be rejected.
+
+- Let's write it so that only $m$ remains in the center:
+
+$$\left\{\overline X - \dfrac{t_{n - 1, 1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}} < m < \overline X + \dfrac{t_{n - 1, 1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}}\right\}$$
+
+- Then the confidence interval:
+
+$$CI_{\mu} = \left(\overline X \pm \dfrac{t_{n - 1, 1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}} \right),$$ 
+
+where $S^2 = \dfrac{1}{n - 1}\underset{i=1}{\overset{n}{\sum}}(X_i - \overline X)^2$
+
+## 📊 Confidence interval for the mean: option 2 {.tiny}
+
+[Classical definition](https://en.wikipedia.org/wiki/Confidence_interval#Definition) of a confidence interval:
+
+> A confidence interval for a parameter $\theta$ of confidence level $1 - \alpha$ is a pair of statistics $L(X), R(X)$ such that $P(L(X) < \theta < R(X)) = 1 - \alpha$.
+
+$$
+\begin{align}
+&T(X) = \sqrt{n}\dfrac{\overline X - \mu}{\sqrt{S^2}} \sim t_{n - 1} \Rightarrow \\
+&P\left(-t_{n - 1, 1-\alpha/2} < \sqrt{n}\dfrac{\overline X - \mu}{\sqrt{S^2}} < t_{n - 1, 1-\alpha/2} \right) = 1 - \alpha \Leftrightarrow \\
+&P\left(\overline X - \dfrac{t_{n - 1, 1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}}  < \mu < \overline X + \dfrac{t_{n - 1, 1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}} \right) = 1 - \alpha
+\end{align}
+$$
+
+- Then the confidence interval:
+
+$$CI_{\mu} = \left(\overline X \pm \dfrac{t_{n - 1, 1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}} \right)$$
+
+## R and 📊 confidence interval
+
+```{r}
+#| label: ci
+#| output-location: column
+
+sample  <- rnorm(100, mean = 10, sd = 2)
+alpha <- 0.05
+n <- length(sample)
+
+t_stat <- qt(1 - alpha / 2, df = n - 1)
+t_stat
+
+mean(sample) + c(-1, 1) * t_stat * sd(sample) / sqrt(n)
+
+t.test(sample, conf.level = 1 - alpha)$conf.int
+```
+
+📈 Task
+
+```{r}
+#| label: ci-data
+#| output-location: column
+
+X = c(6.9, 6.45, 6.32, 6.88, 6.09, 7.13, 6.76)
+alpha <- 0.05
+n <- length(X)
+
+t_stat <- qt(1 - alpha / 2, df = n - 1)
+t_stat
+
+mean(X) + c(-1, 1) * t_stat * sd(X) / sqrt(n)
+
+t.test(X, conf.level = 1 - alpha)$conf.int
+```
+
+# $t$-test and unknown distribution {background-iframe=".08_files/libs/colored-particles/index.html"}
+
+## 📊 Task {.tiny}
+
+> You have come up with an idea for a startup where couriers collect orders for customers and deliver them to their homes. The margin on an order in your startup is X ₴, and the cost of a courier's work is 1k ₴. The specifics of your startup are such that there is a high risk of return without payment. Given the costs, investors are willing to sponsor your infrastructure and customer acquisition if you show that you will make a profit.
+>
+> From the data, you have the money brought in from each user. Sometimes a positive value, sometimes negative.
+
+- $X_1, X_2, \dots X_N$ --- a sample of the user's profit.
+- $H_0$: $E \overline{X} \leq 0$ vs. $H_1: E \overline{X} > 0$
+
+Data:
+
+```{r}
+#| label: profit-data
+
+profits = read_table('data/profit_from_user.out', col_names = "profit")
+profits
+```
+
+## 📊 Task {.smaller}
+
+```{r}
+#| label: profit-avg
+
+cat("Average profit:", mean(profits$profit) |> round(2), "₴")
+cat("Sample size:", nrow(profits))
+```
+
+```{r}
+#| label: profit-distplot
+#| output-location: column
+#| fig-height: 7
+
+profits %>%
+  ggplot(aes(x = profit)) +
+  geom_histogram(aes(y = ..density..), fill = "skyblue", alpha = 0.6) +
+  geom_density(color = blue, size = 1) +
+  labs(
+    title = "Distribution of profits",
+    x = "Profit, ₴",
+    y = "Density"
+  ) +
+  theme_minimal()
+```
+
+- The initial sample is not from a normal distribution
+- The sample is quite large: not 7 items, but 5000.
+
+[Can we use the normal distribution as an approximation?]{.hi}
+
+## $t$-test and approximation {.tiny40}
+
+1. We will consider the same statistic $T = \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{S^2}}$.
+2. $\xi := \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{\sigma^2}} \stackrel{d}{\rightarrow} \mathcal{N}(0, 1)$. Under the CLT, the convergence is only under the [distribution](https://en.wikipedia.org/wiki/Convergence_in_distribution).
+3. Then $T = \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{S^2}} = \xi \cdot \sqrt{\dfrac{\sigma^2}{S^2}}$. Let's denote $\phi := \sqrt{\dfrac{\sigma^2}{S^2}}$
+    - Do you remember at the beginning of the lecture that $S^2$ is the best estimate for the variance? Another way to write this is: $S^2$ [converges in probability](https://en.wikipedia.org/wiki/Convergence_of_random_variables#Convergence_in_probability) to $\sigma^2$. That is, $S^2 \stackrel{p}{\rightarrow} \sigma^2$
+    - And in this case, there is a [theorem](https://en.wikipedia.org/wiki/Continuous_mapping_theorem) that states that $\phi = \dfrac{\sigma^2}{S^2} \stackrel{p}{\rightarrow} 1$.
+4. $T = \xi \cdot \phi$.
+    - $\xi \stackrel{d}{\rightarrow} \mathcal{N}(0, 1)$
+    - $\phi \stackrel{p}{\rightarrow} 1$
+    - And here another [theorem](https://en.wikipedia.org/wiki/Slutsky%27s_theorem) comes into play: $T = \xi \cdot \phi \stackrel{d}{\rightarrow} 1\cdot \mathcal{N}(0, 1)$. This is the same convergence as in the CLT!
+    - That is, the statistic $T$ is also normally distributed!
+
+[So, if the sample is large, we can assume that $T(X) \overset{H_0}{\sim} \mathcal{N}(0, 1)$.]{.hi}
+
+## R and checking {.tiny40}
+
+Let's test our criterion on large samples:
+
+```{r}
+#| label: sim-t-test
+#| code-fold: true
+#| fig-align: center
+
+set.seed(42)
+
+sample_size <- 2000
+M <- 10000
+sample_distr <- 5 + rexp(rate = 1 / 300, n = 2000)
+
+T_X <- map_dbl(1:M, ~ {
+  sample <- sample(sample_distr, sample_size, replace = TRUE)
+  sqrt(sample_size) * (mean(sample) - mean(sample_distr)) / sqrt(var(sample))
+})
+
+tibble(T_X = T_X) %>% 
+  ggplot(aes(x = T_X)) +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "skyblue", alpha = 0.6) +
+  geom_density(aes(color = blue), size = 1) +
+  stat_function(aes(color = red), fun = dnorm, args = list(mean = 0, sd = 1), size = 1) +
+  labs(
+    title = "Distribution of the statistic T(X)",
+    x = "Value",
+    y = "Density",
+    color = "Distribution"
+  ) +
+  theme_minimal() +
+  scale_color_manual(values = c(red, blue), labels = c("Theoretical", "Empirical"))
+```
+
+We can see that the distributions are the same!
+
+## R and checking {.tiny40}
+
+And on the normal distribution, where were the first differences on a small sample?
+
+```{r}
+#| label: sim-t-test-norm
+#| code-fold: true
+#| fig-align: center
+
+set.seed(42)
+
+sample_size <- 2000
+M <- 10000
+sample_distr <- rnorm(mean = 5, sd = 3, n = 300)
+
+T_X <- map_dbl(1:M, ~ {
+  sample <- sample(sample_distr, sample_size, replace = TRUE)
+  sqrt(sample_size) * (mean(sample) - mean(sample_distr)) / sqrt(var(sample))
+})
+
+tibble(T_X = T_X) %>% 
+  ggplot(aes(x = T_X)) +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "skyblue", alpha = 0.6) +
+  geom_density(aes(color = blue), size = 1) +
+  stat_function(aes(color = red), fun = dnorm, args = list(mean = 0, sd = 1), size = 1) +
+  labs(
+    title = "Distribution of the statistic T(X)",
+    x = "Value",
+    y = "Density",
+    color = "Distribution"
+  ) +
+  theme_minimal() +
+  scale_color_manual(values = c(red, blue), labels = c("Theoretical", "Empirical"))
+```
+
+That is, the first time we were unlucky because the sample size was small
+
+## Confidence interval {.smaller}
+
+$$CI_{\mu} = \left(\overline X \pm \dfrac{z_{1 - \alpha/2} \sqrt{S^2}}{\sqrt{n}} \right)$$
+
+```{r}
+#| label: ci-expon
+#| output-location: column
+
+sample  <- rexp(2000, rate = 1 / 300)
+alpha <- 0.05
+n <- length(sample)
+
+z_stat <- qnorm(1 - alpha / 2)
+
+mean(sample) + c(-1, 1) * z_stat * sd(sample) / sqrt(n)
+
+t.test(sample, conf.level = 1 - alpha)$conf.int
+```
+
+- 📊 Задача
+
+```{r}
+#| label: ci-profit
+#| output-location: column
+
+n <- length(profits$profit)
+z_stat <- qnorm(1 - alpha / 2)
+
+mean(profits$profit) + c(-1, 1) * z_stat * sd(profits$profit) / sqrt(n)
+
+t.test(profits$profit, conf.level = 1 - alpha)$conf.int
+```
+
+Yes, the revenue is positive! So we found investors for our startup 🫡.
+
+## $t'$-test vs. $t$-test {.tiny}
+
+To begin with, let's define when it is better to use which criterion?
+
+1. If the sample size is 60, then $t_{59} \approx \mathcal{N}(0, 1)$.
+    - Let's look at the Student's and normal distributions:
+
+```{r}
+#| label: t-vs-z
+#| output-location: column
+#| fig-height: 7
+
+df <- 60 - 1
+tibble(
+  x = seq(-4, 4, length.out = 100),
+  t = dt(x, df),
+  z = dnorm(x)
+) %>%
+  pivot_longer(-x, names_to = "Distribution", values_to = "Density") %>%
+  ggplot(aes(x = x, y = Density, color = Distribution)) +
+  geom_line(size = 1) +
+  labs(
+    title = "Student's and normal distributions",
+    x = "Value",
+    y = "Density",
+    color = "Distribution"
+  ) +
+  theme_minimal() +
+  scale_color_manual(values = c(red, blue), labels = c("Student's", "Normal"))
+```
+
+- We can see that these 2 distributions are visually identical, so it doesn't matter whether you calculate the statistic $T\sim \mathcal{N}(0, 1)$ or $T\sim t_n$.
+- But this does not mean that with $N=60$ $T$-test/$T'$-test work correctly! If the sample is not from a normal distribution, they can both still be wrong.
+
+## $t'$-test vs. $t$-test {.tiny40}
+
+2. If the sample is less than 60, it is safer to use the $t$-test than the $t'$-test.
+    - **The FPR of the $t$-test will always be smaller than that of the $t'$-test**.
+        - FPR is affected by the percentage of cases $p$-value < $\alpha$. In $t$-test $p$-value $\geq$ $t'$-test $p$-value.
+        - `pvalue <- pt(x)` or `pvalue <- pnorm(x)`. So the heavier the tail of the distribution, the larger the $p$-value. Now let's look at an example:
+
+```{r}
+#| label: t-test-vs-tprime
+#| output-location: slide
+#| fig-height: 11
+
+# Параметри
+df_array <- c(2, 5, 10, 20)
+x <- seq(-3, 3, length.out = 100)
+
+# Обчислення CDF для T-розподілу і нормального розподілу
+cdf_data <- map_dfr(df_array, ~ tibble(
+  x = x,
+  cdf = pt(x, df = .x),
+  distribution = paste0("t(df=", .x, ")")
+)) %>%
+  bind_rows(tibble(
+    x = x,
+    cdf = pnorm(x, mean = 0, sd = 1),
+    distribution = "N(0, 1)"
+  ))
+
+# Графік
+ggplot(cdf_data, aes(x = x, y = cdf, color = distribution)) +
+  geom_line() +
+  labs(
+    title = "CDF distribution for t and normal distributions",
+    x = "X",
+    y = "CDF"
+  ) +
+  theme_minimal() +
+  theme(legend.title = element_blank()) +
+  scale_color_manual(values = c(red, blue, green, purple, "black"))
+```
+
+The Student's distribution with infinity degrees of freedom is a normal distribution: $t_{\infty} = \mathcal{N}(0, 1)$.
+
+## Conclusions
+
+We can see that we can use $t$-test everywhere (and $t'$-test not always), and it is safer for small samples. **That is why $t$-test has become much more popular than $t'$-test**. But $t'$-test can also be useful in practice:
+
+- You don't have to think about degrees of freedom during implementation.
+- It will be much easier to write such a criterion in SQL: you can use table values in the code to understand whether the criterion is rejected.
+- It's easier to do various theoretical calculations.
+- It's harder to make a mistake during implementation.
+
+# Two-sample $t$-test. The task of AB testing {background-iframe=".08_files/libs/colored-particles/index.html"}
+
+## 📊 Task
+
+> We have promotion services on our website. We want to start giving discounts on them to attract more people and start earning more money. To do this, we decided to conduct an AB test:
+> We did not give discounts to one half of the users, and in the other half, we gave discounts to all new users. We need to understand whether we started to earn more money.
+
+This time we have 2 samples: $A$ - control, and $B$ - test.
+
+## 📊 Task {.tiny40}
+
+$$H_0: \mathbb{E} A = \mathbb{E} B \; \text{vs.} \; H_1: \mathbb{E}A < \mathbb{E} B$$
+
+:::: {.columns}
+
+::: {.column width="50%"}
+1. **Both samples are normal**. 
+
+Then there are 2 criteria depending on our knowledge of variance:
+
+- $\sigma^2_A = \sigma^2_B$.
+    
+    Then:
+
+    - $S^2_{full} = \dfrac{(N - 1)S^2_A + (M - 1)S^2_B}{N + M - 2}$, where N, M are the size of the control and test, respectively. And the criterion is as follows:
+    - $T(A, B) = \dfrac{\overline A - \overline B}{S^2_{full}\sqrt{1/N + 1/M}} \overset{H_0}{\sim} T_{n + m - 2}$
+   
+- $\sigma^2_A \neq \sigma^2_B$.
+    
+    Then:
+    
+    - $T(A, B) = \dfrac{\overline A - \overline B}{\sqrt{S^2_{A}/N + S^2_{B}/M}} \overset{H_0}{\sim} T_{v}$
+    - де $v = \dfrac{\left(\dfrac{S^2_{A}}{N} + \dfrac{S^2_{B}}{M} \right)^2}{\left(\dfrac{(S^2_{A})^2}{N^2(N - 1)} + \dfrac{(S^2_{B})^2}{M^2(M-1)} \right)}$
+:::
+
+::: {.column width="50%"}
+2. **At least 1 sample is abnormal**. 
+
+Then the normal approximation with a large sample size, the $t'$-test criterion, comes into play:
+
+- $T(A, B) = \dfrac{\overline A - \overline B}{\sqrt{S^2_{A}/N + S^2_{B}/M}} \overset{H_0}{\sim} \mathcal{N}(0, 1)$
+:::
+
+::::
+
+## R and the Two-Sample $t$-test {.tiny}
+
+```{r}
+#| label: ttest_ind-sim
+#| output-location: column
+
+set.seed(42)
+
+# Генерація даних
+X <- rexp(1000, rate = 1 / 1100)
+Y <- rnorm(1000, mean = 980, sd = 30)
+
+# t-тест
+t.test(X, Y, alternative = "greater", var.equal = FALSE)
+```
+
+<br>
+
+```{r}
+#| label: ttest_ind-sim-norm
+
+t.test(X, Y, alternative = "greater", var.equal = FALSE)$p.value
+```
+
+<br>
+
+```{r}
+#| label: ttest_ind-ci
+
+t.test(X, Y, alternative = "greater", var.equal = FALSE)$conf.int
+```
+
+# MDE for the $t$-test. {background-iframe=".08_files/libs/colored-particles/index.html"}
+
+## Recalling MDE {.tiny}
+
+The **MDE** is the true value of the effect such that our chance of detecting it is equal to $1-\beta$ when using our criterion.
+
+What does MDE depend on?
+
+- Error of the 1st kind, or $\alpha$.
+    - For example, if $\alpha = 1$, we will find an effect even with a sample size of 1 (we will just always reject the 0 hypothesis). And if $\alpha = 0$, we will never detect an effect.
+- Power, or $1 - \beta$.
+    - It follows from the definition itself
+- From noise in the data, or from variance.
+    - The noisier the data, as we know, the wider the confidence interval. This means that it is more difficult to accurately predict the true effect, so the MDE will be larger.
+- Sample size.
+    - We are interested not just in the variance in the data, but in the variance of the mean: by the same token, it should be as small as possible. And what is the variance of the mean? It is $\dfrac{\sigma^2}{N}$, so MDE also depends on the sample size.
+
+## 📊 Task {.tiny}
+
+First, let's define the hypothesis to be tested: 
+
+- $H_0: \mu_0 = 0\ vs. \ H_1: \mu_0 > 0$
+
+We define.
+
+- $S^2_{\mu} := \dfrac{S^2}{N}$ &mdash; estimate of the variance of the mean.
+- $S_{\mu} = \sqrt{\dfrac{S^2}{N}}$ &mdash; the estimate of the standard deviation of the mean, or SEM.
+
+Now we know that
+
+- $\overline X \sim \mathcal{N}(\mu, S^2_{\mu})$
+
+We need to find $MDE=m$, such that:
+
+- if $\overline X \sim \mathcal{N}(m, S^2_{\mu})$, then in $1-\beta$ percent of cases the criterion will be rejected. Check the power.
+- If $\overline X \sim \mathcal{N}(0, S^2_{\mu})$, then the criterion will be rejected for it in $\alpha$ percent of cases. Let's check the FPR.
+
+## R & MDE
+
+$$\text{MDE} = (z_{1 - \alpha} + z_{1 - \beta}) \cdot \sqrt{\dfrac{S^2}{N}}$$
+
+where $z_{1 - \alpha}$ and $z_{1 - \beta}$ are quantiles of the distribution $\mathcal{N}(0, 1)$.
+
+```{r}
+#| label: mde
+#| message: false
+
+profits  <- read_table('data/profit_from_user.out', col_names = "profit")
+
+N <- 1000
+alpha <- 0.05
+beta <- 0.2
+S2 <- var(profits$profit)
+A_mean <- mean(profits$profit)
+
+mde <- (qnorm(1 - alpha) + qnorm(1 - beta)) * sqrt(S2 / N)
+mde
+```
+
+---
+
+```{r}
+#| label: mde-plot
+#| output-location: slide
+#| fig-height: 12
+#| message: false
+
+profits_AB <- tibble(
+  A_means = rnorm(10000, mean = A_mean, sd = sqrt(S2 / N)),
+  B_means = rnorm(10000, mean = A_mean + mde, sd = sqrt(S2 / N)),
+) %>%
+  pivot_longer(everything(), names_to = "Group", values_to = "Value")
+
+profits_AB  %>%
+  ggplot(aes(x = Value, fill = Group)) +
+  geom_density(alpha = 0.6) +
+  geom_vline(xintercept = A_mean, linetype = "dashed") +
+  geom_vline(xintercept = A_mean + mde, linetype = "dashed") +
+  geom_vline(xintercept = A_mean + qnorm(1 - alpha) * sqrt(S2 / N), linetype = "dotted", size = 1, color = red_pink) +
+  labs(
+    title = "MDE for the t-test",
+    x = "Value",
+    y = "Density",
+    fill = "Group"
+  ) +
+  theme_minimal() +
+  scale_fill_manual(values = c(red, green), labels = c("Control", "Test")) +
+  scale_color_manual(values = c(red, green), labels = c("FPR", "Power"))
+```
+
+## R & MDE {.smaller}
+
+$N = 1000$, $\alpha=5$%, $1-\beta=80$%, how do you find $S^2$?
+
+In practice, there are 3 ways:
+
+- Estimate on historical data. In this case, it is not suitable because there was no startup before.
+- Estimate using similar data.
+- Estimate it theoretically. The worst way that works if the first 2 don't work.
+
+
+
+## MDE and sample size {.smaller}
+
+For us, this is too large an MDE: we want it to be $\leq$ 100, and we assume that this is the most likely true effect based on experience.
+
+Now let's solve the opposite problem: We know MDE = 100, $\alpha=5$%, $1-\beta=80$%, $S^2$, what is $N$? Let's derive it from the MDE formula:
+
+$$N = \left(\dfrac{z_{1 - \alpha} + z_{1 - \beta}}{\text{MDE}}\right)^2 S^2$$
+
+```{r}
+#| label: mde-n
+
+mde <- 100
+N <- (qnorm(1 - alpha) + qnorm(1 - beta))^2 * S2 / mde^2
+cat("Sample size:", N |> round(0))
+```
+
+# Questions? {.unnumbered .unlisted background-iframe=".08_files/libs/colored-particles/index.html"}
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=2554)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
