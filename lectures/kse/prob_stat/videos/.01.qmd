@@ -1,0 +1,527 @@
+---
+title: "Foundations of Probability"
+subtitle: "Probability and Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+footer: "Probability and Statistics"
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    # toc: true
+    # toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    # fig-height: 9
+    # fig-width: 16
+    highlight-style: github
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: false
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(gt)
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Flipping a Coins
+
+## Flipping a Coin
+
+:::: {.columns}
+
+::: {.column width="40%"}
+50% chance of heads
+
+![](img/10uah_1.png)
+:::
+
+::: {.column width="60%" .fragment}
+50% chance of tails
+
+![](img/10uah_2.png)
+:::
+
+::::
+
+. . .
+
+Let's a head as a success (`1`) and a tail as a failure (`0`).
+
+## Flipping multiple coins
+
+- Simulate flipping a 10 🪙 $\times$ 1 times:
+
+```{r}
+#| label: flip_coins
+
+rbinom(n = 10, size = 1, prob = 0.5) %>% cat()
+```
+
+. . .
+
+- And again:
+
+```{r}
+#| label: flip_coins_again
+
+rbinom(n = 10, size = 1, prob = 0.5) %>% cat()
+```
+
+. . .
+
+- Now, let's flip a 🪙 $\times$ 10 times:
+
+```{r}
+#| label: flip_coins_10
+
+rbinom(n = 1, size = 10, prob = 0.5) %>% cat()
+```
+
+. . .
+
+- And now 10 🪙 $\times$ 10 times:
+
+```{r}
+#| label: flip_coins_10x10
+
+rbinom(n = 10, size = 10, prob = 0.5) %>% cat()
+```
+
+## Unfair coin
+
+- Let's simulate flipping a biased coin:
+  + 80% chance of heads
+
+```{r}
+#| label: flip_unfair
+
+rbinom(n = 10, size = 10, prob = 0.8) %>% cat()
+```
+
+. . .
+
+<br>
+
+- And now 10 🪙 $\times$ 10 times:
+  + 20% chance of heads
+
+```{r}
+#| label: flip_unfair_10x10
+
+rbinom(n = 10, size = 10, prob = 0.2) %>% cat()
+```
+
+## Binomial distribution
+
+A probability distribution is a mathematical description of the possible outcomes of a random variable.
+
+$$X_{1 \times n} \sim \text{Binomial}(\text{size}, p)$$
+
+- $X_{1 \times n}$: vector of $n$ random variables
+- $\text{size}$: number of trials
+- $p$: probability of success
+
+# Density and Cumulative Density Functions
+
+## Simulating a Binomial Distribution
+
+$$X \sim \text{Binomial}(10, 0.5)$$
+
+$$\text{Pr}(X = 5)$$
+
+:::: {.columns}
+
+::: {.column width="40%"}
+Let's simulate this:
+
+- n = 10000
+- size = 10
+- prob = 0.5
+:::
+
+::: {.column width="60%" .fragment}
+```{r}
+#| label: binom_sim
+#| fig-align: center
+
+set.seed(42)
+
+rbinom(n = 10000, size = 10, prob = 0.5) %>% table() %>%
+    as_tibble() %>% 
+    rename(value = 1) %>% 
+    ggplot(aes(x = value, y = n)) +
+    geom_col(fill = turquoise) +
+    geom_text(aes(label = n), vjust = -0.5) +
+    labs(title = "Binomial Distribution",
+         x = "Number of Heads",
+         y = "Frequency") +
+    theme_minimal()
+```
+:::
+
+::::
+
+## Finding density with simulation
+
+$$\hat{\text{Pr}}(X = x) = \frac{1}{n} \sum_{i=1}^{n} I(X_i = x)$$ 
+
+- $X_i$: $i$-th random variable
+- $I(\times)$: indicator function
+
+```{r}
+#| label: binom_sim_prop
+#| fig-align: center
+
+set.seed(42)
+
+rbinom(n = 10000, size = 10, prob = 0.5) %>% table() %>% 
+    as_tibble() %>% 
+    rename(value = 1) %>% 
+    mutate(prop = n / sum(n)) %>% 
+    ggplot(aes(x = value, y = prop)) +
+    geom_col(fill = turquoise) +
+    geom_text(aes(label = scales::percent(prop)), vjust = -0.5) +
+    labs(title = "Binomial Distribution",
+         x = "Number of Heads",
+         y = "Frequency") +
+    theme_minimal()
+```
+
+## Calculating exact probability density
+
+$$\text{Pr}(X = x) = \frac{n!}{x! \times (n - x)!} \times p^x \times (1 - p)^{n - x}$$
+
+$$\text{Pr}(X = 5) = \frac{10!}{5! \times 5!} \times 0.5^5 \times 0.5^5 = $$
+
+```{r}
+#| label: binom_exact
+
+dbinom(x = 5, size = 10, prob = 0.5) %>% cat()
+```
+
+::: {.callout-note}
+## Factorial
+$n! = n \times (n - 1) \times \ldots \times 1$
+:::
+
+## Cumulative Density Function
+
+$$X \sim \text{Binomial}(10, 0.5)$$
+
+$$\text{Pr}(X \leq 4)$$
+
+```{r}
+#| label: binom_cdf_plot
+#| fig-align: center
+
+set.seed(42)
+
+rbinom(n = 10000, size = 10, prob = 0.5) %>% table() %>% 
+    as_tibble() %>% 
+    rename(value = 1) %>% 
+    mutate(
+      value = as.numeric(value),
+      leq_4 = if_else(value <= 4, TRUE, FALSE)
+    ) %>%
+    ggplot(aes(x = value, y = n, fill = leq_4)) +
+    geom_col() +
+    labs(title = "Binomial Distribution",
+         x = "Number of Heads",
+         y = "Frequency",
+         fill = "") +
+    theme_minimal() +
+    scale_fill_manual(values = c("TRUE" = turquoise, "FALSE" = "grey"), labels = c("TRUE" = "≤ 4", "FALSE" = "> 4"))
+```
+
+## Calculating cumulative density with sim. {.smaller}
+
+```{r}
+#| label: binom_cdf_sim
+#| fig-align: center
+
+set.seed(42)
+
+rbinom(n = 10000, size = 10, prob = 0.5) %>% table() %>% 
+    as_tibble() %>% 
+    rename(value = 1) %>% 
+    mutate(
+      value = as.numeric(value),
+      leq_4 = if_else(value <= 4, TRUE, FALSE),
+      n = n / sum(n),
+      prop = cumsum(n)
+    ) %>%
+    ggplot(aes(x = value, y = n, fill = leq_4)) +
+    geom_col() +
+    geom_text(aes(label = scales::percent(prop)), vjust = -0.5) +
+    labs(title = "Binomial Distribution",
+         x = "Number of Heads",
+         y = "Density",
+         fill = "") +
+    theme_minimal() +
+    scale_fill_manual(values = c("TRUE" = turquoise, "FALSE" = "grey"), labels = c("TRUE" = "≤ 4", "FALSE" = "> 4"))
+```
+
+:::: {.columns}
+
+::: {.column width="40%"}
+$\hat{\text{Pr}}(X \leq 4) =$ `r sum(rbinom(n = 10000, size = 10, prob = 0.5) <= 4) / 10000`
+:::
+
+::: {.column width="60%"}
+$\text{Pr}(X \leq x) = \sum_{i=0}^{x} \text{Pr}(X = i)$
+
+$\text{Pr}(X \leq 4) = \sum_{i=0}^{4} \text{Pr}(X = i) =$ `r pbinom(q = 4, size = 10, prob = 0.5)`
+:::
+
+::::
+
+# Expected Value and Variance
+
+## Properties of a distribution
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+```{r}
+#| label: binom_mean_plot
+#| fig-align: center
+
+set.seed(42)
+
+rbinom(n = 10000, size = 10, prob = 0.5) %>% table() %>% 
+    as_tibble() %>% 
+    rename(value = 1) %>% 
+    mutate(value = as.numeric(value)) %>% 
+    ggplot(aes(x = value, y = n)) +
+    geom_col(fill = turquoise) +
+    geom_text(aes(label = n), vjust = -0.5) +
+    geom_vline(xintercept = sum(0:10 * dbinom(0:10, size = 10, prob = 0.5)), color = red, linetype = "dashed", size = 1) +
+    labs(title = "Where is distribution centered?",
+         x = "Number of Heads",
+         y = "Frequency") +
+    theme_minimal()
+```
+:::
+
+::: {.column width="50%"}
+
+```{r}
+#| label: binom_var_plot
+
+set.seed(42)
+
+rbinom(n = 10000, size = 10, prob = 0.5) %>% table() %>% 
+    as_tibble() %>% 
+    rename(value = 1) %>% 
+    mutate(value = as.numeric(value)) %>% 
+    ggplot(aes(x = value, y = n)) +
+    geom_col(fill = turquoise) +
+    geom_text(aes(label = n), vjust = -0.5) +
+    geom_segment(aes(x = 2, xend = 8, y = 250, yend = 250), color = red, size = 1, arrow = arrow(length = unit(0.03, "npc"), ends = "both")) +
+    labs(title = "How spread out is the distribution?",
+         x = "Number of Heads",
+         y = "Frequency") +
+    theme_minimal()
+```
+:::
+
+::::
+
+## Expected Value
+
+:::: {.columns}
+
+::: {.column width="40%"}
+$$X \sim \text{Binomial}(\text{size}, p)$$
+
+$$\text{E}(X) = \text{size} \times p$$
+:::
+
+::: {.column width="60%"}
+```{r}
+#| label: binom_mean_plot_2
+#| fig-align: center
+
+set.seed(42)
+
+rbinom(n = 10000, size = 10, prob = 0.5) %>% table() %>% 
+    as_tibble() %>% 
+    rename(value = 1) %>% 
+    mutate(value = as.numeric(value)) %>% 
+    ggplot(aes(x = value, y = n)) +
+    geom_col(fill = turquoise) +
+    geom_vline(xintercept = mean(rbinom(n = 10000, size = 10, prob = 0.5)), color = red, linetype = "dashed", size = 1) +
+    labs(title = "Where is distribution centered?",
+         x = "Number of Heads",
+         y = "Frequency") +
+    theme_minimal()
+```
+:::
+
+::::
+
+The mean of our sample distribution is `r mean(rbinom(n = 10000, size = 10, prob = 0.5))`.
+
+If we try to find mean of the sample with `size = 100` and `prob = 0.2`: `r mean(rbinom(n = 10000, size = 100, prob = 0.2))`.
+
+## Variance {.smaller}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+$X \sim \text{Binomial}(10, 0.5)$
+
+<br>
+
+$\text{Var}(X) =  \text{size} \times p \times (1 - p)$
+
+<br>
+
+$\text{Var}(X) = 10 \times 0.5 \times (1 - 0.5) = 2.5$
+:::
+
+::: {.column width="50%"}
+$Y \sim \text{Binomial}(100, 0.2)$
+
+<br>
+
+<br>
+
+<br>
+
+$\text{Var}(Y) = 100 \times 0.2 \times (1 - 0.2) = 16$
+:::
+
+::::
+
+## Rules of Expected Value and Variance
+
+$$X \sim \text{Binomial}(\text{size}, p)$$
+
+$$\text{E}(X) = \text{size} \times p$$
+
+$$\text{Var}(X) = \text{size} \times p \times (1 - p)$$
+
+# Laws of probability
+
+## Event A: Coin is heads
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+
+$A = 1$
+
+![](img/10uah_1.png)
+:::
+
+::: {.column width="50%"}
+$A = 0$
+
+![](img/10uah_2.png)
+:::
+
+::::
+
+## Events A and B: Two Different Coins {.smaller}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+
+$A = 1$
+
+![](img/10uah_1.png){width=30%}
+:::
+
+::: {.column width="50%"}
+$A = 0$
+
+![](img/10uah_2.png){width=30%}
+:::
+
+::::
+
+. . .
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+
+$B = 1$
+
+![](img/10uah_1.png){width=30%}
+:::
+
+::: {.column width="50%"}
+$B = 0$
+
+![](img/10uah_2.png){width=30%}
+:::
+
+::::
+
+## Probability of A and B
+
+```{mermaid}
+%%| fig-align: center
+flowchart LR
+    A["Start"] -->|"Pr(A)"| B["A = 1"]
+    A -->|"1 - Pr(A)"| C["A = 0"]
+    B -->|"Pr(B)"| D["B = 1"]
+    B -->|"1 - Pr(B)"| E["B = 0"]
+    C -->|"Pr(B)"| F["B = 1"]
+    C -->|"1 - Pr(B)"| G["B = 0"]
+    D --> H["A = 1, B = 1"]
+    E --> I["A = 1, B = 0"]
+    F --> J["A = 0, B = 1"]
+    G --> K["A = 0, B = 0"]
+```
+
+. . .
+
+$$\text{Pr}(A \text{ and } B) = \text{Pr}(A) \times \text{Pr}(B)$$
+
+$$ \text{Pr}(A \text{ and } B) = 0.5 \times 0.5 = 0.25$$
+
+## Probability of A or B
+
+
