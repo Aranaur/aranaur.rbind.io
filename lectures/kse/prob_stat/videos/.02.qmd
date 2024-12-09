@@ -43,6 +43,10 @@ revealjs-plugins:
 
 library(tidyverse)
 library(gt)
+library(palmerpenguins)
+library(crosstable)
+
+ggplot2::theme_set(ggplot2::theme_minimal())
 
 # Define colors
 red_pink   = "#e64173"
@@ -64,25 +68,25 @@ slate      = "#314f4f"
 :::: {.columns}
 
 ::: {.column width="40%"}
-Population
+**Population**
 
 👦👦🏻👦🏼👦🏽👦🏾👦🏿👧👧🏻👧🏼👧🏽👧🏾👧🏿👦👦🏻👦🏼👦🏽👦🏾👦🏿👧👧🏻👧🏼👧🏽👧🏾👧🏿👦👦🏻👦🏼👦🏽👦🏾👦🏿👧👧🏻👧🏼👧🏽👧🏾👧🏿
 :::
 
 ::: {.column width="20%"}
-Sampling
+[Sampling]{.hi}
 &rarr;
 <br><br><br><br>
-Inferential statistics
+[Inferential statistics]{.hi-purple}
 &larr;
 :::
 
 ::: {.column width="40%"}
-Sample
+**Sample**
 
 👦👦🏻&emsp;👦🏽&emsp;👦🏿👧👧🏻👧🏼&emsp;👧🏾&emsp;👦👦🏻&emsp;👦🏽👦🏾&emsp;👧👧🏻👧🏼&emsp;👧🏾&emsp;👦&emsp;👦🏼👦🏽&emsp;👦🏿&emsp;👧🏻👧🏼&emsp;👧🏾👧🏿
 
-Descriptive statistics
+[Descriptive statistics]{.pink}
 :::
 
 ::::
@@ -104,33 +108,606 @@ The various sub-areas of descriptive statistics can be summarized as follows:
 - **Median** is the middle value of a dataset.
 - **Mode** is the most frequent value in a dataset.
 
+## Data: Palmer penguins
+
+:::: {.columns}
+
+::: {.column width="40%"}
+![](img/02/penguins.png){width=450}
+
+![](img/02/culmen_depth.png){width=450}
+:::
+
+::: {.column width="60%"}
+```{r}
+#| label: penguins
+
+set.seed(42)
+
+penguins_tbl <- penguins %>%
+  slice_sample(n = 5)
+
+penguins_tbl %>%
+  gt() %>%
+  tab_header(title = "Palmer penguins dataset")
+```
+:::
+
+::::
+
 ## Arithmetic mean
 
 $$
 \bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_i
 $$
 
-**Scores**: 85, 90, 92, 82, 100
+Body mass = `r penguins_tbl$body_mass_g` g
+
+<br>
+
+$\overline{\text{body mass}} = \frac{3450 + 3675 + 4500 + 4150 + 5800}{5} =$ `r mean(penguins_tbl$body_mass_g)`
+
+## Other means {.smaller}
+
+- **Geometric mean**: The $n$-th root of the product of $n$ values.
 
 $$
-\bar{x} = \frac{85 + 90 + 92 + 82 + 100}{5}= \frac{449}{5} = 89.8
+\bar{x} = \sqrt[n]{x_1 \cdot x_2 \cdot \ldots \cdot x_n}
 $$
 
-## Median
+$\overline{\text{body mass}} = \sqrt[5]{3450 \cdot 3675 \cdot 4500 \cdot 4150 \cdot 5800} =$ `r prod(penguins_tbl$body_mass_g)^(1/5) |> round(2)`
+
+- **Quadratic mean (root mean square)**: The square root of the average of the squares of the values.
+
+$$
+\bar{x} = \sqrt{\frac{x_1^2 + x_2^2 + \ldots + x_n^2}{n}}
+$$
+
+$\overline{\text{body mass}} = \sqrt{\frac{3450^2 + 3675^2 + 4500^2 + 4150^2 + 5800^2}{5}} =$ `r sqrt(mean(penguins_tbl$body_mass_g^2)) |> round(2)`
+
+## Other means (cont.) {.smaller}
+
+- **Trimmed mean**: The mean of the dataset after removing a certain percentage of the smallest and largest values.
+
+$$
+\bar{x} = \frac{1}{n - 2p} \sum_{i=p+1}^{n-p} x_i
+$$
+
+$\overline{\text{body mass}} = \frac{\color{Red}{3450 +} 3675 + 4500 + 4150 \color{Red}{ + 5800}}{3} = \frac{3675 + 4500 + 4150}{3} =$ `r penguins_tbl$body_mass_g |> sort() |> _[2:4] |> mean() |> round(2)`
+
+## Median {.smaller}
 
 - **Odd number of values**: Middle value.
 - **Even number of values**: Average of two middle values.
 
-**Scores** (odd): 82, 90, 92, 82, 100
+**Body Mass** (odd): 3450, 3675, 4500, 4150, 5800
 
-1. Arrange in ascending order: 82, 82, [90]{.hi}, 92, 100
-2. Middle value: [90]{.hi}
+1. Arrange in ascending order: 3450, 3675, [4150]{.hi}, 4500, 5800
+2. Median: [4150]{.hi}
 
 . . .
 
-**Scores** (even): 82, 90, 92, 82, 100, 73
+**Body Mass** (even): 3450, 3675, 4500, 4150, 5800, 3900
 
-1. Arrange in ascending order: 73, 82, [82, 90]{.hi}, 92, 100
-2. Average of middle values: [82, 90]{.hi} = 86
+1. Arrange in ascending order: 3450, 3675, [3900, 4150]{.hi}, 4500, 5800
+2. Median: $\frac{3900 + 4150}{2} = 4025$
 
-[Median - robust to outliers!]{.hi-slate}
+<center>[Median --- robust to outliers!]{.hi}</center>
+
+## Mode {.smaller}
+
+**Mode** is the most frequent value in a dataset.
+
+```{r}
+#| label: mode
+
+penguins_tbl %>% 
+  gt()
+```
+
+Let's find the mode of the `species` variable of full `penguins` dataset.
+
+```{r}
+#| label: mode-2
+
+penguins %>%
+  count(species, sort = TRUE) %>%
+  gt() %>%
+  data_color(
+    columns = c(n, species),
+    rows = species == "Adelie",
+    colors = c(red_pink, red_pink)
+  ) %>%
+  tab_header(title = md("**Penguin species**"))
+```
+
+- Mode = [152]{.hi}
+
+# Measures of dispersion
+
+## Measures of dispersion
+
+- **Range**: Difference between the maximum and minimum values.
+- **Variance**: Average of squared differences from the mean.
+- **Standard deviation**: Square root of the variance.
+- **Interquartile range** (IQR): Difference between the 75th and 25th percentiles.
+
+## Range
+
+**Body Mass**: `r penguins_tbl$body_mass_g`
+
+$$
+\text{Range} = \text{Max} - \text{Min} = 5800 - 3450 = 2350
+$$
+
+## Variance {.smaller}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+For population:
+$$
+\text{Variance} = \frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^2
+$$
+:::
+
+::: {.column width="50%"}
+For sample:
+$$
+\text{Variance} = \frac{1}{n-1} \sum_{i=1}^{n} (x_i - \bar{x})^2
+$$
+:::
+
+::::
+
+<br>
+
+**Body Mass**: `r penguins_tbl$body_mass_g`
+
+$$
+\begin{aligned}
+\text{Variance} &= \frac{(3450 - 4315)^2 + (3675 - 4315)^2 + (4500 - 4315)^2 + (4150 - 4315)^2 + (5800 - 4315)^2}{5 - 1} \\
+&= \frac{3424500}{4} = 856125
+\end{aligned}
+$$
+
+<center>🤨</center>
+
+## Standard deviation
+
+$$
+\text{Standard deviation} = \sqrt{\text{Variance}}
+$$
+
+**Body Mass**: `r penguins_tbl$body_mass_g`
+
+$$
+\text{Standard deviation} = \sqrt{856125} = 925.27
+$$
+
+[Interpretation:]{.hi} On average, the body mass of penguins in the sample differs from the mean by 925.27 g.
+
+## Interquartile range
+
+- **Quartiles** are values that divide a dataset into four equal parts.
+- **Interquartile range** (IQR) is the difference between the Q3 and Q1 quartiles.
+
+**Body Mass**: 3450, 3575, [3675, 3900, 3915, 4500]{.hi}, 4150, 5800.
+
+$$
+\begin{aligned}
+Q_1 &= 3675 \\
+Q_3 &= 4500 \\
+\text{IQR} &= Q_3 - Q_1 = 4500 - 3675 = 825
+\end{aligned}
+$$
+
+[Interpretation:]{.hi} The body mass of penguins in the sample varies by 825 g between the Q1 and Q3 quartiles.
+
+## Central tendency vs. dispersion
+
+- **Central tendency** measures describe the center of a dataset.
+- **Dispersion** measures describe the spread of a dataset.
+
+```{r}
+#| label: central-vs-dispersion
+#| fig-align: center
+
+set.seed(42)
+
+rexp(1000) %>%
+  tibble(value = .) %>%
+  ggplot(aes(x = value)) +
+  geom_histogram(bins = 30, fill = turquoise, color = "white") +
+  geom_vline(aes(xintercept = mean(value), color = red), linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = median(value), color = blue), linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = mean(value) + sd(value), color = orange), linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = mean(value) - sd(value), color = orange), linetype = "dashed", size = 1) +
+  labs(title = "Central tendency vs. dispersion",
+       x = "Value",
+       y = "Frequency",
+       color = "") +
+  theme_minimal() +
+  scale_color_manual(values = c(red, blue, orange), labels = c("Median", "Mean", "Mean ± SD")) +
+  xlim(0, 5)
+```
+
+# Tables
+
+## Absolute and relative frequencies
+
+:::: {.columns}
+
+::: {.column width="60%"}
+```{r}
+#| label: freq-1
+
+penguins %>% 
+  slice_sample(n = 15) %>%
+  gt() %>% 
+  data_color(
+    columns = c(species),
+    colors = c(turquoise)
+  )
+```
+:::
+
+::: {.column width="40%"}
+```{r}
+#| label: freq-2
+
+penguins %>%
+  count(species, sort = TRUE) %>%
+  mutate(share = (n / sum(n))) %>%
+  gt()  %>%
+  grand_summary_rows(
+    columns = -species,
+    fns = list(TOTAL ~ sum(.))
+   ) %>% 
+  tab_header(title = "Penguin species") %>%
+  cols_label(
+    species = md("**Species**"),
+    n = md("**Frequency**"),
+    share = md("**Share**")
+  )
+```
+:::
+
+::::
+
+## Crosstab
+
+
+:::: {.columns}
+
+::: {.column width="60%"}
+```{r}
+#| label: crosstab-1
+
+penguins %>% 
+  slice_sample(n = 15) %>%
+  gt() %>% 
+  data_color(
+    columns = c(species, island),
+    colors = c(turquoise)
+  )
+```
+:::
+
+::: {.column width="40%"}
+```{r}
+#| label: crosstab-2
+
+penguins %>%
+  crosstable(
+    species,
+    by = island,
+    total="row"
+  ) %>%
+  as_flextable(keep_id=FALSE)
+```
+:::
+
+::::
+
+# Charts
+
+## Bar chart
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r}
+#| label: bar-1
+#| fig-align: center
+#| fig-height: 8
+
+penguins %>%
+  count(species, sort = TRUE) %>%
+  ggplot(aes(x = fct_reorder(species, -n), y = n)) +
+  geom_col(fill = turquoise) +
+  geom_text(aes(label = n), vjust = -0.5) +
+  labs(title = "Penguin species",
+       x = "Species",
+       y = "Frequency") +
+  theme_minimal()
+```
+:::
+
+::: {.column width="50%"}
+```{r}
+#| label: bar-2
+#| fig-align: center
+#| fig-height: 8
+
+penguins %>%
+  count(species, sort = TRUE) %>%
+  ggplot(aes(x = fct_reorder(species, n), y = n)) +
+  geom_col(fill = turquoise) +
+  geom_text(aes(label = n), hjust = -0.5) +
+  labs(title = "Penguin species",
+       x = "Species",
+       y = "Frequency") +
+  theme_minimal() +
+  coord_flip()
+```
+:::
+
+::::
+
+## Grouped bar chart
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r}
+#| label: grouped-bar
+#| fig-align: center
+#| fig-height: 8
+
+penguins %>%
+  count(species, island) %>%
+  ggplot(aes(x = species, y = n, fill = island)) +
+  geom_col(position = "dodge") +
+  labs(title = "Penguin species by island",
+       x = "Species",
+       y = "Frequency",
+       fill = "Island") +
+  theme(legend.position = "bottom") +
+  scale_fill_manual(values = c("Dream" = "darkorange", "Torgersen" = "purple", "Biscoe" = "cyan4"))
+```
+:::
+
+::: {.column width="50%"}
+```{r}
+#| label: grouped-bar-2
+#| fig-align: center
+#| fig-height: 8
+
+penguins %>%
+  count(species, island) %>%
+  ggplot(aes(x = species, y = n, fill = island)) +
+  geom_col(position = "stack") +
+  labs(title = "Penguin species by island",
+       x = "Island",
+       y = "Frequency",
+       fill = "Species") +
+  theme(legend.position = "bottom") +
+  scale_fill_manual(values = c("Dream" = "darkorange", "Torgersen" = "purple", "Biscoe" = "cyan4"))
+```
+:::
+
+::::
+
+## Error bar chart
+
+```{r}
+#| label: error-bar
+#| fig-align: center
+#| fig-height: 8
+
+penguins %>%
+  ggplot(aes(x = species, y = body_mass_g)) +
+  geom_bar(stat = "summary", fun = "mean", fill = turquoise) +
+  geom_errorbar(stat = "summary", fun.data = "mean_se", width = 0.2) +
+  labs(title = "Body mass of penguins
+by species",
+       x = "Species",
+       y = "Body mass, g") +
+  theme_minimal()
+```
+
+## Histogram
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r}
+#| label: histogram-1
+#| fig-align: center
+#| fig-height: 8
+
+penguins %>%
+  ggplot(aes(x = body_mass_g, fill = species)) +
+  geom_histogram(position = "identity", bins = 30, alpha = 0.7) +
+  labs(title = "Body mass of penguins",
+       x = "Body mass, g",
+        y = "Frequency") +
+  theme_minimal() +
+  scale_fill_manual(values = c("Adelie" = "darkorange", "Chinstrap" = "purple", "Gentoo" = "cyan4"))
+```
+:::
+
+::: {.column width="50%"}
+```{r}
+#| label: histogram-2
+#| fig-align: center
+#| fig-height: 8
+
+penguins %>%
+  ggplot(aes(x = body_mass_g, fill = species)) +
+  geom_histogram(position = "identity", bins = 30, alpha = 0.7) +
+  labs(title = "Body mass of penguins",
+       x = "Body mass, g",
+        y = "Frequency") +
+  theme_minimal() +
+  facet_wrap(species ~ ., scales = "free_y", ncol = 1) +
+  scale_fill_manual(values = c("Adelie" = "darkorange", "Chinstrap" = "purple", "Gentoo" = "cyan4"))
+```
+:::
+
+::::
+
+## Scatter plot
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r}
+#| label: scatter-1
+#| fig-align: center
+#| fig-height: 8
+
+ggplot(data = penguins,
+        aes(x = bill_length_mm,
+        y = bill_depth_mm)
+        ) +
+  geom_point() +
+  labs(title = "Penguin bill dimensions",
+       x = "Bill length (mm)",
+       y = "Bill depth (mm)",
+       color = "Penguin species",
+       shape = "Penguin species") +
+  geom_smooth(method = "lm", se = FALSE, color = "gray50")
+```
+
+:::
+
+::: {.column width="50%" .fragment}
+```{r}
+#| label: scatter-2
+#| fig-align: center
+#| fig-height: 8
+
+ggplot(data = penguins,
+        aes(x = bill_length_mm,
+        y = bill_depth_mm,
+        group = species)
+        ) +
+  geom_point(aes(color = species, 
+                 shape = species),
+             size = 3,
+             alpha = 0.8) +
+  geom_smooth(method = "lm", se = FALSE, aes(color = species)) +
+  scale_color_manual(values = c("darkorange","purple","cyan4")) +
+  labs(title = "Penguin bill dimensions",
+       x = "Bill length (mm)",
+       y = "Bill depth (mm)",
+       color = "Penguin species",
+       shape = "Penguin species") +
+  theme(legend.position = c(0.85, 0.15),
+        plot.title.position = "plot",
+        plot.caption = element_text(hjust = 0, face= "italic"),
+        plot.caption.position = "plot")
+```
+:::
+
+::::
+
+::: footer
+[🔗Spurious Correlations](https://www.tylervigen.com/spurious-correlations)
+:::
+
+## Box plot {.smaller}
+
+<center>![](img/02/box-plot-interpretationpng.png){width=800}</center>
+
+. . .
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r}
+#| label: box-1
+#| fig-align: center
+
+penguins %>% 
+  ggplot(aes(x = species, y = flipper_length_mm, fill = species)) +
+  geom_boxplot() +
+  labs(x = "Species",
+       y = "Flipper length (mm)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("Adelie" = "darkorange", "Chinstrap" = "purple", "Gentoo" = "cyan4")) +
+  theme(legend.position = "none")
+```
+:::
+
+::: {.column width="50%" .fragment}
+```{r}
+#| label: box-2
+#| fig-align: center
+
+ggplot(data = penguins, aes(x = species, y = flipper_length_mm)) +
+  geom_boxplot(aes(color = species), width = 0.3, show.legend = FALSE) +
+  geom_jitter(aes(color = species), alpha = 0.5, show.legend = FALSE, position = position_jitter(width = 0.2, seed = 0)) +
+  scale_color_manual(values = c("darkorange","purple","cyan4")) +
+  labs(x = "Species",
+       y = "Flipper length (mm)")
+```
+:::
+
+::::
+
+## Box plot (cont.)
+
+<center>![](img/02/box-plot.gif)</center>
+
+# Levels of measurement
+
+## Levels of measurement
+
+1. **Nominal**: Categories without order (e.g., species).
+2. **Ordinal**: Categories with order (e.g., size).
+3. **Interval**: Equal intervals between values (e.g., temperature).
+4. **Ratio**: Absolute zero point (e.g., weight).
+
+## Nominal variables
+
+:::: {.columns}
+
+::: {.column width="30%"}
+**Gender**
+
+- 🚹 male 
+- 🚺 female
+:::
+
+::: {.column width="30%"}
+**🐧 Species**
+
+- Adelie 
+- Chinstrap
+- Gentoo
+:::
+
+::: {.column width="40%"}
+**Preference for news sources**
+
+- 📺 TV 
+- 📰 Newspapers
+- 🌐 Internet
+:::
+
+::::
+
+## Ordinal variables
+
+**🍽️ Frequency of eating out**
+
+<center>Never < Rarely < Sometimes < Often < Always</center>
+
+<br><br>
+
+**🎓 Education level**
+
+<center>Primary < Secondary < Bachelor's < Master's < PhD</center>
