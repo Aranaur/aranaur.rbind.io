@@ -1,38 +1,44 @@
 ---
-title: "International Powerlifting"
-author: "Ігор Мірошниченко"
-date: today
-date-format: iso
-image: featured.jpg
-number-sections: false
-# execute: 
-#   freeze: auto
-categories:
-  - csv
+title: "Lab 5"
+subtitle: "Descriptive Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+format:
+  html: 
+    highlight-style: github
+    theme: [default, custom.scss]
+    toc: true
+    toc-depth: 2
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
 ---
 
-::: {.column-margin}
-![](featured.jpg){width=100%}
-:::
+# Packages
 
-## Дані [{{< iconify material-symbols download >}}](https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/ipf/ipf.csv)
+In this lab we will work with the tidyverse packages, which is a collection of packages for doing data analysis in a "tidy" way.
 
-```{python}
-#| eval: false
+```{r}
+#| label: load-packages
+#| message: false
 
-"https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/ipf/ipf.csv"
+library(tidyverse)
+library(tidymodels)
 ```
 
-```{python}
-#| echo: false
+```{r}
+#| include: false
 
-import pandas as pd
-
-pd.read_csv('ipf.csv', sep=',')
+ipf  <- read_csv("https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/ipf/ipf.csv")
 ```
 
+# Part 1: Do you even lift?
 
-## Змінні
+Today, we will be working with [data](https://aranaur.rbind.io/datasets/ipf/) from [www.openpowerlifting.org](https://www.openpowerlifting.org/). This data was sourced from [Tidy Tuesday](https://github.com/rfordatascience/tidytuesday/tree/master/data/2019/2019-10-08) and contains international powerlifting records at various meets. At each meet, each lifter gets three attempts at lifting max weight on three lifts: the bench press, squat and deadlift.
+
+The data dictionary for this dataset from TidyTuesday is reproduced below:
 
 +--------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | variable           | description                                                                                                                                                                                                                                                                     |
@@ -112,5 +118,134 @@ pd.read_csv('ipf.csv', sep=',')
 | `meet_name`        | The name of the meet. The name is defined to never include the year or the federation. For example, the meet officially called `2019 USAPL Raw National Championships` would have the MeetName `Raw National Championshps`.                                                     |
 +--------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
+For all of the following exercises, you should include units on axes labels, e.g. "Bench press (lbs)" or "Bench press (kg)". "Age (years)" etc. This is good practice.
 
+## Exercise 1
 
+::: border
+Let's begin by taking a look at the **squat lifting** records.
+
+To begin, remove any observations that are negative for squat. Next, create a new column called `best3_squat_lbs` that converts the record from kg to lbs (you may have to google the conversion). Save your data frame as `ipf_squat`. Report the number of rows and columns of this new data frame using inline code.
+:::
+
+::: callout-tip
+## Hint
+
+First, you're taking a dataset and `filter`ing it for certain records, and then you're `mutate`-ing that dataset to gain a new column, and you're assigning the resulting dataset to a new object called `ipf_squat`.
+:::
+
+## Exercise 2
+
+::: border
+Using `ipf_squat` from the previous exercise, create a scatter plot to investigate the relationship between squat (in lbs) and age. Age should be on the x-axis. Adjust the `alpha` level of your points to get a better sense of the density of the data. Add a linear trend-line. Be sure to label all axes and give the plot a title. Comment on what you observe.
+:::
+
+## Exercise 3
+
+::: border
+Write down the linear model to predict lift squat lbs from age in $x$, $y$, $\beta$ notation. What is $x$? What is $y$? Next, fit the linear model, and save it as `age_fit`. Re-write your previous equation replacing $\beta$ with the numeric estimates. This is called the "fitted" linear model. Interpret each estimate of $\beta$. Are the interpretations sensible?
+:::
+
+## Exercise 4
+
+::: border
+Building on your `ipf_squat` data frame, create a new column called `age2` that takes the age of each lifter and squares it. Save it to your data frame `ipf_squat`. Next, plot squat in lbs vs `age2` and add a linear best fit line. Does this model look like it fits the data better?
+:::
+
+::: callout-tip
+## Hint
+
+To raise a value to a power, use `^` in R, e.g.: `2 ^ 2` gives you 4, `2 ^ 3` gives you 8, etc.
+:::
+
+## Exercise 5
+
+::: border
+One metric to assess the fit of a model is the correlation squared, also known as $R^2$. Fit the age$^2$ model and save the object as `age2_fit`. Subsequently run
+
+```{r}
+#| eval: false
+
+glance(age2_fit)$r.squared
+```
+
+to examine the $R^2$. Compare $R^2$ of the age$^2$ model to the $R^2$ of the model from Exercise 3. Which has a higher $R^2$?
+:::
+
+::: callout-note
+$R^2$ values range from 0 to 1. Values close to 0 means weak correlation between the variables whereas $R^2 = 1$ implies perfect correlation. You can (optionally) read more about $R^2$ in section [7.2.5 of the book](https://openintro-ims.netlify.app/model-slr#sec-r-squared).
+:::
+
+## Exercise 6
+
+::: border
+Next, let's turn our attention to **dead lifting** records.
+
+Recreate the plot below. Make sure axes and title labels are exactly matching, including spelling, capitalization, etc. Based on the plot below, which impacts deadlift weight more, age category or sex?
+:::
+
+::: callout-note
+## Hint
+
+You will need to create a couple of new columns. One to classify age appropriately and one to convert `best3deadlift_kg` to the plotted units (lbs). Notice that there are no negative deadlift values on the x-axis.
+:::
+
+```{r}
+#| label: deadlift-age-sex-plot
+#| fig-width: 6
+#| fig-asp: 0.8
+#| echo: false
+
+ipf |>
+  mutate(Age = ifelse(age < 40, "Under 40", "40 or older")) |>
+  filter(!is.na(Age)) |>
+  filter(best3deadlift_kg > 0 ) |>
+  mutate(best3deadlift_lbs = best3deadlift_kg * 2.20462) |>
+  ggplot(aes(x = best3deadlift_lbs, fill = sex, color = sex))  +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~ Age, ncol = 1) +
+  labs(
+    title = "Distribution of best deadlift in lbs by age grouping and sex", 
+    y = "Density", 
+    x = "Best deadlift (lbs)",
+    color = "Sex", fill = "Sex"
+  )
+```
+
+## Exercise 7
+
+::: border
+Finally, let's turn our attention to **bench press** records.
+
+To begin, remove any observations that are negative for bench press, create two new columns: `best3bench_lbs` and `bodyweight_lbs`. Save the result in a new data frame called `ipf_bench`.
+
+Then, create a scatter plot to investigate the relationship between best bench press (in lbs) and the lifter's bodyweight (in lbs). Bodyweight should be on the x-axis. Add a linear trend-line. Be sure to label all axes and give the plot a title. Comment on what you observe.
+:::
+
+## Exercise 8
+
+::: border
+Fit the linear model displayed in the previous exercise and write down the **fitted model equation** only, replacing $\hat{\beta}$s with their fitted estimates. Interpret the $\hat{\beta}$s (intercept and slope). Report $R^2$. Is body weight an important predictor of bench press ability? Why or why not?
+:::
+
+# Part 2: IMS Exercises
+
+The exercises in this section do not require code. Make sure to answer the questions in full sentences.
+
+## Exercise 9
+
+::: border
+IMS - [Chapter 7 exercises](https://openintro-ims.netlify.app/model-slr#sec-chp7-exercises), #18: Over-under, II.
+:::
+
+## Exercise 10
+
+::: border
+IMS - [Chapter 7 exercises](https://openintro-ims.netlify.app/model-slr#sec-chp7-exercises), #24: Cats weights.
+:::
+
+# Grading
+
+- **Submission of Lab Report:** A complete and accurate submission of the lab assignment in the required format [(2 point)]{.hi}.
+- **Understanding of Code and Correct Use of Methods:** Evaluation of your understanding of the code you submit and the appropriateness of the methods used in your solution [(4 point)]{.hi}.
+- **Verbal Defense of the Lab:** An oral explanation of your solution to verify your understanding of the concepts and methods used. You may be asked to explain the logic of your code, the interpretation of results, or to make minor modifications to your solution during the defense [(4 point)]{.hi}.
