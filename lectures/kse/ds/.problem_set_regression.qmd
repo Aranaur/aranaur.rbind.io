@@ -20,44 +20,82 @@ The data in this problem set come from the 2018 American Community Survey (ACS),
 
 The dataset contains the following variables:
 
-```{r, background variables, echo = F}
-# Load requisite packages
-pacman::p_load(tidyverse, knitr, kableExtra, here)
-# Load data
-acs_sub = here("001-data.rds") %>% read_rds()
-# Create table of variable descriptions
-var_tbl = data.frame(
-  Variable = names(acs_sub) %>% paste0(".mono-small[", ., "]"),
-  Description = c(
-    "State abbreviation",
-    "Binary indicator for whether home county is 'urban'",
-    "The individual's age (in years)",
-    "Binary indicator for whether the individual identified as Asian",
-    "Binary indicator for whether the individual identified as Black",
-    "Binary indicator for whether the individual identified as Hispanic",
-    "Binary indicator for whether the individual identified with a group indigenous to North Am.",
-    "Binary indicator for whether the individual identified as White",
-    "Binary indicator for whether the individual identified as Female",
-    "Binary indicator for whether the individual identified as Male",
-    "Binary indicator for whether the individual graduated college (estimated)",
-    "Binary indicator for whether the individual was married at the time of the sample",
-    "Total (annual) personal income (tens of thousands of dollars)",
-    "Binary indicator for whether the individual uses 'foodstamps' (SNAP)",
-    "Binary indicator for whether the individual has health insurance",
-    "Binary indicator for whether the individual has access to the internet",
-    "The time that the individual typically leaves for work (in minutes since midnight)",
-    "The time that the individual typically arrives at work (in minutes since midnight)",
-    "The length of time that the individual typically travels to work (in minutes)"
-  )
-)
-kable(var_tbl) %>%
-  kable_styling(full_width = F)
-```
+| Variable | Description |
+|----------|-------------|
+| `fips` | County FIPS code |
+| `hh_size` | Household size (number of people) |
+| `hh_income` | Household total income in $10,000 |
+| `cost_housing` | Household's total reported cost of housing |
+| `n_vehicles` | Household's number of vehicles |
+| `hh_share_nonwhite` | Share of household members identifying as non-white ethnicities |
+| `i_renter` | Binary indicator for whether any household members are renters |
+| `i_moved` | Binary indicator for whether a household member moved in prior 1 year |
+| `i_foodstamp` | Binary indicator for whether any household member participates in foodstamps |
+| `i_smartphone` | Binary indicator for whether a household member owns a smartphone |
+| `i_internet` | Binary indicator for whether the household has access to the internet |
+| `time_commuting` | Average time spent commuting per day by each household member (minutes) |
+
+## Data
 
 ```{r}
 #| label: setup
+#| message: false
 
 library(tidyverse)
 
-
+ps_df  <- read_csv("https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/ACS/ACS.csv")
+ps_df %>% head() %>% knitr::kable()
 ```
+
+## Getting to know your data
+
+**1.** Plot a histogram of individuals' personal income (variable: `personal_income`).
+
+::: callout-note
+Household income is in tens of thousands of dollars.
+:::
+
+**2.** What are the mean and median levels of household income? Based upon this answer and the previous
+histogram, is household income (fairly) evenly distributed or is it more skewed? Explain your answer.
+
+**3.** Create a histogram of household income per capita—meaning the household's income divided by the number of individuals in the household. Does dividing by the number of individuals in the household change your understanding of the income distribution? Explain your answer.
+
+**4.** Run a regression that helps summarize the relationship between household income and household size.
+Interpret the results of the regression—the meaning of the coefficient(s). Comment on the coefficient's statistical significance.
+
+**5.** Explain why you chose the specification you chose in the previous question.
+
+- Was it linear, log-linear, log-log?
+- What was the outcome variable?
+- What was the explanatory variable?
+- Why did you make these choices?
+
+**6.** Plot a histogram of the time households spend commuting each day (the variable time_commuting is the average commuting time for a household). Is the distribution of commute time more or less equitable than income? Explain.
+
+## Regression refresher: Varying the specification
+
+**7.** **Linear specification.** Regress average commute time (time_commuting) on household income (hh_income). Interpret the coefficient and comment on its statistical significance.
+
+**8.** **Log-linear specification.** Regress the log of commute time on personal income. Interpret the slope coefficient and comment on its statistical significance.
+
+**9.** **Log-log specification.** Regress the log of average commute time on the log of household income. Interpret the coefficient and comment on its statistical significance.
+
+## Multiple linear regression and indicator variables
+
+**10.** Regress departure time (`time_depart`) on the indicator for female (`i_female`) **and** the indicator for whether the individual was married at the time of the sample (`i_married`). Interpret the intercept and **both** coefficients (commenting on their statistical significances).
+
+**11.** Regress average commute time on the indicator variable for whether a household moved in the last year (`i_moved`). Interpret the intercept and coefficient and comment on their statistical significance.
+
+**12.** Add the share of the household that represents a non-white ethnicity (`hh_share_nonwhite`) to the regression. 
+
+::: callout-note
+Your outcome variable is still average household commute time, but you should now have two explanatory variables. Interpret the intercept and coefficient and comment on their statistical significance.
+:::
+
+**13.** Did adding this second explanatory variable change the coefficient of the first variable at all? What does that tell you? Explain your answer.
+
+**14.** Now add the interaction between your two explanatory variables and re-run the regression. (You should have an intercept and three coefficients—the two variables plus their interaction.) Interpret the coefficient on the interaction and comment on its statistical significance.
+
+**15.**  Did including the interaction change your understanding of the relationship between the variables? Explain.
+
+**16.**  Regress the indicator for whether the household has a smartphone (`i_smartphone`) on the household's income (`hh_income`) and the share of the household's individuals who represent non-white ethnicities (`hh_share_nonwhite`). Interpret the intercept and coefficients. Comment on their statistical significance.
