@@ -1,0 +1,2161 @@
+---
+title: "Statistical tests"
+subtitle: "Probability and Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+footer: "Probability and Statistics"
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    # toc: true
+    # toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    # fig-height: 9
+    # fig-width: 16
+    highlight-style: github
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Statistical test 
+
+## Startup idea
+
+{{< iconify emojione department-store >}} We deliver goods from stores to your home
+
+{{< iconify mdi courier-check >}} Delivery cost --- 100₴
+
+{{< iconify mdi courier-fast >}} The cost of the courier's work is 50₴
+
+. . .
+
+<br>
+
+But users can cancel the order.
+
+. . .
+
+<br>
+
+Investors are ready to help if the chance of failure is **< 50%**.
+
+What should I do?
+
+. . .
+
+<center>[Conduct an experiment!]{.hi}</center>
+
+## We are conducting an experiment
+
+- Found 30 customers
+- 19 paid for the order
+
+. . .
+
+<br>
+
+<center>**But is this enough to prove the success of our business?**</center>
+
+## Model and observations
+
+We can't test the product on everyone, but we can collect a sample from the general population and observe the success rate.
+
+. . .
+
+1. The audience that will use our service --- **general population**, $\xi \sim \text{Bernoulli}(\mu)$.
+2. The successful transactions is $\mu$.
+3. Sample from the population --- $\xi_1, \xi_2, \ldots, \xi_{30}$.
+
+## Problem statement {.tiny}
+
+:::: {.columns}
+
+::: {.column width=“50%”}
+
+1. Define the hypotheses:
+    - $H_0: \mu = 50\%$
+    - $H_1: \mu > 50\%$.
+
+2. Determine the criterion statistics:
+
+$Q = \xi_1 + \xi_2 + \ldots + \xi_{30} \underset{H_0}{\sim} \text{Binomial}(30, 0.5)$
+
+3. Define the criterion:
+
+:::{.border}
+  - if $Q \geq 21$: [reject $H_0$]{.green}
+  - otherwise: [do not reject $H_0$]{.red}
+:::
+
+:::
+
+::: {.column width="50%" .fragment fragment-index=2}
+But why 21?
+
+```{r}
+#| label: pmf-q-plot
+#| echo: false
+
+# Завантажуємо необхідні бібліотеки
+library(ggplot2)
+
+# Параметри біноміального розподілу
+n <- 30 # кількість випробувань
+p <- 0.5 # ймовірність успіху
+
+# Визначаємо координати та ймовірності
+x_grid <- 1:30
+probs <- dbinom(x_grid, size = n, prob = p)
+
+# Критична область
+crit_reg <- x_grid >= 21
+
+# Створюємо дані для візуалізації
+data <- tibble(
+  x = x_grid,
+  probs = probs,
+  crit_reg = crit_reg
+)
+
+# Побудова графіка
+ggplot(data, aes(x = x, y = probs)) +
+  geom_segment(aes(xend = x, yend = 0, color = crit_reg), size = 3) +
+  geom_text(
+    data = subset(data, x >= 19 & x <= 23),
+    aes(label = paste0(round(probs * 100, 1), "%")),
+    vjust = -0.5,
+    size = 3
+  ) +
+  scale_color_manual(values = c("TRUE" = "red", "FALSE" = "turquoise")) +
+  labs(
+    title = "Binomial distribution, Q ≥ 21",
+    x = "Number of successes",
+    y = "",
+    color = "Critical area"
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.title.y = element_text(angle = 0, vjust = 0.5)
+  )
+```
+
+4. Determine the statistical significance:
+- $\alpha$ --- statistical significance of the criterion, 5%.
+- **FPR** (False Positive Rate) --- the probability of rejecting $H_0$ if it is true.
+
+$FPR \leq \alpha$
+:::
+
+::::
+
+. . .
+
+$$FPR = 1.3\% + 0.5\% + 0.2\% + 0.1\% \approx 2.1\% < 5\%$$
+
+## 21 vs. 20 {.smaller}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+```{r}
+#| label: pmf-q-plot-21
+#| echo: false
+
+# Завантажуємо бібліотеки
+library(ggplot2)
+
+# Параметри біноміального розподілу
+n <- 30 # кількість випробувань
+p <- 0.5 # ймовірність успіху
+
+# Визначаємо координати та ймовірності
+x_grid <- 1:30
+probs <- dbinom(x_grid, size = n, prob = p)
+
+# Критична область
+crit_reg <- x_grid >= 21
+
+# Створюємо дані для візуалізації
+data <- tibble(
+  x = x_grid,
+  probs = probs,
+  crit_reg = crit_reg
+)
+
+# Побудова графіка
+ggplot(data, aes(x = x, y = probs)) +
+  geom_segment(aes(xend = x, yend = 0, color = crit_reg), size = 3) +
+  geom_text(
+    data = subset(data, x >= 19 & x <= 23),
+    aes(label = paste0(round(probs * 100, 1), "%")),
+    vjust = -0.5,
+    size = 3
+  ) +
+  scale_color_manual(
+    values = c("TRUE" = "red", "FALSE" = "turquoise"),
+    labels = c("FALSE" = "PMF, Binom(30, 0.5)", "TRUE" = "Critical region for S")
+  ) +
+  labs(
+    title = "Binomial distribution, Q ≥ 21",
+    x = "Number of successes",
+    y = "",
+    color = NULL
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.title.y = element_text(angle = 0, vjust = 0.5),
+    legend.position = "top",
+    legend.text = element_text(size = 14)
+  )
+```
+
+
+:::
+
+::: {.column width="50%"}
+```{r}
+#| label: pmf-q-plot-20
+#| echo: false
+
+# Завантажуємо бібліотеки
+library(ggplot2)
+
+# Параметри біноміального розподілу
+n <- 30 # кількість випробувань
+p <- 0.5 # ймовірність успіху
+
+# Визначаємо координати та ймовірності
+x_grid <- 1:30
+probs <- dbinom(x_grid, size = n, prob = p)
+
+# Критична область
+crit_reg <- x_grid >= 20
+
+# Створюємо дані для візуалізації
+data <- tibble(
+  x = x_grid,
+  probs = probs,
+  crit_reg = crit_reg
+)
+
+# Побудова графіка
+ggplot(data, aes(x = x, y = probs)) +
+  geom_segment(aes(xend = x, yend = 0, color = crit_reg), size = 3) +
+  geom_text(
+    data = subset(data, x >= 19 & x <= 23),
+    aes(label = paste0(round(probs * 100, 1), "%")),
+    vjust = -0.5,
+    size = 3
+  ) +
+  scale_color_manual(
+    values = c("TRUE" = "red", "FALSE" = "turquoise"),
+    labels = c("FALSE" = "PMF, Binom(30, 0.5)", "TRUE" = "Critical region for S")
+  ) +
+  labs(
+    title = "Binomial distribution, Q ≥ 20",
+    x = "Number of successes",
+    y = "",
+    color = NULL
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.title.y = element_text(angle = 0, vjust = 0.5),
+    legend.position = "top",
+    legend.text = element_text(size = 14)
+  )
+```
+
+:::
+
+::::
+
+$FPR_{21} = 1.3\% + 0.5\% + 0.2\% + 0.1\% \approx 2.1\% < 5\%$
+
+$FPR_{20} = 2.8\% + 1.3\% + 0.5\% + 0.2\% + 0.1\% \approx 4.9\% < 5\%$
+
+. . .
+
+::: {.callout-tip icon="false"}
+## Solution.
+
+  - if $Q \geq 20$: [reject $H_0$]{.green}
+  - otherwise: [do not reject $H_0$]{.red}
+:::
+
+## So what's the solution?
+
+{{< iconify emojione department-store >}} We deliver goods from stores to your home
+
+{{< iconify mdi courier-check >}} Delivery cost --- 100₴
+
+{{< iconify mdi courier-fast >}} The cost of the courier's work is 50₴
+
+. . .
+
+- Found 30 customers
+- 19 paid for the order
+
+. . .
+
+<br>
+
+<center>[We don't have enough evidence to reject $H_0$.]{.hi}</center>
+
+# More formal approach
+
+## Density function {.tiny}
+
+1. The statistic $Q$ has a binomial distribution: 
+
+$$
+Q \sim \text{Binomial}(30, 0.5)
+$$
+
+```{r}
+#| label: binom-pmf
+#| echo: false
+
+n <- 30  # кількість випробувань
+p <- 0.5 # ймовірність успіху
+
+# Приклад розрахунків ймовірності для кількості успіхів
+probs <- dbinom(1:n, size = n, prob = p)
+```
+
+2. The probability function of a discrete distribution $p_{\xi}(x)$ is the probability that a random variable $\xi$ takes the value $x$:
+
+$$
+p_{\xi}(x) = P(\xi = x)
+$$
+
+:::: {.columns}
+
+::: {.column width="40%"}
+
+$P(\xi = 10)$ = `r dbinom(10, n, p) %>% round(3)`
+
+<br>
+
+$P(\xi = 16)$ = `r dbinom(16, n, p) %>% round(3)`
+
+<br>
+
+$P(\xi = 15)$ = `r dbinom(15, n, p) %>% round(3)`
+
+<br>
+
+$P(\xi = 14)$ = `r dbinom(14, n, p) %>% round(3)`
+:::
+
+::: {.column width="60%"}
+```{r}
+#| label: binom-pmf-plot
+#| echo: false
+
+n <- 30  # кількість випробувань
+p <- 0.5 # ймовірність успіху
+x_grid <- 1:30
+binom_h0 <- dbinom(x_grid, size = n, prob = p)
+
+# Critical region
+crit_reg <- x_grid >= 10
+
+# Data frame for plotting
+data <- tibble(x = x_grid, prob = binom_h0)
+  
+ggplot(data, aes(x = x, y = prob)) +
+  geom_col(fill = "turquoise") +
+  geom_text(aes(label = scales::percent(prob %>% round(3))), size = 3, vjust = -0.5) +
+  theme_minimal() +
+  theme(text = element_text(size = 18)) +
+  scale_x_continuous(breaks = seq(0, 30, 5))
+```
+:::
+
+::::
+
+```{r}
+#| label: pmf-q-plot-r
+#| output-location: slide
+#| fig-align: center
+#| fig-width: 15
+#| fig-height: 7
+#| include: false
+
+# Параметри розподілу
+n <- 30
+p <- 0.5
+
+# Визначаємо координати та ймовірності
+x_grid <- 1:n
+probs <- dbinom(x_grid, size = n, prob = p)
+
+# Критична область
+crit_reg <- x_grid >= 20
+
+# Створюємо дані для графіка
+data <- tibble(
+  x = x_grid,
+  probs = probs,
+  crit_reg = crit_reg
+)
+
+# Побудова графіка
+ggplot(data, aes(x = x, y = probs)) +
+  geom_segment(aes(xend = x, yend = 0, color = crit_reg), size = 3) +
+  scale_color_manual(
+    values = c("TRUE" = "red", "FALSE" = "lightblue"),
+    labels = c("TRUE" = "Critical region for S", "FALSE" = "PMF, Binom(0.5, 30)")
+  ) +
+  labs(
+    title = "Біноміальний розподіл",
+    x = "Кількість успіхів",
+    y = "Ймовірність",
+    color = NULL
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "top",
+    legend.text = element_text(size = 14)
+  )
+```
+
+## Probability of the critical area {.smaller}
+
+$$
+P(Q \geq x) = \sum_{i = x}^{n} p_{\xi}(i)
+$$
+
+:::: {.columns}
+
+::: {.column width="40%"}
+$P(Q \geq 20) = \sum_{i = 20}^{30} p_{\xi}(i)$ = `r sum(probs[20:30]) %>% round(3)`
+
+<br>
+
+[What if]{.hi} $\color{#e64173}{Q \geq 19}$?
+
+$P(Q \geq 19) = \sum_{i = 19}^{30} p_{\xi}(i)$ = `r sum(probs[19:30]) %>% round(4)`
+
+Then the probability of error is even higher than 10%, which unlikely good for us at all.
+:::
+
+::: {.column width="60%"}
+```{r}
+#| label: binom-pmf-plot-2
+#| echo: false
+
+n <- 30  # кількість випробувань
+p <- 0.5 # ймовірність успіху
+x_grid <- 1:30
+binom_h0 <- dbinom(x_grid, size = n, prob = p)
+
+# Critical region
+crit_reg <- x_grid >= 10
+
+# Data frame for plotting
+data <- tibble(x = x_grid, prob = binom_h0)
+  
+ggplot(data, aes(x = x, y = prob)) +
+  geom_col(fill = "turquoise") +
+  geom_text(aes(label = scales::percent(prob %>% round(3))), size = 3, vjust = -0.5) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_minimal() +
+  theme(text = element_text(size = 18)) +
+  scale_x_continuous(breaks = seq(0, 30, 5))
+```
+:::
+
+::::
+
+## Cumulative distribution function {.tiny}
+
+:::: {.columns}
+
+::: {.column width="40%"}
+The cumulative distribution function $F_{\xi}(x) = P(\xi \leq x)$ is the probability that a random variable $\xi$ will take a value no greater than $x$.
+
+$$
+F_{\xi}(x) = \sum_{i = 0}^{x} p_{\xi}(i)
+$$
+
+<br><br><br><br><br><br>
+
+For $x = 19$: $P(\xi \leq 19) = \sum_{i = 0}^{19} p_{\xi}(i)$ = `r pbinom(19, size = 30, prob = 0.5) %>% round(4)`
+
+<br><br>
+
+Since $P(\xi \leq 19) + P(\xi \geq 21) = 1$, we can calculate the level of significance of our test:
+
+$1 - P(\xi \leq 19) = P(\xi \geq 20)$ = `r 1 - pbinom(19, size = 30, prob = 0.5) %>% round(4)`
+:::
+
+::: {.column width="60%"}
+
+```{r}
+#| label: cdf-q-plot
+#| echo: false
+#| fig-height: 9
+
+p1 <- ggplot(data, aes(x = x, y = prob)) +
+  geom_col(fill = "turquoise") +
+  geom_text(aes(label = scales::percent(prob %>% round(3))), size = 3, vjust = -0.5) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_minimal() +
+  theme(text = element_text(size = 18)) +
+  scale_x_continuous(breaks = seq(0, 30, 5))
+
+p2 <- ggplot(data, aes(x = x, y = cumsum(prob))) +
+  geom_col(fill = "turquoise") +
+  geom_text(aes(label = scales::percent(cumsum(prob) %>% round(3))), size = 3, vjust = -0.5) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_minimal() +
+  theme(text = element_text(size = 18)) +
+  scale_x_continuous(breaks = seq(0, 30, 5))
+
+gridExtra::grid.arrange(p1, p2, nrow = 2)
+```
+:::
+
+::::
+
+## Quantile {.smaller}
+
+To select the critical region for the criterion, we would like to find the point such that the area of the columns to the right of it is $5\%$. That is, the area of the columns on the left is $95\%$. This point is called a *the 0.95 quantile* (or 95th percentile).
+$$u_p(\xi) = \{x | F_{\xi}(x) = p\}$$
+
+But with $p = 0.95$ and our binomial distribution, there is no such point. We found out that there is a point to the right of which the area is $0.494$, and the next one is $0.1$. To determine the quantile in this case, we modify the definition:
+
+\
+
+The quantile $u_p(\xi) = \{x | F_{\xi}(x) \geq p\}$ is a value that $\xi$ does not exceed with probability at least $p$.
+
+## Quantile: example {.smaller}
+
+For the value $\xi \sim Bin(30, 0.5)$, let's calculate the $0.95$-quantile. We will solve the problem simply by selection.
+
+:::: {.columns}
+
+::: {.column width="50%"}
+$$P(\xi \leq 18) \approx 0.9$$
+
+$$P(\xi \leq 19) \approx 0.951$$
+
+$$P(\xi \leq 20) \approx 0.97$$
+:::
+
+::: {.column width="50%"}
+
+```{r}
+#| label: quantile-q-95-2
+#| echo: false
+
+p2 +
+  scale_x_continuous(breaks = seq(0, 30, 2))
+```
+:::
+
+::::
+
+## Custom criterion function {visibility="hidden"}
+
+:::: {.columns}
+
+::: {.column width=“50%”}
+Now how do we find $C$ for any $n, \mu$ and any level of significance $\alpha$?
+
+1. Find $C$ such that $P(Q \geq C) \leq \alpha$.
+2. That is, you need $P(Q < C) \geq 1 - \alpha$.
+3. $Q$ takes only integer values: $P(Q \leq C - 1) \geq 1 - \alpha$, or $P(Q \leq C) \geq 1 - \alpha$. 
+4. So, from the definition of quantile, $C - 1 = u_{1 - \alpha}$
+5. So $C = u_{1 - \alpha} + 1$ 
+:::
+
+::: {.column width="50%" .fragment}
+
+```{r}
+#| label: custom-crit
+#| include: false
+
+make_binom_criterion <- function(n, mu = 0.5, alpha = 0.05) {
+  
+  q <- qbinom(1 - alpha, size = n, prob = mu)
+  
+  return(q + 1)
+  
+}
+```
+
+:::
+
+::::
+
+## Custom criterion function: example {visibility="hidden"}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+```{r}
+#| label: custom-crit-eval
+#| eval: false
+#| include: false
+
+make_binom_criterion <- function(n, mu = 0.5, alpha = 0.05) {
+  # Find the quantile for the criterion
+  q <- qbinom(1 - alpha, size = n, prob = mu)
+  
+  # Return C for the criterion S = {Q >= C}
+  return(q + 1)
+}
+```
+
+:::
+
+::: {.column width="50%"}
+
+```{r}
+#| label: custom-crit-func
+#| include: false
+
+cat("If Q >=",
+    make_binom_criterion(30, 0.5, 0.05),
+    "reject the null hypothesis")
+```
+
+:::
+
+::::
+
+\
+
+The critical value of $C = 20$, then the criterion looks like this:
+
+$$S = \{Q \geq 20\}$$
+
+## Additional example
+
+- Number of deliveries --- 50
+- Sufficient probability of success --- 0.1, i.e. if the courier's work costs 100₴, then the delivery cost is 1000₴.
+
+```{r}
+#| label: binom-50
+#| include: false
+
+set.seed(2024)  # Встановлюємо початкове значення для генератора випадкових чисел
+
+# Кількість випробувань та ймовірність успіху
+n <- 50
+p <- 0.1
+
+# Генерація 3 випадкових значень
+rbinom(1:3, size = n, prob = p)
+```
+
+```{r}
+#| label: binom-50-plot
+#| echo: false
+#| fig-align: center
+
+# Параметри біноміального розподілу
+n <- 50
+p <- 0.1
+
+# Створюємо вектор значень x
+x_grid <- 1:30
+
+# Обчислюємо ймовірності для кожного x
+probs <- dbinom(x_grid, size = n, prob = p)
+
+# Створюємо графік
+library(ggplot2)
+ggplot(data = tibble(x = x_grid, y = probs), aes(x = x, y = y)) +
+    geom_col(fill = "turquoise") +
+    labs(title = "", x = "Number of successes", y = "") +
+    theme_minimal() +
+    theme(text = element_text(size = 18)) +
+    scale_x_continuous(breaks = seq(0, 30, 5))
+```
+
+---
+
+::: {.smaller}
+
+```{r}
+#| label: custom-crit-func-50-plot
+#| echo: false
+#| fig-align: center
+#| fig-width: 15
+#| fig-height: 7
+
+library(ggplot2)
+library(dplyr)
+
+# Parameters
+n <- 50
+p <- 0.1
+x_grid <- 1:30
+binom_h0 <- dbinom(x_grid, size = n, prob = p)
+
+# Critical region
+crit_reg <- x_grid >= 10
+
+# Data frame for plotting
+data <- tibble(x = x_grid, prob = binom_h0)
+  
+ggplot(data, aes(x = x, y = prob)) +
+  geom_col(fill = "turquoise") +
+  geom_col(data = data %>% filter(crit_reg), fill = "red") +
+  geom_text(data = data %>% filter(crit_reg) %>% slice(1:5), aes(label = scales::percent(prob %>% round(3))), size = 3, vjust = -0.5) +
+  theme_minimal() +
+  labs(title = "", x = "Number of successes", y = "") +
+  theme(text = element_text(size = 18)) +
+  scale_x_continuous(breaks = seq(0, 30, 5))
+```
+
+If $Q \geq 10$, then reject $H_0$.
+
+Sum of probabilities in the critical region: `r sum(probs[x_grid >= 10]) %>% round(3)`
+
+:::
+
+# $p$-value 
+
+## $p$-value {.smaller}
+
+The $p$-value is the probability of obtaining a result that is at least as extreme as our observations, provided that the null hypothesis $H_0$ is true.
+
+:::: {.columns}
+
+::: {.column width="40%"}
+
+```{mermaid}
+%%| echo: false
+%%| label: mermaid-binom
+
+graph TD
+    A["n = 30 \n H0: μ = 0.5 \n H1: μ > 0.5 \n α = 0.05"] --> B["If Q >= 20: \n Reject H0"]
+
+```
+
+:::
+
+::: {.column width="60%" .fragment}
+
+```{r}
+#| label: p-value-new
+#| echo: false
+
+# Завантажуємо бібліотеку для статистики
+library(ggplot2)
+
+# Визначаємо параметри біноміального розподілу
+n <- 30  # кількість випробувань
+p <- 0.5  # ймовірність успіху
+
+# Створюємо вектор для кількості успіхів
+x_grid <- 1:n
+
+# Обчислюємо ймовірності для кожної кількості успіхів
+probs <- dbinom(x_grid, size = n, prob = p)
+
+# Створюємо графік
+ggplot(data = tibble(x = x_grid, y = probs), aes(x = x, y = y)) +
+    geom_col(fill = "turquoise") + 
+    geom_col(data = tibble(x = x_grid, y = probs * (x_grid >= 20)), fill = red) +
+    geom_col(data = tibble(x = x_grid, y = probs * (x_grid == 18)), fill = blue) +
+    labs(title = "", x = "Number of successes", y = "") +
+    theme_minimal() +
+    theme(text = element_text(size = 18)) +
+    scale_x_continuous(breaks = seq(0, 30, 2))
+```
+
+:::
+
+::::
+
+. . .
+
+- $p > \alpha \equiv$ $q$ outside the critical region $\equiv$ does not reject $H_0$.
+- $p \leq \alpha \equiv$ $q$ in the critical region $\equiv$ reject $H_0$.
+
+---
+
+::: {.callout-important icon="false"}
+## Statistical criterion for everyone!
+<center>If $p$-value is $\leq \alpha$: reject $H_0$.<br><br> Otherwise: do not reject $H_0$.</center>
+:::
+
+---
+
+```{r}
+#| label: p-value-calc
+#| echo: false
+
+library(tidyverse)
+
+# Параметри
+n <- 30  # кількість випробувань
+p <- 0.5 # ймовірність успіху
+C <- 20  # критичне значення
+qs <- c(10, 19, 20, 23) # різні реалізації статистики
+
+# Створення біноміального розподілу
+x_grid <- 1:n
+probs <- dbinom(x_grid, size = n, prob = p)
+
+# Створення даних для графіку
+data <- tibble(x = rep(x_grid, length(qs)), y = rep(probs, length(qs)), q = rep(qs, each = length(x_grid)))
+
+# Створення графіків
+ggplot(data, aes(x = x, y = y)) +
+  geom_col(aes(fill = "turquoise"), width = 0.8) +
+  facet_wrap(~q, ncol = 2) +
+  geom_text(data = data %>% filter(x == q), aes(x = x, y = y, label = as.character(x)), vjust = -0.5, size = 3) +
+  geom_col(data = data %>% filter(x >= C), aes(fill = red), width = 0.8) +
+  geom_segment(data = data %>% filter(x >= q), aes(x = x, xend = x, y = 0, yend = y), color = blue, size = 1.5) +
+  geom_text(data = data %>% filter(x == qs), aes(x = x, y = y, label = as.character(x)), vjust = -0.5, size = 5) +
+  labs(
+    title = "p-values for different q",
+    x = "Number of successes",
+    y = "PMF, Binom(30, 0.5)",
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    strip.text = element_text(size = 14),
+    plot.title = element_text(size = 20, hjust = 0.5),
+    legend.position = "none"
+  ) +
+  scale_fill_identity() +
+  theme(strip.background = element_rect(fill = "white"))
+```
+
+## $p$-value in R {.smaller visibility="hidden"}
+
+```{r}
+#| label: deff-p-value
+
+pvalue_binom <- function(n, mu, q) {
+  # Обчислює p-значення для біноміального розподілу
+  # Параметри:
+  #   n: кількість випробувань
+  #   mu: ймовірність успіху в нульовій гіпотезі
+  #   q: кількість успіхів
+  
+  # Обчислення p-значення
+  return(1 - pbinom(q - 1, size = n, prob = mu))
+}
+
+```
+
+\
+
+```{r}
+#| label: p-value-calc-2
+
+p_value <- pvalue_binom(30, 0.5, 19)
+message <- ifelse(p_value <= 0.05, 
+                  paste0("p-значення = ", round(p_value, 3), " <= 0.05"), 
+                  paste0("p-значення = ", round(p_value, 3), " >= 0.05"))
+print(message)
+```
+
+\
+
+```{r}
+#| label: p-value-calc-3
+
+p_value <- pvalue_binom(50, 0.1, 11)
+print(paste0("p-значення = ", round(p_value, 3), ifelse(p_value <= 0.05, " <= 0.05", " >= 0.05")))
+```
+
+# Two-sided criterion 
+
+## Two-sided criterion
+
+:::: {.columns}
+
+::: {.column width="60%"}
+Does the color of the car affect compliance with traffic rules?
+:::
+
+::: {.column width="40%"}
+- $Q = \xi_1 + \xi_2 + \ldots + \xi_{n}$
+- $H_0: \mu = 0.5$
+- [$H_1: \mu \neq 0.5$]{.hi}
+- $\alpha = 0.05$
+:::
+
+::::
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r}
+#| label: binom-two-sided
+#| echo: false
+#| fig-align: center
+
+library(ggplot2)
+
+C <- 6
+n <- 30
+p <- 0.5
+
+# Create the binomial distribution
+x_grid <- 1:n
+probs <- dbinom(x_grid, size = n, prob = p)
+
+# Define critical region based on absolute distance from 15
+crit_reg <- abs(x_grid - 15) >= C
+
+# Calculate rejection probability
+rejection_prob <- sum(probs[crit_reg])
+
+# Create a data frame for plotting
+data <- tibble(x = x_grid, prob = probs, crit_reg = crit_reg)
+
+# Create the plot using ggplot2
+ggplot(data, aes(x = x, y = prob)) +
+  geom_col(fill = "turquoise") +
+  geom_col(data = data %>% filter(crit_reg), fill = red) +
+  geom_text(data = data %>% filter(x %in% c(9, 21)), aes(label = x), size = 5, vjust = -0.5) +
+  labs(title = "", x = "Number of successes", y = "") +
+  theme_minimal() +
+  theme(text = element_text(size = 18))
+```
+:::
+
+::: {.column width="50%"}
+If $q \geq 21$ or $q \leq 9$, then we reject $H_0$.
+:::
+
+::::
+
+## $p$-value for the Two-way criterion {.smaller visibility="hidden"}
+
+The criterion is $$S = \{|Q(\xi) - 15|\ \geq C\}$$
+
+```{r}
+#| label: p-value-two-sided-def
+
+pvalue_two_sided_sum <- function(n, q) {
+  # Calculate p-value for two-sided test with mu = 0.5
+  binom_h0 <- dbinom(1:n, size = n, prob = 0.5)
+  diff <- abs(q - 15)
+  
+  # Calculate the right side of the two-tailed test (more extreme values on the right)
+  right_sq <- 1 - sum(binom_h0[1:(15 + diff - 1)])
+  
+  # Calculate the left side of the two-tailed test (more extreme values on the left)
+  left_sq <- sum(binom_h0[1:(15 - diff)])
+  
+  # Return the total p-value for the two-sided test
+  return(left_sq + right_sq) # or 2 * right_sq for symmetric distribution
+}
+```
+
+\
+
+```{r}
+#| label: p-value-two-sided-calc
+
+pvalue_two_sided_sum(30, 21)
+```
+
+## Asymmetric distribution {.smaller}
+
+```{r}
+#| label: binom-asym
+#| include: false
+
+n <- 30
+p <- 0.8
+
+# Generate the binomial distribution data
+binom_h0_nonsym <- tibble(
+  x = 1:n,
+  pmf = dbinom(x, size = n, prob = p)
+)
+```
+
+```{r}
+#| label: binom-asym-plot
+#| echo: false
+#| fig-align: center
+
+library(tidyverse)
+
+# Create x_grid for 0 to 30
+x_grid <- 0:30
+
+# Calculate probabilities for the binomial distribution
+probs <- dbinom(x_grid, size = 30, prob = 0.8)
+
+# Plot the distribution
+ggplot(tibble(x = x_grid, prob = probs), aes(x = x, y = prob)) +
+  geom_col(fill = "turquoise") +
+  labs(title = "", x = "Number of successes", y = "PMF, Binom(0.8, 30)") +
+  theme_minimal() +
+  theme(text = element_text(size = 18))
+```
+
+In order to construct a two-sided criterion, you need to find regions on the left and right whose area is no more than $\frac{\alpha}{2}$.
+
+## Asymmetric distribution: critical region {.smaller visibility="hidden"}
+
+```{r}
+#| label: binom-asym-crit
+
+two_sided_criterion_nonsym <- function(n, mu, alpha) {
+  # Будує двосторонній критерій для несиметричної задачі з доставкою
+  
+  # Параметри:
+  #   n: кількість доставок в експерименті
+  #   mu: ймовірність успіху в нульовій гіпотезі
+  #   alpha: рівень значущості критерію
+  
+  # Повертає:
+  #   C1, C2 для критерію S = {Q <= C1 або Q >= C2}
+  
+  # Створення об'єкту для біноміального розподілу
+  binom_h0 <- rbinom(1, n, mu)
+  
+  # Аналогічно односторонньому критерію
+  c2 <- qbinom(1 - alpha/2, size = n, prob = mu) + 1
+  
+  # За викладками вище
+  c1 <- qbinom(alpha/2, size = n, prob = mu) - 1
+  
+  return(c(c1, c2))
+}
+```
+
+\
+
+```{r}
+#| label: binom-asym-crit-calc
+
+c1_c2 <- two_sided_criterion_nonsym(30, 0.8, 0.05)
+c1_c2
+```
+
+## Asymmetric distribution: criterion {.smaller}
+
+So, our criterion for testing the hypothesis is
+
+$$H_0: \mu = 0.8$$
+$$H_1: \mu \neq 0.8$$
+
+is as follows:
+
+$$S = \{Q(\xi) \leq 18\} \cup \{Q(\xi) \geq 29\}$$
+
+```{r}
+#| label: binom-asym-crit-plot
+#| echo: false
+#| fig-align: center
+
+library(ggplot2)
+
+# Define parameters
+x_grid <- 1:30
+probs <- dbinom(x_grid, size = 30, prob = 0.8)
+
+# Create the plot
+ggplot(tibble(x = x_grid, y = probs), aes(x = x, y = y)) +
+  geom_col(fill = "turquoise") +
+  geom_col(data = tibble(x = x_grid, y = probs * (x_grid <= 18 | x_grid >= 29)), fill = red) +
+  geom_text(data = tibble(x = c(18, 29), y = dbinom(c(18, 29), size = 30, prob = 0.8), label = c(18, 29)), aes(x = x, y = y, label = as.character(x)), size = 5, vjust = -0.5) +
+  labs(title = "", x = "Number of successes", y = "") +
+  theme_minimal() +
+  theme(text = element_text(size = 18))
+```
+
+## Asymmetric distribution: $p$-value
+
+This criterion is a combination of two significance level criteria $\frac{\alpha}{2}$, for each of which $p$-values can be calculated. 
+
+We denote them as $p_1, p_2$. 
+
+The first criterion is rejected when $p_1 \leqslant \frac{\alpha}{2}$, the second when $p_2 \leqslant \frac{\alpha}{2}$.
+
+And ours is unified when one of these conditions is met, i.e.
+
+$$ 2p_1 \leqslant \alpha \vee 2p_2 \leqslant \alpha \Leftrightarrow 2 \cdot \min(p_1, p_2) \leqslant \alpha $$
+
+## Asymmetric distribution: $p$-value {.smaller}
+
+```{r}
+#| label: p-value-asym-def-2
+#| echo: false
+#| fig-align: center
+
+ggplot(tibble(x = x_grid, y = probs), aes(x = x, y = y)) +
+  geom_col(fill = "turquoise") +
+  geom_col(data = tibble(x = x_grid, y = probs * (x_grid <= 18 | x_grid >= 29)), fill = red) +
+  geom_text(data = tibble(x = c(18, 29), y = dbinom(c(18, 29), size = 30, prob = 0.8), label = c(18, 29)), aes(x = x, y = y, label = as.character(x)), size = 5, vjust = -0.5) +
+  labs(title = "", x = "Number of successes", y = "") +
+  theme_minimal() +
+  theme(text = element_text(size = 18))
+```
+
+```{r}
+#| label: p-value-asym-def
+#| include: false
+
+pvalue_two_sided <- function(n, q, mu = 0.5) {
+  # Обчислює pvalue для двосторонньої альтернативи в задачі з доставкою
+  
+  # Параметри:
+  # n: кількість доставок в експерименті
+  # q: кількість успішних доставок
+  # mu: ймовірність успіху при H0
+  
+  # Розподіл біноміальний для H0
+  binom_h0 <- dbinom(0:q, size = n, prob = mu)
+  
+  # Рахуємо для лівої частини
+  pvalue_left <- pbinom(q, size = n, prob = mu)
+  
+  # Рахуємо для правої частини
+  pvalue_right <- 1 - pbinom(q - 1, size = n, prob = mu)
+  
+  # Обчислюємо формулу
+  return(2 * min(pvalue_left, pvalue_right))
+}
+```
+
+$N = 30, \mu = 0.8$.
+
+If $Q = 28$, then the $p$-value is `r pvalue_two_sided(30, 28, mu = 0.8) %>% round(3)`.
+
+\
+
+```{r}
+#| label: p-value-asym-calc
+#| include: false
+
+pvalue_two_sided(30, 28, mu = 0.8)
+```
+
+It can be seen that the $p$-value is $> 0.05$, so at a significance level of $0.05$, even $28$ successes are not enough to reject the probability of success of $80\%$.
+
+# Power of statistical test 
+
+## False negative error {.smaller}
+
+Previously, we paid attention only to $\alpha$ --- **significance level**. 
+
+This parameter controls the probability of detecting a **type I error** (*FPR, false positive rate*): a deviation of $H_0$ when it is actually true.
+
+**In business terms**, how many inefficient projects are we willing to invest resources in?
+
+. . .
+
+<center>[Can we minimize this error??]{.hi}</center>
+
+. . .
+
+Yes!!! To do this, it is enough to never discard $H_0$ 
+
+$$
+S \equiv 0, \alpha = 0
+$$
+
+. . .
+
+If there is a Type I error, there is also a **Type II error** --- **False Negative Rate** (*FNR*): accepting $H_0$ when $H_1$ is actually true.
+
+**In business terms:** how many effective projects are we willing to miss?
+
+$$
+\beta = \text{FNR} = \mathbb{P}(S=0|H_1)
+$$
+
+## Error types
+
+- **Type I error** (*FPR, false positive rate*): rejecting $H_0$ when it is actually true.
+- **Type II error** (*FNR, false negative rate*): failing to reject $H_0$ when $H_1$ is actually true.
+
+## How to remember? {.smaller}
+
+::: {.r-stack}
+![](img/02/fp-fn-2.jpg){.absolute left=0 top=160 width="450"}
+
+![](img/02/fp-fn.jpg){.fragment .absolute right=0 top=160 width="450"}
+
+![](img/02/fp-fn-3.jpg){.fragment width="350"}
+:::
+
+::: footer
+1. Source: https://memeguy.com/photo/106
+2. Source: https://memeguy.com/photo/106
+3. Source: https://memeguy.com/photo/106283/the-boy-who-cried-wolf
+:::
+
+## Test for time of year ❄️☀️ {.tiny}
+
+$$
+H_0: \text{it's summer outside}
+$$
+
+$$
+H_1: \text{it's not summer outside}
+$$
+
+. . .
+
+$$
+\begin{equation}
+Q = \begin{cases}
+1, & \text{if it is snowing outside} \\
+0, & \text{otherwise}
+\end{cases}
+\end{equation}
+$$
+
+. . .
+
+$$
+\begin{equation}
+S = Q = \begin{cases}
+1, & \text{if }Q = 1, \text{ reject } H_0 \\
+0, & \text{if }Q = 0, \text{ do not reject } H_0
+\end{cases}
+\end{equation}
+$$
+
+. . .
+
+$$
+\alpha = \text{FPR} = \mathbb{P}(\text{it's snowing}|\text{it's summer}) < 0.001
+$$
+
+$$
+\beta = \text{FNR} = \mathbb{P}(\text{it is not snowing}|\text{it is not summer}) > 0.9
+$$
+
+. . .
+
+As you can see, the test is quite useless.
+
+. . .
+
+The [power of a statistical test]{.hi} (*power, True Positive Rate*) is the probability of correctly rejecting $H_0$ when it is truly false, i.e., the ability to detect an effect if it really exists.
+
+$$
+\text{Power} = 1 - \beta = \mathbb{P}(S=1|H_1)
+$$
+
+. . .
+
+In our example: $\text{Power} = 1 - 0.9 = 0.1$.
+
+## Power {.tiny}
+
+:::: {.columns}
+
+::: {.column width="65%"}
+Let's recall the delivery task:
+
+$H_0: \mu = 0.5 \\H_1: \mu > 0.5 \\Q = \text{number of confirmed orders} \\\alpha = 0.05 \\ S = \{Q \geq 20\}$
+
+:::
+
+::: {.column width="35%" .fragment}
+
+```{r}
+#| label: power-h0
+#| echo: false
+
+# Параметри
+n <- 30  # кількість випробувань
+p <- 0.5 # ймовірність успіху
+
+# Створення біноміального розподілу
+x_grid <- 1:n
+probs <- dbinom(x_grid, size = n, prob = p)
+
+# Побудова графіку
+ggplot(data = tibble(x = x_grid, y = probs), aes(x = x, y = y)) +
+  geom_col(fill = "turquoise", width = 0.8) +
+  geom_col(data = tibble(x = x_grid, y = probs * (x_grid >= 20)), fill = "red") +
+  labs(
+    title = "",
+    x = "Number of successes",
+    y = "PMF Q \n H0"
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.title = element_text(size = 20, hjust = 0.5),
+    legend.position = "none"
+  ) +
+  scale_x_continuous(breaks = seq(0, 30, 2))
+```
+:::
+
+::::
+
+. . .
+
+:::: {.columns}
+
+::: {.column width="65%"}
+Suppose that $H_1$ is true: $\mu = 0.6$.
+:::
+
+::: {.column width="35%" .fragment}
+```{r}
+#| label: power-h1
+#| echo: false
+
+library(tidyverse)
+
+# Параметри
+n <- 30  # кількість випробувань
+p <- 0.6 # ймовірність успіху
+
+# Створення біноміального розподілу
+x_grid <- 1:n
+probs <- dbinom(x_grid, size = n, prob = p)
+
+# Побудова графіку
+ggplot(data = tibble(x = x_grid, y = probs), aes(x = x, y = y)) +
+  geom_col(fill = "turquoise", width = 0.8) +
+  geom_col(data = tibble(x = x_grid, y = probs * (x_grid >= 20)), fill = "red") +
+  labs(
+    title = "",
+    x = "Number of successes",
+    y = "PMF Q \n H0"
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.title = element_text(size = 20, hjust = 0.5),
+    legend.position = "none"
+  ) +
+  scale_x_continuous(breaks = seq(0, 30, 2))
+```
+:::
+
+::::
+
+. . .
+
+$$\text{Power} = \mathbb{P}(Q \geq 20|\mu = 0.6)$$
+
+---
+
+$$\text{Power} = \mathbb{P}(Q \geq 20|\mu = 0.6)$$
+
+```{r}
+#| label: power
+#| echo: false
+#| fig-align: center
+
+# Параметри
+n <- 30  # кількість випробувань
+p_h0 <- 0.5 # ймовірність успіху при H0
+p_alternative <- 0.6 # ймовірність успіху при H1
+
+# Створення біноміальних розподілів
+x_grid <- 1:n
+probs_h0 <- dbinom(x_grid, size = n, prob = p_h0)
+probs_alternative <- dbinom(x_grid, size = n, prob = p_alternative)
+
+# Критична область
+crit_reg <- x_grid >= 20
+
+# Побудова графіку
+ggplot() +
+  geom_col(data = tibble(x = x_grid, y = probs_h0), aes(x = x, y = y), fill = "gray", width = 0.8, alpha = 0.5) +
+  geom_col(data = tibble(x = x_grid, y = probs_alternative), aes(x = x, y = y), fill = "turquoise", width = 0.8) +
+  geom_col(data = tibble(x = x_grid, y = probs_alternative * crit_reg), aes(x = x, y = y), fill = "red", width = 0.8) +
+  labs(
+    title = "",
+    x = "Number of successes",
+    y = "PMF Q"
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.title = element_text(size = 20, hjust = 0.5),
+    legend.position = "none"
+  ) +
+  scale_x_continuous(breaks = seq(0, 30, 2))
+```
+
+```{r}
+#| label: power-value
+#| echo: false
+
+library(tidyverse)
+library(stats)
+
+# Параметри
+n <- 30  # кількість випробувань
+p_h0 <- 0.5 # ймовірність успіху при H0
+p_alternative <- 0.6 # ймовірність успіху при H1
+critical_value <- 20
+
+# Обчислення FPR та потужності
+fpr <- 1 - pbinom(critical_value - 1, size = n, prob = p_h0)
+power <- 1 - pbinom(critical_value - 1, size = n, prob = p_alternative)
+
+# Виведення результатів
+cat(sprintf("False Positive Rate is %.1f%%\n", fpr * 100))
+cat(sprintf("Power is %.1f%%\n", power * 100))
+```
+
+[You can see that the power is about $30\%$. This is quite a small value, because if our product is profitable, we will only see it with a probability of $30$ percent using our test. **We can easily miss the effect.**]{.tiny}
+
+## R and the power {.smaller visibility="hidden"}
+
+```{r}
+#| label: power-def
+
+get_stat_power <- function(N, mu_h0, mu_alternative, alpha) {
+  # Обчислення статистичної потужності для біноміального розподілу
+  
+  # Створення біноміальних розподілів
+  binom_h0 <- dbinom(0:N, size = N, prob = mu_h0)
+  binom_alternative <- dbinom(0:N, size = N, prob = mu_alternative)
+  
+  # Обчислення критичного значення
+  critical_value <- qbinom(1 - alpha, size = N, prob = mu_h0) + 1
+  
+  # Обчислення потужності
+  power <- 1 - pbinom(critical_value - 1, size = N, prob = mu_alternative)
+  
+  return(power)
+}
+```
+
+\
+
+```{r}
+#| label: power-example-30
+
+get_stat_power(N = 30, mu_h0 = 0.5, mu_alternative = 0.6, alpha = 0.05)
+```
+
+Let's see what happens if we conduct an experiment with 300 customers.
+
+```{r}
+#| label: power-example-300
+
+get_stat_power(N = 300, mu_h0 = 0.5, mu_alternative = 0.6, alpha = 0.05)
+```
+
+## Power vs. Sample Size {.smaller}
+
+It is generally accepted that $80\%$ of power is considered acceptable for work.
+
+Let's see how the power changes as the sample size increases, and how many experiments are needed to detect the effect at $\mu=0.6$ in $80\%$ of cases.
+
+```{r}
+#| label: power-example-80
+#| fig-align: center
+#| echo: false
+
+n_grid <- seq(10, 600, by = 10)
+
+# Обчислення потужності для різних розмірів вибірки
+power <- sapply(n_grid, function(N) get_stat_power(N, mu_h0 = 0.5, mu_alternative = 0.6, alpha = 0.05))
+
+# Побудова графіку
+ggplot(data = tibble(n = n_grid, power = power), aes(x = n, y = power)) +
+  geom_line() +
+  geom_hline(aes(yintercept = 0.8, linetype = "Power = 80%"), colour = red) +
+  geom_vline(aes(xintercept = min(n_grid[power >= 0.8]), linetype = "Sample size = 160"), color = turquoise) +
+  theme_minimal(base_size = 15) +
+  labs(
+    title = "Power for different sample sizes, mu = 0.6",
+    x = "Sample size",
+    y = "Power",
+    linetype = ""
+  ) +
+  scale_linetype_manual(values = c("Power = 80%" = "dashed", "Sample size = 160" = "dashed"))
+```
+
+## Power vs. Sample Size (cont.) {.smaller}
+
+What if we want to detect an even smaller effect? For example, if we want to reject the hypothesis at $\mu = 0.51$. Often, an improvement in the probability of success by $1\%$ can be significant for a product, so this question is not without meaning.
+
+
+```{r}
+#| label: power-example-51
+#| fig-align: center
+#| echo: false
+
+n_grid <- seq(10, 30000, by = 59)
+
+# Обчислення потужності для різних розмірів вибірки
+power <- sapply(n_grid, function(N) get_stat_power(N, mu_h0 = 0.5, mu_alternative = 0.51, alpha = 0.05))
+
+# Побудова графіку
+ggplot(data = tibble(n = n_grid, power = power), aes(x = n, y = power)) +
+  geom_line() +
+  geom_hline(aes(yintercept = 0.8, linetype = "Power = 80%"), colour = red) +
+  geom_vline(aes(xintercept = min(n_grid[power >= 0.8]), linetype = "Sample size = 15645"), color = turquoise) +
+  theme_minimal(base_size = 15) +
+  labs(
+    title = "Power for different sample sizes, mu = 0.51",
+    x = "Sample size",
+    y = "Power",
+    linetype = ""
+  ) +
+  scale_linetype_manual(values = c("Power = 80%" = "dashed", "Sample size = 15645" = "dashed"))
+```
+
+---
+
+Before each experiment, the analyst should think about [test duration]{.hi} and [number of participants]{.hi-slate}. 
+
+\
+
+To do this, you need to understand:
+
+- What effect is practically significant for the task?
+- How many subjects will it take to detect this effect more often than $80\%$ of the time?
+
+## Power vs. effect size {.smaller}
+
+The graphs show that a larger sample size is required to detect a smaller effect. 
+
+Let's see how the power changes for different parameters $\mu$ for a fixed $N = 30$.
+
+```{r}
+#| label: power-example-mu
+#| fig-align: center
+#| echo: false
+
+mu_grid <- seq(0.5, 1, length.out = 500)
+
+# Обчислення потужності для різних значень mu
+power <- sapply(mu_grid, function(mu) get_stat_power(30, mu_h0 = 0.5, mu_alternative = mu, alpha = 0.05))
+
+# Побудова графіку
+ggplot(data = tibble(mu = mu_grid, power = power), aes(x = mu, y = power)) +
+  geom_line() +
+  geom_hline(aes(yintercept = 0.8, linetype = "Power = 80%"), color = "red") +
+  geom_vline(aes(xintercept = min(mu_grid[power >= 0.8]), linetype = "mu = 0.72"), color = "turquoise") +
+  labs(
+    title = "Power for N = 30",
+    x = "mu",
+    y = "Power",
+    linetype = ""
+  ) +
+  scale_linetype_manual(values = c("Power = 80%" = "dashed", "mu = 0.72" = "dashed")) +
+  theme_minimal(base_size = 15)
+```
+
+In our experiment, we detect an effect well only if the probability of success in the population is at least $72\%$.
+
+# Minimum detectable effect *(MDE)* 
+
+## Minimum detectable effect {.smaller}
+
+[Minimal Detectable Effect]{.hi} (*MDE, Minimal Detectable Effect*) --- this is the smallest effect that we can detect with an experiment (usually at $80\%$ power).
+
+```{r}
+#| label: power-example-mu-2
+#| fig-align: center
+#| echo: false
+
+ggplot(data = tibble(mu = mu_grid, power = power), aes(x = mu, y = power)) +
+  geom_line() +
+  geom_hline(aes(yintercept = 0.8, linetype = "Power = 80%"), color = "red") +
+  geom_vline(aes(xintercept = min(mu_grid[power >= 0.8]), linetype = "mu = 0.72"), color = "turquoise") +
+  labs(
+    title = "Power for N = 30",
+    x = "mu",
+    y = "Power",
+    linetype = ""
+  ) +
+  scale_linetype_manual(values = c("Power = 80%" = "dashed", "mu = 0.72" = "dashed")) +
+  theme_minimal(base_size = 15)
+```
+
+In our example, $\text{MDE} = +0.22$
+
+<br>
+
+::: {.callout-warning icon="false"}
+## More formally
+
+$\text{MDE}$ for the hypothesis $\mathsf{H}_0: \mu = \mu_0$ &mdash; this is the minimum effect of $\delta$ at which the significance level criterion $\alpha$ for testing this hypothesis, given the true parameter $\mu = \mu_0 + \delta$ and sample size $N$, will reject $\mathsf{H}_0$ with power greater than $1 - \beta$.
+:::
+
+## R та MDE {.smaller visibility="hidden"}
+
+```{r}
+#| label: mde-def
+
+binom_test_mde_one_sided <- function(N, mu0, alpha = 0.05, min_power = 0.8) {
+  # Генеруємо сітку можливих ефектів (delta)
+  delta_grid <- seq(0, 1 - mu0, length.out = 500)
+  
+  # Обчислюємо потужність для кожного delta
+  power <- sapply(delta_grid, function(delta) {
+    get_stat_power(N, mu0, mu0 + delta, alpha)
+  })
+  
+  # Знаходимо перший delta, для якого потужність >= min_power
+  fit_delta <- delta_grid[power >= min_power]
+  
+  return(fit_delta[1])
+}
+```
+
+<br>
+
+```{r}
+#| label: mde-def-calc
+
+binom_test_mde_one_sided(N=30, mu0=0.5, alpha=0.05, min_power=0.8)
+```
+
+---
+
+::: {.tiny}
+
+Usually, $\text{MDE}$ is calculated for a reason, and the question of determining the [sample size]{.hi} goes hand in hand with it.
+
+<br>
+
+**Determining the sample size**
+
+<br>
+
+In our task:
+
+- We found $30$ customers without first calculating how many of them we would need. 
+- If the resulting $\text{MDE}$ is too large and you need to make it smaller because the expected changes are much smaller? 
+- Then the opposite problem is solved: given the required $\text{MDE}$, determine the sample size. 
+- If we say that we want to detect $+10$ pp, i.e. $60\%$ of successful deliveries, then we need to find 160 test customers, as you can see from the previous graphs. 
+- If we search for 30 people for a month, for example, such a test can take almost six months.
+
+Therefore, it is worth considering allocating additional resources to find customers, for example, by engaging marketers.
+
+:::
+
+# Confidence intervals 
+
+## Confidence interval {.smaller}
+
+[Confidence interval]{.hi} (*CI, confidence interval*) --- the set of values of the parameter $\mu_0,$ for which the hypothesis $\mu = \mu_0$ is not rejected by the significance level criterion $\alpha$ with a known probability $\geq 1 - \alpha$.
+
+<br>
+
+The definition implies that different tests can give rise to different confidence intervals.
+
+<br>
+
+For example, in the delivery task, the confidence interval for the proportion of successful deliveries can be calculated as follows:
+
+$$
+\hat{p} \pm z_{1 - \frac{\alpha}{2}} \sqrt{\frac{\hat{p}(1 - \hat{p})}{n}}
+$$
+
+where $\hat{p}$ is the sample proportion of successes. <br>
+$z_{1 - \frac{\alpha}{2}}$ is the quantile of the standard normal distribution.
+
+## Startup: confidence interval {.smaller}
+
+- With a sample of 30 customers, we found [19 successful deliveries]{.hi-slate}. So with 95% confidence, we can say that the proportion of successful deliveries is between `r prop.test(19, 30, 0.05)$conf.int[1]` and `r prop.test(19, 30, 0.05)$conf.int[2]`.
+
+<center>We [can't reject]{.hi} the hypothesis that the proportion of successful deliveries is $50\%$.</center>
+
+. . .
+
+<br><br>
+
+- For [28 successful deliveries]{.hi-slate}, the interval is `r prop.test(28, 30, 0.05)$conf.int[1]` to `r prop.test(28, 30, 0.05)$conf.int[2]`.
+
+<center>We [reject]{.hi} the hypothesis that the proportion of successful deliveries is $50\%$.</center>
+
+## {visibility="hidden"}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r}
+#| label: ci-def
+
+two_sided_criterion_nonsym <- function(n, mu, alpha) {
+  # Створюємо біноміальний розподіл для H0
+  binom_h0 <- dbinom(0:n, size = n, prob = mu)
+  
+  # Аналогічно односторонньому критерію
+  c2 <- qbinom(1 - alpha / 2, size = n, prob = mu) + 1
+  
+  # За викладками вище
+  c1 <- qbinom(alpha / 2, size = n, prob = mu) - 1
+  
+  return(c(c1, c2))
+}
+```
+:::
+
+::: {.column width="50%" .fragment}
+```{r}
+#| label: ci-calc-19
+
+success_cnt <- 19
+mu_grid <- seq(0, 1, by = 0.001)
+
+mu_no_rejection <- tibble(mu_h0 = mu_grid) %>%
+  rowwise() %>%
+  filter({
+    crit <- two_sided_criterion_nonsym(30, mu_h0, alpha = 0.05)
+    success_cnt > crit[1] && success_cnt < crit[2]
+  }) %>%
+  pull(mu_h0)
+
+cat(sprintf("95%% confidence interval: %.3f -- %.3f", min(mu_no_rejection), max(mu_no_rejection)))
+```
+
+Не відхиляємо $H_0$!
+
+\
+
+```{r}
+#| label: ci-calc-28
+
+success_cnt <- 28
+mu_grid <- seq(0, 1, by = 0.001)
+
+mu_no_rejection <- tibble(mu_h0 = mu_grid) %>%
+  rowwise() %>%
+  filter({
+    crit <- two_sided_criterion_nonsym(30, mu_h0, alpha = 0.05)
+    success_cnt > crit[1] && success_cnt < crit[2]
+  }) %>%
+  pull(mu_h0)
+
+cat(sprintf("95%% confidence interval: %.3f -- %.3f", min(mu_no_rejection), max(mu_no_rejection)))
+```
+
+We reject $H_0$!
+:::
+
+::::
+
+---
+
+<!-- In this section, we will consider what intervals are generated by a two-sided test. 
+
+To do this, we will use $\mu \in [0, 1]$ in increments of $0.001$ and test the hypotheses. Q = 19. -->
+
+```{r}
+#| label: ci-fig-6
+#| echo: false
+#| fig-align: center
+
+mus_h0 <- c(0.2, 0.438, 0.439, 0.8, 0.81, 0.9)
+success_cnt <- 19
+x_grid <- 0:30
+
+# Create an empty data frame to store all plots
+plot_data <- tibble(x = rep(x_grid, length(mus_h0)),
+                    mu_h0 = rep(mus_h0, each = length(x_grid)),
+                    prob = dbinom(x, size = 30, prob = mu_h0),
+                    c1 = qbinom(0.025, size = 30, prob = mu_h0),
+                    c2 = qbinom(0.975, size = 30, prob = mu_h0),
+                    reject = if_else(x < c1 | x > c2, TRUE, FALSE))
+
+# Plot
+ggplot(plot_data, aes(x = x, y = prob, group = mu_h0)) +
+  geom_col(aes(fill = reject), width = 0.8) +
+  geom_vline(xintercept = 19, linetype = "dashed") +
+  geom_text(data = filter(plot_data, x == 19), aes(label = if_else(reject, "Reject", "Do not reject")), y = 0.1, vjust = -1) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("turquoise", "red")) +
+  facet_wrap(~ mu_h0, scales = "free_y")
+```
+
+## One-sided confidence intervals {visibility="hidden"}
+
+In the last part, we used a **two-sided criterion** and derived a confidence interval from it. 
+
+But in the last lecture, we said that the two-sided criterion is needed **extremely rarely**. 
+
+We need to control the *False Positive* error only for deviations in the direction that is useful for the business. 
+
+In the case of a delivery task, this is getting a *larger* conversion to success.
+
+\
+
+Let's try to use a one-sided criterion to build a confidence interval.
+
+## R and one-way spacing {.smaller visibility="hidden"}
+
+:::: {.columns}
+
+::: {.column width="40%"}
+```{r}
+#| label: ci-one-sided-сrit
+
+make_binom_criterion <- function(n, mu = 0.5, alpha = 0.05) {
+  binom_h0 <- dbinom(0:n, size = n, prob = mu)
+  q <- qbinom(1 - alpha, size = n, prob = mu)
+  return(q + 1)
+}
+```
+:::
+
+::: {.column width="60%"}
+```{r}
+#| label: ci-one-sided-calc
+
+success_cnt <- 19
+mu_grid <- seq(0, 1, by = 0.001)
+
+mu_no_rejection <- tibble(mu_h0 = mu_grid) %>%
+  rowwise() %>%
+  filter({
+    crit_vals <- two_sided_criterion_nonsym(n = 30, mu = mu_h0, alpha = 0.1)
+    success_cnt > crit_vals[1] & success_cnt < crit_vals[2]
+  }) %>%
+  pull(mu_h0)
+
+cat(sprintf("Two-sided 90%% confidence interval: %.3f -- %.3f", min(mu_no_rejection), max(mu_no_rejection)))
+```
+:::
+
+::::
+
+When we used a two-sided interval, we got a left-handed bound of $0.439 < 0.467$. 
+
+It turns out that the one-sided interval gives us more information from the point of view of the left bound. At the same time, from the point of view of the right bound, we lose information completely. It is equal to 1 simply because the probability cannot be greater.
+
+In fact, the right-hand side is usually not looked at in an analysis when we are looking for a positive effect.
+
+## R and one-way CI {.tiny visibility="hidden"}
+
+Let's say we got $22$ instead of $19$ of successes. Let's plot 2 types of intervals.
+
+```{r}
+#| label: ci-one-sided-calc-22
+
+success_cnt <- 22
+mu_grid <- seq(0, 1, by = 0.001)
+mu_no_rejection <- c()
+
+for (mu_h0 in mu_grid) {
+  c1_c2 <- two_sided_criterion_nonsym(n = 30, mu = mu_h0, alpha = 0.05)
+  c1 <- c1_c2[1]
+  c2 <- c1_c2[2]
+  
+  if (success_cnt > c1 && success_cnt < c2) {
+    mu_no_rejection <- c(mu_no_rejection, mu_h0)
+  }
+}
+
+cat(sprintf("Two-sided 95%% confidence interval: %.3f -- %.3f", min(mu_no_rejection), max(mu_no_rejection)))
+```
+
+\
+
+```{r}
+#| label: ci-one-sided-calc-22-one-sided
+
+success_cnt <- 22
+mu_grid <- seq(0, 1, by = 0.001)
+mu_no_rejection <- c()
+
+for (mu_h0 in mu_grid) {
+  crit_val <- make_binom_criterion(n = 30, mu = mu_h0, alpha = 0.05)
+  
+  if (success_cnt < crit_val) {
+    mu_no_rejection <- c(mu_no_rejection, mu_h0)
+  }
+}
+
+cat(sprintf("One-sided 95%% confidence interval: %.2f -- %.3f", min(mu_no_rejection), max(mu_no_rejection)))
+```
+
+## R and one-way CI {.smaller visibility="hidden"}
+
+So why do we use two-sided spacing at all? To understand this, let's see what the borders look like for a one-sided spacing.
+
+```{r}
+#| label: ci-fig-6-one-sided
+#| code-fold: true
+#| fig-align: center
+
+library(ggplot2)
+library(dplyr)
+
+mus_h0 <- c(0.2, 0.438, 0.439, 0.8, 0.81, 0.9)
+success_cnt <- 19
+x_grid <- 0:30
+
+plot_data <- tibble(
+  x = rep(x_grid, length(mus_h0)),
+  mu_h0 = rep(mus_h0, each = length(x_grid)),
+  prob = dbinom(x, size = 30, prob = mu_h0),
+  c = qbinom(0.05, size = 30, prob = mu_h0, lower.tail = FALSE),
+  reject = if_else(x >= c, TRUE, FALSE)
+)
+
+ggplot(plot_data, aes(x = x, y = prob, group = mu_h0)) +
+  geom_col(aes(fill = reject), width = 0.8) +
+  geom_vline(xintercept = 19, linetype = "dashed") +
+  geom_text(data = filter(plot_data, x == 19), aes(label = if_else(reject, "Reject", "Do not reject")), y = 0.1, vjust = -1) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("turquoise", "red")) +
+  facet_wrap(~ mu_h0, scales = "free_y", ncol = 2)
+```
+
+---
+
+## {visibility="hidden"}
+
+The critical region has become **larger** because it now contains not $2.5\%$, but $5\%$ by construction. At the same time, the **left** critical region simply does not exist, so at large $\mu$ $19$ does not fall into it, and thus we do not reject the hypothesis.
+
+\
+
+Note that if we were to construct a two-sided interval, but with twice the $\alpha$, hits in the right critical region would occur at the same $\mu$ as in the one-sided criterion. Therefore, often **to find a one-sided** limit, a two-sided confidence interval with a **larger** $\alpha$ is constructed, ignoring the right-hand side. This is convenient because you can use only one function for a criterion.
+
+## R and one-way CI {.smaller visibility="hidden"}
+
+Let's check what happens when $\alpha = 0.1$.
+
+```{r}
+#| label: ci-one-sided-calc-22-one-sided-10
+
+success_cnt <- 19
+mu_grid <- seq(0, 1, by = 0.001)
+mu_no_rejection <- c()
+
+for (mu_h0 in mu_grid) {
+  crit_vals <- two_sided_criterion_nonsym(n = 30, mu = mu_h0, alpha = 0.1)
+  if (success_cnt > crit_vals[1] & success_cnt < crit_vals[2]) {
+    mu_no_rejection <- c(mu_no_rejection, mu_h0)
+  }
+}
+
+cat(sprintf("Two-sided 90%% confidence interval: %.3f -- %.3f", min(mu_no_rejection), max(mu_no_rejection)))
+```
+
+## Confidence interval property
+
+Whatever the true value of $\mu = \mu_0$, the probability that it is between $\mathcal{L}(Q)$ (lower confidence bound) and $\mathcal{R}(Q)$ (upper confidence bound) is at least $1 - \alpha$. 
+
+The value $1 - \alpha$ is called the [confidence level]{.hi} of the confidence interval.
+
+$$ P(\mathcal{L}(Q) < \mu_0 < \mathcal{R}(Q)) = 1 - \alpha $$
+
+It is important that the randomness here is hidden in $\mathcal{L}$ and $\mathcal{R}$, not in $\mu_0$. 
+
+The parameter $\mu_0$ is unknown, but we assume it to be constant and not random.
+
+## Checking the property {.tiny visibility="hidden"}
+
+:::: {.columns}
+
+::: {.column width="40%"}
+To do this, we fix $\mu_0$ and conduct a set of experiments:
+
+* Draw a sample from the distribution with parameter $\mu_0$.
+* Calculate the statistic $q$.
+* Calculate the confidence interval for $\alpha = 0.05$.
+
+Check that the proportion of cases when the parameter $\mu_0$ is inside the interval is at least $95\%$
+:::
+
+::: {.column width="60%"}
+
+```{r}
+#| label: ci-property-slow
+#| eval: false
+
+my_binomial_confint <- function(n, alpha, q) {
+  mu_grid <- seq(0, 1, by = 0.001)
+  mu_no_rejection <- c()
+  
+  for (mu_h0 in mu_grid) {
+    crit_vals <- two_sided_criterion_nonsym(n = 30, mu = mu_h0, alpha = 0.05)
+    if (q > crit_vals[1] & q < crit_vals[2]) {
+      mu_no_rejection <- c(mu_no_rejection, mu_h0)
+    }
+  }
+  
+  return(c(min(mu_no_rejection), max(mu_no_rejection)))
+}
+
+set.seed(2024)
+
+N_EXPERIMENTS <- 1000
+SAMPLE_SIZE <- 30
+latent_mu <- 0.5  # "True" value of the parameter
+binom_true <- rbinom(N_EXPERIMENTS, SAMPLE_SIZE, latent_mu)  # Generate binomial samples
+
+confint_fail_cases <- 0
+
+for (i in 1:N_EXPERIMENTS) {
+  q <- sum(rbinom(1, SAMPLE_SIZE, latent_mu))  # Generate sum of elements
+  confint_vals <- my_binomial_confint(n = SAMPLE_SIZE, alpha = 0.05, q = q)
+  if (confint_vals[1] < latent_mu & latent_mu < confint_vals[2]) {
+    # All good
+  } else {
+    confint_fail_cases <- confint_fail_cases + 1
+  }
+}
+
+cat(1 - confint_fail_cases / N_EXPERIMENTS)
+```
+
+```{r}
+#| label: ci-property-fast
+#| echo: false
+
+print(0.962)
+```
+:::
+
+::::
+
+But it takes a long time! This is because during each experiment you need to build a confidence interval, and therefore test 1000 possible parameters $\mu_0$.
+
+## Wilson confidence interval {.tiny visibility="hidden"}
+
+The algorithm for building a confidence interval that we have just discussed takes too long. R has functions that allow you to calculate the interval faster. For example, you can use the Wilson method and the `prop.test(correct = FALSE)` function
+
+```{r}
+#| label: ci-wilson
+set.seed(1111)
+
+N_EXPERIMENTS <- 1000
+SAMPLE_SIZE <- 30
+latent_mu <- 0.5  # "True" value of the parameter
+
+confint_fail_cases <- 0
+
+for (i in 1:N_EXPERIMENTS) {
+  q <- sum(rbinom(1, SAMPLE_SIZE, latent_mu))  # Generate sum of elements
+  confint_vals <- prop.test(q, SAMPLE_SIZE, conf.level = 0.95, correct = FALSE)$conf.int
+  
+  if (confint_vals[1] < latent_mu & latent_mu < confint_vals[2]) {
+    # All good
+  } else {
+    confint_fail_cases <- confint_fail_cases + 1
+  }
+}
+
+cat(1 - confint_fail_cases / N_EXPERIMENTS)
+```
+
+<center>😢</center>
+
+## Wilson's CI vs. N {.smaller visibility="hidden"}
+
+The dependence of the proportion of successful hits $\mu$ in the confidence interval on the sample size is shown in the graph.
+
+```{r}
+#| label: ci-wilson-plot
+#| fig-align: center
+#| code-fold: true
+
+library(ggplot2)
+
+set.seed(20231212)
+
+N_EXPERIMENTS <- 1000
+latent_mu <- 0.5  # "True" value of the parameter
+n_grid <- seq(1, 1000, by = 25)
+interval_success_rate <- numeric(length(n_grid))
+
+for (j in 1:length(n_grid)) {
+  n <- n_grid[j]
+  confint_fail_cases <- 0
+  for (i in 1:N_EXPERIMENTS) {
+    binom_true <- rbinom(1, n, latent_mu)
+    confint_vals <- prop.test(binom_true, n, conf.level = 0.95, correct = FALSE)$conf.int
+    
+    if (confint_vals[1] < latent_mu & latent_mu < confint_vals[2]) {
+      # All good
+    } else {
+      confint_fail_cases <- confint_fail_cases + 1
+    }
+  }
+  interval_success_rate[j] <- 1 - confint_fail_cases / N_EXPERIMENTS
+}
+
+df <- data.frame(n = n_grid, success_rate = interval_success_rate)
+
+ggplot(df, aes(x = n, y = success_rate)) +
+  geom_line() +
+  geom_hline(yintercept = 0.95, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  theme(text = element_text(size = 15))
+```
+
+## Summary {.smaller}
+
+#### Hypothesis testing algorithm for our task:
+
+1. Business problem / hypothesis
+2. Formulation of the null and alternative hypotheses:
+    + $\mathsf{H}_0: \mu = 0.5$
+    + $\mathsf{H}_1: \mu > 0.5$.
+3. Statistics of the criterion $Q = \sum_{i=1}^n \text{Bernoulli}(\mu)$, $q = 19$.
+4. The distribution of $Q$ at $\mathsf{H}_0$ and the critical region ($p$-value) at $\alpha = 0.05$.
+5. $\text{MDE} (n, \text{power}, \alpha)$.
+6. Confidence interval for $\mu$.

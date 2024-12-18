@@ -1,0 +1,1058 @@
+---
+title: "Z-test"
+subtitle: "Probability and Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+footer: "Probability and Statistics"
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    # toc: true
+    # toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    # fig-height: 9
+    # fig-width: 16
+    highlight-style: github
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+
+# Tests concerning the mean 
+
+## Why analyze averages?
+
+1. Revenue growth. 
+    - If the total value of $\rightarrow$ grows, the average value grows. Therefore, this task can be reformulated as the growth of the average check, or ARPU.
+2. Increase in the number of purchases.
+3. Reducing the outflow of users.
+
+Next, to derive all the criteria, we need a [normal distribution]{.hi}. *Because this is the distribution that the mean of the samples follows*.
+
+## Normal Distribution {.tiny}
+
+[Normal distribution]{.hi} $\xi \sim \mathcal{N}(\mu, \sigma^2)$ is a continuous distribution in which the density decreases with increasing distance from $\mu$ exponentially.
+
+$$
+f(x) = \frac{1}{\sigma\sqrt{2\pi}} \exp^{-\frac{1}{2}\left(\frac{x-\mu}{\sigma}\right)^2}
+$$
+
+where:
+
+- $\mu$ is the offset parameter: how much the center is shifted from 0.
+- $\sigma^2$ --- scale parameter: how "flat" the distribution graph will be.
+
+```{r}
+#| label: normal_distribution-plot
+#| echo: false
+#| fig-align: center
+
+library(tidyverse)
+
+# Parameters
+params <- tibble(
+  mu = c(0, 0, 0, -2),
+  sigma = c(0.2, 1, 5, 0.5)
+)
+
+# Generate data for plotting
+plot_data <- params %>%
+  rowwise() %>%
+  mutate(data = list(tibble(
+    x = seq(-4, 4, length.out = 1000),
+    y = (1 / (sigma * sqrt(2 * pi))) * exp(-0.5 * ((x - mu) / sigma)^2)
+  ))) %>%
+  unnest(data)
+
+# Plot
+ggplot(plot_data, aes(x = x, y = y, color = factor(paste0("mu=", mu, ", sigma=", sigma)))) +
+  geom_line() +
+  labs(
+    title = "Normal Distributions with Different Parameters",
+    color = "Parameters",
+    x = "x",
+    y = "Density"
+  ) +
+  theme_minimal()
+```
+
+## R and the normal distribution {.smaller visibility="hidden"}
+
+Suppose we want to define the distribution $\mathcal{N}(\mu, \sigma^2)$. For this, we can use the function `dnorm(x, mean, sd)`.
+
+**Parameters**:
+
+- `x` --- the value at which we want to calculate the density.
+- `mean` --- the mean of the distribution.
+- `sd` --- the standard deviation of the distribution. [Not variance!]{.red}
+
+Other functions for working with the normal distribution:
+
+- `pnorm(x, mean, sd)` --- the cumulative distribution function.
+- `qnorm(p, mean, sd)` --- the quantile function.
+- `rnorm(n, mean, sd)` --- random number generation.
+
+## R and the normal distribution {.smaller visibility="hidden"}
+
+![](img/rnorm.png){fig-align="center"}
+
+
+```{r}
+#| label: normal-distribution
+
+norm_dist <- tibble(
+  x = seq(-4, 4, length.out = 1000),
+  y = dnorm(x, mean = 0, sd = 1)
+)
+
+norm_dist %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_line() + 
+  # rnorm
+  geom_jitter(data = slice_sample(norm_dist, n = 100), aes(x = x, y = 0), color = "red", size = 1, height = 0.02) +
+  # pnorm
+  geom_area(data = norm_dist %>% filter(x <= 2), aes(x = x, y = y), fill = "steelblue", alpha = 0.6) +
+  geom_text(aes(x = 2, y = 0.1, label = "pnorm(2) = 0.977"), hjust = 0, vjust = -2, size = 7, color = "steelblue") +
+  geom_segment(aes(x = 2, y = 0.11, xend = 1, yend = 0.08),
+                  arrow = arrow(length = unit(0.5, "cm"))) +
+  # qnorm
+  geom_segment(aes(x = qnorm(0.975, mean = 0, sd = 1), xend = qnorm(0.975, mean = 0, sd = 1), y = 0, yend = dnorm(2)), color = "darkred") +
+  geom_text(aes(x = qnorm(0.975, mean = 0, sd = 1), y = 0.1, label = "qnorm(0.975)"), hjust = 0, vjust = 0) +
+  labs(
+    title = "Normal Distribution",
+    x = "x",
+    y = "Density"
+  ) +
+  theme_minimal()
+
+```
+
+## R and the normal distribution {.smaller visibility="hidden"}
+
+```{r}
+#| label: normal-distribution-cumulative
+
+# Ініціалізація
+library(tidyverse)
+
+# Cumulative distribution function
+p_x_leq_2 <- pnorm(2, mean = 0, sd = 1)
+cat("P(X <= 2) =", p_x_leq_2, "\n")
+cat("або так", pnorm(2, mean = 0, sd = 1), "\n")
+
+# You can specify vector
+p_values <- pnorm(c(2, -1), mean = 0, sd = 1)
+cat("[P(X <= 2), P(X <= -1)] =", paste(p_values, collapse = ", "), "\n")
+```
+
+\
+
+```{r}
+#| label: normal-distribution-percent
+
+# Quantile 0.975
+quantile_0_975 <- qnorm(0.975, mean = 0, sd = 1)
+cat("quantile 0.975 =", quantile_0_975, "\n")
+```
+
+\
+
+```{r}
+#| label: normal-distribution-probability
+
+# Density
+pdf_0 <- dnorm(0, mean = 0, sd = 1)
+cat("pdf(0) =", pdf_0, "\n")
+```
+
+## Normal distribution
+
+```{r}
+#| label: normal-distribution-plot
+#| fig-align: center
+#| echo: false
+
+# Ініціалізація
+set.seed(2024)
+
+# Параметри розподілу
+mu <- 0
+sigma <- 2
+x <- seq(-8, 8, length.out = 1000) # рівновіддалені 1000 точок від -8 до 8
+
+# Розрахунок щільності, кумулятивної функції розподілу та вибірки
+pdf <- dnorm(x, mean = mu, sd = sigma)
+cdf <- pnorm(x, mean = mu, sd = sigma)
+sample <- rnorm(10000, mean = mu, sd = sigma)
+
+# Візуалізація
+library(ggplot2)
+library(gridExtra)
+
+# Щільність
+p1 <- ggplot() +
+  geom_histogram(aes(x = sample, y = ..density..), fill = "steelblue", alpha = 0.6) +
+  geom_line(aes(x = x, y = pdf), color = "darkred", size = 1) +
+  labs(title = "Density visualisation", x = "", y = "Density") +
+  theme_minimal()
+
+# Кумулятивна функція
+p2 <- ggplot() +
+  geom_line(aes(x = x, y = cdf), color = "darkgreen", size = 1) +
+  labs(title = "Cumulative distribution function", x = "", y = "CDF") +
+  theme_minimal()
+
+# Показати графіки
+grid.arrange(p1, p2, ncol = 2)
+```
+
+## Properties of the normal distribution
+
+1. $\xi_1 \sim \mathcal{N}(\mu_1, \sigma_1^2),\ \xi_2 \sim \mathcal{N}(\mu_2, \sigma_2^2) \Rightarrow \\ \xi_1 + \xi_2 \sim \mathcal{N}(\mu_1 + \mu_2, \sigma_1^2 + \sigma_2^2)$[^1]
+<br><br>
+
+2. $a \xi_1 \sim \mathcal{N}(a\mu_1, a^2\sigma_1^2)$
+
+[^1]: [Proofing](https://en.wikipedia.org/wiki/Sum_of_normally_distributed_random_variables#:~:text=This%20means%20that%20the%20sum,squares%20of%20the%20standard%20deviations)
+
+## 1st property of the normal distribution {.smaller}
+
+```{r}
+#| label: normal-distribution-sum
+#| echo: false
+
+first_mean <- 3
+first_var <- 4
+
+second_mean <- -1
+second_var <- 2
+
+first_dist <- list(mean = first_mean, sd = sqrt(first_var))
+second_dist <- list(mean = second_mean, sd = sqrt(second_var))
+
+# Important scale = sqrt(first_var + second_var)
+checking_sum_distr <- data.frame(
+  mean = first_mean + second_mean,
+  sd = sqrt(first_var + second_var)
+)
+```
+
+1. Generate a sample from the 1st and 2nd distributions and sum them.
+2. Next, we will plot the empirical density of the distribution and compare it with the true density on the graph.
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+```{r}
+#| label: normal-distribution-1
+#| fig-align: center
+#| echo: false
+
+# Генерація вибірок
+set.seed(2024)
+
+first_sample <- rnorm(10000, mean = first_dist$mean, sd = first_dist$sd)
+second_sample <- rnorm(10000, mean = second_dist$mean, sd = second_dist$sd)
+sum_sample <- first_sample + second_sample
+
+x <- seq(-8, 12, length.out = 1000)
+checking_sum_pdf <- dnorm(x, mean = checking_sum_distr$mean, sd = checking_sum_distr$sd)
+
+ggplot() +
+  geom_histogram(aes(x = first_sample, y = ..density..), fill = "steelblue", alpha = 0.6, bins = 40) +
+  geom_density(aes(x = first_sample), color = "darkblue", size = 1) +
+  labs(
+    title = "Distribution of the 1st sample: mu = 3, sigma = 4",
+    x = "X",
+    y = "Density"
+  ) +
+  theme_minimal()
+```
+:::
+
+::: {.column width="50%"}
+
+```{r}
+#| label: normal-distribution-2
+#| fig-align: center
+#| echo: false
+
+ggplot() +
+  geom_histogram(aes(x = second_sample, y = ..density..), fill = "steelblue", alpha = 0.6, bins = 40) +
+  geom_density(aes(x = second_sample), color = "darkblue", size = 1) +
+  labs(
+    title = "Distribution of the 2nd sample: mu = -1, sigma = 2",
+    x = "X",
+    y = "Density"
+  ) +
+  theme_minimal()
+```
+:::
+
+::::
+
+## 1st property of the normal distribution {.smaller}
+
+```{r}
+#| label: normal-distribution-sum-plot
+#| fig-align: center
+#| echo: false
+
+# Генерація вибірок
+set.seed(2024)
+
+first_sample <- rnorm(10000, mean = first_dist$mean, sd = first_dist$sd)
+second_sample <- rnorm(10000, mean = second_dist$mean, sd = second_dist$sd)
+sum_sample <- first_sample + second_sample
+
+x <- seq(-8, 12, length.out = 1000)
+checking_sum_pdf <- dnorm(x, mean = checking_sum_distr$mean, sd = checking_sum_distr$sd)
+
+ggplot() +
+  geom_histogram(aes(x = sum_sample, y = ..density..), fill = "steelblue", alpha = 0.6, bins = 40) +
+  geom_line(aes(x = x, y = checking_sum_pdf), color = "darkred", size = 1) +
+  geom_density(aes(x = sum_sample), color = "darkblue", size = 1) +
+  geom_vline(xintercept = checking_sum_distr$mean, color = "darkred", linetype = "dashed") +
+  labs(
+    title = "Checking distributions: mu = 2, sigma = 2.45",
+    x = "X",
+    y = "Density"
+  ) +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(-8, 12, by = 2))
+```
+
+## Central limit theorem {.smaller}
+
+Let $\xi_1, ..., \xi_n$ be **independently** identically distributed random variables with equal expectation and variance:
+
+- $E [\xi_i] = \mu < \infty$
+- $Var[\xi_i] = \sigma^2 < \infty$. 
+
+Then $\sqrt{n}\dfrac{\overline \xi - \mu}{\sqrt{\sigma^2}}$ [converges in distribution](https://en.wikipedia.org/wiki/Convergence_in_distribution) to $\mathcal{N}(0, 1)$.
+
+Or we can write it as:
+
+$$
+\sqrt{n}\dfrac{\overline \xi - \mu}{\sqrt{\sigma^2}} \sim \mathcal{N}(0, 1) \Leftrightarrow \overline \xi \sim \mathcal{N}\left(\mu, \dfrac{\sigma^2}{n} \right)
+$$
+
+## {{< iconify arcticons dnd-5e-character-keep >}} Central limit theorem and DnD {.tiny}
+
+Let's say we have a D20 dice from Dungeons and Dragons. Let's roll it 1000 times and calculate the sum of the values.
+
+```{r}
+#| label: dnd-dice
+#| fig-align: center
+#| echo: false
+
+n = 1000
+d20 = 1:20
+
+dice_tbl <- tibble(
+  n_dice = rep(c(1, 2, 5, 10, 50, 100), each = n),
+  sample = map(n_dice, ~sample(d20, .x, replace = TRUE)),
+) %>% 
+  mutate(sample = map(sample, ~sum(.x))) %>% 
+  unnest(sample)
+
+ggplot(dice_tbl, aes(x = sample)) +
+  geom_histogram(aes(y = ..density..), bins = 20, fill = "steelblue", alpha = 0.6) +
+  geom_density(color = "darkblue", size = 1) +
+  labs(
+    title = "Distribution of the sum of D20 dice",
+    x = "Sum of D20 dice",
+    y = "Density"
+  ) +
+  theme_minimal() +
+  facet_wrap(~n_dice, scales = "free")
+```
+
+
+
+## Central limit theorem {visibility="hidden"}
+
+- $\xi$ is a random variable with an unknown distribution.
+- $\mathbb{E}(\xi) = \mu$ --- mathematical expectation.
+- $\text{Var}(\xi) = \sigma^2$ --- variance.
+
+. . .
+
+<br>
+
+- $\sum_{i=1}^n \xi_i \sim \mathcal{N}(n\mu, n\sigma^2)$
+
+. . .
+
+- $\frac{\sum_{i=1}^n \xi_i}{n} = \bar{\xi} \sim \mathcal{N}(\mu, \frac{\sigma^2}{n})$
+
+. . .
+
+Let's reduce this result to the standard normal distribution: subtract the mathematical expectation and divide by $\frac{\sigma}{\sqrt{n}}$.
+
+- $\bar{\xi} - \mu \sim \mathcal{N}(0, \frac{\sigma^2}{n})$
+
+. . .
+
+[$$\sqrt{n} \frac{\bar{\xi} - \mu}{\sigma} \sim \mathcal{N}(0, 1)$$]{.hi}
+
+::: {.callout-note icon=false}
+Random variables can be weakly dependent on each other and slightly differently distributed. The central limit theorem will still be [correct](https://en.wikipedia.org/wiki/Stable_distribution#A_generalized_central_limit_theorem).
+:::
+
+## Visualization of the CLT {.tiny .scrollable}
+
+Generate $N$ samples of $M$ elements in each:
+
+- For each sample, calculate the normalized average over $M$ elements.
+- As a result, we get a sample of N elements.
+- It must be from a normal distribution.
+
+```{r}
+#| label: central-limit-theorem-generate
+#| echo: false
+
+visualize_CLT <- function(sample_generator, expected_value, variance) {
+
+  set.seed(2024)
+  N <- 5000
+  clt_sample <- numeric(N)
+
+  for (i in 1:N) {
+    sample <- sample_generator()
+    sample_size <- length(sample)
+    statistic <- sqrt(sample_size) * (mean(sample) - expected_value) / sqrt(variance)
+    clt_sample[i] <- statistic
+  }
+
+  x <- seq(-4, 4, length.out = 1000)
+  normal_pdf <- dnorm(x, mean = 0, sd = 1)
+
+  ggplot() +
+    geom_histogram(aes(x = clt_sample, y = ..density..), bins = 50, fill = "steelblue", alpha = 0.6) +
+    geom_line(aes(x = x, y = normal_pdf), color = "darkred", size = 1) +
+    geom_density(aes(x = clt_sample), color = "darkblue", size = 1) +
+    labs(
+      title = "Distribution of average values",
+      x = "X",
+      y = "Density"
+    ) +
+    theme_minimal()
+}
+```
+
+$$\xi \sim \text{Binom}(20, 0.01)$$
+
+:::: {.columns}
+
+::: {.column width="50%"}
+- $N = 5000$
+
+```{r}
+#| label: central-limit-theorem-binomial
+#| fig-align: center
+#| echo: false
+
+binom_generator <- function(p, n, size) {
+  rbinom(size, size = n, prob = p)
+}
+
+p <- 0.01
+n <- 20
+size <- 5000
+
+visualize_CLT(
+  sample_generator = function() binom_generator(p = p, n = n, size = size),
+  expected_value = p * n,
+  variance = n * p * (1 - p)
+)
+```
+
+<center>😊</center>
+
+:::
+
+::: {.column width="50%"}
+- $N = 40$
+
+```{r}
+#| label: central-limit-theorem-binomial-small
+#| fig-align: center
+#| echo: false
+
+binom_generator <- function(p, n, size) {
+  rbinom(size, size = n, prob = p)
+}
+
+p <- 0.01
+n <- 20
+size <- 40
+
+visualize_CLT(
+  sample_generator = function() binom_generator(p = p, n = n, size = size),
+  expected_value = p * n,
+  variance = n * p * (1 - p)
+)
+```
+
+<center>🤨</center>
+:::
+
+::::
+
+## Visualization of the CLT: exponential distribution {.tiny visibility="hidden"}
+
+$$\xi \sim \text{Exp}(24)$$
+
+
+
+```{r}
+#| label: central-limit-theorem-exponential
+#| fig-align: center
+#| code-fold: true
+
+expon_generator <- function(expected_value, size) {
+  rexp(size, rate = 1 / expected_value)
+}
+
+expected_value <- 24
+size <- 400
+
+visualize_CLT(
+  sample_generator = function() expon_generator(expected_value = expected_value, size = size),
+  expected_value = expected_value,
+  variance = expected_value^2
+)
+```
+
+---
+
+<iframe id="clt-example" src="https://aranaur-central-limit-theorem.hf.space/" style="border: none; width: 100%; height: 100%" frameborder="0">
+
+</iframe>
+
+::: footer
+[:hugs: Hugging Face: Central limit theorem](https://huggingface.co/spaces/aranaur/Central-Limit-Theorem)
+:::
+
+## Equivalent wording of the CLT
+
+$$\begin{align}
+\sqrt{n}\dfrac{\overline \xi - \mu}{\sqrt{\sigma^2}} &\sim \mathcal{N}(0, 1) \stackrel{prop. 2}{\Leftrightarrow}\\
+\overline \xi - \mu &\sim \mathcal{N}\left(0, \dfrac{\sigma^2}{n} \right) \Leftrightarrow\\
+\dfrac{\underset{i=1}{\overset{n}{\sum}} \xi_i}{n} &\sim \mathcal{N}\left(\mu, \dfrac{\sigma^2}{n} \right) \Leftrightarrow\\
+\underset{i=1}{\overset{n}{\sum}} \xi_i &\sim \mathcal{N}\left(n \cdot \mu, n \cdot \sigma^2 \right)
+\end{align}$$
+
+# Fisher's $Z$-test 
+
+## 📈 Problem 🚚: [binomial distribution]{.hi-slate} {.smaller}
+
+- $T(X^n) = \underset{i=1}{\overset{n}{\sum}} X_i,\ T \overset{H_0}{\sim} \text{Binom} (n, \mu_0)$
+- Let the realisation of $T(X^n) = t$.
+- $\text{p-value} = P_{H_0}(T(X^n) \geq t) = 1 - P_{H_0}(T(X^n) < t)$
+<!-- - Or, if we rewrite it in R `p_value <- 1 - pbinom(t - 1, size = n, prob = mu0)` -->
+
+For our example:
+
+- $n = 30$,
+- $\mu_0 = 0.5$,
+- $t = 19$.
+
+Then the p-value will be `r 1 - pbinom(18, size = 30, prob = 0.5)`.
+
+```{r}
+#| label: binomial-p-value
+#| include: false
+
+get_pvalue_by_old_logic <- function(n, mu0, t) {
+  1 - pbinom(t - 1, size = n, prob = mu0)
+}
+
+n <- 30
+mu0 <- 0.5
+t <- 19
+
+old_p_value <- get_pvalue_by_old_logic(n, mu0, t)
+cat("p-value obtained using the old, correct formula:", old_p_value, "\n")
+```
+
+## 📈 Problem 🚚: [binomial distribution]{.hi-slate} {.smaller}
+
+- For a sufficiently large sample size, $\underset{i=1}{\overset{n}{\sum}} X_i \sim \mathcal{N}\left(n \cdot \mu_0, n \cdot \sigma^2 \right)$,
+- $X_i \overset{H_0}{\sim} \text{Bernoulli} (\mu_0)$
+- $\sigma^2 = \mu_0 \cdot (1 - \mu_0)$
+- $\text{p-value} = P_{H_0}(T(X^n) \geq t)$. 
+
+<!-- Or in R: `p_value <- 1 - pnorm(t, mean = sum_mu, sd = sum_std)` -->
+
+This time, we look at the statistics not at point t-1, as we did before, but at point t. **Since we have a continuous distribution, we do not need to subtract 1**:
+
+- in the case of normal distribution: $P(T(X^n) \geq t) = P(T(X^n) > t) = 1 - P(T(X^n) \leq t)$;
+- in the case of binomial distribution: $P(T(X^n) \geq t) = 1 - P(T(X^n) \leq t - 1)$.
+
+## Binomial vs. normal distribution {.smaller}
+
+```{r}
+#| label: binomial-vs-normal
+#| fig-align: center
+#| echo: false
+
+n <- 30
+mu0 <- 0.5
+t <- 19
+
+x <- 0:30
+binom_pmf <- dbinom(x, size = n, prob = mu0)
+norm_pmf <- dnorm(x, mean = n * mu0, sd = sqrt(n * mu0 * (1 - mu0)))
+
+ggplot() +
+  geom_bar(aes(x = x, y = binom_pmf, fill = "steelblue"), stat = "identity", , alpha = 0.6) +
+  geom_line(aes(x = x, y = norm_pmf, color = "darkred"), size = 1) +
+  labs(
+    title = "Binomial vs. normal distribution",
+    x = "X",
+    y = "Density"
+  ) +
+  theme_minimal() +
+  scale_color_manual(values = c("darkred" = "darkred"), labels = c("Normal distribution"), name = '') +
+  scale_fill_manual(values = c("steelblue" = "steelblue"), labels = c("Binomial distribution"), name = '')
+```
+
+## Binomial vs. normal distribution {.tiny}
+
+Let's calculate the p-value using the normal distribution approximation:
+
+$P(T(X^n) \geq t) = 1 - P(T(X^n) \leq t)$
+
+<br><br>
+
+:::: {.columns}
+
+::: {.column width="50%"}
+- $n = \color{#e64173}{30}$,
+- $\mu_0 = 0.5$,
+- $t = 19$.
+
+```{r}
+#| label: normal-p-value
+#| echo: false
+
+get_pvalue_by_normal_approx <- function(n, mu0, t) {
+  sum_mu <- n * mu0
+  sum_variance <- n * mu0 * (1 - mu0)
+  sum_std <- sqrt(sum_variance)
+
+  1 - pnorm(t, mean = sum_mu, sd = sum_std)
+}
+
+normal_dist_p_value <- get_pvalue_by_normal_approx(n, mu0, t)
+# cat("p-value obtained from the normal distribution approximation:", normal_dist_p_value, "\n")
+```
+
+p-value obtained from the normal distribution approximation: `r normal_dist_p_value`.
+
+p-value obtained using the old, correct formula: `r get_pvalue_by_old_logic(n, mu0, t)`.
+:::
+
+::: {.column width="50%"}
+```{r}
+#| label: normal-p-value-large
+#| echo: false
+
+n <- 3000
+mu0 <- 0.5
+t <- 1544
+
+old_p_value <- get_pvalue_by_old_logic(n, mu0, t)
+# cat("p-value obtained using the old, correct formula:", old_p_value, "\n")
+
+normal_dist_p_value <- get_pvalue_by_normal_approx(n, mu0, t)
+# cat("p-value obtained from the normal distribution approximation:", normal_dist_p_value, "\n")
+```
+
+- $n = \color{#e64173}{3000}$,
+- $\mu_0 = 0.5$,
+- $t = 1544$.
+
+p-value obtained from the normal distribution approximation: `r normal_dist_p_value`.
+
+p-value obtained using the old, correct formula: `r get_pvalue_by_old_logic(n, mu0, t)`.
+:::
+
+::::
+
+As we can see, the p-value obtained using the normal distribution approximation is **very close** to the p-value obtained using the old, correct formula, but only for a sufficiently **large sample size**.
+
+## Fisher's $Z$-test {.smaller}
+
+$H_0: \mu = \mu_0\ vs.\ H_1: \mu > \mu_0$
+
+- The statistic $Z(X) = \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{\sigma^2}}$
+- For a sufficiently large sample size, $Z(X) \overset{H_0}{\sim} \mathcal{N}(0, 1)$ (according to the CLT)
+- One-sided test: $\left\{Z(X) \geq z_{1 - \alpha} \right\}$
+    - p-value = $1 - \Phi(z)$, where $z$ is the realisation of the statistic $Z(X)$, $\Phi(z)$ is the distribution test $\mathcal{N}(0, 1)$
+- Two-sided criterion: $\left\{Z(X) \geq z_{1 - \frac{\alpha}{2}} \right\} \bigcup \left\{Z(X) \leq -z_{1 - \frac{\alpha}{2}} \right\}$
+    - p-value = $2\cdot \min \left[{\Phi(z), 1 - \Phi(z)} \right]$, where $z$ is the realisation of the statistic $Z(X)$c
+
+## Fisher's $Z$ test: small sample size
+
+```{r}
+#| label: z-test-small
+#| include: false
+
+z_criterion_pvalue <- function(sample_mean, sample_size, mu0, variance) {
+  Z_statistic <- sqrt(sample_size) * (sample_mean - mu0) / sqrt(variance)
+  1 - pnorm(Z_statistic)
+}
+
+n <- 30
+t <- 19
+mu0 <- 0.5
+variance <- mu0 * (1 - mu0)
+
+old_p_value <- get_pvalue_by_old_logic(n, mu0, t)
+normal_p_value <- get_pvalue_by_normal_approx(n, mu0, t)
+z_pvalue <- z_criterion_pvalue(t / n, n, mu0, variance)
+
+cat("p-value obtained using the old, correct formula:", old_p_value, "\n",
+    "p-value obtained from the normal distribution:", normal_p_value, "\n",
+    "Z-test p-value:", z_pvalue, "\n")
+```
+
+- $n = 30$,
+- $\mu_0 = 0.5$,
+- $t = 19$.
+- $\sigma^2 = \mu_0 \cdot (1 - \mu_0)$.
+
+p-value obtained using the old, correct formula: `r old_p_value`.
+
+p-value obtained from the normal distribution approximation: `r normal_p_value`.
+
+Z-test p-value: `r z_pvalue`.
+
+## Fisher's $Z$ test: a larger sample
+
+```{r}
+#| label: z-test-large
+
+z_criterion_pvalue <- function(sample_mean, sample_size, mu0, variance) {
+  Z_statistic <- sqrt(sample_size) * (sample_mean - mu0) / sqrt(variance)
+  1 - pnorm(Z_statistic)
+}
+
+n <- 3000
+t <- 1544
+mu0 <- 0.5
+variance <- mu0 * (1 - mu0)
+
+old_p_value <- get_pvalue_by_old_logic(n, mu0, t)
+normal_p_value <- get_pvalue_by_normal_approx(n, mu0, t)
+z_pvalue <- z_criterion_pvalue(t / n, n, mu0, variance)
+
+cat("p-value obtained using the old, correct formula:", old_p_value, "\n",
+    "p-value obtained from the normal distribution:", normal_p_value, "\n",
+    "Z-test p-value:", z_pvalue, "\n")
+```
+
+- $n = 3000$,
+- $\mu_0 = 0.5$,
+- $t = 1544$.
+- $\sigma^2 = \mu_0 \cdot (1 - \mu_0)$.
+
+p-value obtained using the old, correct formula: `r old_p_value`.
+
+p-value obtained from the normal distribution approximation: `r normal_p_value`.
+
+Z-test p-value: `r z_pvalue`.
+
+## Continuity correction {.tiny}
+
+> Is it possible to refine the results of the $Z$-test for a binomial distribution with small sample sizes?
+
+- $Z$-test: $p$-value = 0.07
+- Accurate $p$-value = 0.10
+
+First, let's visualise the `p-value(t)` function of the criteria described above: 
+
+- the `p-value` of the test based on the normal approximation
+    - here is a simple formula: you need to implement `1 - pnorm(t)`
+- the `p-value` of the binomial test. Let's calculate it in 2 cases:
+    - `t` is a noninteger number. Let's look at an example
+        - Let `t=19.5`. 
+        The p-value $= P(T(X) \geq t) = P(T(X) \geq 19.5) = 1 - P(T(X) < 19.5) =|P(T(X) = 19.5) = 0|= 1 - P(T(X) \leq 19.5)$. Note that the last probability is a distribution function. Therefore.
+            <!-- - `p_value <- 1 - pbinom(t, size = n, prob = mu0)` -->
+    - `t` is an integer.
+        - Let `t = 19`. p-value $= P(T(X) \geq t) = P(T(X) \geq 19) = 1 - P(T(X) < 19) = 1 - P(T(X) \leq 18)$. 
+            <!-- - `p_value <- 1 - pbinom(t - 1, size = n, prob = mu0)` -->
+            <!-- - as well as `p-value(t) = 1 - pbinom(t-a, n, mu0) = p-value(t-a)`, where `0 < a < 1`. For example, `p-value(19) = p-value(18.9)`. -->
+
+## Continuity correction {.tiny}
+
+```{r}
+#| label: continuity-correction-def
+#| echo: false
+#| fig-align: center
+
+cmp_pvalue_binom_and_norm <- function(n, mu0, t, add_to_x = 0) {
+  # Parameters
+  sum_mu <- n * mu0
+  sum_variance <- n * mu0 * (1 - mu0)
+  sum_std <- sqrt(sum_variance)
+  
+  x_axis <- seq(0, n, length.out = 1000)
+  dots_to_show <- seq(0, n, by = 1)
+  
+  # Plot
+  ggplot() +
+    # Binomial p-value
+    geom_point(aes(x = dots_to_show, y = 1 - pbinom(dots_to_show - 1, size = n, prob = mu0)),
+                  color = "slategray",
+                  size = 3) +
+    geom_point(aes(x = t, y = 1 - pbinom(t - 1, size = n, prob = mu0), color = "slategray"),
+                  size = 5) +
+    # Normal p-value
+    geom_line(aes(x = x_axis,
+                  y = 1 - pnorm(x_axis + add_to_x, mean = sum_mu, sd = sum_std)),
+                  color = red,
+                  alpha = 0.5) +
+    geom_point(aes(x = t, y = 1 - pnorm(t + add_to_x, mean = sum_mu, sd = sum_std), color = "red"), 
+               size = 5) +
+    labs(title = "Comparison of p-value: binomial and normal",
+         x = "t", y = "p-value") +
+    theme_minimal() +
+    scale_colour_manual(name = "p-value", values = c('red' = red, slategray = "slategray"), 
+                       labels = c("Normal distribution: t = 15", "Binomial distribution: t = 15"))
+}
+
+cmp_pvalue_binom_and_norm(30, 0.5, 15)
+```
+
+- $p_{\text{binom}} > p_{\text{norm}}$
+- As the sample size increases, these values coincide.
+
+## Continuity correction {.tiny}
+
+:::: {.columns}
+
+::: {.column width="33%"}
+```{r}
+#| label: continuity-correction-difference-1
+#| include: false
+
+n <- 20
+t <- 10
+
+old_p_value <- get_pvalue_by_old_logic(n, mu0, t)
+normal_dist_p_value <- get_pvalue_by_normal_approx(n, mu0, t)
+
+cat("p-value obtained using the old, correct formula:", old_p_value, "\n",
+    "p-value obtained from the normal distribution:", normal_dist_p_value, "\n",
+    "Difference:", round(abs(old_p_value - normal_dist_p_value), 3), "\n")
+```
+
+- $n = 20$,
+- $\mu_0 = 0.5$,
+- $t = 10$.
+
+p-value obtained using the old, correct formula: `r old_p_value`.
+
+p-value obtained from the normal distribution: `r normal_dist_p_value`.
+
+Difference: `r round(abs(old_p_value - normal_dist_p_value), 3)`.
+:::
+
+::: {.column width="33%"}
+```{r}
+#| label: continuity-correction-difference-2
+#| include: false
+
+# With the growth of t
+n <- 20
+t <- 14
+
+old_p_value <- get_pvalue_by_old_logic(n, mu0, t)
+normal_dist_p_value <- get_pvalue_by_normal_approx(n, mu0, t)
+cat("p-value obtained using the old, correct formula:", old_p_value, "\n",
+    "p-value obtained from the normal distribution:", normal_dist_p_value, "\n",
+    "Difference:", round(abs(old_p_value - normal_dist_p_value), 3), "\n")
+```
+
+- $n = 20$,
+- $\mu_0 = 0.5$,
+- $t = 14$.
+
+p-value obtained using the old, correct formula: `r old_p_value`.
+
+p-value obtained from the normal distribution: `r normal_dist_p_value`.
+
+Difference: `r round(abs(old_p_value - normal_dist_p_value), 3)`.
+:::
+
+::: {.column width="33%"}
+```{r}
+#| label: continuity-correction-difference-3
+#| include: false
+
+# With increasing n
+n <- 200
+t <- 100
+
+old_p_value <- get_pvalue_by_old_logic(n, mu0, t)
+normal_dist_p_value <- get_pvalue_by_normal_approx(n, mu0, t)
+cat("p-value, отримане за старою, коректною формулою:", old_p_value, "\n",
+    "p-value, отримане з наближення нормальним розподілом:", normal_dist_p_value, "\n",
+    "Різниця:", round(abs(old_p_value - normal_dist_p_value), 3), "\n")
+```
+
+- $n = 200$,
+- $\mu_0 = 0.5$,
+- $t = 100$.
+
+p-value obtained using the old, correct formula: `r old_p_value`.
+
+p-value obtained from the normal distribution: `r normal_dist_p_value`.
+
+Difference: `r round(abs(old_p_value - normal_dist_p_value), 3)`.
+:::
+
+::::
+
+## Continuity correction
+
+$$F_{\text{new}}(x) = F_{\text{old}}(x - 0.5)$$ 
+
+```{r}
+#| label: continuity-correction-correction
+#| fig-align: center
+#| echo: false
+
+cmp_pvalue_binom_and_norm(30, 0.5, 15, add_to_x=-0.5)
+```
+
+## Continuity correction {.smaller}
+
+```{r}
+#| label: continuity-correction-def-2
+#| echo: false
+
+get_pvalue_by_normal_approx_with_addition <- function(n, mu0, t) {
+  sum_mu <- n * mu0
+  sum_variance <- n * mu0 * (1 - mu0)
+  sum_std <- sqrt(sum_variance)
+  
+  return(1 - pnorm(t - 0.5, mean = sum_mu, sd = sum_std))
+}
+```
+
+<br>
+
+```{r}
+#| label: continuity-correction-difference-4
+#| include: false
+
+n <- 30
+mu0 <- 0.5
+t <- 19
+
+old_p_value <- get_pvalue_by_old_logic(n, mu0, t)
+normal_dist_p_value <- get_pvalue_by_normal_approx(n, mu0, t)
+normal_with_add_p_value <- get_pvalue_by_normal_approx_with_addition(n, mu0, t)
+
+cat("p-value obtained using the old, correct formula:", old_p_value, "\n",
+    "p-value obtained from the normal distribution:", normal_dist_p_value, "\n",
+    "p-value obtained from the normal distribution approximation with a correction:", normal_with_add_p_value, "\n")
+```
+
+- $n = 30$,
+- $\mu_0 = 0.5$,
+- $t = 19$.
+
+p-value obtained using the old, correct formula: `r old_p_value`.
+
+p-value obtained from the normal distribution: `r normal_dist_p_value`.
+
+p-value obtained from the normal distribution approximation with a correction: `r normal_with_add_p_value`.
+
+## Correction and Fisher's test {.smaller visibility="hidden"}
+
+```{r}
+#| label: z-test-small-cc
+
+z_criterion_pvalue <- function(sample_mean, sample_size, mu0, variance, use_continuity_correction = FALSE) {
+  if (use_continuity_correction) {
+    sample_mean <- (sample_mean * sample_size - 0.5) / sample_size
+  }
+  Z_statistic <- sqrt(sample_size) * (sample_mean - mu0) / sqrt(variance)
+  return(1 - pnorm(Z_statistic))
+}
+```
+
+Let's look at the results for a small sample:
+
+```{r}
+#| label: z-test-small-cc-results
+
+n <- 30
+t <- 19
+mu0 <- 0.5
+variance <- mu0 * (1 - mu0)
+
+old_p_value <- get_pvalue_by_old_logic(n, mu0, t)
+z_pvalue <- z_criterion_pvalue(t / n, n, mu0, variance, use_continuity_correction = TRUE)
+normal_with_add_p_value <- get_pvalue_by_normal_approx_with_addition(n, mu0, t)
+
+cat("p-value obtained using the old, correct formula:", old_p_value, "\n",
+    "p-value obtained from the normal distribution:", normal_with_add_p_value, "\n",
+    "Z-test p-value:", z_pvalue, "\n")
+```
+
+## Summary {visibility="hidden"}
+
+In this session, we will:
+
+- Recalled what a normal distribution is and what properties it has.
+- Recalled how the Central Limit Theorem is formulated and how it can be used.
+- Learned about Fisher's $Z$-test and solved a conversion problem using it.
+    - In addition, we saw in practice what the continuity correction is and why it is needed.
+    - The only thing is: [in this criterion, you need to know the sample variance. But in practice, it is not always known]{.hi}.
