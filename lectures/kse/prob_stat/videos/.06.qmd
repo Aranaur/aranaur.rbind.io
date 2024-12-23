@@ -1,0 +1,726 @@
+---
+title: "Goodness of fit"
+subtitle: "Probability and Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+footer: "Probability and Statistics"
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    # toc: true
+    # toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    # fig-height: 9
+    # fig-width: 16
+    highlight-style: github
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+from scipy.stats import (
+    norm, binom, expon, t, chi2, pareto, ttest_ind, ttest_1samp,
+    sem, beta, kstwobign, randint, kstest, shapiro, jarque_bera,
+)
+from statsmodels.stats.diagnostic import lilliefors
+from statsmodels.stats.proportion import proportion_confint
+from tqdm.notebook import tqdm
+import numpy as numpy
+from seaborn import distplot
+from matplotlib import pyplot
+import seaborn
+
+import warnings
+warnings.filterwarnings("ignore")
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Kolmogorov test
+
+## 📈 Task {.tiny}
+
+> You have bought a beautiful new dice, and you want to check if it is true that all its faces fall out equally likely.
+
+$X_1, \ldots, X_n$ — outcomes of $n$ rolls of the dice.
+
+$\mathcal{P}$ --- true probabilities of the dice faces.
+
+$\mathcal{P}_0$ --- hypothesized probabilities of the dice faces.
+
+<br>
+
+- $H_0$: $\mathcal{P} = \mathcal{P}_0$.
+- $H_1$: $\mathcal{P} \neq \mathcal{P}_0$.
+
+
+## 📊 $\mathcal{P}$ vs. $F$
+
+- $H_0$: $\mathcal{P} = \mathcal{P}_0$.
+- $H_1$: $\mathcal{P} \neq \mathcal{P}_0$.
+
+Instead of **comparing the distributions** themselves, we can **compare the distribution functions** among them since a [distribution is uniquely define by its distribution function](https://stats.stackexchange.com/questions/136658/why-does-a-cumulative-distribution-function-cdf-uniquely-define-a-distribution).
+
+. . .
+
+- $H_0: F = F_0$
+- $H_1: F \neq F_0$
+
+where $F, F_0$ &mdash; *distribution functions*.
+
+## 📊 Step 1: distribution {.smaller}
+
+**We need to come up with the statistic and how it is distributed at $H_0$**.
+
+1. We estimate the CDF, or $F(x)$:
+    - Theoretical CDF $F_0(x) = P(X \leq x)$.
+    - Empirical CDF $\hat{F}(x) = \frac{1}{n} \sum_{i=1}^n I(X_i \leq x) \stackrel{p}{\rightarrow} F(x)$.
+
+## 📊 Step 1: visualization {.tiny}
+
+- Take some distribution (e.g., exponential) and any point, e.g., 3.
+- Let's calculate the true $F(x)$ there.
+- Next, for different $n$, let's calculate $\widehat{F_n}(x)$.
+- We plot the distance $\widehat{F_n}(x) - F(x)$. The larger $n$ is, the smaller the distance must be.
+
+. . .
+
+```{python}
+#| label: plot_cdf
+#| echo: false
+#| fig-align: center
+
+def calc_Fn(sample, x):
+    """
+        The function constructs an empirical distribution function over sample for Fn(x).
+    """
+    
+    return numpy.mean(sample <= x)
+
+numpy.random.seed(42)
+N = 5000
+n_array = numpy.arange(10, N, 10)
+# We took an exponential distribution as an example
+X = expon().rvs(N)
+x = 3
+F_x = expon().cdf(x)
+
+delta = []
+for n in n_array:
+    # Calculate F_n_x from the first n generated points
+    F_n_x = calc_Fn(X[:n], x)
+    delta.append(F_n_x - F_x)
+
+pyplot.figure(figsize=(10, 5))
+pyplot.title('Distribution $\widehat{F_n}(x) - F(x)$, x is fixed', fontsize=12)
+pyplot.plot(n_array, delta, c=red_pink, label='$\widehat{F_n}(x) - F({x})$')
+pyplot.plot(n_array, [0] * len(n_array), c=turquoise, linewidth=3, label='0')
+pyplot.legend(fontsize=12)
+pyplot.xlabel('Sample size', fontsize=12)
+pyplot.ylabel('$\delta$', fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.show()
+```
+
+## 📊 Glivenko-Cantelli {.smaller}
+
+How does $\widehat{F_n}(x)$ approximate $F(x)$ at each point x?
+
+<br>
+
+**Theorem (Glivenko-Cantelli):**
+
+Let $X_1, X_2 \dots$ &mdash; a sample of unlimited size from a distribution with distribution function $F$. Then
+
+$$
+D_n = \underset{x \in \mathbb{R}}{\sup} |\widehat{F_n}(x) - F(x)| \stackrel{p}{\rightarrow} 0
+$$
+
+If we take a point $x$ such that $|F(x) - F_0(x)|$ is maximal (this is $\sup$), then this difference tends to zero.
+
+## 📊 Glivenko-Cantelli visualization {.tiny40}
+
+- Generating a sample.
+- Count $F(x)$ at each point of $x$.
+- Count $\widehat{F_n}(x)$ at each point of $x$.
+- Plot the graphs as a function of $n$.
+
+. . .
+
+```{python}
+#| label: plot_cdf_glc
+#| echo: false
+#| fig-align: center
+
+numpy.random.seed(4)
+N = 1000
+n_array = [10, 100]
+X = expon().rvs(N)
+# This time it's not a single point, it's a number line
+x = numpy.linspace(0, 5, 1000)
+F_x = expon().cdf(x)
+
+
+pyplot.figure(figsize=(25, 8))
+
+
+for ind, n in enumerate(n_array):
+    F_n_x = numpy.array([calc_Fn(X[:n], x_dot) for x_dot in x])
+    
+    # Draw Dn on the graph
+    # Calculate delta 
+    delta = numpy.abs(F_n_x - F_x)
+    # Looking for the maximum value index
+    x_ind = numpy.argmax(delta)
+    # By the index we get the point x at which the largest distance
+    dn_x_dot = x[x_ind]
+    # Looking for the lower and upper points
+    down_bound = min(F_n_x[x_ind], F_x[x_ind])
+    up_bound = max(F_n_x[x_ind], F_x[x_ind])
+    
+    pyplot.subplot(1, 2, ind + 1)
+    pyplot.title('$\widehat{F_n} - F$, ' + f'n={n}', fontsize=16)
+    pyplot.plot(x, F_x, color="orange", label='F(x)')
+    pyplot.plot(x, F_n_x,color="blue", label='$\widehat{F_n}(x)$')
+    pyplot.vlines(dn_x_dot, down_bound, up_bound,
+               color='maroon', linestyle='-', linewidth=3, label='$D_n$')
+    pyplot.legend(fontsize=16)
+    pyplot.grid(linewidth=0.2)
+    pyplot.xlabel('x', fontsize=16)
+    pyplot.ylabel('CDF', fontsize=16)
+
+pyplot.show()
+```
+
+The larger $n$ is, the more accurately we predict $F(x)$ on the entire numerical line.
+
+## 📊 Step 2: statistic {.smaller}
+
+**Kolmogorov test statistic**
+
+Let's replace $F(x)$ with an estimate: the empirical distribution function. Then the **statistic of the test will be**
+
+$$
+D_n = \underset{x \in \mathbb{R}}{\sup} |\widehat{F_n}(x) - F_0(x)|
+$$
+
+where $F_0(x)$ is the hypothesized distribution function.
+
+- $H_0: D_n \stackrel{p}{\rightarrow} 0$.
+
+We need to find the distribution of $D_n$ under $H_0$.
+
+## 📊 Step 3: Distribution {.tiny}
+
+**Distribution of Kolmogorov test statistics**
+
+> Kolmogorov's theorem
+>
+> Let $X$ be sampled from a continuous distribution. Then at $H_0$ $\sqrt{n}D_n \stackrel{d}{\rightarrow} \phi$, where $\phi$ has a **Kolmogorov distribution**: $F_\phi(x) = \begin{equation*} 
+ \begin{cases}
+  \sum\limits_{k=-\infty}^ \infty (-1)^k e^{-2k^2 x^2}, &\text{ $ x > 0$}\\\
+   0, &\text{ $ x < 0$}
+ \end{cases}
+\end{equation*}$
+
+Where $\stackrel{d}{\rightarrow}$ means convergence in distribution.
+
+That is, as $n$ grows, $D_n \rightarrow 0$, and $\sqrt{n}D_n \rightarrow \phi$.
+
+## 📊 Step 3: visualization
+
+Let us graphically see how the Kolmogorov statistic is distributed, and how it behaves when n is small. To do this, we:
+
+1. Generate 1000 experiments and in each of them calculate the statistics $\sqrt{n}D_n$.
+2. In each experiment, generate a sample.
+3. Let's calculate the statistic $D$.
+4. Let's construct a histogram.
+5. Let's build the Kolmogorov distribution.
+6. Repeat the same exercise for different sample sizes
+
+---
+
+```{python}
+#| label: plot_kolmogorov
+#| fig-align: center
+#| echo: false
+
+def get_D_statistic(sample, cdf_func):
+    """
+        Calculate the D statistic for the sample. Does not work for discrete distributions.
+        Parameters:
+            - sample: sample
+            - cdf_func: function to build cdf for F0
+            
+    """
+    
+    # Sort the sample to get intervals X_i, X_i+1
+    sample = numpy.sort(sample)
+    # We calculate the empirical distribution function
+    F_n_x = numpy.array([calc_Fn(sample, x) for x in sample])
+    # Shift 1 to the right to calculate the difference at point X_i+1
+    F_n_x_shifted = numpy.concatenate([[0], F_n_x[:-1]])
+    # Build an array of F(X) values
+    F_x = cdf_func(sample)
+    
+    F_x_shifted = cdf_func(sample)
+    # Determine the maximum distance at the left points of the interval X_i
+    left_interval_max = numpy.max(numpy.abs(F_x - F_n_x))
+    # Determine the maximum distance at the right points of the interval X_i+1
+    right_interval_max = numpy.max(numpy.abs(F_x_shifted - F_n_x_shifted))
+    return max(left_interval_max, right_interval_max)
+
+numpy.random.seed(8)
+n_array = [5, 100]
+distribution = expon()
+exp_size = 10000
+
+
+pyplot.figure(figsize=(25, 8))
+
+# For different sample sizes, plot the graphs
+for ind, n in enumerate(n_array):
+    
+    statistics = []
+    # Generate exp_size of experiments
+    for i in range(exp_size):
+        X = distribution.rvs(n)
+        statistics.append(get_D_statistic(X, distribution.cdf) * numpy.sqrt(n))
+    
+
+    pyplot.subplot(1, 2, ind + 1)
+    pyplot.title(f'Visualization of Kolmogorov statistic distribution, N={n}', fontsize=16)
+    distplot(statistics, label='$\sqrt{n}D_n$')
+    x_array = numpy.linspace(0, numpy.max(statistics), 1000)
+    pyplot.plot(x_array, kstwobign.pdf(x_array), label='Kolmogorov distribution')
+    pyplot.legend(fontsize=16)
+    pyplot.grid(linewidth=0.2)
+    pyplot.xlabel('Statistics', fontsize=16)
+    pyplot.ylabel('Density', fontsize=16)
+pyplot.show()
+```
+
+There is a slight upward shift, which is good, because the test will be wrong less than $\alpha$% of the time.
+
+# Shapiro-Wilk test and QQ-plot
+
+## Shapiro-Wilk test
+
+- **Purpose**: to check if the sample is drawn from a normal distribution.
+- $H_0$: the sample is drawn from a normal distribution.
+- $H_1$: the sample is not drawn from a normal distribution.
+
+$$
+W = \frac{\left(\sum_{i=1}^n a_i x_{(i)}\right)^2}{\sum_{i=1}^n (x_i - \bar{x})^2}
+$$
+
+where $a_i$ --- coefficients, $x_{(i)}$ --- ordered sample, $x_i$ --- sample, $\bar{x}$ --- sample mean.
+
+## Shapiro-Wilk test {.tiny}
+
+$X \sim \text{Normal}(\mu = 100, \sigma = 10)$
+
+$Y \sim \text{Normal}(\mu = -1000, \sigma = 25)$
+
+$H_0$: $\frac{X}{Y} \sim \text{Normal}(\theta)$
+
+$H_1$: $\frac{X}{Y} \not\sim \text{Normal}(\theta)$
+
+:::: {.columns}
+
+::: {.column width="33%"}
+```{python}
+#| label: shapiro_test_x
+#| fig-align: center
+#| echo: false
+
+numpy.random.seed(42)
+
+X = norm(100, 10).rvs(1000)
+Y = norm(-1000, 25).rvs(1000)
+
+#plots
+distplot(X, label='X')
+pyplot.legend()
+pyplot.title('X distribution')
+pyplot.grid(linewidth=0.2)
+```
+:::
+
+::: {.column width="33%"}
+```{python}
+#| label: shapiro_test_y
+#| fig-align: center
+#| echo: false
+
+#plots
+distplot(Y, label='Y')
+pyplot.legend()
+pyplot.title('Y distribution')
+pyplot.grid(linewidth=0.2)
+```
+:::
+
+::: {.column width="33%"}
+```{python}
+#| label: shapiro_test_x_y
+#| fig-align: center
+#| echo: false
+
+#plots
+distplot(X/Y, label='X/Y')
+pyplot.legend()
+pyplot.title('X/Y distribution')
+pyplot.grid(linewidth=0.2)
+```
+:::
+
+::::
+
+- For $X$ the Shapiro-Wilk test = `{python} round(shapiro(X)[0], 4)` and $p$-value = `{python} round(shapiro(X)[1], 2)`. 
+
+For $Y$: `{python} round(shapiro(Y)[0], 4)` and `{python} round(shapiro(Y)[1], 2)`.
+
+For $X/Y$: `{python} round(shapiro(X/Y)[0], 4)` and `{python} round(shapiro(X/Y)[1], 2)`.
+
+## QQ-plot {.smaller}
+
+QQ-plot &mdash is a method that allows you to visualize “how well” a normal distribution describes the data.
+
+**QQ-plot visualization**:
+
+- Let the sampling distribution &mdash; $\mathcal{N}(\mu, \sigma^2)$.
+- Let us find the quantiles of 2 distributions: $\mathcal{N}(\mu, \sigma^2)$ and $\mathcal{N}(0, 1)$. Their quantiles will be $Q, Q'$, respectively.
+- Let us put the quantiles of the first distribution on the Y-axis and the quantiles of the second distribution on the X-axis.
+- Then the rule derived above states that all points $(Q'_{\alpha}, Q_{\alpha})$ lie on the same line.
+    - The tangent of the slope of this line is always the same and is equal to $\frac{\sigma'}{\sigma}$. 
+
+
+```{python}
+#| label: qq_plot
+#| include: false
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Arc
+from matplotlib.transforms import IdentityTransform, TransformedBbox, Bbox
+
+
+class AngleAnnotation(Arc):
+    """
+    Draws an arc between two vectors which appears circular in display space.
+    """
+    def __init__(self, xy, p1, p2, size=75, unit="points", ax=None,
+                 text="", textposition="inside", text_kw=None, **kwargs):
+        """
+        Parameters
+        ----------
+        xy, p1, p2 : tuple or array of two floats
+            Center position and two points. Angle annotation is drawn between
+            the two vectors connecting *p1* and *p2* with *xy*, respectively.
+            Units are data coordinates.
+
+        size : float
+            Diameter of the angle annotation in units specified by *unit*.
+
+        unit : str
+            One of the following strings to specify the unit of *size*:
+
+            * "pixels": pixels
+            * "points": points, use points instead of pixels to not have a
+              dependence on the DPI
+            * "axes width", "axes height": relative units of Axes width, height
+            * "axes min", "axes max": minimum or maximum of relative Axes
+              width, height
+
+        ax : `matplotlib.axes.Axes`
+            The Axes to add the angle annotation to.
+
+        text : str
+            The text to mark the angle with.
+
+        textposition : {"inside", "outside", "edge"}
+            Whether to show the text in- or outside the arc. "edge" can be used
+            for custom positions anchored at the arc's edge.
+
+        text_kw : dict
+            Dictionary of arguments passed to the Annotation.
+
+        **kwargs
+            Further parameters are passed to `matplotlib.patches.Arc`. Use this
+            to specify, color, linewidth etc. of the arc.
+
+        """
+        self.ax = ax or plt.gca()
+        self._xydata = xy  # in data coordinates
+        self.vec1 = p1
+        self.vec2 = p2
+        self.size = size
+        self.unit = unit
+        self.textposition = textposition
+
+        super().__init__(self._xydata, size, size, angle=0.0,
+                         theta1=self.theta1, theta2=self.theta2, **kwargs)
+
+        self.set_transform(IdentityTransform())
+        self.ax.add_patch(self)
+
+        self.kw = dict(ha="center", va="center",
+                       xycoords=IdentityTransform(),
+                       xytext=(0, 0), textcoords="offset points",
+                       annotation_clip=True)
+        self.kw.update(text_kw or {})
+        self.text = ax.annotate(text, xy=self._center, **self.kw)
+
+    def get_size(self):
+        factor = 1.
+        if self.unit == "points":
+            factor = self.ax.figure.dpi / 72.
+        elif self.unit[:4] == "axes":
+            b = TransformedBbox(Bbox.unit(), self.ax.transAxes)
+            dic = {"max": max(b.width, b.height),
+                   "min": min(b.width, b.height),
+                   "width": b.width, "height": b.height}
+            factor = dic[self.unit[5:]]
+        return self.size * factor
+
+    def set_size(self, size):
+        self.size = size
+
+    def get_center_in_pixels(self):
+        """return center in pixels"""
+        return self.ax.transData.transform(self._xydata)
+
+    def set_center(self, xy):
+        """set center in data coordinates"""
+        self._xydata = xy
+
+    def get_theta(self, vec):
+        vec_in_pixels = self.ax.transData.transform(vec) - self._center
+        return np.rad2deg(np.arctan2(vec_in_pixels[1], vec_in_pixels[0]))
+
+    def get_theta1(self):
+        return self.get_theta(self.vec1)
+
+    def get_theta2(self):
+        return self.get_theta(self.vec2)
+
+    def set_theta(self, angle):
+        pass
+
+    # Redefine attributes of the Arc to always give values in pixel space
+    _center = property(get_center_in_pixels, set_center)
+    theta1 = property(get_theta1, set_theta)
+    theta2 = property(get_theta2, set_theta)
+    width = property(get_size, set_size)
+    height = property(get_size, set_size)
+
+    # The following two methods are needed to update the text position.
+    def draw(self, renderer):
+        self.update_text()
+        super().draw(renderer)
+
+    def update_text(self):
+        c = self._center
+        s = self.get_size()
+        angle_span = (self.theta2 - self.theta1) % 360
+        angle = np.deg2rad(self.theta1 + angle_span / 2)
+        r = s / 2
+        if self.textposition == "inside":
+            r = s / np.interp(angle_span, [60, 90, 135, 180],
+                                          [3.3, 3.5, 3.8, 4])
+        self.text.xy = c + r * np.array([np.cos(angle), np.sin(angle)])
+        if self.textposition == "outside":
+            def R90(a, r, w, h):
+                if a < np.arctan(h/2/(r+w/2)):
+                    return np.sqrt((r+w/2)**2 + (np.tan(a)*(r+w/2))**2)
+                else:
+                    c = np.sqrt((w/2)**2+(h/2)**2)
+                    T = np.arcsin(c * np.cos(np.pi/2 - a + np.arcsin(h/2/c))/r)
+                    xy = r * np.array([np.cos(a + T), np.sin(a + T)])
+                    xy += np.array([w/2, h/2])
+                    return np.sqrt(np.sum(xy**2))
+
+            def R(a, r, w, h):
+                aa = (a % (np.pi/4))*((a % (np.pi/2)) <= np.pi/4) + \
+                     (np.pi/4 - (a % (np.pi/4)))*((a % (np.pi/2)) >= np.pi/4)
+                return R90(aa, r, *[w, h][::int(np.sign(np.cos(2*a)))])
+
+            bbox = self.text.get_window_extent()
+            X = R(angle, r, bbox.width, bbox.height)
+            trans = self.ax.figure.dpi_scale_trans.inverted()
+            offs = trans.transform(((X-s/2), 0))[0] * 72
+            self.text.set_position([offs*np.cos(angle), offs*np.sin(angle)])
+```
+
+---
+
+```{python}
+#| label: qq_plot_code
+#| fig-align: center
+#| echo: false
+
+mu = 5
+sigma = 10
+sample_distr = norm(loc=mu, scale=sigma)
+standart_distr = norm(loc=0, scale=1)
+quantiles = np.arange(0.001, 1, 0.1)
+quantle_xticks = ["$Q_{" + str(round(x, 2)) + "}$" for x in quantiles]
+quantle_yticks = ["$Q'_{" + str(round(x, 2)) + "}$" for x in quantiles]
+standart_q = standart_distr.ppf(quantiles)
+sample_q = sample_distr.ppf(quantiles)
+
+
+fig = pyplot.figure(figsize=(15, 10))
+ax = fig.add_subplot(1,1,1)
+pyplot.title('QQ-Plot, visualization on ideal data', fontsize=15)
+
+
+ax.plot(standart_q, sample_q, label="Line $(Q_{\\alpha}, Q'_{\\alpha})$")
+for index in [1, 5]:
+    center = (standart_q[index], sample_q[index])
+    dot1 = (standart_q[index] + 1, sample_q[index])
+    dot2 = (standart_q[index + 1], sample_q[index + 1])
+    
+    label=""
+    if index == 1:
+        label="$tan(\phi) = \dfrac{\sigma'}{\sigma}$"
+    am1 = AngleAnnotation(center, dot1, dot2, ax=ax, size=250, text=r"$\phi$", text_kw=dict(fontsize=16))
+    ax.plot(*zip(*[center, dot1]), color="black", label=label)
+
+
+pyplot.ylabel("Quantiles $\mathcal{N}(\mu, \sigma^2)$", fontsize=15)
+pyplot.xlabel("Quantiles $\mathcal{N}(0, 1)$", fontsize=15)
+pyplot.xticks(standart_q, quantle_xticks, fontsize=15)
+pyplot.yticks(sample_q, quantle_yticks, fontsize=15)
+pyplot.legend(fontsize=15)
+pyplot.grid(linewidth=0.2)
+pyplot.show()
+```
+
+$$
+\begin{align}
+\phi_i = arctg \left({\frac {Q'_{0.i+0.1}-Q'_{0.i}}{Q_{0.i+0.1}-Q_{0.i}}}\right) = arctg \left({\frac{\sigma'}{\sigma}}\right) = arctg(b) 
+\end{align}
+$$
+
+## QQ-plot {.smaller}
+
+- Suppose we have N points in the sample.
+- Then, the score of the $i$-th quantile &mdash; $i$ value in the sorted sample (recall the empirical distribution function). $\widehat{F_n}(x) = \dfrac{1}{N}\sum([X_i \leq x])$.
+- Let's construct the quantiles of the standard normal distribution.
+    - To do this, we calculate the quantile at each point $\dfrac{i}{N},\ i \in {\{1, ...\ N - 1\}}$
+- Let's put the estimates of the quantiles of the first distribution on the Y-axis and the true quantiles of the second distribution on the X-axis.
+- If the graph resembles a straight line, it is a normal distribution.
+
+
+```{python}
+#| include: false
+
+def my_qq_plot(sample):
+    """
+        Функция для отрисовки QQ-Plot.
+    """
+    
+    # Строим оценку квантилей
+    # Сортируем выборку
+    sample.sort()
+    # Сами значения и есть оценки квантили
+    sample_quantiles = sample[1:-1]
+    N = len(sample)
+
+    # Считаем N-2 точки квантилей стандартного нормального распределения (без +- бесконечности)
+    x = [i / N for i in range(1, N - 1)]
+    theoretical_quantiles = norm().ppf(x)
+    
+    # Визуализация
+    fig = pyplot.figure(figsize=(15, 7))
+    ax = fig.add_subplot(1,1,1)
+
+    ax.plot(theoretical_quantiles, sample_quantiles, 'k.', linewidth=1.0, color = red_pink)
+
+    ax.set_xlabel('theoretical quantiles', fontsize=15)
+    ax.set_ylabel('sample quantiles', fontsize=15)
+    ax.set_title('QQ-Plot for sampling from a normal distribution', fontsize=15)
+    pyplot.grid(linewidth=0.2)
+    pyplot.show()
+```
+
+---
+
+
+```{python}
+#| label: qq_plot_example
+#| fig-align: center
+#| echo: false
+
+numpy.random.seed(102)
+sample = norm(loc=100, scale=1000).rvs(size=1000)
+my_qq_plot(sample)
+```
+
+## Example: Site Load Time
+
+Let's say we wanted to plot the load time of our site in seconds. We took the last 20 values (in seconds) from different users in our logs, and plot the Q-Q plot for this sample.
+
+- Sample: `[0.11, 0.07, 0.1, 0.09, 0.17, 0.14, 0.05, 0.05, 0.17, 0.07, 0.06, 0.06, 0.12, 0.12, 0.08, 0.15, 0.07, 0.06, 0.13, 0.17]`
+
+---
+
+```{python}
+#| label: qq_plot_example_2
+#| fig-align: center
+#| echo: false
+#| fig-height: 6
+
+sample = [0.11, 0.07, 0.1, 0.09, 0.17, 0.14, 0.05, 0.05, 0.17, 0.07, 0.06, 0.06, 0.12, 0.12, 0.08, 0.15, 0.07, 0.06, 0.13, 0.17]
+my_qq_plot(sample)
+```
+
+## Example: Student's distribution
+
+```{python}
+#| label: qq_plot_example_3
+#| fig-align: center
+#| echo: false
+#| fig-height: 6
+
+from scipy.stats import t
+numpy.random.seed(102)
+sample = t(df=3).rvs(size=1000)
+
+my_qq_plot(sample)
+```
