@@ -73,13 +73,13 @@ slate      = "#314f4f"
 
 ## 📈 Task {.tiny}
 
-> You have bought a beautiful new dice, and you want to check if it is true that all its faces fall out equally likely.
+> Imagine that we want to check whether the distribution of a data set follows a known distribution.
 
-$X_1, \ldots, X_n$ — outcomes of $n$ rolls of the dice.
+$X_1, \ldots, X_n$ — a sample from an unknown distribution.
 
-$\mathcal{P}$ --- true probabilities of the dice faces.
+$\mathcal{P}$ --- the distribution function of the unknown distribution.
 
-$\mathcal{P}_0$ --- hypothesized probabilities of the dice faces.
+$\mathcal{P}_0$ --- the distribution function of the known distribution.
 
 <br>
 
@@ -107,7 +107,7 @@ where $F, F_0$ &mdash; *distribution functions*.
 
 1. We estimate the CDF, or $F(x)$:
     - Theoretical CDF $F_0(x) = P(X \leq x)$.
-    - Empirical CDF $\hat{F}(x) = \frac{1}{n} \sum_{i=1}^n I(X_i \leq x) \stackrel{p}{\rightarrow} F(x)$.
+    - Empirical CDF $\hat{F}(x) = \dfrac{1}{n}\sum I(X_i \leq x)$.
 
 ## 📊 Step 1: visualization {.tiny}
 
@@ -166,10 +166,10 @@ How does $\widehat{F_n}(x)$ approximate $F(x)$ at each point x?
 Let $X_1, X_2 \dots$ &mdash; a sample of unlimited size from a distribution with distribution function $F$. Then
 
 $$
-D_n = \underset{x \in \mathbb{R}}{\sup} |\widehat{F_n}(x) - F(x)| \stackrel{p}{\rightarrow} 0
+D_n = \underset{x \in \mathbb{R}}{\sup} |\widehat{F_n}(x) - F(x)| \stackrel{}{\rightarrow} 0
 $$
 
-If we take a point $x$ such that $|F(x) - F_0(x)|$ is maximal (this is $\sup$), then this difference tends to zero.
+This expression $D_n$ denotes the *maximum difference* between $\hat{F}_n(x)$ and $F(x)$ for all possible values of `x`.
 
 ## 📊 Glivenko-Cantelli visualization {.tiny40}
 
@@ -239,7 +239,8 @@ $$
 
 where $F_0(x)$ is the hypothesized distribution function.
 
-- $H_0: D_n \stackrel{p}{\rightarrow} 0$.
+- $H_0: F = F_0$.
+- $H_1: F \neq F_0$.
 
 We need to find the distribution of $D_n$ under $H_0$.
 
@@ -249,7 +250,9 @@ We need to find the distribution of $D_n$ under $H_0$.
 
 > Kolmogorov's theorem
 >
-> Let $X$ be sampled from a continuous distribution. Then at $H_0$ $\sqrt{n}D_n \stackrel{d}{\rightarrow} \phi$, where $\phi$ has a **Kolmogorov distribution**: $F_\phi(x) = \begin{equation*} 
+> Let $X$ be sampled from a continuous distribution. Then at $H_0$ $\sqrt{n}D_n \stackrel{d}{\rightarrow} \phi$, where $\phi$ has a **Kolmogorov distribution**: 
+
+$F_\phi(x) = \begin{equation*} 
  \begin{cases}
   \sum\limits_{k=-\infty}^ \infty (-1)^k e^{-2k^2 x^2}, &\text{ $ x > 0$}\\\
    0, &\text{ $ x < 0$}
@@ -335,86 +338,7 @@ pyplot.show()
 
 There is a slight upward shift, which is good, because the test will be wrong less than $\alpha$% of the time.
 
-# Shapiro-Wilk test and QQ-plot
-
-## Shapiro-Wilk test
-
-- **Purpose**: to check if the sample is drawn from a normal distribution.
-- $H_0$: the sample is drawn from a normal distribution.
-- $H_1$: the sample is not drawn from a normal distribution.
-
-$$
-W = \frac{\left(\sum_{i=1}^n a_i x_{(i)}\right)^2}{\sum_{i=1}^n (x_i - \bar{x})^2}
-$$
-
-where $a_i$ --- coefficients, $x_{(i)}$ --- ordered sample, $x_i$ --- sample, $\bar{x}$ --- sample mean.
-
-## Shapiro-Wilk test {.tiny}
-
-$X \sim \text{Normal}(\mu = 100, \sigma = 10)$
-
-$Y \sim \text{Normal}(\mu = -1000, \sigma = 25)$
-
-$H_0$: $\frac{X}{Y} \sim \text{Normal}(\theta)$
-
-$H_1$: $\frac{X}{Y} \not\sim \text{Normal}(\theta)$
-
-:::: {.columns}
-
-::: {.column width="33%"}
-```{python}
-#| label: shapiro_test_x
-#| fig-align: center
-#| echo: false
-
-numpy.random.seed(42)
-
-X = norm(100, 10).rvs(1000)
-Y = norm(-1000, 25).rvs(1000)
-
-#plots
-distplot(X, label='X')
-pyplot.legend()
-pyplot.title('X distribution')
-pyplot.grid(linewidth=0.2)
-```
-:::
-
-::: {.column width="33%"}
-```{python}
-#| label: shapiro_test_y
-#| fig-align: center
-#| echo: false
-
-#plots
-distplot(Y, label='Y')
-pyplot.legend()
-pyplot.title('Y distribution')
-pyplot.grid(linewidth=0.2)
-```
-:::
-
-::: {.column width="33%"}
-```{python}
-#| label: shapiro_test_x_y
-#| fig-align: center
-#| echo: false
-
-#plots
-distplot(X/Y, label='X/Y')
-pyplot.legend()
-pyplot.title('X/Y distribution')
-pyplot.grid(linewidth=0.2)
-```
-:::
-
-::::
-
-- For $X$ the Shapiro-Wilk test = `{python} round(shapiro(X)[0], 4)` and $p$-value = `{python} round(shapiro(X)[1], 2)`. 
-
-For $Y$: `{python} round(shapiro(Y)[0], 4)` and `{python} round(shapiro(Y)[1], 2)`.
-
-For $X/Y$: `{python} round(shapiro(X/Y)[0], 4)` and `{python} round(shapiro(X/Y)[1], 2)`.
+# QQ-plot and Shapiro-Wilk test
 
 ## QQ-plot {.smaller}
 
@@ -640,7 +564,7 @@ $$
 ## QQ-plot {.smaller}
 
 - Suppose we have N points in the sample.
-- Then, the score of the $i$-th quantile &mdash; $i$ value in the sorted sample (recall the empirical distribution function). $\widehat{F_n}(x) = \dfrac{1}{N}\sum([X_i \leq x])$.
+- Then, the score of the $i$-th quantile &mdash; $i$ value in the sorted sample (recall the empirical distribution function). $\widehat{F_n}(x) = \dfrac{1}{n}\sum I(X_i \leq x)$.
 - Let's construct the quantiles of the standard normal distribution.
     - To do this, we calculate the quantile at each point $\dfrac{i}{N},\ i \in {\{1, ...\ N - 1\}}$
 - Let's put the estimates of the quantiles of the first distribution on the Y-axis and the true quantiles of the second distribution on the X-axis.
@@ -710,7 +634,7 @@ sample = [0.11, 0.07, 0.1, 0.09, 0.17, 0.14, 0.05, 0.05, 0.17, 0.07, 0.06, 0.06,
 my_qq_plot(sample)
 ```
 
-## Example: Student's distribution
+## Example: $t$-distribution
 
 ```{python}
 #| label: qq_plot_example_3
@@ -718,9 +642,117 @@ my_qq_plot(sample)
 #| echo: false
 #| fig-height: 6
 
+def my_qq_plot(sample):
+    """
+        Функция для отрисовки QQ-Plot.
+    """
+    
+    # Строим оценку квантилей
+    # Сортируем выборку
+    sample.sort()
+    # Сами значения и есть оценки квантили
+    sample_quantiles = sample[1:-1]
+    N = len(sample)
+
+    # Считаем N-2 точки квантилей стандартного нормального распределения (без +- бесконечности)
+    x = [i / N for i in range(1, N - 1)]
+    theoretical_quantiles = norm().ppf(x)
+    
+    # Визуализация
+    fig = pyplot.figure(figsize=(15, 7))
+    ax = fig.add_subplot(1,1,1)
+
+    ax.plot(theoretical_quantiles, sample_quantiles, 'k.', linewidth=1.0, color = red_pink)
+
+    ax.set_xlabel('theoretical quantiles', fontsize=15)
+    ax.set_ylabel('sample quantiles', fontsize=15)
+    ax.set_title('QQ-Plot for a t-distributed sample', fontsize=15)
+    pyplot.grid(linewidth=0.2)
+    pyplot.show()
+
 from scipy.stats import t
 numpy.random.seed(102)
 sample = t(df=3).rvs(size=1000)
 
 my_qq_plot(sample)
 ```
+
+## Shapiro-Wilk test
+
+- **Purpose**: to check if the sample is drawn from a normal distribution.
+- $H_0$: the sample is drawn from a normal distribution.
+- $H_1$: the sample is not drawn from a normal distribution.
+
+$$
+W = \frac{\left(\sum_{i=1}^n a_i x_{(i)}\right)^2}{\sum_{i=1}^n (x_i - \bar{x})^2}
+$$
+
+where $a_i$ --- coefficients, $x_{(i)}$ --- ordered sample, $x_i$ --- sample, $\bar{x}$ --- sample mean.
+
+## Shapiro-Wilk test {.tiny}
+
+$X \sim \text{Normal}(\mu = 100, \sigma = 10)$
+
+$Y \sim \text{Normal}(\mu = -1000, \sigma = 25)$
+
+$H_0$: $\frac{X}{Y} \sim \text{Normal}(\theta)$
+
+$H_1$: $\frac{X}{Y} \not\sim \text{Normal}(\theta)$
+
+:::: {.columns}
+
+::: {.column width="33%"}
+```{python}
+#| label: shapiro_test_x
+#| fig-align: center
+#| echo: false
+
+numpy.random.seed(42)
+
+X = norm(100, 10).rvs(1000)
+Y = norm(-1000, 25).rvs(1000)
+
+#plots
+distplot(X, label='X')
+pyplot.legend()
+pyplot.title('X distribution')
+pyplot.grid(linewidth=0.2)
+```
+:::
+
+::: {.column width="33%"}
+```{python}
+#| label: shapiro_test_y
+#| fig-align: center
+#| echo: false
+
+#plots
+distplot(Y, label='Y')
+pyplot.legend()
+pyplot.title('Y distribution')
+pyplot.grid(linewidth=0.2)
+```
+:::
+
+::: {.column width="33%"}
+```{python}
+#| label: shapiro_test_x_y
+#| fig-align: center
+#| echo: false
+
+#plots
+distplot(X/Y, label='X/Y')
+pyplot.legend()
+pyplot.title('X/Y distribution')
+pyplot.grid(linewidth=0.2)
+```
+:::
+
+::::
+
+- For $X$ the Shapiro-Wilk test = `{python} round(shapiro(X)[0], 4)` and $p$-value = `{python} round(shapiro(X)[1], 2)`. 
+
+For $Y$: `{python} round(shapiro(Y)[0], 4)` and `{python} round(shapiro(Y)[1], 2)`.
+
+For $X/Y$: `{python} round(shapiro(X/Y)[0], 4)` and `{python} round(shapiro(X/Y)[1], 2)`.
+
