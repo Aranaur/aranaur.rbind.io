@@ -1,0 +1,374 @@
+---
+title: "Mann — Whitney U-test"
+subtitle: "Probability and Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+footer: "Probability and Statistics"
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    # toc: true
+    # toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    # fig-height: 9
+    # fig-width: 16
+    highlight-style: github
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+from scipy.stats import (
+    norm, binom, expon, t, chi2, pareto, ttest_1samp, ttest_ind, sem, bernoulli, mannwhitneyu, uniform, gamma
+)
+from tqdm import tqdm_notebook
+import scipy.stats as stats
+from statsmodels.stats.proportion import proportion_confint
+from statsmodels.stats.api import CompareMeans, DescrStatsW
+import numpy as numpy
+import math
+from seaborn import distplot
+from matplotlib import pyplot
+import pandas as pd
+import seaborn
+from statsmodels.stats.api import CompareMeans, DescrStatsW
+import warnings
+warnings.filterwarnings('ignore')
+numpy.random.seed(42)
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+## Basic concepts {.smaller}
+
+:::: {.columns}
+
+::: {.column width="40%"}
+This time, let's invent a new homogeneity criterion that tests the bias of one sample relative to another.
+
+Recall the null hypothesis of the homogeneity test:
+
+$$
+H_0: F = G,\ vs. H_1: F \neq G
+$$
+
+where $F$, $G$ are distribution functions of 2 samples.
+:::
+
+::: {.column width="60%"}
+```{python}
+#| echo: false
+#| fig-align: center
+
+distr_a = norm(loc=1, scale=1)
+distr_b = norm(loc=3, scale=1)
+
+x = numpy.linspace(-4, 6, 1000)
+
+pyplot.figure(figsize=(10, 5))
+pyplot.title("2 normal distributions with bias", fontsize=12)
+pyplot.plot(x, distr_a.pdf(x), label='A')
+pyplot.plot(x, distr_b.pdf(x), label='B')
+pyplot.xlabel(f'X', fontsize=12)
+pyplot.ylabel('Density', fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.legend(fontsize=12)
+pyplot.show()
+```
+:::
+
+::::
+
+Previously, we have relied on the [values]{.hi-slate} of the sample items; this time, it is suggested to look not at the values themselves but at their [order]{.hi} relative to each other.
+
+## Mann — Whitney U-test {.smaller}
+
+:::: {.columns}
+
+::: {.column width="60%"}
+```{python}
+#| echo: false
+#| fig-align: center
+
+numpy.random.seed(8)
+sample_a = distr_a.rvs(50)
+sample_no_shift = distr_a.rvs(50)
+sample_b = distr_b.rvs(50)
+
+fig = pyplot.figure(figsize=(20, 16))
+
+ax = fig.subplots(nrows=2, ncols=2)
+
+pyplot.subplot(2, 2, 1)
+pyplot.title("2 normal distributions without bias", fontsize=12)
+pyplot.plot(x, distr_a.pdf(x), lw=5, label='A')
+pyplot.plot(x, distr_a.pdf(x), linestyle='--', lw=3, label='B')
+pyplot.xlabel(f'X', fontsize=12)
+pyplot.ylabel('Density', fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.legend(fontsize=12)
+
+
+pyplot.subplot(2, 2, 2)
+pyplot.title("2 normal distributions with bias", fontsize=12)
+pyplot.plot(x, distr_a.pdf(x), label='A')
+pyplot.plot(x, distr_b.pdf(x), label='B')
+pyplot.xlabel(f'X', fontsize=12)
+pyplot.ylabel('Density', fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.legend(fontsize=12)
+
+
+
+pyplot.subplot(2, 2, 3)
+pyplot.scatter(sample_a, [0] * len(sample_a), label='A')
+pyplot.scatter(sample_no_shift, [0] * len(sample_no_shift), alpha=0.5, label='B')
+pyplot.xlabel(f'Values in samples', fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.legend(fontsize=12)
+
+pyplot.subplot(2, 2, 4)
+pyplot.scatter(sample_a, [0] * len(sample_a), label='A')
+pyplot.scatter(sample_b, [0] * len(sample_b), alpha=0.5, label='B')
+pyplot.xlabel(f'Values in samples', fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.legend(fontsize=12)
+pyplot.show()
+```
+:::
+
+::: {.column width="40%"}
+**Idea:** Let's **count the number of pairs** where the orange element is *larger* than the blue element; if there are many or few such pairs, then one sample will be biased relative to the other.
+
+$$
+\begin{align}
+    U = \sum_{i}^N\sum_{j}^M I[A_i < B_j]
+\end{align}
+$$
+
+where $A_1, ..., A_N$ &mdash; the first sample, $B_1, ..., B_M$ &mdash; the second sample, $I$ &mdash; an indicator function which is 1 if the condition in parentheses is met, and 0 otherwise. 
+:::
+
+::::
+
+## Count the number of pairs
+
+```{python}
+#| include: false
+
+def calculate_U(A, B):
+    U = 0
+    for A_elem in A:
+        for B_elem in B:
+            U += A_elem < B_elem
+    return U
+```
+
+If $H_0$ is true, then the number of pairs where $A_i < B_j$ should be close to $n \times m / 2$.
+
+- $n$ = 50
+- $m$ = 50
+
+So the expected value of $U$ is $50 \times 50 / 2 = 1250$.
+
+But in our case, $U$ = `{python} calculate_U(sample_a, sample_b)`.
+
+We need to figure out if 2205 is a lot or a little.
+
+## U-distribution for case {.tiny}
+
+```{python}
+#| echo: false
+#| fig-align: center
+
+numpy.random.seed(35)
+alpha=0.05
+sample_size = 50
+N_exps = 1000
+
+statistics = []
+
+for i in range(N_exps):
+    A = distr_a.rvs(sample_size)
+    B = distr_a.rvs(sample_size)
+    
+    U = calculate_U(A, B)
+
+    statistics.append(U)
+    
+EU = len(A) * len(B) / 2
+pyplot.figure(figsize=(10, 5))
+pyplot.title("$U$ Visualization", fontsize=12)
+pyplot.vlines(EU, 0, 120, color=red_pink, label='$\mathbb{E}_{H0}$U')
+pyplot.hist(statistics, bins='auto')
+pyplot.xlabel(f'X', fontsize=12)
+pyplot.ylabel('Density', fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.legend(fontsize=14)
+pyplot.show()
+```
+
+Quantile: `{python} numpy.quantile(statistics, [0.025, 0.975])[0]` - `{python} numpy.quantile(statistics, [0.025, 0.975])[1]`
+
+$U$ = 2205 is in the tail of the distribution, which means that the null hypothesis is rejected.
+
+But this will work only for this case. We need a more general approach.
+
+## Mann — Whitney U-test {.smaller}
+
+:::: {.columns}
+
+::: {.column width="40%"}
+$$
+\begin{align}
+    &U \overset{H_0}\rightarrow \mathcal{N}(\mathbb{E}U, \mathbb{D}U), \text{where}\\
+    &U = \sum_{i}^N\sum_{j}^M I[A_i < B_j],\\
+    &\mathbb{E} U = \dfrac{NM}{2},\\
+    &\mathbb{D}U = \dfrac{NM(N + M + 1)}{12}
+\end{align}
+$$
+:::
+
+::: {.column width="60%"}
+
+```{python}
+#| include: false
+
+def mann_whitney_distribution(A, B):
+    N = len(A)
+    M = len(B)
+    DU = N * M * (N + M + 1) / 12
+    return norm(loc=N * M / 2, scale=DU ** (1/2))
+```
+
+```{python}
+#| echo: false
+#| fig-align: center
+
+x = numpy.linspace(min(statistics), max(statistics), 1000)
+distrib = mann_whitney_distribution(A, B)
+
+EU = len(A) * len(B) / 2
+pyplot.figure(figsize=(10, 5))
+pyplot.title("$U$ Visualization", fontsize=12)
+pyplot.hist(statistics, density=True, bins='auto')
+pyplot.plot(x, distrib.pdf(x), label="Theoretical distribution")
+pyplot.vlines(EU, 0, 0.003, color=red_pink, label='$\mathbb{E}_{H0}$U')
+pyplot.xlabel(f'X', fontsize=12)
+pyplot.ylabel('Density', fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.legend(fontsize=12)
+pyplot.show()
+```
+:::
+
+::::
+
+The minus of our current solution is that it takes a long time to run, specifically in quadratic time.
+
+## Speeding up the calculation: ranks {.tiny}
+
+:::: {.columns}
+
+::: {.column width="40%"}
+**Idea on how to speed up the criterion:** let's organize all the elements in the graph below—the leftmost element &mdash; first, the next &mdash; second, etc. Let's call these numbers ranks.
+
+$A = \color{#181485}{[1, 5, 8, 20]}$
+
+$B = \color{#FFA500}{[2, 3, 6]}$
+
+$A \& B = [\color{#181485}1, \color{#FFA500}2, \color{#FFA500}3, \color{#181485}5, \color{#FFA500}6, \color{#181485}8, \color{#181485}20]$
+
+:::
+
+::: {.column width="60%"}
+```{python}
+#| echo: false
+
+sample_a = [1, 5, 8, 20]
+sample_b = [2, 3, 6]
+
+ranks_b = stats.rankdata(sample_a + sample_b)[len(sample_b):]
+
+pyplot.figure(figsize=(20, 5))
+pyplot.title("Example of ranks", fontsize=12)
+pyplot.scatter(sample_a, [0] * len(sample_a), label='A')
+
+pyplot.scatter(sample_b, [0] * len(sample_b), alpha=0.5, label='B')
+for elem, rank in zip(sorted(sample_b), sorted(ranks_b)):
+    pyplot.text(elem - 0.03, 0.01, int(rank), c='blue')
+
+
+pyplot.xlabel(f'Values in samples', fontsize=12)
+pyplot.grid(linewidth=0.2)
+pyplot.legend(fontsize=12)
+pyplot.show()
+```
+:::
+
+::::
+
+<br>
+
+$R_j$ is the rank of $B_j$ in the sample $(A_1,\ ...,\ A_N,\ B_1,\ ...,\ B_M)$.
+
+$V = R_1 +\ ...\ ...\ + R_M$. 
+
+**Idea $V$**: the more biased one sample is relative to another, the greater/smaller the sum of ranks of one sample.
+
+$$U = V - \dfrac{M (M + 1)}{2}$$
+
+## Algorithm of the Mann — Whitney U-test {.tiny}
+
+Hypothesis to be tested: $H_0: F=G,\ vs.\ H_1: F \neq G$.
+
+- The sample ranks $A_1,\ ...\ A_N,\ B_1,\ ...\ B_M$ are calculated.
+- All ranks of sample $B$ are saved: this is sample $R$.
+- The sum of the ranks of sample $B$ in the list $A \& B$ is taken: $V = R_1 +\ ...\ ...\ + R_M$. The statistic $U = V - \dfrac{M (M + 1)}{2}$ is calculated
+- The expected value and variance under $H_0$, are calculated:
+$$
+\begin{align}
+    &\mathbb{E} U = \dfrac{NM}{2},\\
+    &\mathbb{D} U = \dfrac{NM(N + M + 1)}{12}
+\end{align}
+$$
+
+- $U \overset{H_0}\rightarrow \mathcal{N}(\mathbb{E}U, \mathbb{D}U)$. Quantiles are calculated from this distribution.
+
+<br>
+
+<center>**It does not depend on noise in the data!**</center>
+
