@@ -377,16 +377,196 @@ pyplot.show()
 
 Bootstrap CI: `{python} fast_bootstrap_ci(sample, theta_func, alpha=0.05)`
 
+## Two-sample bootstrap
+
+Suppose you have a sample $X,\ Y$ of size $N, M$ respectively. Then:
+
+1. Calculate $\widehat{\theta_X}, \widehat{\theta_Y}$ from the original sample. Calculate the difference between them $\widehat{\theta} = \widehat{\theta_X} - \widehat{\theta_Y}$.
+2. In a loop of size `B`:
+    1. Generate new samples from samples `X` and `Y` with return sizes `N` and `M,` respectively.
+    2. Compute $\theta^*_{X, i},\ \theta^*_{Y, i}$ from these samples. $\theta^*_{i} = \theta^*_{X, i} - \theta^*_{Y, i}$
+3. Save $\theta^*_1,\ ...,\ \theta^*_B$ into an array.
+4. Construct a confidence interval using the formula above.
+
+## Types of confidence intervals in bootstrap {.smaller}
+
+1. Central: $CI = (2\widehat{\theta} - \theta^*_{[1 - \alpha/2]}, 2\widehat{\theta} - \theta^*_{[\alpha/2]})$. We have already considered it.
+2. Normal: $CI = (\widehat{\theta} \pm z_{1-\alpha/2}\cdot \sqrt{S^2_{\theta^*}})$ (if the $\widehat{\theta}$ statistic is normally distributed, we can calculate from the sample $\theta^*$ the standard deviation $\sqrt{S^2_{\theta^*}}$. we make the assumption that $\sqrt{S^2_{\theta^*}} \approx \sqrt{S^2_{\widehat{\theta}}}$).
+    
+3. Percentile: $CI = (\theta^*_{[\alpha/2]}, \theta^*_{[1 - \alpha/2]})$
+    - Theoretically, it works if there exists some monotone function $F$ such that $\hat U = F(\hat\theta(X_i))$ and $\hat U \sim \mathcal{N}(\varphi, c^2)$, where $\varphi = F(\theta)$. Where $X$ &mdash; the sample, $U$ &mdash; one observation of the random variable $\hat U$.
+
+## Bootstrap CI visualization {.smaller}
+
+```{python}
+#| label: bootstrap-vis
+#| fig-align: center
+#| include: false
+
+def fast_bootstrap_ci(sample, theta_func, alpha=0.05):
+
+    B = 1000 # Чтобы ускорить работу
+    batch_size = B // 20
+    N = len(sample)
+
+    # Добавляем размерность к выборке, чтобы работать с массивом массивов.
+    theta_estim = theta_func(numpy.expand_dims(sample, axis=0)).ravel()
+    assert len(theta_estim) == 1
+    theta_estim = theta_estim[0]
+
+    theta_asterisk_array = []
+    for _ in range(0, B, batch_size):
+        # Генерируем сразу batch_size выборок
+        bootstrap_sample = numpy.random.choice(sample, replace=True, size=(batch_size, N))
+        theta_asterisk = theta_func(bootstrap_sample).ravel()
+        assert len(theta_asterisk) == batch_size
+        theta_asterisk_array = numpy.concatenate([theta_asterisk_array, theta_asterisk])
+    left_theta_asterisk, right_theta_asterisk = numpy.quantile(theta_asterisk_array, [alpha/2, 1-alpha/2])
+    std = numpy.std(theta_asterisk_array)
+
+
+    central_left_bound, central_right_bound = 2 * theta_estim - right_theta_asterisk, 2 * theta_estim - left_theta_asterisk
+    percentile_left_bound, percentile_right_bound = left_theta_asterisk, right_theta_asterisk
+    norm_left_bound, norm_right_bound = theta_estim - norm().ppf(1-alpha/2) * std, theta_estim + norm().ppf(1-alpha/2) * std
+
+    return {
+        'central bootstrap': (central_left_bound, central_right_bound),
+        'percentile bootstrap': (percentile_left_bound, percentile_right_bound),
+        'norm bootstrap': (norm_left_bound, norm_right_bound)
+    }
+
+
+def mc_result_dict_creator(bad_cnt, MC_size):
+    # Создает словарь, в котором значения по умолчанию инициализируются словарем
+    mc_result = defaultdict(dict)
+    for method in bad_cnt:
+        fpr = bad_cnt[method] / MC_size
+        left_fpr, right_fpr = proportion_confint(count = bad_cnt[method], nobs = MC_size, alpha=0.05, method='wilson')
+        mc_result[method]['FPR'] = fpr
+        mc_result[method]['FPR, left_bound'] = left_fpr
+        mc_result[method]['FPR, right_bound'] = right_fpr
+    return mc_result
+
+def mc_bootstrap_checker(N, example_dist, theta, theta_func, alpha=0.05, MC_size = 1000):
+    numpy.random.seed(42)
+
+    # Создает словарь, в котором значения по умолчанию инициализируются 0
+    bad_cnt = defaultdict(lambda: 0)
+    for i in range(MC_size):
+        ex_sample = example_dist.rvs(N)
+
+        curr_res = fast_bootstrap_ci(ex_sample, theta_func, alpha=alpha)
+
+        for ci_type in curr_res:
+            left, right = curr_res[ci_type]
+            bad_cnt[ci_type] += 1 - (left < theta < right)
+
+    return mc_result_dict_creator(bad_cnt, MC_size)
+
+N_to_check = [50, 100, 500, 1000, 2000, 5000]
+
+example_dist = stats.expon(scale=5)
+theta = example_dist.ppf(0.5)
+theta_func = lambda sample: numpy.percentile(sample, 50, axis=1)
+
+final_results = {}
+for N in tqdm(N_to_check):
+    final_results[N] = mc_bootstrap_checker(N, example_dist, theta, theta_func, alpha=0.05, MC_size = 1000)
+
+
+def show_FPR(result_dict, methods, colors):
+    pyplot.figure(figsize=(18.5, 8))
+    pyplot.title('Dependence of FPR on sample size for different methods', fontsize=15)
+    N_array = list(result_dict.keys())
+    x_ticks = numpy.arange(0, len(N_array))
+
+    pyplot.hlines(0.05, x_ticks[0], x_ticks[-1],
+                   color='red', linestyle='-', label="$\\alpha$")
+    for method, color in zip(methods, colors):
+        FPR = []
+        left_bound = []
+        right_bound = []
+        for N in result_dict:
+            curr_dict = result_dict[N][method]
+            FPR.append(curr_dict['FPR'])
+            left_bound.append(curr_dict['FPR, left_bound'])
+            right_bound.append(curr_dict['FPR, right_bound'])
+
+        pyplot.plot(x_ticks, FPR, color=color, label=method)
+        pyplot.fill_between(x_ticks, left_bound, right_bound,
+                   color=color, alpha=0.2)
+
+    pyplot.legend(fontsize=15)
+    pyplot.xticks(x_ticks, N_array)
+    pyplot.xlabel('N', fontsize=15)
+    pyplot.ylabel('FPR', fontsize=15)
+    pyplot.grid(linewidth=0.2)
+
+    pyplot.show()
+```
+
+```{python}
+#| label: bootstrap-vis-2
+#| echo: false
+#| fig-align: center
+
+colors = [green, turquoise, blue]
+methods = ['central bootstrap', 'percentile bootstrap', 'norm bootstrap']
+show_FPR(final_results, methods, colors)
+```
+
+## $t$-test vs. bootstrap {.smaller}
+
+- Can bootstrap help when the $t$-test doesn't work?
+
+```{python}
+#| include: false
+
+def mc_ttest_checker(N, example_dist, theta, alpha=0.05, MC_size = 1000):
+    numpy.random.seed(42)
+
+    bad_cnt = defaultdict(lambda: 0)
+    for i in range(MC_size):
+        ex_sample = example_dist.rvs(N)
+
+        ttest_pval = ttest_1samp(ex_sample, popmean=theta).pvalue
+        bad_cnt['ttest'] += (ttest_pval < alpha)
+
+    return mc_result_dict_creator(bad_cnt, MC_size)
+
+
+N_to_check = [5, 10, 20, 50, 100, 200, 500, 1000]
+
+example_dist = stats.expon(scale=5)
+theta = example_dist.mean()
+theta_func = lambda sample: numpy.mean(sample, axis=1)
+
+boot_results = {}
+ttest_results = {}
+final_results = {}
+for N in tqdm(N_to_check):
+    boot_results = mc_bootstrap_checker(N, example_dist, theta, theta_func, alpha=0.05, MC_size = 1000)
+    ttest_results = mc_ttest_checker(N, example_dist, theta, alpha=0.05, MC_size = 1000)
+    final_results[N] = dict(boot_results, **ttest_results)
+```
+
+```{python}
+#| echo: false
+#| fig-align: center
+
+colors = [green, turquoise, blue, yellow]
+methods = ['central bootstrap', 'percentile bootstrap', 'norm bootstrap', 'ttest']
+show_FPR(final_results, methods, colors)
+```
+
 ## Summary
 
-Bootstrap &mdash; a method of constructing a confidence interval for any characteristic of a distribution, consisting of 2 heuristics: 
+Bootstrap &mdash; a method of constructing a confidence interval for any characteristic of a distribution: 
 
 - Substituting the proper distribution for the empirical distribution
 - Generating the final sample $\theta^*$ using Monte Carlo to estimate the quantiles of the distribution correctly.
 
-This is a universal way to calculate confidence intervals for non-trivial characteristics and distributions. And it can often come in handy in your work, so you should keep it in mind.
-
-## Basic questions about bootstrap {.tiny}
+## Basic questions about bootstrap {.smaller}
 
 1. When does a bootstrap work?
     - When the samples are large enough. Both heuristics that make up a bootstrap work if:

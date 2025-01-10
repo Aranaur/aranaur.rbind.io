@@ -1,0 +1,259 @@
+---
+title: "Related distributions"
+subtitle: "Probability and Statistics"
+affiliation: "Kyiv School of Economics"
+format: 
+  html: default
+toc: true
+number-sections: true
+echo: false
+eval: false
+---
+
+# Approximating a binomial to the normal
+
+Suppose you flipped 1000 coins, each with a 20% chance of being heads. What would be the mean and variance of the binomial distribution?
+
+- Mean 1000; variance 200
+- Mean 200; variance 200
+- Mean 200; variance 160
+- Mean 160; variance 160
+
+# Simulating from the binomial and the normal
+
+In this exercise you'll see for yourself whether the normal is a reasonable approximation to the binomial by simulating large samples from the binomial distribution and its normal approximation and comparing their histograms.
+
+- Generate 100,000 draws from the Binomial(1000, .2) distribution. Save this as `binom_sample.`
+- Generate 100,000 draws from the normal distribution that approximates this binomial distribution, using the `rnorm()` function. (Remember that `rnorm()` takes the mean and the standard deviation, which is the square root of the variance). Save this as `normal_sample`.
+- Compare the two distributions with the `compare_histograms()` function. (Remember that this takes two arguments: the first and second vectors to compare).
+
+Code for the `compare_histograms()` function is provided below:
+
+```{.r}
+compare_histograms <- function(variable1, variable2) {
+  library(ggplot2)
+  x <- data.frame(value = variable1, variable = "Variable 1")
+  y <- data.frame(value = variable2, variable = "Variable 2")
+  ggplot(rbind(x, y), aes(value)) +
+    geom_histogram(bins = 30) +
+    facet_wrap(~ variable, nrow = 2)
+}
+```
+
+
+```{r}
+# Draw a random sample of 100,000 from the Binomial(1000, .2) distribution
+binom_sample <- rbinom(100000, 1000, .2)
+
+# Draw a random sample of 100,000 from the normal approximation
+normal_sample <- rnorm(100000, 200, sqrt(160))
+
+# Compare the two distributions with the compare_histograms function
+compare_histograms(binom_sample, normal_sample)
+```
+
+# Comparing the cumulative density of the binomial
+
+If you flip 1000 coins that each have a 20% chance of being heads, what is the probability you would get 190 heads or fewer?
+
+You'll get similar answers if you solve this with the binomial or its normal approximation. In this exercise, you'll solve it both ways, using both simulation and exact calculation.
+
+- Use the simulated `binom_sample` (provided) from the last exercise to estimate the probability of getting 190 or fewer heads.
+- Use the simulated `normal_sample` to estimate the probability of getting 190 or fewer heads.
+- Calculate the exact probability of the binomial being <= 190 with `pbinom()`.
+- Calculate the exact probability of the normal being <= 190 with `pnorm()`.
+
+```{r}
+# Simulations from the normal and binomial distributions
+binom_sample <- rbinom(100000, 1000, .2)
+normal_sample <- rnorm(100000, 200, sqrt(160))
+```
+
+```{r}
+# Use binom_sample to estimate the probability of <= 190 heads
+mean(binom_sample <= 190)
+
+# Use normal_sample to estimate the probability of <= 190 heads
+mean(normal_sample <= 190)
+
+# Calculate the probability of <= 190 heads with pbinom
+pbinom(190, 1000, .2)
+
+# Calculate the probability of <= 190 heads with pnorm
+pnorm(190, 200, sqrt(160))
+```
+
+# Comparing the distributions of the normal and binomial for low n
+
+When we flip a *lot* of coins, it looks like the normal distribution is a pretty close approximation. What about when we flip only 10 coins, each still having a 20% chance of coming up heads? Is the normal still a good approximation?
+
+- Generate 100,000 draws from the Binomial(10, .2) distribution. Save this as `binom_sample.`
+- Generate 100,000 draws from the normal distribution that approximates this binomial distribution, using the `rnorm()` function. Save this as `normal_sample`.
+- Compare the two distributions with the `compare_histograms()` function. (Remember that this takes two arguments: the two samples that are to be compared).
+
+```{r}
+# Draw a random sample of 100,000 from the Binomial(10, .2) distribution
+binom_sample <- rbinom(100000, 10, .2)
+
+# Draw a random sample of 100,000 from the normal approximation
+normal_sample <- rnorm(100000, 2, sqrt(1.6))
+
+# Compare the two distributions with the compare_histograms function
+compare_histograms(binom_sample, normal_sample)
+```
+
+# Approximating a binomial with a Poisson
+
+If you were drawing from a binomial with size = 1000 and p = .002, what would be the mean of the Poisson approximation?
+
+- 1
+- **2**
+- 4
+- 20
+
+# Simulating from a Poisson and a binomial
+
+If we were flipping 100,000 coins that each have a .2% chance of coming up heads, you could use a Poisson(2) distribution to approximate it. Let's check that through simulation.
+
+- Generate 100,000 draws from the Binomial(1000, .002) distribution. Save it as `binom_sample`.
+- Generate 100,000 draws from the Poisson distribution that approximates this binomial distribution, using the `rpois()` function. Save it as `poisson_sample`.
+- Compare the two distributions with the compare_histograms() function. (Remember that this takes two arguments: the two samples that are to be compared).
+
+```{r}
+# Draw a random sample of 100,000 from the Binomial(1000, .002) distribution
+binom_sample <- rbinom(100000, 1000, .002)
+
+# Draw a random sample of 100,000 from the Poisson approximation
+poisson_sample <- rpois(100000, 2)
+
+# Compare the two distributions with the compare_histograms function
+compare_histograms(binom_sample, poisson_sample)
+```
+
+# Density of the Poisson distribution
+
+In this exercise you'll find the probability that a Poisson random variable will be equal to zero by simulating and using the `dpois()` function, which gives an exact answer.
+
+- Simulate 100,000 draws from a Poisson distribution with a mean of 2.
+- Use this simulation to estimate the probability that a draw from this Poisson distribution will be 0.
+- Find the exact probability that a draw from a Poisson(2) distribution is zero, using the `dpois()` function.
+
+```{r}
+# Simulate 100,000 draws from Poisson(2)
+poisson_sample <- rpois(100000, 2)
+
+# Find the percentage of simulated values that are 0
+mean(poisson_sample == 0)
+
+# Use dpois to find the exact probability that a draw is 0
+dpois(0, 2)
+```
+
+# Sum of two Poisson variables
+
+One of the useful properties of the Poisson distribution is that when you add multiple Poisson distributions together, the result is also a Poisson distribution.
+
+Here you'll generate two random Poisson variables to test this.
+
+- Simulate 100,000 draws from the Poisson(1) distribution, saving them as `X`.
+- Simulate 100,000 draws separately from the Poisson(2) distribution, and save them as `Y`.
+- Add `X` and `Y` together to create a variable `Z`.
+- We expect `Z` to follow a Poisson(3) distribution. Use the `compare_histograms` function to compare `Z` to 100,000 draws from a Poisson(3) distribution.
+
+```{r}
+# Simulate 100,000 draws from Poisson(1)
+X <- rpois(100000, 1)
+
+# Simulate 100,000 draws from Poisson(2)
+Y <- rpois(100000, 2)
+
+# Add X and Y together to create Z
+Z <- X + Y
+
+# Use compare_histograms to compare Z to the Poisson(3)
+compare_histograms(Z, rpois(100000, 3))
+```
+
+# Waiting for first coin flip
+
+You'll start by simulating a series of coin flips, and "waiting" for the first heads.
+
+- Simulate 100 instances of flipping a single coin with a 20% chance of heads, and save it as the variable `flips.` (Thus, `flips` should be a vector of length 100).
+- Use `which()` to find the first case where a coin resulted in heads.
+
+```{r}
+# Simulate 100 instances of flipping a 20% coin
+flips <- rbinom(100, 1, .2)
+
+# Use which to find the first case of 1 ("heads")
+which(flips == 1)[1]
+```
+
+# Using `replicate()` for simulation
+
+Use the `replicate()` function to simulate 100,000 trials of waiting for the first heads after flipping coins with 20% chance of heads. Plot a histogram of this simulation by calling `qplot()`.
+
+- Use `replicate()` to simulate 100,000 geometric trials. Copy and paste the expression given to you as your second argument to `replicate()`.
+- Plot a histogram by calling `qplot()` on the replications.
+
+```{r}
+# Existing code for finding the first instance of heads
+which(rbinom(100, 1, 0.2) == 1)[1]
+
+# Replicate this 100,000 times using replicate()
+replications <- replicate(100000, which(rbinom(100, 1, 0.2) == 1)[1])
+
+# Histogram the replications with qplot
+qplot(replications)
+```
+
+# Simulating from the geometric distribution
+
+In this exercise you'll compare your `replications` with the output of `rgeom()`.
+
+Use the function `rgeom()` to simulate 100,000 draws from a geometric distributions with probability .2. Save this as `geom_sample`.
+Compare `replications` and `geom_sample` with the `compare_histograms()` function.
+
+```{r}
+# Replications from the last exercise
+replications <- replicate(100000, which(rbinom(100, 1, .2) == 1)[1])
+
+# Generate 100,000 draws from the corresponding geometric distribution
+geom_sample <- rgeom(100000, .2)
+
+# Compare the two distributions with compare_histograms
+compare_histograms(replications, geom_sample)
+```
+
+# Probability of a machine lasting X days
+
+A new machine arrives in a factory. This type of machine is very unreliable: every day, it has a 10% chance of breaking permanently. How long would you expect it to last?
+
+Notice that this is described by the cumulative distribution of the geometric distribution, and therefore the `pgeom()` function. `pgeom(X, .1)` would describe the probability that there are X working days before the day it breaks (that is, that it breaks on day X + 1).
+
+- Use `pgeom()` to find the probability that the machine breaks on the 5th day or earlier.
+- Use `pgeom()` to find the probability that the machine is *still working* by the end of the 20th day.
+
+```{r}
+# Find the probability the machine breaks on 5th day or earlier
+pgeom(4, .1)
+
+# Find the probability the machine is still working on 20th day
+1 - pgeom(19, .1)
+```
+
+# Graphing the probability that a machine still works
+
+If you were a supervisor at the factory with the unreliable machine, you might want to understand how likely the machine is to keep working over time. In this exercise, you'll plot the probability that the machine is still working across the first 30 days.
+
+- Calculate a vector of probabilities of whether the machine is *still working* on each day from day 1 to 30, and save it as `still_working.` You can do this with a single call to `pgeom()` by passing in a vector of numbers as the first argument. The machine has a 10% chance of breaking each day.
+- Run the command `qplot(still_working)` to graph the probability of the machine still working on each of the first 30 days, with the day on the x-axis and the probability on the y-axis.
+
+```{r}
+# Calculate the probability of machine working on day 1-30
+still_working <- 1 - pgeom(0:29, .1)
+
+# Plot the probability for days 1 to 30
+qplot(1:30, still_working)
+```
+

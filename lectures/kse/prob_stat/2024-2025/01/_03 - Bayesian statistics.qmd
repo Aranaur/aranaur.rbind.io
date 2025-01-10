@@ -1,0 +1,183 @@
+---
+title: "Bayesian statistics"
+subtitle: "Probability and Statistics"
+affiliation: "Kyiv School of Economics"
+format: 
+  html: default
+toc: true
+number-sections: true
+echo: false
+eval: false
+---
+
+# Updating
+
+Suppose you have a coin that is equally likely to be fair (50% heads) or biased (75% heads). You then flip the coin 20 times and see 11 heads.
+
+Without doing any math, which do you now think is more likely- that the coin is fair, or that the coin is biased?
+
+- More likely that the coin is fair
+- More likely that the coin is biased
+- Still equally likely
+
+# Updating with simulation
+
+We see 11 out of 20 flips from a coin that is either fair (50% chance of heads) or biased (75% chance of heads). How likely is it that the coin is fair? Answer this by simulating 50,000 fair coins and 50,000 biased coins.
+
+- Simulate 50,000 cases of flipping 20 coins from a fair coin (50% chance of heads), as well as from a biased coin (75% chance of heads). Save these variables as fair and biased respectively.
+- Find the number of fair coins where exactly 11/20 came up heads, then the number of biased coins where exactly 11/20 came up heads. Save them as fair_11 and biased_11 respectively.
+- Find the fraction of all coins that came up heads 11 times that were fair coins- this is the posterior probability that a coin with 11/20 is fair.
+
+```{r}
+# Simulate 50000 cases of flipping 20 coins from fair and from biased
+fair <- rbinom(50000, 20, .5)
+biased <- rbinom(50000, 20, .75)
+
+# How many fair cases, and how many biased, led to exactly 11 heads?
+fair_11 <- sum(fair == 11)
+biased_11 <- sum(biased == 11)
+
+# Find the fraction of fair coins that are 11 out of all coins that were 11
+fair_11 / (fair_11 + biased_11)
+```
+
+# Updating after 16 heads
+
+Suppose that when you flip a different coin (that could either be fair or biased) 20 times, you see 16 heads.
+
+Without doing any math, which do you now think is more likely- that this coin is fair, or that it's biased?
+
+- More likely that the coin is fair.
+- More likely that the coin is biased.
+- Still equally likely.
+
+# Updating with simulation after 16 heads
+
+We see 16 out of 20 flips from a coin that is either fair (50% chance of heads) or biased (75% chance of heads). How likely is it that the coin is fair?
+
+- Simulate 50,000 cases of flipping 20 coins from a fair coin (50% chance of heads), as well as from a biased coin (75% chance of heads). Save these variables as fair and biased respectively.
+- Find the number of fair coins where exactly 16/20 came up heads, then the number of biased coins where exactly 16/20 came up heads. Save them as fair_16 and biased_16 respectively.
+- Print the fraction of all coins that came up heads 16 times that were fair coins- this is the posterior probability that a coin with 16/20 is fair.
+
+```{r}
+# Simulate 50000 cases of flipping 20 coins from fair and from biased
+fair <- rbinom(50000, 20, .5)
+biased <- rbinom(50000, 20, .75)
+
+# How many fair cases, and how many biased, led to exactly 16 heads?
+fair_16 <- sum(fair == 16)
+biased_16 <- sum(biased == 16)
+
+# Find the fraction of fair coins that are 16 out of all coins that were 16
+fair_16 / (fair_16 + biased_16)
+```
+
+# Updating with priors
+
+We see 14 out of 20 flips are heads, and start with a 80% chance the coin is fair and a 20% chance it is biased to 75%.
+
+You'll solve this case with simulation, by starting with a "bucket" of 10,000 coins, where 8,000 are fair and 2,000 are biased, and flipping each of them 20 times.
+
+- Simulate 8,000 trials of flipping a fair coin 20 times and 2,000 trials of flipping a biased coin 20 times. Save them as `fair_flips` and `biased_flips`, respectively.
+- Find the number of cases that resulted in 14 heads from each coin, saving them as `fair_14` and `biased_14` respectively.
+- Find the fraction of all coins that resulted in 14 heads that were fair: this is an estimate of the posterior probability that the coin is fair.
+
+```{r}
+# Simulate 8000 cases of flipping a fair coin, and 2000 of a biased coin
+fair_flips <- rbinom(8000, 20, .5)
+biased_flips <- rbinom(2000, 20, .75)
+
+# Find the number of cases from each coin that resulted in 14/20
+fair_14 <- sum(fair_flips == 14)
+biased_14 <- sum(biased_flips == 14)
+
+# Use these to estimate the posterior probability
+fair_14 / (fair_14 + biased_14)
+```
+
+# Updating with three coins
+
+Suppose instead of a coin being either fair or biased, there are three possibilities: that the coin is fair (50% heads), low (25% heads), and high (75% heads). There is a 80% chance it is fair, a 10% chance it is biased low, and a 10% chance it is biased high.
+
+You see 14/20 flips are heads. What is the probability that the coin is fair?
+
+- Use the `rbinom()` function to simulate 80,000 draws from the fair coin, 10,000 draws from the high coin, and 10,000 draws from the low coin, with each draw containing 20 flips. Save them as `flips_fair`, `flips_high`, and `flips_low`, respectively.
+- For each of these types, compute the number of coins that resulted in 14. Save them as `fair_14`, `high_14`, and `low_14`, respectively.
+- Find the posterior probability that the coin was fair, by dividing the number of fair coins resulting in 14 from the total number of coins resulting in 14.
+
+```{r}
+# Simulate 80,000 draws from fair coin, 10,000 from each of high and low coins
+flips_fair <- rbinom(80000, 20, .5)
+flips_high <- rbinom(10000, 20, .75)
+flips_low <- rbinom(10000, 20, .25)
+
+# Compute the number of coins that resulted in 14 heads from each of these piles
+fair_14 <- sum(flips_fair == 14)
+high_14 <- sum(flips_high == 14)
+low_14 <- sum(flips_low == 14)
+
+# Compute the posterior probability that the coin was fair
+fair_14 / (fair_14 + low_14 + high_14)
+```
+
+# Updating with Bayes theorem
+
+In this chapter, you used simulation to estimate the posterior probability that a coin that resulted in 11 heads out of 20 is fair. Now you'll calculate it again, this time using the exact probabilities from `dbinom()`. There is a 50% chance the coin is fair and a 50% chance the coin is biased.
+
+- Use the `dbinom()` function to calculate the exact probability of getting 11 heads out of 20 flips with a fair coin (50% chance of heads) and with a biased coin (75% chance of heads). Save them as `probability_fair` and `probability_biased`, respectively.
+- Use these to calculate the posterior probability that the coin is fair. This is the probability that you would get 11 from a fair coin, divided by the sum of the two probabilities.
+
+```{r}
+# Use dbinom to calculate the probability of 11/20 heads with fair or biased coin
+probability_fair <- dbinom(11, 20, .5)
+probability_biased <- dbinom(11, 20, .75)
+
+# Calculate the posterior probability that the coin is fair
+probability_fair / (probability_fair + probability_biased)
+```
+
+# Updating for other outcomes
+
+In the last exercise, you solved for the probability that the coin is fair if it results in 11 heads out of 20 flips, assuming that beforehand there was an equal chance of it being a fair coin or a biased coin. Recall that the code looked something like:
+
+```{.r}
+probability_fair <- dbinom(11, 20, .5)
+probability_biased <- dbinom(11, 20, .75)
+probability_fair / (probability_fair + probability_biased)
+```
+
+Now you'll find, using the `dbinom()` approach, the posterior probability if there were two other outcomes.
+
+- Find the probability that a coin resulting in 14 heads out of 20 flips is fair.
+- Find the probability that a coin resulting in 18 heads out of 20 flips is fair.
+
+```{r}
+# Find the probability that a coin resulting in 14/20 is fair
+dbinom(14, 20, .5) / (dbinom(14, 20, .5) + dbinom(14, 20, .75))
+
+# Find the probability that a coin resulting in 18/20 is fair
+dbinom(18, 20, .5) / (dbinom(18, 20, .5) + dbinom(18, 20, .75))
+```
+
+# More updating with priors
+
+Suppose we see 16 heads out of 20 flips, which would normally be strong evidence that the coin is biased. However, suppose we had set a prior probability of a 99% chance that the coin is fair (50% chance of heads), and only a 1% chance that the coin is biased (75% chance of heads).
+
+You'll solve this exercise by finding the exact answer with `dbinom()` and Bayes' theorem. Recall that Bayes' theorem looks like:
+
+$$
+\text{Pr}(\text{fair}|A) = \frac{\text{Pr}(A|\text{fair}) \times \text{Pr}(\text{fair})}{\text{Pr}(A)}
+$$
+
+- Use `dbinom()` to calculate the probabilities that a fair coin and a biased coin would result in 16 heads out of 20 flips.
+- Use Bayes' theorem to find the posterior probability that the coin is fair, given that there is a **99% prior probability** that the coin is fair.
+
+```{r}
+# Use dbinom to find the probability of 16/20 from a fair or biased coin
+probability_16_fair <- dbinom(16, 20, .5)
+probability_16_biased <- dbinom(16, 20, .75)
+
+# Use Bayes' theorem to find the posterior probability that the coin is fair
+(probability_16_fair * .99) / (probability_16_fair * .99 + probability_16_biased * .01)
+```
+

@@ -1,0 +1,948 @@
+---
+title: "Welcome to R"
+subtitle: "Probability and Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .01_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=2851">🔗Probability and Statistics (BE27, EBD27)</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Getting started {background-iframe=".01_files/libs/colored-particles/index.html"}
+
+## Software installation {.smaller}
+
+1. Download [R](https://www.r-project.org/).
+
+2. Download [RStudio](https://posit.co/download/rstudio-desktop/).
+
+Also you can use:
+
+- [VS Code](https://code.visualstudio.com/).
+- [Positron](https://positron.posit.co/)[^positron].
+- [Posit Cloud](https://posit.cloud/)[^posit-cloud].
+- [Google Colab](https://colab.research.google.com/)[^colab].
+
+[^positron]: A next-generation data science IDE by Posit.
+
+[^posit-cloud]: Has a free plan with 1GB of RAM and 1 CPU core but also has time limits.
+
+[^colab]: Does not support Quarto.
+
+## Some OS-specific extras
+
+- **Windows:** Install [Rtools](https://cran.r-project.org/bin/windows/Rtools/). I also recommend that you install [Chocolately](https://chocolatey.org/)[^choco].
+- **Mac:** Install [Homebrew](https://brew.sh/). I also recommend that you configure/open your C++ toolchain (see [here](https://github.com/rmacoslib/r-macos-rtools#installer-package-for-macos-r-toolchain-).)
+- **Linux:** None (you should be good to go).
+
+[^choco]: My instructions how to use Chocolately are [here](https://aranaur.rbind.io/blog/2023/01/) (in Ukrainian).
+
+## Checklist {.smaller}
+
+- [x] Do you have the most recent version of R?
+
+```{r}
+#| label: check-r-version
+
+version$version.string
+```
+
+<br>
+
+- [x] Do you have the most recent version of RStudio?
+
+```{r}
+#| label: check-rstudio-version
+#| eval: false
+
+RStudio.Version()$version # <1>
+```
+
+1. Requires an interactive session but should return something like `[1] ‘2023.12.1.402’`.
+
+<br>
+
+- [x] Have you updated all of your R packages?
+
+```{r}
+#| label: check-packages
+#| eval: false
+
+update.packages(ask = FALSE, checkBuilt = TRUE)
+```
+
+# Why R? {background-iframe=".01_files/libs/colored-particles/index.html"}
+
+## Why R and RStudio?
+
+```{r}
+#| label: why-r
+#| echo: false
+#| fig-align: center
+
+pop_df = 
+  data.frame(
+  lang = c("SQL", "Python", "R", "SAS", "Matlab", "SPSS", "Stata"),
+  n_jobs = c(107130, 66976, 48772, 25644, 11464, 3717, 1624),
+  free = c(T, T, T, F, F, F, F)
+  )
+## Plot it
+pop_df %>% 
+  mutate(lang = lang %>% factor(ordered = T)) %>%
+  ggplot(aes(x = lang, y = n_jobs, fill = free)) +
+  geom_col() +
+  geom_hline(yintercept = 0) +
+  aes(x = reorder(lang, -n_jobs), fill = reorder(free, -free)) +
+  xlab("Statistical language") +
+  scale_y_continuous(label = scales::comma) +
+  ylab("Number of jobs") +
+  labs(
+    title = "Comparing statistical languages"
+    ) +
+  scale_fill_manual(
+    "Free?",
+    labels = c("True", "False"),
+    values = c("#f92672", "darkslategray")
+    ) +
+  ggthemes::theme_pander(base_size = 17) +
+  # theme_ipsum() +
+  theme(legend.position = "bottom")
+```
+
+## R code example (linear regression) {.smaller}
+
+```{r}
+#| label: linear-regression
+
+fit  <- lm(mpg ~ wt, data = mtcars)
+summary(fit)
+```
+
+## Base R plot
+
+```{r}
+#| label: base-plot
+
+# par(mar = c(4, 4, 1, .1)) ## Just for nice plot margins on this slide deck
+plot(mtcars$wt, mtcars$mpg)
+abline(fit, col = "red")
+```
+
+## ggplot2
+
+```{r}
+#| label: ggplot2-plot
+#| fig-align: center
+
+library(ggplot2)
+
+ggplot(data = mtcars, aes(x = wt, y = mpg)) + 
+  geom_point() +
+  geom_smooth(method = "lm", color = "red")
+```
+
+## And more...
+
+```{r}
+#| label: more-plotting
+#| eval: false
+
+library(gganimate)
+library(gapminder)
+
+ggplot(gapminder, aes(gdpPercap, lifeExp, size = pop, colour = country)) +
+  geom_point(alpha = 0.7, show.legend = FALSE) +
+  scale_colour_manual(values = country_colors) +
+  scale_size(range = c(2, 12)) +
+  scale_x_log10() +
+  facet_wrap(~continent) +
+  # Here comes the gganimate specific bits
+  labs(title = 'Year: {frame_time}', x = 'GDP per capita', y = 'life expectancy') +
+  transition_time(year) +
+  ease_aes('linear')
+```
+
+## And more... (cont.)
+
+![](img/gapminder.gif){fig-align="center"}
+
+## And more... (cont.) {.tiny}
+
+```{r}
+#| label: more-kable
+
+library(kableExtra)
+
+mpg_list <- split(mtcars$mpg, mtcars$cyl)
+disp_list <- split(mtcars$disp, mtcars$cyl)
+inline_plot <- data.frame(cyl = c(4, 6, 8), mpg_box = "", mpg_hist = "",
+                          mpg_line1 = "", mpg_line2 = "",
+                          mpg_points1 = "", mpg_points2 = "", mpg_poly = "")
+inline_plot %>%
+  kbl(booktabs = TRUE) %>%
+  kable_paper(full_width = FALSE) %>%
+  column_spec(2, image = spec_boxplot(mpg_list)) %>%
+  column_spec(3, image = spec_hist(mpg_list)) %>%
+  column_spec(4, image = spec_plot(mpg_list, same_lim = TRUE)) %>%
+  column_spec(5, image = spec_plot(mpg_list, same_lim = FALSE)) %>%
+  column_spec(6, image = spec_plot(mpg_list, type = "p")) %>%
+  column_spec(7, image = spec_plot(mpg_list, disp_list, type = "p")) %>%
+  column_spec(8, image = spec_plot(mpg_list, polymin = 5))
+```
+
+## And more... (cont.)
+
+<iframe width="1350" height="760" src="https://gallery.shinyapps.io/051-movie-explorer/"></iframe>
+
+::: footer
+🔗Source: [Movie explorer](https://gallery.shinyapps.io/051-movie-explorer/)
+:::
+
+## And more... (cont.) {.tiny}
+
+```{r}
+#| label: leaflet-map
+#| layout: [[100]]
+
+library(leaflet)
+
+content <- paste(sep = "<br/>",
+  "<b><a href='https://kse.ua/ua/'>Kyiv School of Economics</a></b>",
+  "Mykoly Shpaka St, 3",
+  "Kyiv, Ukraine"
+)
+
+leaflet() %>% 
+  addTiles() %>% 
+  addMarkers(lng = 30.4298435, lat = 50.4584603, popup = content)
+```
+
+# Some R basics {background-iframe=".01_files/libs/colored-particles/index.html"}
+
+## Basic arithmetic
+
+```{r}
+#| label: basic-arithmetic
+
+1 + 2 ## Addition
+6 - 7 ## Subtraction
+5 / 2 ## Division
+2^3 ## Exponentiation, 2 ** 3 will also work
+2 + 4 * 1^3 ## Standard order of precedence (`*` before `+`, etc.)
+100 %/% 60 ## How many whole hours in 100 minutes?
+100 %% 60 ## How many minutes are left over?
+```
+
+## Logic
+
+```{r}
+#| label: logical-operations
+
+1 > 2
+1 > 2 & 1 > 0.5 ## The "&" stands for "and"
+1 > 2 | 1 > 0.5 ## The "|" stands for "or"
+isTRUE (1 < 2)
+```
+
+You can read more about logical operators and types [here](https://stat.ethz.ch/R-manual/R-devel/library/base/html/Logic.html) and [here](https://stat.ethz.ch/R-manual/R-devel/library/base/html/logical.html).
+
+## Logic (cont.) {.smaller}
+
+#### Order of precedence
+
+Much like standard arithmetic, logic statements follow a strict order of precedence. Logical operators (`>`, `==`, etc) are evaluated before Boolean operators (`&` and `|`). Failure to recognise this can lead to unexpected behaviour...
+
+```{r}
+1 > 0.5 & 2
+```
+
+What's happening here is that R is evaluating two separate "logical" statements:
+
+- `1 > 0.5`, which is is obviously TRUE.
+- `2`, which is TRUE(!) because R is "helpfully" converting it to `as.logical(2)`.
+
+**Solution:** Be explicit about each component of your logic statement(s).
+
+```{r}
+1 > 0.5 & 1 > 2
+```
+
+## Logic (cont.)
+
+#### Negation: `!`
+
+We use `!` as a short hand for negation. This will come in very handy when we start filtering data objects based on non-missing (i.e. non-NA) observations.
+
+```{r}
+is.na(1:10)
+!is.na(1:10)
+# Negate(is.na)(1:10) ## This also works. Try it yourself.
+```
+
+## Logic (cont.) {.smaller}
+
+**Value matching:** `%in%`
+
+To see whether an object is contained within (i.e. matches one of) a list of items, use `%in%`.
+
+```{r}
+4 %in% 1:10
+4 %in% 5:10
+```
+
+. . .
+
+There's no equivalent "not in" command, but how might we go about creating one?
+
+- Hint: Think about negation...
+
+. . .
+
+```{r}
+`%ni%`  <- Negate(`%in%`) ## The backticks (`) help to specify functions.
+4 %ni% 5:10
+```
+
+## Logic (cont.)
+
+**Evaluation**
+
+We'll get to assignment shortly. However, to preempt it somewhat, we always use two equal signs for logical evaluation.
+
+```{r, error=T}
+#| label: logical-evaluation
+#| error: true
+
+1 = 1 ## This doesn't work
+1 == 1 ## This does.
+1 != 2 ## Note the single equal sign when combined with a negation.
+```
+
+## Logic (cont.) {.smaller}
+
+**Evaluation caveat:** Floating-point numbers
+
+What do you think will happen if we evaluate `0.1 + 0.2 == 0.3`?
+
+. . .
+
+```{r floating1}
+0.1 + 0.2 == 0.3
+```
+Uh-oh! (Or, maybe you're thinking: Huh??)
+
+. . .
+
+**Problem:** Computers represent numbers as binary (i.e. base 2) floating-points. More [here](https://floating-point-gui.de/basic/).
+
+- Fast and memory efficient, but can lead to unexpected behaviour. 
+- Similar to the way that standard decimal (i.e. base 10) representation can't precisely capture certain fractions (e.g. $\frac{1}{3} = 0.3333...$). 
+
+. . .
+
+**Solution:** Use `all.equal()` for evaluating floats (i.e  fractions).
+
+```{r floating2}
+all.equal(0.1 + 0.2, 0.3)
+```
+
+## Assignment {.smaller}
+
+In R, we can use either `<-` or `=` to handle assignment.
+
+. . .
+
+Assignment with `<-`:
+
+`<-` is normally read aloud as "gets". You can think of it as a (left-facing) arrow saying *assign in this direction*.
+
+```{r}
+a <- 10 + 5
+a
+```
+
+. . .
+
+Of course, an arrow can point in the other direction too (i.e. `->`). So, the following code chunk is equivalent to the previous one, although used much less frequently.
+
+```{r}
+10 + 5 -> a
+```
+
+## Assignment (cont.)
+
+**Assignment with `=`**
+
+You can also use `=` for assignment.
+
+```{r}
+b = 10 + 10 ## Note that the assigned object *must* be on the left with "=".
+b
+```
+
+. . .
+
+**Which assignment operator to use?**
+
+Most R users seem to prefer `<-` for assignment, since `=` also has specific role for evaluation *within* functions.
+
+**Bottom line:** Use whichever you prefer. Just be consistent.
+
+## Help {.tiny}
+
+For more information on a (named) function or object in R, consult the "help" documentation. For example:
+
+```R
+help(plot)
+```
+
+Or, more simply, just use `?`:
+  
+```R
+# This is what most people use.
+?plot 
+```
+
+Or, just use `F1`.
+
+. . .
+
+</br>
+
+**Aside 1:** Comments in R are demarcated by `#`.
+
+- Hit `Ctrl+Shift+c` in RStudio to (un)comment whole sections of highlighted code.
+
+. . .
+
+**Aside 2:** See the *Examples* section at the bottom of the help file?
+
+- You can run them with the `example()` function. Try it: `example(plot)`.
+
+## Help (cont.) {.smaller}
+
+**Vignettes**
+
+For many packages, you can also try the `vignette()` function, which will provide an introduction to a package and it's purpose through a series of helpful examples.
+
+- Try running `vignette("dplyr")` in your console now.
+
+. . .
+
+I highly encourage reading package vignettes if they are available. 
+
+- They are often the best way to learn how to use a package.
+
+. . .
+
+One complication is that you need to know the exact name of the package vignette(s).
+
+- E.g. The `dplyr` package actually has several vignettes associated with it: "dplyr", "window-functions", "programming", etc.
+- You can run `vignette()` (i.e. without any arguments) to list the available vignettes of every *installed* package installed on your system. 
+- Or, run `vignette(all = FALSE)` if you only want to see the vignettes of any *loaded* packages.
+
+## Help (cont.)
+
+Similar to vignettes, many packages come with built-in, interactive demos.
+
+To list all available demos on your system:
+
+```r
+demo(package = .packages(all.available = TRUE))
+```
+
+. . .
+
+To run a specific demo, just tell R which one and the name of the parent package. For example:
+
+```r
+demo("graphics", package = "graphics")
+```
+
+## Reserved words {.smaller}
+
+We've seen that we can assign objects to different names. However, there are a number of special words that are "reserved" in R.
+
+- These are are fundamental commands, operators and relations in base R that you cannot (re)assign, even if you wanted to.
+- We already encountered examples with the logical operators.
+
+See [here](http://stat.ethz.ch/R-manual/R-devel/library/base/html/Reserved.html) for a full list, including (but not limited to):
+
+```R
+if 
+else 
+while 
+function 
+for
+TRUE 
+FALSE 
+NULL 
+Inf 
+NaN 
+NA
+```
+
+## Semi-reserved words {.tiny}
+
+In addition to the list of strictly reserved words, there is a class of words and strings that I am going to call "semi-reserved".
+
+- These are named functions or constants (e.g. `pi`) that you can re-assign if you really wanted to... but already come with important meanings from base R.
+
+Arguably the most important semi-reserved character is `c()`, which we use for concatenation; i.e. creating vectors and binding different objects together.
+
+```{r}
+my_vector = c(1, 2, 5)
+my_vector
+```
+
+. . .
+
+What happens if you type the following? (Try it in your console.)
+
+```R
+c = 4
+c(1, 2 ,5)
+```
+
+. . .
+
+Vectors are very important in R, because the language has been optimised for them. Don't worry about this now; later you'll learn what I mean by "vectorising" a function.
+
+## Semi-reserved words (cont.) {.smaller}
+
+*(Continued from previous slide.)*
+
+In this case, thankfully nothing. R is "smart" enough to distinguish between the variable `c = 4` that we created and the built-in function `c()` that calls for concatenation.
+
+. . .
+
+However, this is still *extremely* sloppy coding. R won't always be able to distinguish between conflicting definitions. And neither will you. For example:
+```{r}
+pi
+pi = 2
+pi
+```
+
+. . .
+
+**Bottom line:** Don't use (semi-)reserved characters!
+
+## Namespace conflicts
+
+A similar issue crops up when we load two packages, which have functions that share the same name. E.g. Look what happens we load the `dplyr` package.
+
+```{r}
+library(dplyr)
+```
+
+. . .
+
+The messages that you see about some object being *masked from 'package:X'* are warning you about a namespace conflict.
+
+- E.g. Both `dplyr` and the `stats` package (which gets loaded automatically when you start R) have functions named "filter" and "lag".
+
+## Namespace conflicts (cont.) {.smaller}
+
+The potential for namespace conflicts is a result of the OOP approach[^oop].
+
+- Also reflects the fundamental open-source nature of R and the use of external packages. People are free to call their functions whatever they want, so some overlap is only to be expected.
+
+[^oop]: Similar problems arise in virtually every other programming language (Python, C, etc.)
+
+. . .
+
+Whenever a namespace conflict arises, the most recently loaded package will gain preference. So the `filter()` function now refers specifically to the `dplyr` variant.
+
+But what if we want the `stats` variant? Well, we have two options:
+
+1. Temporarily use `stats::filter()`
+2. Permanently assign `filter = stats::filter`
+
+## Solving namespace conflicts {.smaller}
+
+1. Use `package::function()`
+
+We can explicitly call a conflicted function from a particular package using the `package::function()` syntax. For example:
+```{r}
+stats::filter(1:10, rep(1, 2))
+```
+
+. . .
+
+We can also use `::` for more than just conflicted cases. 
+
+- E.g. Being explicit about where a function (or dataset) comes from can help add clarity to our code. Try these lines of code in your R console.
+
+```r
+dplyr::starwars ## Print the starwars data frame from the dplyr package
+scales::comma(c(1000, 1000000)) ## Use the comma function, which comes from the scales package
+```
+
+The `::` syntax also means that we can call functions without loading package first. E.g. As long as `dplyr` is installed on our system, then `dplyr::filter(iris, Species=="virginica")` will work.
+
+## Solving namespace conflicts (cont.)
+
+2. Assign `function  <- package::function`
+  
+A more permanent solution is to assign a conflicted function name to a particular package. This will hold for the remainder of your current R session, or until you change it back. E.g.
+
+```{r, eval=F}
+filter  <- stats::filter ## Note the lack of parentheses.
+filter  <- dplyr::filter ## Change it back again.
+```
+
+## Solving namespace conflicts (cont.)
+
+3. Use `conflict_prefer()`
+
+```{r}
+#| label: conflict-prefer
+#| eval: false
+
+#> ✖️ dplyr::filter()  masks stats::filter()
+
+library(conflicted)
+conflict_prefer("filter", winner = "dplyr")
+```
+
+## User-side namespace conflicts
+
+A final thing to say about namespace conflicts is that they don't only arise from loading packages. They can arise when users create their own functions with a conflicting name.
+
+<br>
+
+In a similar vein, one of the most common and confusing errors that even experienced R programmers run into is related to the habit of calling objects ["df"]{.hi} or ["data"]{.hi}... both of which are functions in base R!
+
+<br>
+
+See for yourself by typing `?df` or `?data`.
+
+# Data types and structures {background-iframe=".01_files/libs/colored-particles/index.html"}
+
+## Basic Data Types
+
+- `numeric`
+  + `integer`
+  + `double`
+- `character`
+- `logical`
+- `factor`
+- `Date`
+
+## Numeric {.smaller}
+
+- `numeric` is the most common data type in R.
+- It can be either an `integer` or a `double` (i.e. a floating-point number).
+
+```{r}
+#| label: numeric
+
+a <- 1 ## integer?
+b <- 1.0 ## This is a double
+c <- 1.5 ## This is also a double
+```
+
+<br>
+
+```{r}
+#| label: numeric-class
+
+class(a)
+typeof(a)
+```
+
+. . .
+
+<br>
+
+```{r}
+#| label: numeric-class2
+
+a <- 1L ## This is an integer
+
+typeof(a)
+```
+
+## Character
+
+- `character` is used for text data.
+- It is defined by wrapping text in either single or double quotes.
+
+```{r}
+#| label: character
+
+a <- "Hello, world!"
+b <- 'Hello, world!'
+```
+
+## Logical {.smaller}
+
+- `logical` is used for binary data.
+
+```{r}
+#| label: logical
+
+a <- TRUE
+b <- FALSE
+```
+
+## Factor {.smaller}
+
+- `factor` is used for categorical data.
+- it can be ordered or unordered.
+
+```{r}
+#| label: factor
+
+race <- factor(
+  c("istari", "human", "human",
+    "elf", "dwarf", "hobbit",
+    "hobbit", "hobbit", "hobbit"),
+  levels = c("istari", "human", "elf", "dwarf", "hobbit")
+  )
+
+race
+```
+
+<br>
+
+```{r}
+#| label: factor-order
+
+lotr_books <- factor(c("The Fellowship of the Ring",
+                       "The Return of the King",
+                       "The Two Towers"),
+                     levels = c("The Fellowship of the Ring",
+                                "The Two Towers",
+                                "The Return of the King"),
+                     ordered = TRUE)
+
+lotr_books
+```
+
+## Data structures
+
+![](img/dataStructures.png){fig-align="center"}
+
+## Vector {.smaller}
+
+- A vector is a one-dimensional array that can hold same type of data.
+
+```{r}
+#| label: vector
+
+c(1, 2, 3, 4, 5)
+
+c("a", "b", "c", "d", "e")
+
+c(TRUE, FALSE, TRUE, TRUE, FALSE)
+
+-5:5
+
+3:-2
+
+seq(1, 10, by = 2)
+
+rep(3, 5)
+```
+
+## Vector (cont.)
+
+- Vectors can be combined using `c()`.
+
+```{r}
+#| label: vector-combine
+
+v1 <- c("Speak", "friend")
+
+v2 <- c("and", "enter")
+
+c(v1, v2)
+```
+
+## Vector (cont.)
+
+:::: {.columns}
+
+::: {.column width="40%"}
+
+Type of Coercion:
+
+- [implicit coercion]{.hi}
+- explicit coercion
+```{r}
+#| label: coercion
+
+c(TRUE, 2, FALSE)
+
+3 - TRUE
+
+c(TRUE, 2, "Hello")
+```
+:::
+
+::: {.column width="60%" .fragment}
+![](img/coercion.jpg){fig-align="center" width=40%}
+:::
+
+::::
+
+`NULL < raw < logical < integer < double < complex < character < list < expression`
+
+## Vector (cont.)
+
+Type of Coercion:
+
+- [explicit coercion]{.hi}
+
+```{r}
+#| label: coercion2
+
+as.numeric(c(TRUE, 2, FALSE, FALSE))
+
+as.character(c(TRUE, 2, FALSE, FALSE))
+```
+
+## Matrix
+
+:::: {.columns}
+
+::: {.column width="50%"}
+- A matrix is a two-dimensional array that can hold same type of data.
+
+```{r}
+#| label: matrix
+
+matrix(1:16, nrow = 4, ncol = 4)
+```
+
+```{r}
+#| label: matrix2
+
+matrix(1:16, nrow = 4, ncol = 4, byrow = TRUE)
+```
+:::
+
+::: {.column width="50%"}
+Popular functions and operators:
+
+- `rbind()` and `cbind()`
+- `dim()`
+- `rownames()` and `colnames()`
+- `t()`
+- `%*%`
+- `det()`
+:::
+
+::::
+
+## Array
+
+- An array is a multi-dimensional extension of a matrix.
+
+```{r}
+#| label: array
+
+array(1:16, c(4, 2, 2))
+```
+
+## List
+
+- A list is a collection of objects (vectors, matrices, arrays, etc.) that can be of different types.
+
+```{r}
+#| label: list
+
+list(vec = c(1:5),
+    gendalf = "You shall not pass",
+    my_matrix = matrix(1:4, ncol = 2))
+```
+
+## Data frame
+
+- A data frame is a list of vectors of equal length.
+
+```{r}
+#| label: data-frame
+
+data.frame(name = c("Frodo", "Eowyn", "Legolas", "Arwen"),
+           sex = c("male", "female", "male", "female"),
+           age = c(51, 24, 2931, 2700),
+           one_ring = c(TRUE, FALSE, FALSE, FALSE))
+```
+
+## Additional materials
+
+- [Advanced R](https://adv-r.hadley.nz/)
+- [Big Book of R](https://www.bigbookofr.com/)
+- [R Cookbook](https://rc2e.com/)
+
+
+
+
+# Questions? {.unnumbered .unlisted background-iframe=".01_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=2554)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
