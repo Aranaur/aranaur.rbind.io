@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src=".06_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".06_files/libs/quarto-html/tabby.min.js"></script>
+<script src=".06_files/libs/quarto-html/popper.min.js"></script>
+<script src=".06_files/libs/quarto-html/tippy.umd.min.js"></script>
+<link href=".06_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".06_files/libs/quarto-html/light-border.css" rel="stylesheet">
+<link href=".06_files/libs/quarto-html/quarto-html.min.css" rel="stylesheet" data-mode="light">
+<link href=".06_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".06_files/libs/quarto-contrib/iconify-1.0.7/iconify-icon.min.js"></script><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.5.57">
+
+  <meta name="author" content="Ihor Miroshnychenko">
+  <title>Goodness of fit</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href=".06_files/libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href=".06_files/libs/revealjs/dist/reveal.css">
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+      vertical-align: middle;
+    }
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+      }
+    pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+    div.sourceCode
+      { color: #24292e;  }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #24292e; } /* Normal */
+    code span.al { color: #ff5555; font-weight: bold; } /* Alert */
+    code span.an { color: #6a737d; } /* Annotation */
+    code span.at { color: #d73a49; } /* Attribute */
+    code span.bn { color: #005cc5; } /* BaseN */
+    code span.bu { color: #d73a49; } /* BuiltIn */
+    code span.cf { color: #d73a49; } /* ControlFlow */
+    code span.ch { color: #032f62; } /* Char */
+    code span.cn { color: #005cc5; } /* Constant */
+    code span.co { color: #6a737d; } /* Comment */
+    code span.cv { color: #6a737d; } /* CommentVar */
+    code span.do { color: #6a737d; } /* Documentation */
+    code span.dt { color: #d73a49; } /* DataType */
+    code span.dv { color: #005cc5; } /* DecVal */
+    code span.er { color: #ff5555; text-decoration: underline; } /* Error */
+    code span.ex { color: #d73a49; font-weight: bold; } /* Extension */
+    code span.fl { color: #005cc5; } /* Float */
+    code span.fu { color: #6f42c1; } /* Function */
+    code span.im { color: #032f62; } /* Import */
+    code span.in { color: #6a737d; } /* Information */
+    code span.kw { color: #d73a49; } /* Keyword */
+    code span.op { color: #24292e; } /* Operator */
+    code span.ot { color: #6f42c1; } /* Other */
+    code span.pp { color: #d73a49; } /* Preprocessor */
+    code span.re { color: #6a737d; } /* RegionMarker */
+    code span.sc { color: #005cc5; } /* SpecialChar */
+    code span.ss { color: #032f62; } /* SpecialString */
+    code span.st { color: #032f62; } /* String */
+    code span.va { color: #e36209; } /* Variable */
+    code span.vs { color: #032f62; } /* VerbatimString */
+    code span.wa { color: #ff5555; } /* Warning */
+  </style>
+  <link rel="stylesheet" href=".06_files/libs/revealjs/dist/theme/quarto.css">
+  <link href=".06_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href=".06_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href=".06_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href=".06_files/libs/revealjs/plugin/reveal-chalkboard/font-awesome/css/all.css" rel="stylesheet">
+  <link href=".06_files/libs/revealjs/plugin/reveal-chalkboard/style.css" rel="stylesheet">
+  <link href=".06_files/libs/revealjs/plugin/verticator/verticator.css" rel="stylesheet">
+  <link href=".06_files/libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+
+  .callout {
+    margin-top: 1em;
+    margin-bottom: 1em;  
+    border-radius: .25rem;
+  }
+
+  .callout.callout-style-simple { 
+    padding: 0em 0.5em;
+    border-left: solid #acacac .3rem;
+    border-right: solid 1px silver;
+    border-top: solid 1px silver;
+    border-bottom: solid 1px silver;
+    display: flex;
+  }
+
+  .callout.callout-style-default {
+    border-left: solid #acacac .3rem;
+    border-right: solid 1px silver;
+    border-top: solid 1px silver;
+    border-bottom: solid 1px silver;
+  }
+
+  .callout .callout-body-container {
+    flex-grow: 1;
+  }
+
+  .callout.callout-style-simple .callout-body {
+    font-size: 1rem;
+    font-weight: 400;
+  }
+
+  .callout.callout-style-default .callout-body {
+    font-size: 0.9rem;
+    font-weight: 400;
+  }
+
+  .callout.callout-titled.callout-style-simple .callout-body {
+    margin-top: 0.2em;
+  }
+
+  .callout:not(.callout-titled) .callout-body {
+      display: flex;
+  }
+
+  .callout:not(.no-icon).callout-titled.callout-style-simple .callout-content {
+    padding-left: 1.6em;
+  }
+
+  .callout.callout-titled .callout-header {
+    padding-top: 0.2em;
+    margin-bottom: -0.2em;
+  }
+
+  .callout.callout-titled .callout-title  p {
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+  }
+    
+  .callout.callout-titled.callout-style-simple .callout-content  p {
+    margin-top: 0;
+  }
+
+  .callout.callout-titled.callout-style-default .callout-content  p {
+    margin-top: 0.7em;
+  }
+
+  .callout.callout-style-simple div.callout-title {
+    border-bottom: none;
+    font-size: .9rem;
+    font-weight: 600;
+    opacity: 75%;
+  }
+
+  .callout.callout-style-default  div.callout-title {
+    border-bottom: none;
+    font-weight: 600;
+    opacity: 85%;
+    font-size: 0.9rem;
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+  }
+
+  .callout.callout-style-default div.callout-content {
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+  }
+
+  .callout.callout-style-simple .callout-icon::before {
+    height: 1rem;
+    width: 1rem;
+    display: inline-block;
+    content: "";
+    background-repeat: no-repeat;
+    background-size: 1rem 1rem;
+  }
+
+  .callout.callout-style-default .callout-icon::before {
+    height: 0.9rem;
+    width: 0.9rem;
+    display: inline-block;
+    content: "";
+    background-repeat: no-repeat;
+    background-size: 0.9rem 0.9rem;
+  }
+
+  .callout-title {
+    display: flex
+  }
+    
+  .callout-icon::before {
+    margin-top: 1rem;
+    padding-right: .5rem;
+  }
+
+  .callout.no-icon::before {
+    display: none !important;
+  }
+
+  .callout.callout-titled .callout-body > .callout-content > :last-child {
+    padding-bottom: 0.5rem;
+    margin-bottom: 0;
+  }
+
+  .callout.callout-titled .callout-icon::before {
+    margin-top: .5rem;
+    padding-right: .5rem;
+  }
+
+  .callout:not(.callout-titled) .callout-icon::before {
+    margin-top: 1rem;
+    padding-right: .5rem;
+  }
+
+  /* Callout Types */
+
+  div.callout-note {
+    border-left-color: #4582ec !important;
+  }
+
+  div.callout-note .callout-icon::before {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAAEU0lEQVRYCcVXTWhcVRQ+586kSUMMxkyaElstCto2SIhitS5Ek8xUKV2poatCcVHtUlFQk8mbaaziwpWgglJwVaquitBOfhQXFlqlzSJpFSpIYyXNjBNiTCck7x2/8/LeNDOZxDuEkgOXe++553zfefee+/OYLOXFk3+1LLrRdiO81yNqZ6K9cG0P3MeFaMIQjXssE8Z1JzLO9ls20MBZX7oG8w9GxB0goaPrW5aNMp1yOZIa7Wv6o2ykpLtmAPs/vrG14Z+6d4jpbSKuhdcSyq9wGMPXjonwmESXrriLzFGOdDBLB8Y6MNYBu0dRokSygMA/mrun8MGFN3behm6VVAwg4WR3i6FvYK1T7MHo9BK7ydH+1uurECoouk5MPRyVSBrBHMYwVobG2aOXM07sWrn5qgB60rc6mcwIDJtQrnrEr44kmy+UO9r0u9O5/YbkS9juQckLed3DyW2XV/qWBBB3ptvI8EUY3I9p/67OW+g967TNr3Sotn3IuVlfMLVnsBwH4fsnebJvyGm5GeIUA3jljERmrv49SizPYuq+z7c2H/jlGC+Ghhupn/hcapqmcudB9jwJ/3jvnvu6vu5lVzF1fXyZuZZ7U8nRmVzytvT+H3kilYvH09mLWrQdwFSsFEsxFVs5fK7A0g8gMZjbif4ACpKbjv7gNGaD8bUrlk8x+KRflttr22JEMRUbTUwwDQScyzPgedQHZT0xnx7ujw2jfVfExwYHwOsDTjLdJ2ebmeQIlJ7neo41s/DrsL3kl+W2lWvAga0tR3zueGr6GL78M3ifH0rGXrBC2aAR8uYcIA5gwV8zIE8onoh8u0Fca/ciF7j1uOzEnqcIm59sEXoGc0+z6+H45V1CvAvHcD7THztu669cnp+L0okAeIc6zjbM/24LgGM1gZk7jnRu1aQWoU9sfUOuhrmtaPIO3YY1KLLWZaEO5TKUbMY5zx8W9UJ6elpLwKXbsaZ4EFl7B4bMtDv0iRipKoDQT2sNQI9b1utXFdYisi+wzZ/ri/1m7QfDgEuvgUUEIJPq3DhX/5DWNqIXDOweC2wvIR90Oq3lDpdMIgD2r0dXvGdsEW5H6x6HLRJYU7C69VefO1x8Gde1ZFSJLfWS1jbCnhtOPxmpfv2LXOA2Xk2tvnwKKPFuZ/oRmwBwqRQDcKNeVQkYcOjtWVBuM/JuYw5b6isojIkYxyYAFn5K7ZBF10fea52y8QltAg6jnMqNHFBmGkQ1j+U43HMi2xMar1Nv0zGsf1s8nUsmUtPOOrbFIR8bHFDMB5zL13Gmr/kGlCkUzedTzzmzsaJXhYawnA3UmARpiYj5ooJZiUoxFRtK3X6pgNPv+IZVPcnwbOl6f+aBaO1CNvPW9n9LmCp01nuSaTRF2YxHqZ8DYQT6WsXT+RD6eUztwYLZ8rM+rcPxamv1VQzFUkzFXvkiVrySGQgJNvXHJAxiU3/NwiC03rSf05VBaPtu/Z7/B8Yn/w7eguloAAAAAElFTkSuQmCC');
+  }
+
+  div.callout-note.callout-style-default .callout-title {
+    background-color: #dae6fb
+  }
+
+  div.callout-important {
+    border-left-color: #d9534f !important;
+  }
+
+  div.callout-important .callout-icon::before {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAAEKklEQVRYCcVXTWhcVRS+575MJym48A+hSRFr00ySRQhURRfd2HYjk2SSTokuBCkU2o0LoSKKraKIBTcuFCoidGFD08nkBzdREbpQ1EDNIv8qSGMFUboImMSZd4/f9zJv8ibJMC8xJQfO3HPPPef7zrvvvnvviIkpC9nsw0UttFunbUhpFzFtarSd6WJkStVMw5xyVqYTvkwfzuf/5FgtkVoB0729j1rjXwThS7Vio+Mo6DNnvLfahoZ+i/o32lULuJ3NNiz7q6+pyAUkJaFF6JwaM2lUJlV0MlnQn5aTRbEu0SEqHUa0A4AdiGuB1kFXRfVyg5d87+Dg4DL6m2TLAub60ilj7A1Ec4odSAc8X95sHh7+ZRPCFo6Fnp7HfU/fBng/hi10CjCnWnJjsxvDNxWw0NfV6Rv5GgP3I3jGWXumdTD/3cbEOP2ZbOZp69yniG3FQ9z1jD7bnBu9Fc2tKGC2q+uAJOQHBDRiZX1x36o7fWBs7J9ownbtO+n0/qWkvW7UPIfc37WgT6ZGR++EOJyeQDSb9UB+DZ1G6DdLDzyS+b/kBCYGsYgJbSQHuThGKRcw5xdeQf8YdNHsc6ePXrlSYMBuSIAFTGAtQo+VuALo4BX83N190NWZWbynBjhOHsmNfFWLeL6v+ynsA58zDvvAC8j5PkbOcXCMg2PZFk3q8MjI7WAG/Dp9AwP7jdGBOOQkAvlFUB+irtm16I1Zw9YBcpGTGXYmk3kQIC/Cds55l+iMI3jqhjAuaoe+am2Jw5GT3Nbz3CkE12NavmzN5+erJW7046n/CH1RO/RVa8lBLozXk9uqykkGAyRXLWlLv5jyp4RFsG5vGVzpDLnIjTWgnRy2Rr+tDKvRc7Y8AyZq10jj8DqXdnIRNtFZb+t/ZRtXcDiVnzpqx8mPcDWxgARUqx0W1QB9MeUZiNrV4qP+Ehc+BpNgATsTX8ozYKL2NtFYAHc84fG7ndxUPr+AR/iQSns7uSUufAymwDOb2+NjK27lEFocm/EE2WpyIy/Hi66MWuMKJn8RvxIcj87IM5Vh9663ziW36kR0HNenXuxmfaD8JC7tfKbrhFr7LiZCrMjrzTeGx+PmkosrkNzW94ObzwocJ7A1HokLolY+AvkTiD/q1H0cN48c5EL8Crkttsa/AXQVDmutfyku0E7jShx49XqV3MFK8IryDhYVbj7Sj2P2eBxwcXoe8T8idsKKPRcnZw1b+slFTubwUwhktrfnAt7J++jwQtLZcm3sr9LQrjRzz6cfMv9aLvgmnAGvpoaGLxM4mAEaLV7iAzQ3oU0IvD5x9ix3yF2RAAuYAOO2f7PEFWCXZ4C9Pb2UsgDeVnFSpbFK7/IWu7TPTvBqzbGdCHOJQSxiEjt6IyZmxQyEJHv6xyQsYk//moVFsN2zP6fRImjfq7/n/wFDguUQFNEwugAAAABJRU5ErkJggg==');
+  }
+
+  div.callout-important.callout-style-default .callout-title {
+    background-color: #f7dddc
+  }
+
+  div.callout-warning {
+    border-left-color: #f0ad4e !important;
+  }
+
+  div.callout-warning .callout-icon::before {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAAETklEQVRYCeVWW2gcVRg+58yaTUnizqbipZeX4uWhBEniBaoUX1Ioze52t7sRq6APio9V9MEaoWlVsFasRq0gltaAPuxms8lu0gcviE/FFOstVbSIxgcv6SU7EZqmdc7v9+9mJtNks51NTUH84ed889/PP+cmxP+d5FIbMJmNbpREu4WUkiTtCicKny0l1pIKmBzovF2S+hIJHX8iEu3hZJ5lNZGqyRrGSIQpq15AzF28jgpeY6yk6GVdrfFqdrD6Iw+QlB8g0YS2g7dyQmXM/IDhBhT0UCiRf59lfqmmDvzRt6kByV/m4JjtzuaujMUM2c5Z2d6JdKrRb3K2q6mA+oYVz8JnDdKPmmNthzkAk/lN63sYPgevrguc72aZX/L9C6x09GYyxBgCX4NlvyGUHOKELlm5rXeR1kchuChJt4SSwyddZRXgvwMGvYo4QSlk3/zkHD8UHxwVJA6zjZZqP8v8kK8OWLnIZtLyCAJagYC4rTGW/9Pqj92N/c+LUaAj27movwbi19tk/whRCIE7Q9vyI6yvRpftAKVTdUjOW40X3h5OXsKCdmFcx0xlLJoSuQngnrJe7Kcjm4OMq9FlC7CMmScQANuNvjfP3PjGXDBaUQmbp296S5L4DrpbrHN1T87ZVEZVCzg1FF0Ft+dKrlLukI+/c9ENo+TvlTDbYFvuKPtQ9+l052rXrgKoWkDAFnvh0wTOmYn8R5f4k/jN/fZiCM1tQx9jQQ4ANhqG4hiL0qIFTGViG9DKB7GYzgubnpofgYRwO+DFjh0Zin2m4b/97EDkXkc+f6xYAPX0KK2I/7fUQuwzuwo/L3AkcjugPNixC8cHf0FyPjWlItmLxWw4Ou9YsQCr5fijMGoD/zpdRy95HRysyXA74MWOnscpO4j2y3HAVisw85hX5+AFBRSHt4ShfLFkIMXTqyKFc46xdzQM6XbAi702a7sy04J0+feReMFKp5q9esYLCqAZYw/k14E/xcLLsFElaornTuJB0svMuJINy8xkIYuL+xPAlWRceH6+HX7THJ0djLUom46zREu7tTkxwmf/FdOZ/sh6Q8qvEAiHpm4PJ4a/doJe0gH1t+aHRgCzOvBvJedEK5OFE5jpm4AGP2a8Dxe3gGJ/pAutug9Gp6he92CsSsWBaEcxGx0FHytmIpuqGkOpldqNYQK8cSoXvd+xLxXADw0kf6UkJNFtdo5MOgaLjiQOQHcn+A6h5NuL2s0qsC2LOM75PcF3yr5STuBSAcGG+meA14K/CI21HcS4LBT6tv0QAh8Dr5l93AhZzG5ZJ4VxAqdZUEl9z7WJ4aN+svMvwHHL21UKTd1mqvChH7/Za5xzXBBKrUcB0TQ+Ulgkfbi/H/YT5EptrGzsEK7tR1B7ln9BBwckYfMiuSqklSznIuoIIOM42MQO+QnduCoFCI0bpkzjCjddHPN/F+2Yu+sd9bKNpVwHhbS3LluK/0zgfwD0xYI5dXuzlQAAAABJRU5ErkJggg==');
+  }
+
+  div.callout-warning.callout-style-default .callout-title {
+    background-color: #fcefdc
+  }
+
+  div.callout-tip {
+    border-left-color: #02b875 !important;
+  }
+
+  div.callout-tip .callout-icon::before {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAADr0lEQVRYCe1XTWgTQRj9ZjZV8a9SPIkKgj8I1bMHsUWrqYLVg4Ue6v9BwZOxSYsIerFao7UiUryIqJcqgtpimhbBXoSCVxUFe9CTiogUrUp2Pt+3aUI2u5vdNh4dmMzOzHvvezuz8xNFM0mjnbXaNu1MvFWRXkXEyE6aYOYJpdW4IXuA4r0fo8qqSMDBU0v1HJUgVieAXxzCsdE/YJTdFcVIZQNMyhruOMJKXYFoLfIfIvVIMWdsrd+Rpd86ZmyzzjJmLStqRn0v8lzkb4rVIXvnpScOJuAn2ACC65FkPzEdEy4TPWRLJ2h7z4cArXzzaOdKlbOvKKX25Wl00jSnrwVxAg3o4dRxhO13RBSdNvH0xSARv3adTXbBdTf64IWO2vH0LT+cv4GR1DJt+DUItaQogeBX/chhbTBxEiZ6gftlDNXTrvT7co4ub5A6gp9HIcHvzTa46OS5fBeP87Qm0fQkr4FsYgVQ7Qg+ZayaDg9jhg1GkWj8RG6lkeSacrrHgDaxdoBiZPg+NXV/KifMuB6//JmYH4CntVEHy/keA6x4h4CU5oFy8GzrBS18cLJMXcljAKB6INjWsRcuZBWVaS3GDrqB7rdapVIeA+isQ57Eev9eCqzqOa81CY05VLd6SamW2wA2H3SiTbnbSxmzfp7WtKZkqy4mdyAlGx7ennghYf8voqp9cLSgKdqNfa6RdRsAAkPwRuJZNbpByn+RrJi1RXTwdi8RQF6ymDwGMAtZ6TVE+4uoKh+MYkcLsT0Hk8eAienbiGdjJHZTpmNjlbFJNKDVAp2fJlYju6IreQxQ08UJDNYdoLSl6AadO+fFuCQqVMB1NJwPm69T04Wv5WhfcWyfXQB+wXRs1pt+nCknRa0LVzSA/2B+a9+zQJadb7IyyV24YAxKp2Jqs3emZTuNnKxsah+uabKbMk7CbTgJx/zIgQYErIeTKRQ9yD9wxVof5YolPHqaWo7TD6tJlh7jQnK5z2n3+fGdggIOx2kaa2YI9QWarc5Ce1ipNWMKeSG4DysFF52KBmTNMmn5HqCFkwy34rDg05gDwgH3bBi+sgFhN/e8QvRn8kbamCOhgrZ9GJhFDgfcMHzFb6BAtjKpFhzTjwv1KCVuxHvCbsSiEz4CANnj84cwHdFXAbAOJ4LTSAawGWFn5tDhLMYz6nWeU2wJfIhmIJBefcd/A5FWQWGgrWzyORZ3Q6HuV+Jf0Bj+BTX69fm1zWgK7By1YTXchFDORywnfQ7GpzOo6S+qECrsx2ifVQAAAABJRU5ErkJggg==');
+  }
+
+  div.callout-tip.callout-style-default .callout-title {
+    background-color: #ccf1e3
+  }
+
+  div.callout-caution {
+    border-left-color: #fd7e14 !important;
+  }
+
+  div.callout-caution .callout-icon::before {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAACV0lEQVRYCdVWzWoUQRCuqp2ICBLJXgITZL1EfQDBW/bkzUMUD7klD+ATSHBEfAIfQO+iXsWDxJsHL96EHAwhgzlkg8nBg25XWb0zIb0zs9muYYWkoKeru+vn664fBqElyZNuyh167NXJ8Ut8McjbmEraKHkd7uAnAFku+VWdb3reSmRV8PKSLfZ0Gjn3a6Xlcq9YGb6tADjn+lUfTXtVmaZ1KwBIvFI11rRXlWlatwIAAv2asaa9mlB9wwygiDX26qaw1yYPzFXg2N1GgG0FMF8Oj+VIx7E/03lHx8UhvYyNZLN7BwSPgekXXLribw7w5/c8EF+DBK5idvDVYtEEwMeYefjjLAdEyQ3M9nfOkgnPTEkYU+sxMq0BxNR6jExrAI31H1rzvLEfRIdgcv1XEdj6QTQAS2wtstEALLG1yEZ3QhH6oDX7ExBSFEkFINXH98NTrme5IOaaA7kIfiu2L8A3qhH9zRbukdCqdsA98TdElyeMe5BI8Rs2xHRIsoTSSVFfCFCWGPn9XHb4cdobRIWABNf0add9jakDjQJpJ1bTXOJXnnRXHRf+dNL1ZV1MBRCXhMbaHqGI1JkKIL7+i8uffuP6wVQAzO7+qVEbF6NbS0LJureYcWXUUhH66nLR5rYmva+2tjRFtojkM2aD76HEGAD3tPtKM309FJg5j/K682ywcWJ3PASCcycH/22u+Bh7Aa0ehM2Fu4z0SAE81HF9RkB21c5bEn4Dzw+/qNOyXr3DCTQDMBOdhi4nAgiFDGCinIa2owCEChUwD8qzd03PG+qdW/4fDzjUMcE1ZpIAAAAASUVORK5CYII=');
+  }
+
+  div.callout-caution.callout-style-default .callout-title {
+    background-color: #ffe5d0
+  }
+
+  </style>
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+</head>
+<body class="quarto-light">
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide" data-background-iframe=".06_files/libs/colored-particles/index.html" class="quarto-title-block center">
+  <h1 class="title">Goodness of fit</h1>
+  <p class="subtitle">Applied statistical analysis</p>
+
+<div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+Ihor Miroshnychenko 
+</div>
+        <p class="quarto-title-affiliation">
+            Taras Shevchenko National University of Kyiv, FIT
+          </p>
+    </div>
+</div>
+
+</section><section id="TOC">
+<nav role="doc-toc"> 
+<h2 id="toc-title">Table of contents</h2>
+<ul>
+<li><a href="#/kolmogorov-test" id="/toc-kolmogorov-test">Kolmogorov test</a></li>
+<li><a href="#/qq-plot-and-shapiro-wilk-test" id="/toc-qq-plot-and-shapiro-wilk-test">QQ-plot and Shapiro-Wilk test</a></li>
+</ul>
+</nav>
+</section>
+<section>
+<section id="kolmogorov-test" class="title-slide slide level1 center">
+<h1>Kolmogorov test</h1>
+
+</section>
+<section id="task" class="slide level2 tiny">
+<h2>📈 Task</h2>
+<blockquote>
+<p>Imagine that we want to check whether the distribution of a data set follows a known distribution.</p>
+</blockquote>
+<p><span class="math inline">\(X_1, \ldots, X_n\)</span> — a sample from an unknown distribution.</p>
+<p><span class="math inline">\(\mathcal{P}\)</span> — the distribution function of the unknown distribution.</p>
+<p><span class="math inline">\(\mathcal{P}_0\)</span> — the distribution function of the known distribution.</p>
+<p><br></p>
+<ul>
+<li><span class="math inline">\(H_0\)</span>: <span class="math inline">\(\mathcal{P} = \mathcal{P}_0\)</span>.</li>
+<li><span class="math inline">\(H_1\)</span>: <span class="math inline">\(\mathcal{P} \neq \mathcal{P}_0\)</span>.</li>
+</ul>
+</section>
+<section id="mathcalp-vs.-f" class="slide level2">
+<h2>📊 <span class="math inline">\(\mathcal{P}\)</span> vs.&nbsp;<span class="math inline">\(F\)</span></h2>
+<ul>
+<li><span class="math inline">\(H_0\)</span>: <span class="math inline">\(\mathcal{P} = \mathcal{P}_0\)</span>.</li>
+<li><span class="math inline">\(H_1\)</span>: <span class="math inline">\(\mathcal{P} \neq \mathcal{P}_0\)</span>.</li>
+</ul>
+<p>Instead of <strong>comparing the distributions</strong> themselves, we can <strong>compare the distribution functions</strong> among them since a <a href="https://stats.stackexchange.com/questions/136658/why-does-a-cumulative-distribution-function-cdf-uniquely-define-a-distribution">distribution is uniquely define by its distribution function</a>.</p>
+<div class="fragment">
+<ul>
+<li><span class="math inline">\(H_0: F = F_0\)</span></li>
+<li><span class="math inline">\(H_1: F \neq F_0\)</span></li>
+</ul>
+<p>where <span class="math inline">\(F, F_0\)</span> — <em>distribution functions</em>.</p>
+</div>
+</section>
+<section id="step-1-distribution" class="slide level2 smaller">
+<h2>📊 Step 1: distribution</h2>
+<p><strong>We need to come up with the statistic and how it is distributed at <span class="math inline">\(H_0\)</span></strong>.</p>
+<ol type="1">
+<li>We estimate the CDF, or <span class="math inline">\(F(x)\)</span>:
+<ul>
+<li>Theoretical CDF <span class="math inline">\(F_0(x) = P(X \leq x)\)</span>.</li>
+<li>Empirical CDF <span class="math inline">\(\hat{F}(x) = \dfrac{1}{n}\sum I(X_i \leq x) = \frac{\text{number of points} \leq x}{n}\)</span>.</li>
+</ul></li>
+</ol>
+</section>
+<section id="step-1-visualization" class="slide level2 tiny">
+<h2>📊 Step 1: visualization</h2>
+<ul>
+<li>Take some distribution (e.g., exponential) and any point, e.g., 3.</li>
+<li>Let’s calculate the true <span class="math inline">\(F(x)\)</span> there.</li>
+<li>Next, for different <span class="math inline">\(n\)</span>, let’s calculate <span class="math inline">\(\widehat{F_n}(x)\)</span>.</li>
+<li>We plot the distance <span class="math inline">\(\widehat{F_n}(x) - F(x)\)</span>. The larger <span class="math inline">\(n\)</span> is, the smaller the distance must be.</li>
+</ul>
+<div class="fragment">
+<div id="cell-plot_cdf" class="cell" data-execution_count="2">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> calc_Fn(sample, x):</span>
+<span id="cb1-2"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""</span></span>
+<span id="cb1-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">        The function constructs an empirical distribution function over sample for Fn(x).</span></span>
+<span id="cb1-4"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb1-5"><a href="" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb1-6"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> numpy.mean(sample <span class="op">&lt;=</span> x)</span>
+<span id="cb1-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="" aria-hidden="true" tabindex="-1"></a>numpy.random.seed(<span class="dv">42</span>)</span>
+<span id="cb1-9"><a href="" aria-hidden="true" tabindex="-1"></a>N <span class="op">=</span> <span class="dv">5000</span></span>
+<span id="cb1-10"><a href="" aria-hidden="true" tabindex="-1"></a>n_array <span class="op">=</span> numpy.arange(<span class="dv">10</span>, N, <span class="dv">10</span>)</span>
+<span id="cb1-11"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># We took an exponential distribution as an example</span></span>
+<span id="cb1-12"><a href="" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> expon().rvs(N)</span>
+<span id="cb1-13"><a href="" aria-hidden="true" tabindex="-1"></a>x <span class="op">=</span> <span class="dv">3</span></span>
+<span id="cb1-14"><a href="" aria-hidden="true" tabindex="-1"></a>F_x <span class="op">=</span> expon().cdf(x)</span>
+<span id="cb1-15"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="" aria-hidden="true" tabindex="-1"></a>delta <span class="op">=</span> []</span>
+<span id="cb1-17"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> n_array:</span>
+<span id="cb1-18"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Calculate F_n_x from the first n generated points</span></span>
+<span id="cb1-19"><a href="" aria-hidden="true" tabindex="-1"></a>    F_n_x <span class="op">=</span> calc_Fn(X[:n], x)</span>
+<span id="cb1-20"><a href="" aria-hidden="true" tabindex="-1"></a>    delta.append(F_n_x <span class="op">-</span> F_x)</span>
+<span id="cb1-21"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-22"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">5</span>))</span>
+<span id="cb1-23"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.title(<span class="st">'Distribution $\widehat</span><span class="sc">{F_n}</span><span class="st">(x) - F(x)$, x is fixed'</span>, fontsize<span class="op">=</span><span class="dv">12</span>)</span>
+<span id="cb1-24"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.plot(n_array, delta, c<span class="op">=</span>red_pink, label<span class="op">=</span><span class="st">'$\widehat</span><span class="sc">{F_n}</span><span class="st">(x) - F(</span><span class="sc">{x}</span><span class="st">)$'</span>)</span>
+<span id="cb1-25"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.plot(n_array, [<span class="dv">0</span>] <span class="op">*</span> <span class="bu">len</span>(n_array), c<span class="op">=</span>turquoise, linewidth<span class="op">=</span><span class="dv">3</span>, label<span class="op">=</span><span class="st">'0'</span>)</span>
+<span id="cb1-26"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.legend(fontsize<span class="op">=</span><span class="dv">12</span>)</span>
+<span id="cb1-27"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.xlabel(<span class="st">'Sample size'</span>, fontsize<span class="op">=</span><span class="dv">12</span>)</span>
+<span id="cb1-28"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.ylabel(<span class="st">'$\delta$'</span>, fontsize<span class="op">=</span><span class="dv">12</span>)</span>
+<span id="cb1-29"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.grid(linewidth<span class="op">=</span><span class="fl">0.2</span>)</span>
+<span id="cb1-30"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".06_files/figure-revealjs/plot_cdf-output-1.svg" id="plot_cdf" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="glivenko-cantelli" class="slide level2 smaller">
+<h2>📊 Glivenko-Cantelli</h2>
+<p>How does <span class="math inline">\(\widehat{F_n}(x)\)</span> approximate <span class="math inline">\(F(x)\)</span> at each point x?</p>
+<p><br></p>
+<p><strong>Theorem (Glivenko-Cantelli):</strong></p>
+<p>Let <span class="math inline">\(X_1, X_2 \dots\)</span> — a sample of unlimited size from a distribution with distribution function <span class="math inline">\(F\)</span>. Then</p>
+<p><span class="math display">\[
+D_n = \underset{x \in \mathbb{R}}{\sup} |\widehat{F_n}(x) - F(x)| \stackrel{}{\rightarrow} 0
+\]</span></p>
+<p>This expression <span class="math inline">\(D_n\)</span> denotes the <em>maximum difference</em> between <span class="math inline">\(\hat{F}_n(x)\)</span> and <span class="math inline">\(F(x)\)</span> for all possible values of <code>x</code>.</p>
+</section>
+<section id="glivenko-cantelli-visualization" class="slide level2 tiny40">
+<h2>📊 Glivenko-Cantelli visualization</h2>
+<ul>
+<li>Generating a sample.</li>
+<li>Count <span class="math inline">\(F(x)\)</span> at each point of <span class="math inline">\(x\)</span>.</li>
+<li>Count <span class="math inline">\(\widehat{F_n}(x)\)</span> at each point of <span class="math inline">\(x\)</span>.</li>
+<li>Plot the graphs as a function of <span class="math inline">\(n\)</span>.</li>
+</ul>
+<div class="fragment">
+<div id="cell-plot_cdf_glc" class="cell" data-execution_count="3">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="" aria-hidden="true" tabindex="-1"></a>numpy.random.seed(<span class="dv">4</span>)</span>
+<span id="cb2-2"><a href="" aria-hidden="true" tabindex="-1"></a>N <span class="op">=</span> <span class="dv">1000</span></span>
+<span id="cb2-3"><a href="" aria-hidden="true" tabindex="-1"></a>n_array <span class="op">=</span> [<span class="dv">10</span>, <span class="dv">100</span>]</span>
+<span id="cb2-4"><a href="" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> expon().rvs(N)</span>
+<span id="cb2-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># This time it's not a single point, it's a number line</span></span>
+<span id="cb2-6"><a href="" aria-hidden="true" tabindex="-1"></a>x <span class="op">=</span> numpy.linspace(<span class="dv">0</span>, <span class="dv">5</span>, <span class="dv">1000</span>)</span>
+<span id="cb2-7"><a href="" aria-hidden="true" tabindex="-1"></a>F_x <span class="op">=</span> expon().cdf(x)</span>
+<span id="cb2-8"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-10"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.figure(figsize<span class="op">=</span>(<span class="dv">25</span>, <span class="dv">8</span>))</span>
+<span id="cb2-11"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ind, n <span class="kw">in</span> <span class="bu">enumerate</span>(n_array):</span>
+<span id="cb2-14"><a href="" aria-hidden="true" tabindex="-1"></a>    F_n_x <span class="op">=</span> numpy.array([calc_Fn(X[:n], x_dot) <span class="cf">for</span> x_dot <span class="kw">in</span> x])</span>
+<span id="cb2-15"><a href="" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb2-16"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Draw Dn on the graph</span></span>
+<span id="cb2-17"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Calculate delta </span></span>
+<span id="cb2-18"><a href="" aria-hidden="true" tabindex="-1"></a>    delta <span class="op">=</span> numpy.<span class="bu">abs</span>(F_n_x <span class="op">-</span> F_x)</span>
+<span id="cb2-19"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Looking for the maximum value index</span></span>
+<span id="cb2-20"><a href="" aria-hidden="true" tabindex="-1"></a>    x_ind <span class="op">=</span> numpy.argmax(delta)</span>
+<span id="cb2-21"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co"># By the index we get the point x at which the largest distance</span></span>
+<span id="cb2-22"><a href="" aria-hidden="true" tabindex="-1"></a>    dn_x_dot <span class="op">=</span> x[x_ind]</span>
+<span id="cb2-23"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Looking for the lower and upper points</span></span>
+<span id="cb2-24"><a href="" aria-hidden="true" tabindex="-1"></a>    down_bound <span class="op">=</span> <span class="bu">min</span>(F_n_x[x_ind], F_x[x_ind])</span>
+<span id="cb2-25"><a href="" aria-hidden="true" tabindex="-1"></a>    up_bound <span class="op">=</span> <span class="bu">max</span>(F_n_x[x_ind], F_x[x_ind])</span>
+<span id="cb2-26"><a href="" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb2-27"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.subplot(<span class="dv">1</span>, <span class="dv">2</span>, ind <span class="op">+</span> <span class="dv">1</span>)</span>
+<span id="cb2-28"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.title(<span class="st">'$\widehat</span><span class="sc">{F_n}</span><span class="st"> - F$, '</span> <span class="op">+</span> <span class="ss">f'n=</span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">'</span>, fontsize<span class="op">=</span><span class="dv">16</span>)</span>
+<span id="cb2-29"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.plot(x, F_x, color<span class="op">=</span><span class="st">"orange"</span>, label<span class="op">=</span><span class="st">'F(x)'</span>)</span>
+<span id="cb2-30"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.plot(x, F_n_x,color<span class="op">=</span><span class="st">"blue"</span>, label<span class="op">=</span><span class="st">'$\widehat</span><span class="sc">{F_n}</span><span class="st">(x)$'</span>)</span>
+<span id="cb2-31"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.vlines(dn_x_dot, down_bound, up_bound,</span>
+<span id="cb2-32"><a href="" aria-hidden="true" tabindex="-1"></a>               color<span class="op">=</span><span class="st">'maroon'</span>, linestyle<span class="op">=</span><span class="st">'-'</span>, linewidth<span class="op">=</span><span class="dv">3</span>, label<span class="op">=</span><span class="st">'$D_n$'</span>)</span>
+<span id="cb2-33"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.legend(fontsize<span class="op">=</span><span class="dv">16</span>)</span>
+<span id="cb2-34"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.grid(linewidth<span class="op">=</span><span class="fl">0.2</span>)</span>
+<span id="cb2-35"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.xlabel(<span class="st">'x'</span>, fontsize<span class="op">=</span><span class="dv">16</span>)</span>
+<span id="cb2-36"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.ylabel(<span class="st">'CDF'</span>, fontsize<span class="op">=</span><span class="dv">16</span>)</span>
+<span id="cb2-37"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-38"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".06_files/figure-revealjs/plot_cdf_glc-output-1.svg" id="plot_cdf_glc" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The larger <span class="math inline">\(n\)</span> is, the more accurately we predict <span class="math inline">\(F(x)\)</span> on the entire numerical line.</p>
+</div>
+</section>
+<section id="step-2-statistic" class="slide level2 smaller">
+<h2>📊 Step 2: statistic</h2>
+<p><strong>Kolmogorov test statistic</strong></p>
+<p>Let’s replace <span class="math inline">\(F(x)\)</span> with an estimate: the empirical distribution function. Then the <strong>test statistic will be</strong></p>
+<p><span class="math display">\[
+D_n = \underset{x \in \mathbb{R}}{\sup} |\widehat{F_n}(x) - F_0(x)|
+\]</span></p>
+<p>where <span class="math inline">\(F_0(x)\)</span> is the hypothesized distribution function.</p>
+<ul>
+<li><span class="math inline">\(H_0: F = F_0\)</span>.</li>
+<li><span class="math inline">\(H_1: F \neq F_0\)</span>.</li>
+</ul>
+<p>We need to find the distribution of <span class="math inline">\(D_n\)</span> under <span class="math inline">\(H_0\)</span>.</p>
+</section>
+<section id="step-3-distribution" class="slide level2 tiny">
+<h2>📊 Step 3: Distribution</h2>
+<p><strong>Distribution of Kolmogorov test statistics</strong></p>
+<blockquote>
+<p>Kolmogorov’s theorem</p>
+<p>Let <span class="math inline">\(X\)</span> be sampled from a continuous distribution. Then at <span class="math inline">\(H_0\)</span> <span class="math inline">\(\sqrt{n}D_n \stackrel{d}{\rightarrow} \phi\)</span>, where <span class="math inline">\(\phi\)</span> has a <strong>Kolmogorov distribution</strong>:</p>
+</blockquote>
+<p><span class="math inline">\(F_\phi(x) = \begin{equation*}
+\begin{cases}
+  \sum\limits_{k=-\infty}^ \infty (-1)^k e^{-2k^2 x^2}, &amp;\text{ $ x &gt; 0$}\\\
+   0, &amp;\text{ $ x &lt; 0$}
+\end{cases}
+\end{equation*}\)</span></p>
+<p>Where <span class="math inline">\(\stackrel{d}{\rightarrow}\)</span> means convergence in distribution.</p>
+<p>That is, as <span class="math inline">\(n\)</span> grows, <span class="math inline">\(D_n \rightarrow 0\)</span>, and <span class="math inline">\(\sqrt{n}D_n \rightarrow \phi\)</span>.</p>
+</section>
+<section id="step-3-visualization" class="slide level2">
+<h2>📊 Step 3: visualization</h2>
+<p>Let us graphically see how the Kolmogorov statistic is distributed, and how it behaves when n is small. To do this, we:</p>
+<ol type="1">
+<li>Generate 1000 experiments and in each of them calculate the statistics <span class="math inline">\(\sqrt{n}D_n\)</span>.</li>
+<li>In each experiment, generate a sample.</li>
+<li>Let’s calculate the statistic <span class="math inline">\(D\)</span>.</li>
+<li>Let’s construct a histogram.</li>
+<li>Let’s build the Kolmogorov distribution.</li>
+<li>Repeat the same exercise for different sample sizes</li>
+</ol>
+</section>
+<section class="slide level2">
+
+<div id="cell-plot_kolmogorov" class="cell" data-execution_count="4">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_D_statistic(sample, cdf_func):</span>
+<span id="cb3-2"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""</span></span>
+<span id="cb3-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">        Calculate the D statistic for the sample. Does not work for discrete distributions.</span></span>
+<span id="cb3-4"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">        Parameters:</span></span>
+<span id="cb3-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">            - sample: sample</span></span>
+<span id="cb3-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">            - cdf_func: function to build cdf for F0</span></span>
+<span id="cb3-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">            </span></span>
+<span id="cb3-8"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb3-9"><a href="" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb3-10"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Sort the sample to get intervals X_i, X_i+1</span></span>
+<span id="cb3-11"><a href="" aria-hidden="true" tabindex="-1"></a>    sample <span class="op">=</span> numpy.sort(sample)</span>
+<span id="cb3-12"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co"># We calculate the empirical distribution function</span></span>
+<span id="cb3-13"><a href="" aria-hidden="true" tabindex="-1"></a>    F_n_x <span class="op">=</span> numpy.array([calc_Fn(sample, x) <span class="cf">for</span> x <span class="kw">in</span> sample])</span>
+<span id="cb3-14"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Shift 1 to the right to calculate the difference at point X_i+1</span></span>
+<span id="cb3-15"><a href="" aria-hidden="true" tabindex="-1"></a>    F_n_x_shifted <span class="op">=</span> numpy.concatenate([[<span class="dv">0</span>], F_n_x[:<span class="op">-</span><span class="dv">1</span>]])</span>
+<span id="cb3-16"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Build an array of F(X) values</span></span>
+<span id="cb3-17"><a href="" aria-hidden="true" tabindex="-1"></a>    F_x <span class="op">=</span> cdf_func(sample)</span>
+<span id="cb3-18"><a href="" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb3-19"><a href="" aria-hidden="true" tabindex="-1"></a>    F_x_shifted <span class="op">=</span> cdf_func(sample)</span>
+<span id="cb3-20"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Determine the maximum distance at the left points of the interval X_i</span></span>
+<span id="cb3-21"><a href="" aria-hidden="true" tabindex="-1"></a>    left_interval_max <span class="op">=</span> numpy.<span class="bu">max</span>(numpy.<span class="bu">abs</span>(F_x <span class="op">-</span> F_n_x))</span>
+<span id="cb3-22"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Determine the maximum distance at the right points of the interval X_i+1</span></span>
+<span id="cb3-23"><a href="" aria-hidden="true" tabindex="-1"></a>    right_interval_max <span class="op">=</span> numpy.<span class="bu">max</span>(numpy.<span class="bu">abs</span>(F_x_shifted <span class="op">-</span> F_n_x_shifted))</span>
+<span id="cb3-24"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">max</span>(left_interval_max, right_interval_max)</span>
+<span id="cb3-25"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-26"><a href="" aria-hidden="true" tabindex="-1"></a>numpy.random.seed(<span class="dv">8</span>)</span>
+<span id="cb3-27"><a href="" aria-hidden="true" tabindex="-1"></a>n_array <span class="op">=</span> [<span class="dv">5</span>, <span class="dv">100</span>]</span>
+<span id="cb3-28"><a href="" aria-hidden="true" tabindex="-1"></a>distribution <span class="op">=</span> expon()</span>
+<span id="cb3-29"><a href="" aria-hidden="true" tabindex="-1"></a>exp_size <span class="op">=</span> <span class="dv">10000</span></span>
+<span id="cb3-30"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-31"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-32"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.figure(figsize<span class="op">=</span>(<span class="dv">25</span>, <span class="dv">8</span>))</span>
+<span id="cb3-33"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-34"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># For different sample sizes, plot the graphs</span></span>
+<span id="cb3-35"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ind, n <span class="kw">in</span> <span class="bu">enumerate</span>(n_array):</span>
+<span id="cb3-36"><a href="" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb3-37"><a href="" aria-hidden="true" tabindex="-1"></a>    statistics <span class="op">=</span> []</span>
+<span id="cb3-38"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Generate exp_size of experiments</span></span>
+<span id="cb3-39"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(exp_size):</span>
+<span id="cb3-40"><a href="" aria-hidden="true" tabindex="-1"></a>        X <span class="op">=</span> distribution.rvs(n)</span>
+<span id="cb3-41"><a href="" aria-hidden="true" tabindex="-1"></a>        statistics.append(get_D_statistic(X, distribution.cdf) <span class="op">*</span> numpy.sqrt(n))</span>
+<span id="cb3-42"><a href="" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb3-43"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-44"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.subplot(<span class="dv">1</span>, <span class="dv">2</span>, ind <span class="op">+</span> <span class="dv">1</span>)</span>
+<span id="cb3-45"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.title(<span class="ss">f'Visualization of Kolmogorov statistic distribution, N=</span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">'</span>, fontsize<span class="op">=</span><span class="dv">16</span>)</span>
+<span id="cb3-46"><a href="" aria-hidden="true" tabindex="-1"></a>    distplot(statistics, label<span class="op">=</span><span class="st">'$\sqrt</span><span class="sc">{n}</span><span class="st">D_n$'</span>)</span>
+<span id="cb3-47"><a href="" aria-hidden="true" tabindex="-1"></a>    x_array <span class="op">=</span> numpy.linspace(<span class="dv">0</span>, numpy.<span class="bu">max</span>(statistics), <span class="dv">1000</span>)</span>
+<span id="cb3-48"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.plot(x_array, kstwobign.pdf(x_array), label<span class="op">=</span><span class="st">'Kolmogorov distribution'</span>)</span>
+<span id="cb3-49"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.legend(fontsize<span class="op">=</span><span class="dv">16</span>)</span>
+<span id="cb3-50"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.grid(linewidth<span class="op">=</span><span class="fl">0.2</span>)</span>
+<span id="cb3-51"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.xlabel(<span class="st">'Statistics'</span>, fontsize<span class="op">=</span><span class="dv">16</span>)</span>
+<span id="cb3-52"><a href="" aria-hidden="true" tabindex="-1"></a>    pyplot.ylabel(<span class="st">'Density'</span>, fontsize<span class="op">=</span><span class="dv">16</span>)</span>
+<span id="cb3-53"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+
+</div>
+<img data-src=".06_files/figure-revealjs/plot_kolmogorov-output-1.svg" id="plot_kolmogorov" class="quarto-figure quarto-figure-center r-stretch"><p>There is a slight upward shift, which is good, because the test will be wrong less than <span class="math inline">\(\alpha\)</span>% of the time.</p>
+</section></section>
+<section>
+<section id="qq-plot-and-shapiro-wilk-test" class="title-slide slide level1 center">
+<h1>QQ-plot and Shapiro-Wilk test</h1>
+
+</section>
+<section id="qq-plot" class="slide level2 smaller">
+<h2>QQ-plot</h2>
+<p>QQ-plot &amp;mdash is a method that allows you to visualize “how well” a normal distribution describes the data.</p>
+<p><strong>QQ-plot visualization</strong>:</p>
+<ul>
+<li>Let the sampling distribution — <span class="math inline">\(\mathcal{N}(\mu, \sigma^2)\)</span>.</li>
+<li>Let us find the quantiles of 2 distributions: <span class="math inline">\(\mathcal{N}(\mu, \sigma^2)\)</span> and <span class="math inline">\(\mathcal{N}(0, 1)\)</span>. Their quantiles will be <span class="math inline">\(Q, Q'\)</span>, respectively.</li>
+<li>Let us put the quantiles of the first distribution on the Y-axis and the quantiles of the second distribution on the X-axis.</li>
+<li>Then the rule derived above states that all points <span class="math inline">\((Q'_{\alpha}, Q_{\alpha})\)</span> lie on the same line.
+<ul>
+<li>The tangent of the slope of this line is always the same and is equal to <span class="math inline">\(\frac{\sigma'}{\sigma}\)</span>.</li>
+</ul></li>
+</ul>
+</section>
+<section class="slide level2">
+
+<div id="cell-qq_plot_code" class="cell" data-execution_count="6">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="" aria-hidden="true" tabindex="-1"></a>mu <span class="op">=</span> <span class="dv">5</span></span>
+<span id="cb4-2"><a href="" aria-hidden="true" tabindex="-1"></a>sigma <span class="op">=</span> <span class="dv">10</span></span>
+<span id="cb4-3"><a href="" aria-hidden="true" tabindex="-1"></a>sample_distr <span class="op">=</span> norm(loc<span class="op">=</span>mu, scale<span class="op">=</span>sigma)</span>
+<span id="cb4-4"><a href="" aria-hidden="true" tabindex="-1"></a>standart_distr <span class="op">=</span> norm(loc<span class="op">=</span><span class="dv">0</span>, scale<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb4-5"><a href="" aria-hidden="true" tabindex="-1"></a>quantiles <span class="op">=</span> np.arange(<span class="fl">0.001</span>, <span class="dv">1</span>, <span class="fl">0.1</span>)</span>
+<span id="cb4-6"><a href="" aria-hidden="true" tabindex="-1"></a>quantle_xticks <span class="op">=</span> [<span class="st">"$Q_{"</span> <span class="op">+</span> <span class="bu">str</span>(<span class="bu">round</span>(x, <span class="dv">2</span>)) <span class="op">+</span> <span class="st">"}$"</span> <span class="cf">for</span> x <span class="kw">in</span> quantiles]</span>
+<span id="cb4-7"><a href="" aria-hidden="true" tabindex="-1"></a>quantle_yticks <span class="op">=</span> [<span class="st">"$Q'_{"</span> <span class="op">+</span> <span class="bu">str</span>(<span class="bu">round</span>(x, <span class="dv">2</span>)) <span class="op">+</span> <span class="st">"}$"</span> <span class="cf">for</span> x <span class="kw">in</span> quantiles]</span>
+<span id="cb4-8"><a href="" aria-hidden="true" tabindex="-1"></a>standart_q <span class="op">=</span> standart_distr.ppf(quantiles)</span>
+<span id="cb4-9"><a href="" aria-hidden="true" tabindex="-1"></a>sample_q <span class="op">=</span> sample_distr.ppf(quantiles)</span>
+<span id="cb4-10"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="" aria-hidden="true" tabindex="-1"></a>fig <span class="op">=</span> pyplot.figure(figsize<span class="op">=</span>(<span class="dv">15</span>, <span class="dv">10</span>))</span>
+<span id="cb4-13"><a href="" aria-hidden="true" tabindex="-1"></a>ax <span class="op">=</span> fig.add_subplot(<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">1</span>)</span>
+<span id="cb4-14"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.title(<span class="st">'QQ-Plot, visualization on ideal data'</span>, fontsize<span class="op">=</span><span class="dv">15</span>)</span>
+<span id="cb4-15"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-16"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-17"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(standart_q, sample_q, label<span class="op">=</span><span class="st">"Line $(Q_{</span><span class="ch">\\</span><span class="st">alpha}, Q'_{</span><span class="ch">\\</span><span class="st">alpha})$"</span>)</span>
+<span id="cb4-18"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> index <span class="kw">in</span> [<span class="dv">1</span>, <span class="dv">5</span>]:</span>
+<span id="cb4-19"><a href="" aria-hidden="true" tabindex="-1"></a>    center <span class="op">=</span> (standart_q[index], sample_q[index])</span>
+<span id="cb4-20"><a href="" aria-hidden="true" tabindex="-1"></a>    dot1 <span class="op">=</span> (standart_q[index] <span class="op">+</span> <span class="dv">1</span>, sample_q[index])</span>
+<span id="cb4-21"><a href="" aria-hidden="true" tabindex="-1"></a>    dot2 <span class="op">=</span> (standart_q[index <span class="op">+</span> <span class="dv">1</span>], sample_q[index <span class="op">+</span> <span class="dv">1</span>])</span>
+<span id="cb4-22"><a href="" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-23"><a href="" aria-hidden="true" tabindex="-1"></a>    label<span class="op">=</span><span class="st">""</span></span>
+<span id="cb4-24"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> index <span class="op">==</span> <span class="dv">1</span>:</span>
+<span id="cb4-25"><a href="" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="st">"$tan(\phi) = \dfrac{\sigma'}{\sigma}$"</span></span>
+<span id="cb4-26"><a href="" aria-hidden="true" tabindex="-1"></a>    am1 <span class="op">=</span> AngleAnnotation(center, dot1, dot2, ax<span class="op">=</span>ax, size<span class="op">=</span><span class="dv">250</span>, text<span class="op">=</span><span class="vs">r"$\phi$"</span>, text_kw<span class="op">=</span><span class="bu">dict</span>(fontsize<span class="op">=</span><span class="dv">16</span>))</span>
+<span id="cb4-27"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(<span class="op">*</span><span class="bu">zip</span>(<span class="op">*</span>[center, dot1]), color<span class="op">=</span><span class="st">"black"</span>, label<span class="op">=</span>label)</span>
+<span id="cb4-28"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-29"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-30"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.ylabel(<span class="st">"Quantiles $\mathcal</span><span class="sc">{N}</span><span class="st">(\mu, \sigma^2)$"</span>, fontsize<span class="op">=</span><span class="dv">15</span>)</span>
+<span id="cb4-31"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.xlabel(<span class="st">"Quantiles $\mathcal</span><span class="sc">{N}</span><span class="st">(0, 1)$"</span>, fontsize<span class="op">=</span><span class="dv">15</span>)</span>
+<span id="cb4-32"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.xticks(standart_q, quantle_xticks, fontsize<span class="op">=</span><span class="dv">15</span>)</span>
+<span id="cb4-33"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.yticks(sample_q, quantle_yticks, fontsize<span class="op">=</span><span class="dv">15</span>)</span>
+<span id="cb4-34"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.legend(fontsize<span class="op">=</span><span class="dv">15</span>)</span>
+<span id="cb4-35"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.grid(linewidth<span class="op">=</span><span class="fl">0.2</span>)</span>
+<span id="cb4-36"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+
+</div>
+<img data-src=".06_files/figure-revealjs/qq_plot_code-output-1.svg" id="qq_plot_code" class="quarto-figure quarto-figure-center r-stretch"><p><span class="math display">\[
+\begin{align}
+\phi_i = arctg \left({\frac {Q'_{0.i+0.1}-Q'_{0.i}}{Q_{0.i+0.1}-Q_{0.i}}}\right) = arctg \left({\frac{\sigma'}{\sigma}}\right) = arctg(b)
+\end{align}
+\]</span></p>
+</section>
+<section id="qq-plot-1" class="slide level2 smaller">
+<h2>QQ-plot</h2>
+<ul>
+<li>Suppose we have N points in the sample.</li>
+<li>Then, the score of the <span class="math inline">\(i\)</span>-th quantile — <span class="math inline">\(i\)</span> value in the sorted sample (recall the empirical distribution function). <span class="math inline">\(\widehat{F_n}(x) = \dfrac{1}{n}\sum I(X_i \leq x)\)</span>.</li>
+<li>Let’s construct the quantiles of the standard normal distribution.
+<ul>
+<li>To do this, we calculate the quantile at each point <span class="math inline">\(\dfrac{i}{N},\ i \in {\{1, ...\ N - 1\}}\)</span></li>
+</ul></li>
+<li>Let’s put the estimates of the quantiles of the first distribution on the Y-axis and the true quantiles of the second distribution on the X-axis.</li>
+<li>If the graph resembles a straight line, it is a normal distribution.</li>
+</ul>
+</section>
+<section class="slide level2">
+
+<div id="cell-qq_plot_example" class="cell" data-execution_count="8">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="" aria-hidden="true" tabindex="-1"></a>numpy.random.seed(<span class="dv">102</span>)</span>
+<span id="cb5-2"><a href="" aria-hidden="true" tabindex="-1"></a>sample <span class="op">=</span> norm(loc<span class="op">=</span><span class="dv">100</span>, scale<span class="op">=</span><span class="dv">1000</span>).rvs(size<span class="op">=</span><span class="dv">1000</span>)</span>
+<span id="cb5-3"><a href="" aria-hidden="true" tabindex="-1"></a>my_qq_plot(sample)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+
+</div>
+<img data-src=".06_files/figure-revealjs/qq_plot_example-output-1.svg" id="qq_plot_example" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="example-site-load-time" class="slide level2">
+<h2>Example: Site Load Time</h2>
+<p>Let’s say we wanted to plot the load time of our site in seconds. We took the last 20 values (in seconds) from different users in our logs, and plot the Q-Q plot for this sample.</p>
+<ul>
+<li>Sample: <code>[0.11, 0.07, 0.1, 0.09, 0.17, 0.14, 0.05, 0.05, 0.17, 0.07, 0.06, 0.06, 0.12, 0.12, 0.08, 0.15, 0.07, 0.06, 0.13, 0.17]</code></li>
+</ul>
+</section>
+<section class="slide level2">
+
+<div id="cell-qq_plot_example_2" class="cell" data-fig-height="6" data-execution_count="9">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="" aria-hidden="true" tabindex="-1"></a>sample <span class="op">=</span> [<span class="fl">0.11</span>, <span class="fl">0.07</span>, <span class="fl">0.1</span>, <span class="fl">0.09</span>, <span class="fl">0.17</span>, <span class="fl">0.14</span>, <span class="fl">0.05</span>, <span class="fl">0.05</span>, <span class="fl">0.17</span>, <span class="fl">0.07</span>, <span class="fl">0.06</span>, <span class="fl">0.06</span>, <span class="fl">0.12</span>, <span class="fl">0.12</span>, <span class="fl">0.08</span>, <span class="fl">0.15</span>, <span class="fl">0.07</span>, <span class="fl">0.06</span>, <span class="fl">0.13</span>, <span class="fl">0.17</span>]</span>
+<span id="cb6-2"><a href="" aria-hidden="true" tabindex="-1"></a>my_qq_plot(sample)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+
+</div>
+<img data-src=".06_files/figure-revealjs/qq_plot_example_2-output-1.svg" id="qq_plot_example_2" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="example-t-distribution" class="slide level2">
+<h2>Example: <span class="math inline">\(t\)</span>-distribution</h2>
+<div class="columns">
+<div class="column" style="width:40%;">
+<div id="cell-t_distribution_vs_normal_density" class="cell" data-execution_count="10">
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".06_files/figure-revealjs/t_distribution_vs_normal_density-output-1.svg" id="t_distribution_vs_normal_density" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div>
+</div><div class="column" style="width:60%;">
+<div id="cell-qq_plot_example_3" class="cell" data-fig-height="6" data-execution_count="11">
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".06_files/figure-revealjs/qq_plot_example_3-output-1.svg" id="qq_plot_example_3" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div>
+</div></div>
+</section>
+<section id="shapiro-wilk-test" class="slide level2">
+<h2>Shapiro-Wilk test</h2>
+<ul>
+<li><strong>Purpose</strong>: to check if the sample is drawn from a normal distribution.</li>
+<li><span class="math inline">\(H_0\)</span>: the sample is drawn from a normal distribution.</li>
+<li><span class="math inline">\(H_1\)</span>: the sample is not drawn from a normal distribution.</li>
+</ul>
+<p><span class="math display">\[
+W = \frac{\left(\sum_{i=1}^n a_i x_{(i)}\right)^2}{\sum_{i=1}^n (x_i - \bar{x})^2}
+\]</span></p>
+<p>where <span class="math inline">\(a_i\)</span> — coefficients, <span class="math inline">\(x_{(i)}\)</span> — ordered sample, <span class="math inline">\(x_i\)</span> — sample, <span class="math inline">\(\bar{x}\)</span> — sample mean.</p>
+</section>
+<section id="shapiro-wilk-test-1" class="slide level2 tiny">
+<h2>Shapiro-Wilk test</h2>
+<p><span class="math inline">\(X \sim \text{Normal}(\mu = 100, \sigma = 10)\)</span></p>
+<p><span class="math inline">\(Y \sim \text{Normal}(\mu = -1000, \sigma = 25)\)</span></p>
+<p><span class="math inline">\(H_0\)</span>: <span class="math inline">\(\frac{X}{Y} \sim \text{Normal}(\theta)\)</span></p>
+<p><span class="math inline">\(H_1\)</span>: <span class="math inline">\(\frac{X}{Y} \not\sim \text{Normal}(\theta)\)</span></p>
+<div class="columns">
+<div class="column" style="width:33%;">
+<div id="cell-shapiro_test_x" class="cell" data-execution_count="12">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="" aria-hidden="true" tabindex="-1"></a>numpy.random.seed(<span class="dv">42</span>)</span>
+<span id="cb7-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> norm(<span class="dv">100</span>, <span class="dv">10</span>).rvs(<span class="dv">1000</span>)</span>
+<span id="cb7-4"><a href="" aria-hidden="true" tabindex="-1"></a>Y <span class="op">=</span> norm(<span class="op">-</span><span class="dv">1000</span>, <span class="dv">25</span>).rvs(<span class="dv">1000</span>)</span>
+<span id="cb7-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">#plots</span></span>
+<span id="cb7-7"><a href="" aria-hidden="true" tabindex="-1"></a>distplot(X, label<span class="op">=</span><span class="st">'X'</span>)</span>
+<span id="cb7-8"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.legend()</span>
+<span id="cb7-9"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.title(<span class="st">'X distribution'</span>)</span>
+<span id="cb7-10"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.grid(linewidth<span class="op">=</span><span class="fl">0.2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".06_files/figure-revealjs/shapiro_test_x-output-1.svg" id="shapiro_test_x" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div>
+</div><div class="column" style="width:33%;">
+<div id="cell-shapiro_test_y" class="cell" data-execution_count="13">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">#plots</span></span>
+<span id="cb8-2"><a href="" aria-hidden="true" tabindex="-1"></a>distplot(Y, label<span class="op">=</span><span class="st">'Y'</span>)</span>
+<span id="cb8-3"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.legend()</span>
+<span id="cb8-4"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.title(<span class="st">'Y distribution'</span>)</span>
+<span id="cb8-5"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.grid(linewidth<span class="op">=</span><span class="fl">0.2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".06_files/figure-revealjs/shapiro_test_y-output-1.svg" id="shapiro_test_y" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div>
+</div><div class="column" style="width:33%;">
+<div id="cell-shapiro_test_x_y" class="cell" data-execution_count="14">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">#plots</span></span>
+<span id="cb9-2"><a href="" aria-hidden="true" tabindex="-1"></a>distplot(X<span class="op">/</span>Y, label<span class="op">=</span><span class="st">'X/Y'</span>)</span>
+<span id="cb9-3"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.legend()</span>
+<span id="cb9-4"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.title(<span class="st">'X/Y distribution'</span>)</span>
+<span id="cb9-5"><a href="" aria-hidden="true" tabindex="-1"></a>pyplot.grid(linewidth<span class="op">=</span><span class="fl">0.2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".06_files/figure-revealjs/shapiro_test_x_y-output-1.svg" id="shapiro_test_x_y" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div>
+</div></div>
+<ul>
+<li>For <span class="math inline">\(X\)</span> the <span class="math inline">\(p\)</span>-value = 0.63.</li>
+</ul>
+<p>For <span class="math inline">\(Y\)</span>: 0.73.</p>
+<p>For <span class="math inline">\(X/Y\)</span>: 0.11.</p>
+</section></section>
+<section id="thanks-for-your-attention" class="title-slide slide level1 unnumbered unlisted center" data-background-iframe=".06_files/libs/colored-particles/index.html">
+<h1>Thanks for your attention!</h1>
+<p><br> <br></p>
+<p><iconify-icon inline="" icon="solar:book-bold"></iconify-icon> <a href="https://aranaur.rbind.io/lectures/asa/">Course materials</a></p>
+<p><iconify-icon inline="" icon="mdi:envelope"></iconify-icon> ihor.miroshnychenko@knu.ua</p>
+<p><iconify-icon inline="" icon="ic:baseline-telegram"></iconify-icon> <a href="https://t.me/araprof">Data Mirosh</a></p>
+<p><iconify-icon inline="" icon="mdi:linkedin"></iconify-icon> <a href="https://www.linkedin.com/in/ihormiroshnychenko/">@ihormiroshnychenko</a></p>
+<p><iconify-icon inline="" icon="mdi:github"></iconify-icon> <a href="https://github.com/Aranaur">@aranaur</a></p>
+<p><iconify-icon inline="" icon="ion:home"></iconify-icon> <a href="https://aranaur.rbind.io">aranaur.rbind.io</a></p>
+<div class="quarto-auto-generated-content">
+<p><img src="fit.png" class="slide-logo"></p>
+<div class="footer footer-default">
+<p><a href="https://aranaur.rbind.io/lectures/asa/">🔗Applied statistical analysis</a></p>
+</div>
+</div>
+</section>
+    </div>
+  </div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src=".06_files/libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src=".06_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src=".06_files/libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src=".06_files/libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src=".06_files/libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src=".06_files/libs/revealjs/plugin/reveal-chalkboard/plugin.js"></script>
+  <script src=".06_files/libs/revealjs/plugin/verticator/verticator.js"></script>
+  <script src=".06_files/libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src=".06_files/libs/revealjs/plugin/notes/notes.js"></script>
+  <script src=".06_files/libs/revealjs/plugin/search/search.js"></script>
+  <script src=".06_files/libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script src=".06_files/libs/revealjs/plugin/math/math.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': true,
+'previewLinksAuto': false,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.togglePdfExport(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleChalkboard(event)\"><kbd>b</kbd> Toggle Chalkboard</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleNotesCanvas(event)\"><kbd>c</kbd> Toggle Notes Canvas</a></li>\n<li class=\"slide-tool-item\" data-item=\"6\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.downloadDrawings(event)\"><kbd>d</kbd> Download Drawings</a></li>\n<li class=\"slide-tool-item\" data-item=\"7\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'chalkboard': {"buttons":true},
+'verticator': {"themetag":"h1","color":"","inversecolor":"","skipuncounted":false,"clickable":true,"position":"auto","offset":"3vmin","autogenerate":true,"tooltip":false,"scale":1},
+'smaller': false,
+ 
+        // Display controls in the bottom right corner
+        controls: false,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: 'h.v',
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'default',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: true,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: true,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'fade',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'fade',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1350,
+
+        height: 759.375,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 0.1,
+
+        math: {
+          mathjax: 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js',
+          config: 'TeX-AMS_HTML-full',
+          tex2jax: {
+            inlineMath: [['\\(','\\)']],
+            displayMath: [['\\[','\\]']],
+            balanceBraces: true,
+            processEscapes: false,
+            processRefs: true,
+            processEnvironments: true,
+            preview: 'TeX',
+            skipTags: ['script','noscript','style','textarea','pre','code'],
+            ignoreClass: 'tex2jax_ignore',
+            processClass: 'tex2jax_process'
+          },
+        },
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, RevealChalkboard, Verticator, QuartoSupport,
+
+          RevealMath,
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    <script id="quarto-html-after-body" type="application/javascript">
+    window.document.addEventListener("DOMContentLoaded", function (event) {
+      const toggleBodyColorMode = (bsSheetEl) => {
+        const mode = bsSheetEl.getAttribute("data-mode");
+        const bodyEl = window.document.querySelector("body");
+        if (mode === "dark") {
+          bodyEl.classList.add("quarto-dark");
+          bodyEl.classList.remove("quarto-light");
+        } else {
+          bodyEl.classList.add("quarto-light");
+          bodyEl.classList.remove("quarto-dark");
+        }
+      }
+      const toggleBodyColorPrimary = () => {
+        const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+        if (bsSheetEl) {
+          toggleBodyColorMode(bsSheetEl);
+        }
+      }
+      toggleBodyColorPrimary();  
+      const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+      tabsets.forEach(function(tabset) {
+        const tabby = new Tabby('#' + tabset.id);
+      });
+      const isCodeAnnotation = (el) => {
+        for (const clz of el.classList) {
+          if (clz.startsWith('code-annotation-')) {                     
+            return true;
+          }
+        }
+        return false;
+      }
+      const onCopySuccess = function(e) {
+        // button target
+        const button = e.trigger;
+        // don't keep focus
+        button.blur();
+        // flash "checked"
+        button.classList.add('code-copy-button-checked');
+        var currentTitle = button.getAttribute("title");
+        button.setAttribute("title", "Copied!");
+        let tooltip;
+        if (window.bootstrap) {
+          button.setAttribute("data-bs-toggle", "tooltip");
+          button.setAttribute("data-bs-placement", "left");
+          button.setAttribute("data-bs-title", "Copied!");
+          tooltip = new bootstrap.Tooltip(button, 
+            { trigger: "manual", 
+              customClass: "code-copy-button-tooltip",
+              offset: [0, -8]});
+          tooltip.show();    
+        }
+        setTimeout(function() {
+          if (tooltip) {
+            tooltip.hide();
+            button.removeAttribute("data-bs-title");
+            button.removeAttribute("data-bs-toggle");
+            button.removeAttribute("data-bs-placement");
+          }
+          button.setAttribute("title", currentTitle);
+          button.classList.remove('code-copy-button-checked');
+        }, 1000);
+        // clear code selection
+        e.clearSelection();
+      }
+      const getTextToCopy = function(trigger) {
+          const codeEl = trigger.previousElementSibling.cloneNode(true);
+          for (const childEl of codeEl.children) {
+            if (isCodeAnnotation(childEl)) {
+              childEl.remove();
+            }
+          }
+          return codeEl.innerText;
+      }
+      const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+        text: getTextToCopy
+      });
+      clipboard.on('success', onCopySuccess);
+      if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+        // For code content inside modals, clipBoardJS needs to be initialized with a container option
+        // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+        const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+          text: getTextToCopy,
+          container: window.document.getElementById('quarto-embedded-source-code-modal')
+        });
+        clipboardModal.on('success', onCopySuccess);
+      }
+        var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+        var mailtoRegex = new RegExp(/^mailto:/);
+          var filterRegex = new RegExp('/' + window.location.host + '/');
+        var isInternal = (href) => {
+            return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+        }
+        // Inspect non-navigation links and adorn them if external
+     	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+        for (var i=0; i<links.length; i++) {
+          const link = links[i];
+          if (!isInternal(link.href)) {
+            // undo the damage that might have been done by quarto-nav.js in the case of
+            // links that we want to consider external
+            if (link.dataset.originalHref !== undefined) {
+              link.href = link.dataset.originalHref;
+            }
+          }
+        }
+      function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+        const config = {
+          allowHTML: true,
+          maxWidth: 500,
+          delay: 100,
+          arrow: false,
+          appendTo: function(el) {
+              return el.closest('section.slide') || el.parentElement;
+          },
+          interactive: true,
+          interactiveBorder: 10,
+          theme: 'light-border',
+          placement: 'bottom-start',
+        };
+        if (contentFn) {
+          config.content = contentFn;
+        }
+        if (onTriggerFn) {
+          config.onTrigger = onTriggerFn;
+        }
+        if (onUntriggerFn) {
+          config.onUntrigger = onUntriggerFn;
+        }
+          config['offset'] = [0,0];
+          config['maxWidth'] = 700;
+        window.tippy(el, config); 
+      }
+      const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+      for (var i=0; i<noterefs.length; i++) {
+        const ref = noterefs[i];
+        tippyHover(ref, function() {
+          // use id or data attribute instead here
+          let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+          try { href = new URL(href).hash; } catch {}
+          const id = href.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note) {
+            return note.innerHTML;
+          } else {
+            return "";
+          }
+        });
+      }
+      const findCites = (el) => {
+        const parentEl = el.parentElement;
+        if (parentEl) {
+          const cites = parentEl.dataset.cites;
+          if (cites) {
+            return {
+              el,
+              cites: cites.split(' ')
+            };
+          } else {
+            return findCites(el.parentElement)
+          }
+        } else {
+          return undefined;
+        }
+      };
+      var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+      for (var i=0; i<bibliorefs.length; i++) {
+        const ref = bibliorefs[i];
+        const citeInfo = findCites(ref);
+        if (citeInfo) {
+          tippyHover(citeInfo.el, function() {
+            var popup = window.document.createElement('div');
+            citeInfo.cites.forEach(function(cite) {
+              var citeDiv = window.document.createElement('div');
+              citeDiv.classList.add('hanging-indent');
+              citeDiv.classList.add('csl-entry');
+              var biblioDiv = window.document.getElementById('ref-' + cite);
+              if (biblioDiv) {
+                citeDiv.innerHTML = biblioDiv.innerHTML;
+              }
+              popup.appendChild(citeDiv);
+            });
+            return popup.innerHTML;
+          });
+        }
+      }
+    });
+    </script>
+    
+
+</body></html>
