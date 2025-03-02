@@ -1,0 +1,91 @@
+---
+title: "Lab 6: 🪙 Crypto yield"
+subtitle: "Probability and Statistics"
+affiliation: "Kyiv School of Economics"
+format: 
+  html: default
+toc: true
+number-sections: false
+echo: false
+eval: false
+---
+
+![](yield.png)
+
+# Input
+
+We decided to analyze the yields of two cryptocurrencies. But before investing in one or the other currency, it is necessary to study the distributions of these yields.
+
+# Task
+
+::: {.callout-important}
+**We expect all the results to be interpreted in the task context.**
+:::
+
+## Data
+
+Gather data on two cryptocurrencies at the **close** of the stock exchange for the last few days. For each cryptocurrency, determine its yield per day.
+
+Formula for calculating the yield:
+
+$$
+\text{Yield} = \frac{P_{t} - P_{t-1}}{P_{t-1}} \times 100\% = \log\left(\frac{P_{t}}{P_{t-1}}\right) \times 100\%
+$$
+
+where $P_{t}$ is the price of the cryptocurrency at time $t$.
+
+The [`cryptoQuotes`](https://serkor1.github.io/cryptoQuotes/) package for R can be used as a data source. For example, the following code can be used to collect data on the bitcoin rate:
+
+```{r}
+#| warning: false
+#| message: false
+#| echo: true
+#| eval: true
+
+library(tidyverse)
+library(cryptoQuotes)
+
+BTC <- cryptoQuotes::get_quote(
+  ticker   = 'BTCUSDT', # <1>
+  source   = 'binance', # <2>
+  futures  = TRUE,     # <3>
+  interval = '1d',    # <4>
+  from     = Sys.Date() - 199 # <5>
+) %>% 
+  as_tibble() # <6>
+```
+
+1. 'ticker' - a cryptocurrency ticker.
+2. `source` - the exchange from which we receive data.
+3. Futures - futures.
+4. `interval` - data interval.
+5. `from` - the date of the start of data collection (the `Sys.Date()` function returns the current date).
+6. `as_tibble()` - converting data to the `tibble` format.
+
+
+```{r}
+#| eval: true
+head(BTC) %>% 
+  knitr::kable()
+```
+
+::: {.callout-tip}
+## Tips for using the `cryptoQuotes` package
+- `available_tickers()` - available tickers.
+- `available_exchanges()` - available exchanges.
+- `available_intervals()` - available intervals.
+:::
+
+## How to analyze the yield
+
+1. Collect data on the yield of two cryptocurrencies.
+2. Use statistical methods to analyze the yield distributions.
+3. Use visualizations to compare the yield distributions of the two cryptocurrencies.
+4. Check the normality of the yield distribution for each cryptocurrency[^norm].
+5. Write conclusions based on the analysis of the yield distributions.
+
+::: {.callout-note}
+You can further compare the average returns using appropriate hypotheses and tests.
+:::
+
+[^norm]: We expect you to use all the methods we learned in class to test the normality of a distribution.
