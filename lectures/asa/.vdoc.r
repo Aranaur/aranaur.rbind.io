@@ -1,0 +1,87 @@
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#| echo: false
+#| message: false
+#| warning: false
+#| label: packages
+
+
+library(googlesheets4)
+library(gt)
+library(tidyverse)
+gs4_deauth()
+d <- read_sheet("https://docs.google.com/spreadsheets/d/1-GBRMHm2TmaPwlj3hAIg-96ghE4pxkpBj73e_Uyzw9s/edit?usp=sharing", sheet = "asa24")
+#
+#
+#
+#| echo: false
+#| label: table-gen
+
+d |>
+  gt() |>
+  sub_missing(columns = everything(), missing_text = "") |>
+  cols_align(
+    align = "center", 
+    columns = c(`№`, Слайд, Відео, Код, Завдання)
+    ) |>
+  cols_align(
+    align = "left", 
+    columns = c(Тема, Код)
+    ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "right",
+      color = "#D3D3D3",
+      style = "solid"
+    ),
+    locations = cells_body(
+      columns = c(Тема, Слайд, Відео, Завдання)
+    )
+  ) |>
+  fmt_markdown(
+    columns = c(Тема, Слайд, Відео, Код, Завдання)
+  ) |>
+  cols_width(
+    `№` ~ px(45),
+    Тема ~ px(100), 
+    Слайд ~ px(45),
+    Відео ~ px(45),
+    Код ~ px(300),
+    Завдання ~ px(185)
+  ) |>
+  cols_label_with(fn = function(x) {
+        x |>
+        stringr::str_replace_all("^|$", "**") |>
+        md()
+    }) |>
+  tab_options(table.font.size = 13) |>
+  opt_row_striping()
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
