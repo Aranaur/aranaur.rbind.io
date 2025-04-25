@@ -38,6 +38,7 @@ jupyter: python3
 execute: 
   echo: true
   warning: false
+  # cache: true
 editor_options: 
   chunk_output_type: console
 
@@ -125,58 +126,1364 @@ if not dest.exists():
 extracted = data_dir / "On_Time_Reporting_Carrier_On_Time_Performance_(1987_present)_2022_1.csv"
 ```
 
-## Дані з Google Drive
+## Дані з Google Drive {.tiny}
 
 ```{python}
+#| eval: false
 import gdown
 import io
-```
-
-:::: {.columns}
-
-::: {.column width="50%"}
-Polars
-
-```{python}
 import polars as pl
+import pandas as pd
+import time
 
-# ID файлу
 file_id = "1UApDVdpgyeeZbJTvgCIjMjumGv_tWeQi"
 url = f"https://drive.google.com/uc?id={file_id}"
 
-# Завантажуємо файл у байтовий об'єкт
 response = gdown.download(url, quiet=True, fuzzy=True)
+```
 
-# Відкриваємо як об'єкт у пам’яті
+```{python}
+#| include: false
+import gdown
+import io
+import polars as pl
+import pandas as pd
+import time
+
+response = "On_Time_Reporting_Carrier_On_Time_Performance_(1987_present)_2022_1.csv"
+```
+
+::: {.panel-tabset}
+## Polars
+
+```{python}
+pl.Config.set_tbl_rows(5)
+
+start = time.time()
 with open(response, 'rb') as f:
-    df_pl = pl.read_csv(f)
+    df_pl = pl.read_csv(f, truncate_ragged_lines=True)
+end = time.time()
+print(f"Time taken: {end - start:.2f} seconds")
 
-print(df_pl.head())
+df_pl
+```
+## Pandas
+```{python}
+pd.options.display.max_rows = 5
+
+start = time.time()
+with open(response, 'rb') as f:
+    df_pd = pd.read_csv(f, on_bad_lines='skip')
+end = time.time()
+print(f"Time taken: {end - start:.2f} seconds")
+
+df_pd
+```
+
+:::
+
+## Рядки за номером, стовпці за назвою
+
+::: {.panel-tabset}
+## Polars (recommended)
+
+Using `head` and `tail`:
+
+```{python}
+%%timeit
+
+df_pl.select(["Dest", "Tail_Number"]).head(16).tail(4)
+```
+
+Or using `gather`:
+
+```{python}
+%%timeit
+df_pl.select(pl.col(["Dest", "Tail_Number"]).gather(list(range(12, 16))))
+```
+
+## Polars (square bracket)
+
+```{python}
+%%timeit
+df_pl[12:16, ["Dest", "Tail_Number"]]
+```
+
+## Pandas
+
+```{python}
+%%timeit
+df_pd.loc[12:15, ["Dest", "Tail_Number"]]
+```
+
+:::
+
+## Рядки за індексом рядка, стовпці за назвою
+
+Оскільки в Polars немає такого поняття як індекс, ми просто використовуємо `.filter`:
+
+::: {.panel-tabset}
+## Polars
+
+```{python}
+%%timeit
+(
+    df_pl
+    .filter(pl.col("IATA_CODE_Reporting_Airline").is_in(['AA', 'DL']))
+    .select(["IATA_CODE_Reporting_Airline", "Dest", "Tail_Number"])
+)
+```
+
+## Pandas
+
+```{python}
+%%timeit
+(
+    df_pd
+    .set_index("IATA_CODE_Reporting_Airline")
+    .loc[['AA', 'DL'], ["Dest", "Tail_Number"]]
+)
+```
+
+:::
+
+## Рядки за номерами, стовпці за номерами
+
+::: {.panel-tabset}
+## Polars
+
+```{python}
+df_pl[[0, 1, 3], [0, 1]]
+```
+
+## Pandas
+
+```{python}
+df_pd.iloc[[0, 1, 3], [0, 1]]
+```
+
+:::
+
+# Пайпи
+
+## Пайпи
+
+- `thing.min().abs().str()` замість `str(abs(min(thing)))`
+- методи `assign` та `pipe`
+
+## Отримати назви міст {.tiny}
+
+У наборі даних є два стовпці, які мають вигляд `$city, $state`. Давайте визначимо функцію, яка видаляє частину зі значенням штату з цих стовпців.
+
+::: {.panel-tabset}
+## Polars
+
+``` {python}
+def extract_city_name_pl() -> pl.Expr:
+    """
+    Chicago, IL -> Chicago for OriginCityName and DestCityName
+    """
+    cols = ["OriginCityName", "DestCityName"]
+    return pl.col(cols).str.split(",").list.get(0)
+```
+
+## Pandas
+
+``` {python}
+def extract_city_name_pd(df: pd.DataFrame) -> pl.DataFrame:
+    """
+    Chicago, IL -> Chicago for OriginCityName and DestCityName
+    """
+    cols = ["OriginCityName", "DestCityName"]
+    return df.assign(**{col: df[col].str.split(",", regex=False).str[0] for col in cols})
+```
+
+:::
+
+## Отримати назви міст {.tiny}
+
+Кілька пунктів, на які слід звернути увагу:
+
+1. Наша функція Pandas додає стовпці до фрейму даних, тоді як наша функція Polars просто генерує *вираз*.
+Ви побачите, що часто простіше передавати `Expr`, ніж фрейми даних, тому що 
+    i. Вони працюють як з `DataFrame`, так і з `LazyFrame`, і вони не прив'язані до конкретних даних.
+    ii. Polars працює краще, якщо ви поміщаєте все в один виклик `.select` або `.with_columns`, а не викликаєте `.select` кілька разів. Якщо ви передаєте вирази, то цей патерн стає простим.
+2.  Polars є швидким і зручним для виконання одних і тих же дій з декількома стовпчиками. Ми можемо передати список стовпців в `pl.col`
+    а потім викликати метод на цьому `pl.col` так, ніби це один стовпець. Коли вираз буде виконано, його буде розпаралелено за допомогою Polars.
+
+    Тим часом у Pandas нам доводиться циклічно перебирати стовпці, щоб створити словник kwargs  для `.assign`. Це не розпаралелюється. (Ми могли б використовувати `.apply` з `axis=0` замість цього, але це все одно відбуватиметься послідовно).
+3.  Виклик `.str.split` у Polars створює стовпчик, де кожен елемент є списком. Такий тип даних дратує в Pandas тому що з ними повільно і незручно працювати - зверніть увагу, що найзручніший спосіб отримати перший елемент стовпця зі списком у Pandas - це викликати `.str[0]`, навіть якщо це список, а не рядок 🤔.
+    
+    Я не впевнений, що це взагалі має працювати. На противагу цьому, Polars насправді має першокласну підтримку стовпців зі списками, і вони працюють швидко, **якщо вони не мають змішаних типів.**
+
+## Отримати назви міст {.tiny}
+
+::: {.panel-tabset}
+## Polars
+
+``` {python}
+def time_col_pl(col: str) -> pl.Expr:
+    col_expr = pl.col(col)
+    return (
+        pl.when(col_expr == "2400")
+        .then(pl.lit("0000"))
+        .otherwise(col_expr)
+        .str.strptime(pl.Time, "%H%M", strict=True)
+        .alias(col)
+    )
+
+
+def time_to_datetime_pl(columns: list[str]) -> list[pl.Expr]:
+    """
+    Combine all time items into datetimes.
+
+    2014-01-01,0914 -> 2014-01-01 09:14:00
+    """
+    date_col = pl.col("FlightDate")
+    return [
+        date_col
+        .dt.combine(time_col_pl(col))
+        .alias(col)
+        for col in columns
+    ]
+```
+
+## Pandas
+
+``` {python}
+def time_col_pd(col: str, df: pd.DataFrame) -> pd.Series:
+    timepart = df[col].replace("2400", "0000")
+    return pd.to_datetime(df["FlightDate"] + ' ' +
+                            timepart.str.slice(0, 2) + ':' +
+                            timepart.str.slice(2, 4),
+                            errors='coerce')
+
+def time_to_datetime_pd(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    '''
+    Combine all time items into datetimes.
+
+    2014-01-01,0914 -> 2014-01-01 09:14:00
+    '''
+    return df.assign(**{col: time_col_pd(col, df) for col in columns})
+```
+
+:::
+
+## Загальні налаштування {.tiny}
+
+```{python}
+category_cols = [
+    "Dest",
+    "Tail_Number",
+    "IATA_CODE_Reporting_Airline",
+    "CancellationCode",
+]
+time_cols = ["DepTime", "ArrTime", "CRSArrTime", "CRSDepTime"]
+cols = (
+    category_cols
+    + time_cols
+    + [
+        "FlightDate",
+        "Flight_Number_Reporting_Airline",
+        "OriginCityName",
+        "DestCityName",
+        "Origin",
+        "DepDelay",
+    ]
+)
+
+extracted = "On_Time_Reporting_Carrier_On_Time_Performance_(1987_present)_2022_1.csv"
+```
+
+## Використовуємо функції {.tiny}
+
+::: {.panel-tabset}
+## Polars
+
+``` {python}
+dtypes_pl = (
+    {col: pl.Categorical for col in category_cols}
+    | {"FlightDate": pl.Date}
+    | {col: pl.Utf8 for col in time_cols}
+)
+df_pl = (
+    pl.scan_csv(extracted, schema_overrides=dtypes_pl, null_values="")
+    .select(cols)
+    .with_columns([extract_city_name_pl(), *time_to_datetime_pl(time_cols)])
+    .collect()
+)
+df_pl.head()
+```
+
+## Pandas
+
+``` {python}
+dtypes_pd = (
+    {col: pd.CategoricalDtype() for col in category_cols}
+    | {col: pd.StringDtype() for col in time_cols}
+)
+df_pd = (
+    pd.read_csv(extracted, dtype=dtypes_pd, usecols=cols, na_values="")
+    .pipe(extract_city_name_pd)
+    .pipe(time_to_datetime_pd, time_cols)
+    .assign(FlightDate=lambda df: pd.to_datetime(df["FlightDate"]))
+)
+df_pd[cols].head()
+```
+
+:::
+
+## Використовуємо функції
+
+Відмінності між двома підходами:
+
+1. Оскільки `scan_csv` є лінивим, використання `scan_csv` з наступним `.select` для вибору підмножини стовпців еквівалентно `usecols` у `pd.read_csv`. Ось чому сам `pl.scan_csv` не має параметра для вибору підмножини стовпців для читання.
+2. У Polars є метод `.pipe`, але ми не використовуємо його у цьому випадку, оскільки простіше працювати з виразами.
+
+## Візуалізація {.tiny}
+
+::: {.panel-tabset}
+## Polars
+
+``` {python}
+#| output-location: column
+# filter for the busiest airlines
+filter_expr = pl.col("IATA_CODE_Reporting_Airline").is_in(
+    pl.col("IATA_CODE_Reporting_Airline")
+    .value_counts(sort=True)
+    .struct.field("IATA_CODE_Reporting_Airline")
+    .head(5)
+)
+(
+    df_pl
+    .drop_nulls(subset=["DepTime", "IATA_CODE_Reporting_Airline"])
+    .filter(filter_expr)
+    .sort("DepTime")
+    .group_by_dynamic(
+        "DepTime",
+        every="1h",
+        group_by="IATA_CODE_Reporting_Airline")
+    .agg(pl.col("Flight_Number_Reporting_Airline").count())
+    .pivot(
+        index="DepTime",
+        on="IATA_CODE_Reporting_Airline",
+        values="Flight_Number_Reporting_Airline",
+    )
+    .sort("DepTime")
+    # fill every missing hour with 0 so the plot looks better
+    .upsample(time_column="DepTime", every="1h")
+    .fill_null(0)
+    .select([pl.col("DepTime"), pl.col(pl.UInt32).rolling_sum(24)])
+    .to_pandas()
+    .set_index("DepTime")
+    .rename_axis("Flights per Day", axis=1)
+    .plot()
+)
+```
+
+## Pandas
+
+``` {python}
+#| output-location: column
+(
+    df_pd
+    .dropna(subset=["DepTime", "IATA_CODE_Reporting_Airline"])
+    # filter for the busiest airlines
+    .loc[
+        lambda x: x["IATA_CODE_Reporting_Airline"].isin(
+            x["IATA_CODE_Reporting_Airline"].value_counts().index[:5]
+        )
+    ]
+    .assign(
+        IATA_CODE_Reporting_Airline=lambda x: x[
+            "IATA_CODE_Reporting_Airline"
+        ].cat.remove_unused_categories()  #  annoying pandas behaviour
+    )
+    .set_index("DepTime")
+    # TimeGrouper to resample & groupby at once
+    .groupby(["IATA_CODE_Reporting_Airline", pd.Grouper(freq="h")])[
+        "Flight_Number_Reporting_Airline"
+    ]
+    .count()
+    # the .pivot takes care of this in the Polars code.
+    .unstack(0)
+    .fillna(0)
+    .rolling(24)
+    .sum()
+    .rename_axis("Flights per Day", axis=1)
+    .plot()
+)
 ```
 :::
 
-::: {.column width="50%"}
+## Візуалізація {.smaller}
+
+Відмінності між Polars і Pandas:
+
+1. Для групування за часовим вікном та іншим значенням ми використовуємо `.groupby_dynamic`. У Pandas ми використовуємо .groupby з помічником `pd.Grouper`.
+2. Замість `.rolling(n).sum()` у Polars використовується `.rolling_sum(n)`.
+3. Якщо ви бачите код Pandas, що використовує `.unstack`, то відповідний код Polars, ймовірно, потребує `.pivot`.
+4. У Polars `.value_counts` повертає стовпець `pl.Struct`, що містить значення та кількість значень. У Pandas вона повертає ряд, де елементами є кількість значень, а індекс містить самі значення.
+5. У Polars нам потрібно вибрати всі стовпці UInt32 в одній точці за допомогою pl.col(pl.UInt32). У Pandas спосіб роботи `.rolling` означає, що нам не потрібно вибирати ці стовпці явно, але якщо ми це зробимо, це буде виглядати як `df.select_dtypes("uint32")`.
+
+## Літаки з кількома щоденними рейсами {.tiny .scrollable}
+
+::: {.panel-tabset}
+## Polars
+
+``` {python}
+#| output-location: column
+flights_pl = (
+    df_pl.select(
+        pl.col([
+            "FlightDate",
+            "Tail_Number",
+            "DepTime",
+            "DepDelay"
+        ])
+    )
+    .drop_nulls()
+    .sort("DepTime")
+    .filter(pl.col("DepDelay") < 500)
+    .with_columns(
+        pl.col("DepTime")
+        .rank()
+        .over(["FlightDate", "Tail_Number"])
+        .alias("turn")
+    )
+)
+
+fig, ax = plt.subplots(figsize=(10, 5))
+sns.boxplot(x="turn", y="DepDelay", data=flights_pl.to_pandas(), ax=ax)
+ax.set_ylim(-50, 50)
+```
+
+## Pandas
+
+``` {python}
+#| output-location: column
+flights_pd = (
+    df_pd[[
+        "FlightDate",
+        "Tail_Number",
+        "DepTime",
+        "DepDelay"
+    ]]
+    .dropna()
+    .sort_values('DepTime')
+    .loc[lambda x: x["DepDelay"] < 500]
+    .assign(turn = lambda x:
+        x.groupby(["FlightDate", "Tail_Number"])
+        ["DepTime"].transform('rank')
+        .astype(int)
+    )
+)
+fig, ax = plt.subplots(figsize=(10, 5))
+sns.boxplot(x="turn", y="DepDelay", data=flights_pd, ax=ax)
+ax.set_ylim(-50, 50)
+```
+
+:::
+
+## Літаки з кількома щоденними рейсами
+
+Тут є одна новинка: [віконні функції](https://pola-rs.github.io/polars-book/user-guide/dsl/window_functions.html).
+
+Коли код Pandas має вигляд:
+
+```python
+.groupby("country")["population"].transform("sum")
+```
+то еквівалентний код Polars матиме вигляд:
+
+```python
+pl.col("population").sum().over("country")
+```
+
+## Затримка по годинах доби {.tiny}
+
+::: {.panel-tabset}
+## Polars
+
+``` {python}
+#| output-location: column
+plt.figure(figsize=(10, 5))
+(
+    df_pl.select(
+        pl.col(
+            ["FlightDate", "Tail_Number", "DepTime", "DepDelay"],
+        )
+    )
+    .drop_nulls()
+    .filter(pl.col("DepDelay").is_between(5, 600, closed="none"))
+    .with_columns(pl.col("DepTime").dt.hour().alias("hour"))
+    .to_pandas()
+    .pipe((sns.boxplot, "data"), x="hour", y="DepDelay")
+)
+```
+
+## Pandas
+
+``` {python}
+#| output-location: column
+plt.figure(figsize=(10, 5))
+(
+    df_pd[["FlightDate", "Tail_Number", "DepTime", "DepDelay"]]
+    .dropna()
+    .loc[lambda df: df["DepDelay"].between(5, 600, inclusive="neither")]
+    .assign(hour=lambda df: df["DepTime"].dt.hour)
+    .pipe((sns.boxplot, "data"), x="hour", y="DepDelay")
+)
+```
+
+:::
+
+## Підсумок
+
+![](data/pandas_chain_tweet.png){fig-align="center"}
+
+# Продуктивність
+
+## Шість досить очевидних правил ефективності {.tiny}
+
+[Polars дуже швидкий](https://www.pola.rs/benchmarks.html).
+
+- Використовуйте лінивий API.
+- Використовуйте `Expr` і не використовуйте `.apply`, якщо це дійсно необхідно.
+- Використовуйте найменші необхідні числові типи (наприклад, якщо у вас є ціле число від 0 до 255, використовуйте `pl.UInt8`, а не `pl.Int64`). Це заощадить і час, і місце.
+- Використовуйте ефективне сховище (якщо ви зберігаєте дані у файлах, Parquet - хороший вибір).
+- Використовуйте категоризації для рядків, що повторюються (але зауважте, що це може бути недоцільно, якщо повторюваність невелика).
+- Вибирайте лише ті стовпці, які вам потрібні.
+
+## Polars швидше справляється з нудними завданнями {.tiny}
+
+[Дані](https://www.kaggle.com/datasets/yagunnersya/fifa-21-messy-raw-dataset-for-cleaning-exploring?resource=download) з Kaggle.
+
+Крім того, дані занадто малі, тому я об'єднав їх 20 разів.
+
+```{python}
+#| label: messy
+
+fifa = pd.read_csv("data/fifa21_raw_data.csv")
+fifa = pd.concat([fifa] * 20, ignore_index=True)
+
+fifa.to_csv("data/fifa21_raw_big.csv", index=False)
+fifa
+```
+
+## Шаблон стовпців {.tiny .scrollable}
+
 ```{python}
 import pandas as pd
+import polars as pl
+import numpy as np
+import math
+str_cols = [
+    "Name",
+    "LongName",
+    "playerUrl",
+    "photoUrl",
+]
+initial_category_cols_pl = [
+    "Nationality",
+    "Preferred Foot",
+    "Best Position",
+    "A/W",
+    "D/W"
+]
+category_cols = [*initial_category_cols_pl, "Club"]
+date_cols = [
+    "Joined",
+    "Loan Date End"
+]
+# всі вони починаються з символу євро і закінчуються на 0, M або K
+money_cols = [
+    "Value",
+    "Wage",
+    "Release Clause"
+]
+star_cols = [
+    "W/F",
+    "SM",
+    "IR",
+]
+# Contract col - діапазон років контракту
+# Positions - список посад
+# Height - у см
+# Weight в кг
+# Hits - номери з K та M 
+messy_cols = [
+    "Contract",
+    "Positions",
+    "Height",
+    "Weight",
+    "Hits"
+]
+initially_str_cols = str_cols + date_cols + money_cols + star_cols + messy_cols
+initially_str_cols_pl = [*initially_str_cols, "Club"]
+u32_cols = [
+    "ID",
+    "Total Stats"
+]
+u8_cols = [
+    'Age',
+    '↓OVA',
+    'POT',
+    'BOV',
+    'Crossing',
+    'Finishing',
+    'Heading Accuracy',
+    'Short Passing',
+    'Volleys',
+    'Dribbling',
+    'Curve',
+    'FK Accuracy',
+    'Long Passing',
+    'Ball Control',
+    'Acceleration',
+    'Sprint Speed',
+    'Agility',
+    'Reactions',
+    'Balance',
+    'Shot Power',
+    'Jumping',
+    'Stamina',
+    'Strength',
+    'Long Shots',
+    'Aggression',
+    'Interceptions',
+    'Positioning',
+    'Vision',
+    'Penalties',
+    'Composure',
+    'Marking',
+    'Standing Tackle',
+    'Sliding Tackle',
+    'GK Diving',
+    'GK Handling',
+    'GK Kicking',
+    'GK Positioning',
+    'GK Reflexes',
+    'PAC',
+    'SHO',
+    'PAS',
+    'DRI',
+    'DEF',
+    'PHY'
+]
 
-# ID файлу
-file_id = "1UApDVdpgyeeZbJTvgCIjMjumGv_tWeQi"
-url = f"https://drive.google.com/uc?id={file_id}"
+u16_cols = [
+    'Attacking',
+    'Skill',
+    'Movement',
+    'Power',
+    'Mentality',
+    'Defending',
+    'Goalkeeping',
+    'Total Stats',
+    'Base Stats'
+]
+```
 
-# Завантажуємо файл у байтовий об'єкт
-response = gdown.download(url, quiet=True, fuzzy=True)
+## Dtypes
 
-# Відкриваємо як об'єкт у пам’яті
-with open(response, 'rb') as f:
-    df_pd = pd.read_csv(f)
-
-print(df_pd.head())
+::: {.panel-tabset}
+## Polars
+``` {python}
+# не можна використовувати UInt8/16 в scan_csv
+dtypes_pl = (
+    {col: pl.Utf8 for col in initially_str_cols_pl}
+    | {col: pl.Categorical for col in initial_category_cols_pl}
+    | {col: pl.UInt32 for col in [*u32_cols, *u16_cols, *u8_cols]}
+)
+```
+## Pandas
+``` {python}
+dtypes_pd = (
+    {col: pd.StringDtype() for col in initially_str_cols}
+    | {col: pd.CategoricalDtype() for col in category_cols}
+    | {col: "uint32" for col in u32_cols}
+    | {col: "uint8" for col in u8_cols}
+    | {col: "uint16" for col in u16_cols}
+)
 ```
 :::
 
-::::
+## Очистка {.tiny .scrollable}
+
+[`pl.when`](https://pola-rs.github.io/polars/py-polars/html/reference/expressions/api/polars.when.html#polars.when) для тернарних виразів.
+
+::: {.panel-tabset}
+## Polars
+
+``` {python}
+def parse_date_pl(col: pl.Expr) -> pl.Expr:
+    return col.str.strptime(pl.Date, format="%b %d, %Y")
+
+def parse_suffixed_num_pl(col: pl.Expr) -> pl.Expr:
+    suffix = col.str.slice(-1, 1)
+    suffix_value = (
+        pl.when(suffix == "K")
+        .then(1_000)
+        .when(suffix == "M")
+        .then(1_000_000)
+        .otherwise(1)
+        .cast(pl.UInt32)
+    )
+    without_suffix = (
+        col
+        .str.replace("K", "", literal=True)
+        .str.replace("M", "", literal=True)
+        .cast(pl.Float32)
+    )
+    original_name = col.meta.output_name()
+    return (suffix_value * without_suffix).alias(original_name)
+
+def parse_money_pl(col: pl.Expr) -> pl.Expr:
+    return parse_suffixed_num_pl(col.str.slice(1)).cast(pl.UInt32)
+
+def parse_star_pl(col: pl.Expr) -> pl.Expr:
+    return col.str.slice(0, 1).cast(pl.UInt8)
+
+def feet_to_cm_pl(col: pl.Expr) -> pl.Expr:
+    feet_inches_split = col.str.split_exact("'", 1)
+    total_inches = (
+        (feet_inches_split.struct.field("field_0").cast(pl.UInt8, strict=False) * 12)
+        + feet_inches_split.struct.field("field_1").str.strip_chars_end('"').cast(pl.UInt8, strict=False)
+    )
+    return (total_inches * 2.54).round(0).cast(pl.UInt8)
+
+def parse_height_pl(col: pl.Expr) -> pl.Expr:
+    is_cm = col.str.ends_with("cm")
+    return (
+        pl.when(is_cm)
+        .then(col.str.slice(0, 3).cast(pl.UInt8, strict=False))
+        .otherwise(feet_to_cm_pl(col))
+    )
+
+def parse_weight_pl(col: pl.Expr) -> pl.Expr:
+    is_kg = col.str.ends_with("kg")
+    without_unit = col.str.extract(r"(\d+)").cast(pl.UInt8)
+    return (
+        pl.when(is_kg)
+        .then(without_unit)
+        .otherwise((without_unit * 0.453592).round(0).cast(pl.UInt8))
+    )
+
+def parse_contract_pl(col: pl.Expr) -> list[pl.Expr]:
+    contains_tilde = col.str.contains(" ~ ", literal=True)
+    loan_str = " On Loan"
+    loan_col = col.str.ends_with(loan_str)
+    split = (
+        pl.when(contains_tilde)
+        .then(col)
+        .otherwise(None)
+        .str.split_exact(" ~ ", 1)
+    )
+    start = split.struct.field("field_0").cast(pl.UInt16).alias("contract_start")
+    end = split.struct.field("field_1").cast(pl.UInt16).alias("contract_end")
+    free_agent = (col == "Free").alias("free_agent").fill_null(False)
+    loan_date = (
+        pl.when(loan_col)
+        .then(col)
+        .otherwise(None)
+        .str.split_exact(" On Loan", 1)
+        .struct.field("field_0")
+        .alias("loan_date_start")
+    )
+    return [start, end, free_agent, parse_date_pl(loan_date)]
+```
+
+## Pandas
+
+``` {python}
+def parse_date_pd(col: pd.Series) -> pd.Series:
+    return pd.to_datetime(col, format="%b %d, %Y")
+
+def parse_suffixed_num_pd(col: pd.Series) -> pd.Series:
+    suffix_value = (
+        col
+        .str[-1]
+        .map({"K": 1_000, "M": 1_000_000})
+        .fillna(1)
+        .astype("uint32")
+    )
+    without_suffix = (
+        col
+        .str.replace("K", "", regex=False)
+        .str.replace("M", "", regex=False)
+        .astype("float")
+    )
+    return suffix_value * without_suffix
+
+def parse_money_pd(col: pd.Series) -> pd.Series:
+    return parse_suffixed_num_pd(col.str[1:]).astype("uint32")
+
+def parse_star_pd(col: pd.Series) -> pd.Series:
+    return col.str[0].astype("uint8")
+
+def feet_to_cm_pd(col: pd.Series) -> pd.Series:
+    feet_inches_split = col.str.split("'", expand=True)
+    total_inches = (
+        feet_inches_split[0].astype("uint8").mul(12)
+        + feet_inches_split[1].str[:-1].astype("uint8")
+    )
+    return total_inches.mul(2.54).round().astype("uint8")
+
+def parse_height_pd(col: pd.Series) -> pd.Series:
+    is_cm = col.str.endswith("cm")
+    cm_values = col.loc[is_cm].str[:-2].astype("uint8")
+    inches_as_cm = feet_to_cm_pd(col.loc[~is_cm])
+    return pd.concat([cm_values, inches_as_cm])
+
+def parse_weight_pd(col: pd.Series) -> pd.Series:
+    is_kg = col.str.endswith("kg")
+    without_unit = col.where(is_kg, col.str[:-3]).mask(is_kg, col.str[:-2]).astype("uint8")
+    return without_unit.where(is_kg, without_unit.mul(0.453592).round().astype("uint8"))
+
+def parse_contract_pd(df: pd.DataFrame) -> pd.DataFrame:
+    contract_col = df["Contract"]
+    contains_tilde = contract_col.str.contains(" ~ ", regex=False)
+    split = (
+        contract_col.loc[contains_tilde].str.split(" ~ ", expand=True).astype(pd.UInt16Dtype())
+    )
+    split.columns = ["contract_start", "contract_end"]
+    not_tilde = contract_col.loc[~contains_tilde]
+    free_agent = (contract_col == "Free").rename("free_agent").fillna(False)
+    loan_date = parse_date_pd(not_tilde.loc[~free_agent].str[:-8]).rename("loan_date_start")
+    return pd.concat([df.drop("Contract", axis=1), split, free_agent, loan_date], axis=1)
+```
+
+:::
+
+## Порівняння продуктивності {.tiny .scrollable}
+
+У цьому прикладі **Polar в рази швидше** ніж Pandas
+
+::: {.panel-tabset}
+## Polars
+
+``` {python}
+%%time
+new_cols_pl = ([
+    pl.col("Club").str.strip_chars().cast(pl.Categorical),
+    parse_suffixed_num_pl(pl.col("Hits")).cast(pl.UInt32),
+    pl.col("Positions").str.split(","),
+    parse_height_pl(pl.col("Height")),
+    parse_weight_pl(pl.col("Weight")),
+]
++ [parse_date_pl(pl.col(col)) for col in date_cols]
++ [parse_money_pl(pl.col(col)) for col in money_cols]
++ [parse_star_pl(pl.col(col)) for col in star_cols]
++ parse_contract_pl(pl.col("Contract"))
++ [pl.col(col).cast(pl.UInt16) for col in u16_cols]
++ [pl.col(col).cast(pl.UInt8) for col in u8_cols]
+)
+fifa_pl = (
+    pl.scan_csv("data/fifa21_raw_big.csv", schema_overrides=dtypes_pl)
+    .with_columns(new_cols_pl)
+    .drop("Contract")
+    .rename({"↓OVA": "OVA"})
+    .collect()
+)
+```
+
+## Pandas
+
+``` {python}
+%%time
+fifa_pd = (
+    pd.read_csv("data/fifa21_raw_big.csv", dtype=dtypes_pd)
+    .assign(Club=lambda df: df["Club"].cat.rename_categories(lambda c: c.strip()),
+        **{col: lambda df: parse_date_pd(df[col]) for col in date_cols},
+        **{col: lambda df: parse_money_pd(df[col]) for col in money_cols},
+        **{col: lambda df: parse_star_pd(df[col]) for col in star_cols},
+        Hits=lambda df: parse_suffixed_num_pd(df["Hits"]).astype(pd.UInt32Dtype()),
+        Positions=lambda df: df["Positions"].str.split(","),
+        Height=lambda df: parse_height_pd(df["Height"]),
+        Weight=lambda df: parse_weight_pd(df["Weight"])
+    )
+    .pipe(parse_contract_pd)
+    .rename(columns={"↓OVA": "OVA"})
+)
+```
+:::
+
+## Порівняння продуктивності {.tiny}
+
+Результати:
+
+::: {.panel-tabset}
+## Polars
+
+``` {python}
+fifa_pl.head(3)
+```
+
+## Pandas
+
+``` {python}
+fifa_pd.head(3)
+```
+:::
+
+## Порівняння продуктивності
+
+У цьому сценарії перевага Polars у швидкості, ймовірно, зводиться до трьох речей:
+
+- Він набагато швидше читає CSV-файли.
+- Він набагато швидше обробляє рядки.
+- Він може вибирати/призначати стовпці паралельно.
+
+## NumPy може іноді прискорювати роботу Polars
+
+Polars добре ладнає з утилітами NumPy, навіть у лінивому режимі (що цікаво, оскільки NumPy не має лінивого API).
+
+Дані:
+
+```{python}
+airports = pl.scan_csv("data/airports.csv").drop_nulls().unique(subset=["AIRPORT"])
+pairs = airports.join(airports, how="cross").filter(
+    (pl.col("AIRPORT") != pl.col("AIRPORT_right"))
+    & (pl.col("LATITUDE") != pl.col("LATITUDE_right"))
+    & (pl.col("LONGITUDE") != pl.col("LONGITUDE_right"))
+)
+```
+
+## Розрахувати відстань по великому колу
+
+$$
+d = 2r \cdot \arccos(\sin(\varphi_1) \cdot \sin(\varphi_2) + \cos(\varphi_1) \cdot \cos(\varphi_2) \cdot \cos(\theta_1 - \theta_2))
+$$
+
+::: footer
+[Great-circle distance](https://en.wikipedia.org/wiki/Great-circle_distance#:~:text=The%20great%2Dcircle%20distance%2C%20orthodromic,the%20surface%20of%20the%20sphere.)
+:::
+
+::: {.panel-tabset}
+## Polars
+
+``` {python}
+def deg2rad_pl(degrees: pl.Expr) -> pl.Expr:
+    return degrees * math.pi / 180
+
+def gcd_pl(lat1: pl.Expr, lng1: pl.Expr, lat2: pl.Expr, lng2: pl.Expr):
+    ϕ1 = deg2rad_pl(90 - lat1)
+    ϕ2 = deg2rad_pl(90 - lat2)
+
+    θ1 = deg2rad_pl(lng1)
+    θ2 = deg2rad_pl(lng2)
+
+    cos = ϕ1.sin() * ϕ2.sin() * (θ1 - θ2).cos() + ϕ1.cos() * ϕ2.cos()
+    arc = cos.arccos()
+    return arc * 6373
+```
+
+## NumPy
+
+``` {python}
+def gcd_np(lat1, lng1, lat2, lng2):
+    ϕ1 = np.deg2rad(90 - lat1)
+    ϕ2 = np.deg2rad(90 - lat2)
+
+    θ1 = np.deg2rad(lng1)
+    θ2 = np.deg2rad(lng2)
+
+    cos = np.sin(ϕ1) * np.sin(ϕ2) * np.cos(θ1 - θ2) + np.cos(ϕ1) * np.cos(ϕ2)
+    arc = np.arccos(cos)
+    return arc * 6373
+```
+:::
+
+## Розрахувати відстань по великому колу
+
+::: {.panel-tabset}
+## Polars
+
+``` {python}
+%%timeit
+pairs.select(
+    gcd_pl(
+        pl.col("LATITUDE"),
+        pl.col("LONGITUDE"),
+        pl.col("LATITUDE_right"),
+        pl.col("LONGITUDE_right")
+    )
+).collect()
+```
+
+## NumPy
+
+``` {python}
+%%timeit
+pairs.select(
+    gcd_np(
+        pl.col("LATITUDE"),
+        pl.col("LONGITUDE"),
+        pl.col("LATITUDE_right"),
+        pl.col("LONGITUDE_right")
+    )
+).collect()
+```
+:::
+
+## Polars інколи повільший за Pandas {.tiny .scrollable}
+
+```{python}
+def create_frame(n, n_groups):
+    return pl.DataFrame(
+        {"name": np.random.randint(0, n_groups, size=n), "value2": np.random.randn(n)}
+    )
+
+def pandas_transform(df: pd.DataFrame) -> pd.DataFrame:
+    g = df.groupby("name")["value2"]
+    v = df["value2"]
+    return (v - g.transform("mean")) / g.transform("std")
 
 
+def polars_transform() -> pl.Expr:
+    v = pl.col("value2")
+    return (v - v.mean().over("name")) / v.std().over("name")
+
+rand_df_pl = create_frame(50_000_000, 50_000)
+rand_df_pd = rand_df_pl.to_pandas()
+```
+
+::: {.panel-tabset}
+## Polars
+``` {python}
+%timeit rand_df_pl.select(polars_transform())
+```
+## Pandas
+``` {python}
+%timeit pandas_transform(rand_df_pd)
+```
+:::
+
+# Охайні дані
+
+## Охайні дані
+
+Існує [ціла стаття](https://vita.had.co.nz/papers/tidy-data.pdf) Хедлі Вікхем (Hadley Wickham) про чисті дані, але вона у форматі PDF, тому ви, мабуть, не будете її читати. Ось визначення чистих даних, наведене в цій статті:
+
+1. Кожна змінна утворює стовпець.
+2. Кожне спостереження формує рядок.
+3. Кожен тип одиниці спостереження формує таблицю.
+
+## Дані NBA {.tiny .scrollable}
+
+```{python}
+#| output-location: column
+from pathlib import Path
+import polars as pl
+import pandas as pd
+
+pl.Config.set_tbl_rows(5)
+pd.options.display.max_rows = 5
+
+nba_dir = Path("data/nba/")
+
+column_names = {
+    "Date": "date",
+    "Visitor/Neutral": "away_team",
+    "PTS": "away_points",
+    "Home/Neutral": "home_team",
+    "PTS.1": "home_points",
+}
+
+if not nba_dir.exists():
+    nba_dir.mkdir()
+    for month in (
+        "october",
+        "november",
+        "december",
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+    ):
+        # На практиці ми б зробили більше очищення даних тут, і зберегли б у паркет, а не CSV.
+        # Але ми зберігаємо брудні дані тут, щоб потім очистити їх для педагогічних цілей.
+        url = f"http://www.basketball-reference.com/leagues/NBA_2016_games-{month}.html"
+        tables = pd.read_html(url)
+        raw = (
+            pl.from_pandas(tables[0].query("Date != 'Playoffs'"))
+            .rename(column_names)
+            .select(column_names.values())
+        )
+        raw.write_csv(nba_dir / f"{month}.csv")
+
+nba_glob = nba_dir / "*.csv"
+pl.scan_csv(nba_glob).head().collect()
+```
+
+## Очистка даних {.tiny}
+
+::: {.panel-tabset}
+## Polars
+
+``` {python}
+games_pl = (
+    pl.scan_csv(nba_glob)
+    .with_columns(
+        pl.col("date").str.strptime(pl.Date, "%a, %b %d, %Y"),
+    )
+    .sort("date")
+    .with_row_index("game_id")
+)
+games_pl.head().collect()
+```
+
+## Pandas
+
+``` {python}
+games_pd = (
+    pl.read_csv(nba_glob)
+    .to_pandas()
+    .dropna(how="all")
+    .assign(date=lambda x: pd.to_datetime(x["date"], format="%a, %b %d, %Y"))
+    .sort_values("date")
+    .reset_index(drop=True)
+    .set_index("date", append=True)
+    .rename_axis(["game_id", "date"])
+    .sort_index()
+)
+games_pd.head()
+```
+:::
+
+## Pivot {.tiny}
+
+Припустимо, у вас є фреймворк даних, який виглядає так:
+
+``` {python}
+#| code-fold: true
+from datetime import date
+prices = pl.DataFrame({
+    "date": [*[date(2020, 1, 1)]*4, *[date(2020, 1, 2)]*4, *[date(2020, 1, 3)]*4],
+    "ticker": [*["AAPL", "TSLA", "MSFT", "NFLX"]*3],
+    "price": [100, 200, 300, 400, 110, 220, 330, 420, 105, 210, 315, 440],
+})
+prices
+```
+
+І в Polars, і в Pandas ви можете викликати `df.pivot`, щоб отримати фрейм даних, який виглядає так:
+
+```{python}
+#| code-fold: true
+pivoted = prices.pivot(index="date", values="price", on="ticker")
+pivoted
+```
+
+## Melt/ Unpivot {.tiny}
+
+```{python}
+pivoted.unpivot(index="date", value_name="price")
+```
+
+## Tidy NBA data {.tiny .scrollable}
+
+Припустимо, ми хочемо порахувати дні відпочинку кожної команди перед кожною грою. У поточній структурі це складно, оскільки нам потрібно відстежувати обидва стовпці `home_team` і `away_team`
+
+::: {.panel-tabset}
+## Polars
+
+``` {python}
+#| output-location: column
+tidy_pl = (
+    games_pl
+    .unpivot(
+        index=["game_id", "date"],
+        on=["away_team", "home_team"],
+        value_name="team",
+    )
+    .sort("game_id")
+    .with_columns((
+        pl.col("date")
+        .alias("rest")
+        .diff().over("team")
+        .dt.total_days() - 1).cast(pl.Int8))
+    .drop_nulls("rest")
+    .collect()
+)
+tidy_pl
+```
+
+## Pandas
+``` {python}
+#| output-location: column
+tidy_pd = (
+    games_pd.reset_index()
+    .melt(
+        id_vars=["game_id", "date"],
+        value_vars=["away_team", "home_team"],
+        value_name="team",
+    )
+    .sort_values("game_id")
+    .assign(
+        rest=lambda df: (
+            df
+            .sort_values("date")
+            .groupby("team")
+            ["date"]
+            .diff()
+            .dt.days
+            .sub(1)
+        )
+    )
+    .dropna(subset=["rest"])
+    .astype({"rest": pd.Int8Dtype()})
+)
+tidy_pd
+```
+:::
+
+## Tidy NBA data {.tiny .scrollable}
+
+Тепер ми використовуємо `.pivot`, щоб додати ці дані про дні відпочинку назад до вихідного фрейму даних.
+
+::: {.panel-tabset}
+## Polars
+``` {python}
+by_game_pl = (
+    tidy_pl
+    .pivot(
+        values="rest",
+        index=["game_id", "date"],
+        on="variable"
+    )
+    .rename({"away_team": "away_rest", "home_team": "home_rest"})
+)
+joined_pl = (
+    by_game_pl
+    .join(games_pl.collect(), on=["game_id", "date"])
+    .with_columns([
+        pl.col("home_points").alias("home_win") > pl.col("away_points"),
+        pl.col("home_rest").alias("rest_spread") - pl.col("away_rest"),
+    ])
+)
+joined_pl
+```
+## Pandas
+``` {python}
+by_game_pd = (
+    tidy_pd
+    .pivot(
+        values="rest",
+        index=["game_id", "date"],
+        columns="variable"
+    )
+    .rename(
+        columns={"away_team": "away_rest", "home_team": "home_rest"}
+    )
+)
+joined_pd = by_game_pd.join(games_pd).assign(
+    home_win=lambda df: df["home_points"] > df["away_points"],
+    rest_spread=lambda df: df["home_rest"] - df["away_rest"],
+)
+joined_pd
+```
+:::
+
+## Tidy NBA data vizualization {.tiny .scrollable}
+
+``` {python}
+#| output-location: column
+import seaborn as sns
+sns.set_theme(font_scale=0.6)
+sns.catplot(
+    tidy_pl.to_pandas(),
+    x="variable",
+    y="rest",
+    col="team",
+    col_wrap=5,
+    kind="bar",
+    height=1.5,
+)
+```
+
+## Tidy NBA data vizualization {.tiny .scrollable}
+
+Побудова графіка розподілу `rest_spread`:
+
+::: {.panel-tabset}
+## Polars
+``` {python}
+#| output-location: column
+import numpy as np
+delta_pl = joined_pl["rest_spread"]
+ax = (
+    delta_pl
+    .value_counts()
+    .drop_nulls()
+    .to_pandas()
+    .set_index("rest_spread")
+    ["count"]
+    .reindex(np.arange(delta_pl.min(), delta_pl.max() + 1), fill_value=0)
+    .sort_index()
+    .plot(kind="bar", color="k", width=0.9, rot=0, figsize=(9, 6))
+)
+ax.set(xlabel="Difference in Rest (Home - Away)", ylabel="Games")
+```
+## Pandas
+``` {python}
+#| output-location: column
+delta_pd = joined_pd["rest_spread"]
+ax = (
+    delta_pd
+    .value_counts()
+    .reindex(np.arange(delta_pd.min(), delta_pd.max() + 1), fill_value=0)
+    .sort_index()
+    .plot(kind="bar", color="k", width=0.9, rot=0, figsize=(9, 6))
+)
+ax.set(xlabel="Difference in Rest (Home - Away)", ylabel="Games")
+```
+:::
+
+## Tidy NBA data vizualization {.tiny .scrollable}
+
+Побудова графіка відсотка виграшу за `rest_spread`:
+
+::: {.panel-tabset}
+## Polars
+``` {python}
+#| output-location: column
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots(figsize=(9, 6))
+sns.barplot(
+    x="rest_spread",
+    y="home_win",
+    data=joined_pl.filter(pl.col("rest_spread").is_between(-3, 3, closed="both")).to_pandas(),
+    color="#4c72b0",
+    ax=ax,
+)
+```
+## Pandas
+``` {python}
+#| output-location: column
+fig, ax = plt.subplots(figsize=(9, 6))
+sns.barplot(
+    x="rest_spread",
+    y="home_win",
+    data=joined_pd.query('-3 <= rest_spread <= 3'),
+    color="#4c72b0",
+    ax=ax,
+)
+```
+:::
+
+## Щось ще? {.tiny}
+
+- [DuckDB](https://duckdb.org/): схоже на SQLite, але з підтримкою Pandas і Polars.
+- [Dask](https://dask.org/): розподілені обчислення для Pandas.
+- [data.table](https://rdatatable.gitlab.io/data.table/index.html): швидка обробка даних для R.
+- [Ibis](https://ibis-project.org/): обробка даних для Pandas, Polars, SQLAlchemy, DuckDB, PySpark, BigQuery.
+- [cuDF](https://rapids.ai/): обробка даних для GPU.
+- [Vaex](https://vaex.io/): обробка даних для великих наборів даних.
+- [Apache Arrow](https://arrow.apache.org/): універсальний стовпчастий формат і багатомовний інструментарій для швидкого обміну даними та аналітики в пам'яті
+- [PySpark](https://spark.apache.org/docs/latest/api/python/index.html): багатомовний рушій для виконання інженерії даних, науки про дані та машинного навчання на одновузлових машинах або кластерах.
 
 
 # Дякую за увагу! {.unnumbered .unlisted background-iframe=".01_files/libs/colored-particles/index.html"}
