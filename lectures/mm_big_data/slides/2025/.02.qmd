@@ -1,0 +1,1357 @@
+---
+title: "Основи великих даних з PySpark"
+subtitle: "Моделі та методи обробки великих даних"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка, ФІТ
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .02_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: <a href="https://aranaur.rbind.io/lectures/mm_big_data/">🔗Моделі та методи обробки великих даних</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    # center: true
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    # controls-layout: bottom-right
+    chalkboard: true
+    logo: fit.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    # fig-width: 9
+    # fig-height: 5
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+  # gfm:
+  #   mermaid-format: png
+preload-iframes: true
+engine: jupyter
+jupyter: python3
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Import libraries
+from scipy.stats import (
+    binom
+)
+import numpy as numpy
+from seaborn import distplot
+from matplotlib import pyplot
+import seaborn
+import random
+
+import sys
+
+# Import libraries
+# import numpy as numpy
+import pandas as pd
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+
+from IPython.display import Markdown
+from tabulate import tabulate
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Вступ до аналізу великих даних за допомогою Spark
+
+## Що таке великі дані?
+
+> Великі дані --- набори інформації (як структурованої, так і неструктурованої) настільки великих розмірів, що традиційні способи та підходи (здебільшого засновані на рішеннях класу бізнесової аналітики та системах управління базами даних) не можуть бути застосовані до них - Wikipedia
+
+## Три «V» великих даних
+
+- **Обсяг** (Volume) --- обсяг даних, які потрібно зберігати та обробляти. Це може бути величезна кількість даних, що перевищує можливості традиційних систем зберігання.
+- **Швидкість** (Velocity) --- швидкість, з якою дані генеруються та обробляються. Це може бути потік даних у реальному часі або дані, які надходять з різних джерел.
+- **Різноманітність** (Variety) --- різноманітність типів даних, які потрібно обробляти. Це можуть бути структуровані, напівструктуровані та неструктуровані дані з різних джерел.
+
+## Концепції та термінологія великих даних
+
+- **Кластерні обчислення**: Об'єднання ресурсів декількох машин
+- **Паралельні обчислення**: Одночасні обчислення на одному комп'ютері
+- **Розподілені обчислення**: Сукупність вузлів (мережевих комп'ютерів), які працюють паралельно
+- **Пакетна обробка**: Розбиття завдання на невеликі частини і запуск їх на окремих машинах
+- **Обробка в реальному часі**: Негайна обробка даних
+
+## Системи обробки великих даних {.smaller}
+
+- **Hadoop/MapReduce**: Масштабований та відмовостійкий фреймворк на Java
+  + Відкритий вихідний код
+  + Пакетна обробка
+- **Apache Spark**: Універсальна та швидка кластерна обчислювальна система
+  + Відкритий вихідний код
+  + Пакетна обробка даних та обробка даних у реальному часі
+
+::: {.callout-note}
+Apache Spark на сьогоднішній день є кращим за Hadoop/MapReduce у більшості випадків, оскільки він швидший, простіший у використанні та підтримує різноманітні джерела даних.
+:::
+
+## Особливості фреймворку Apache Spark
+
+- Фреймворк розподілених кластерних обчислень
+- Ефективні обчислення в пам'яті для великих масивів даних
+- Блискавична платформа для обробки даних
+- Забезпечує підтримку Java, Scala, Python, R та SQL
+
+## Компоненти Apache Spark
+
+```{dot}
+//| echo: false
+
+digraph SparkArchitecture {
+    rankdir=BT
+    node [shape=box style=filled fontcolor=white width=2.5 height=1]
+
+    Core [label="Apache Spark Core\nRDD API", fillcolor="#72A8EB", fontcolor=black]
+
+    SQL [label="Spark SQL", fillcolor="#1A3A7A"]
+    ML [label="MLlib\nMachine Learning", fillcolor="#1A3A7A"]
+    GraphX [label="GraphX", fillcolor="#1A3A7A"]
+    Streaming [label="Spark Streaming", fillcolor="#1A3A7A"]
+
+    Core -> SQL
+    Core -> ML
+    Core -> GraphX
+    Core -> Streaming
+}
+```
+
+## Режими розгортання Spark
+
+- **Локальний режим**: Одна машина, наприклад, ваш ноутбук
+  + Локальна модель зручна для тестування, налагодження та демонстрації
+- **Кластерний режим**: Набір заздалегідь визначених машин
+  + Добре підходить для реальних сценаріїв, коли потрібно обробляти великі обсяги даних
+- Робочий процес: Локально $\rightarrow$ кластери
+- Не потрібно змінювати код
+
+# PySpark: Spark з Python {.unnumbered .unlisted}
+
+## Огляд PySpark
+
+- Apache Spark написано на Scala
+- Для підтримки Python зі Spark, спільнота Apache Spark випустила PySpark
+- Подібна швидкість та потужність обчислень до Scala
+- API PySpark схожі на Pandas та Scikit-learn
+
+## Що таке оболонка Spark?
+
+- Інтерактивне середовище для виконання завдань Spark
+- Допомагає для швидкого інтерактивного прототипування
+- Оболонки Spark дозволяють взаємодіяти з даними на диску або в пам'яті
+- Три різні оболонки Spark:
+  + Spark-оболонка для Scala
+  + PySpark-оболонка для Python
+  + SparkR для R
+
+## PySpark shell
+
+- Оболонка PySpark --- це інструмент командного рядка на основі Python
+- Оболонка PySpark дозволяє аналітикам даних взаємодіяти зі структурами даних Spark
+- PySpark shell підтримує підключення до кластера
+
+## Розуміння SparkContext
+
+- SparkContext --- це точка входу у світ Spark
+- Точка входу --- це спосіб підключення до кластера Spark
+- Точка входу --- це як ключ до будинку
+- PySpark має SparkContext за замовчуванням, який називається `sc`
+
+## Перевірка SparkContext {.tiny}
+
+- **Версія**: Щоб отримати версію SparkContext
+
+```{.yaml filename="Terminal"}
+pyspark --version
+```
+
+```{yaml}
+Welcome to
+      ____              __
+     / __/__  ___ _____/ /__
+    _\ \/ _ \/ _ `/ __/  '_/
+   /__ / .__/\_,_/_/ /_/\_\   version 3.5.5
+      /_/
+
+Using Python version 3.11.4 (tags/v3.11.4:d2340ef, Jun  7 2023 05:45:37)
+Spark context Web UI available at http://AranaurPC:4040
+Spark context available as 'sc' (master = local[*], app id = local-1745489304985).
+SparkSession available as 'spark'.
+```
+
+```{python}
+from pyspark import SparkContext
+
+sc = SparkContext(master = 'local[*]')
+print(sc.version)
+```
+
+- **Версія Python**:
+
+```{python}
+print(sc.pythonVer)
+```
+
+- **Майстер**: URL кластера або локального рядка для запуску у локальному режимі SparkContext
+
+```{python}
+print(sc.master)
+```
+
+
+
+::: footer
+[🔗PySpark RDD Cheat Sheet](https://media.datacamp.com/legacy/image/upload/v1676303379/Marketing/Blog/PySpark_RDD_Cheat_Sheet.pdf)
+:::
+
+## Завантаження даних у PySpark
+
+- Метод SparkContext `parallelize()`
+
+```{python}
+rdd = sc.parallelize([1,2,3,4,5])
+```
+
+- Метод `textFile()` SparkContext
+
+```{python}
+rdd = sc.textFile("data/data.txt")
+```
+
+# Функціональне програмування у Python {.unnumbered .unlisted}
+
+## Що таке анонімні функції в Python?
+
+- Лямбда-функції --- анонімні функції в Python
+- Дуже потужна функція, яка використовується у Python. Досить ефективні з `map()` та `filter()`
+- Лямбда-функції створюють функції для подальшого виклику подібно до `def`
+- Повертає функції без імені (тобто анонімні)
+
+## Синтаксис лямбда-функції
+
+- Загальний вигляд лямбда-функції має вигляд
+
+```{python}
+#| eval: false
+lambda arguments: expression
+```
+
+- Приклад лямбда-функції
+
+```{python}
+double = lambda x: x * 2
+print(double(3))
+```
+
+## Різниця між функціями `def` та `lambda`
+
+- Код на Python для ілюстрації куба числа
+
+```{python}
+def cube(x):
+  return x ** 3
+
+g = lambda x: x ** 3
+
+print(g(10))
+print(cube(10))
+```
+
+- Немає оператора повернення для лямбда-функції
+- Можна розміщувати лямбда-функцію будь-де
+
+## `map()`
+
+- `map()` застосовує функцію до всіх елементів у вхідному списку
+- Загальний синтаксис `map()`
+
+```{python}
+#| eval: false
+
+map(function, list)
+```
+
+- Приклад `map()`
+
+```{python}
+items = [1, 2, 3, 4]
+new_items = list(map(lambda x: x + 2 , items))
+print(new_items)
+```
+
+## `filter()`
+
+- функція `filter()` отримує функцію та список і повертає новий список, для якого функція
+повертає значення `true`
+- Загальний синтаксис `filter()`
+
+```{python}
+#| eval: false
+
+filter(function, list)
+```
+
+- Приклад `filter()`
+
+```{python}
+items = [1, 2, 3, 4]
+new_items = list(filter(lambda x: (x%2 != 0), items))
+
+print(new_items)
+```
+
+# Програмування в PySpark RDD
+
+## Що таке RDD?
+
+- RDD (Resilient Distributed Datasets) --- це основна структура даних у Spark
+
+```{dot}
+//| echo: false
+//| 
+digraph RDDDistribution {
+    node [shape=box style=filled fontname="Helvetica"]
+
+    DataFile [label="Файл даних на диску", style="filled,bold", fillcolor=white, color=black]
+    Driver [label="Драйвер Spark створює RDD\n й розподіляє між вузлами", style="filled,bold", fillcolor=white, color=black]
+
+    subgraph cluster_0 {
+        label="Кластер"
+        style="rounded,filled"
+        color=gray
+        fillcolor="#f0f8ff"
+        
+        Node1 [label="Розділ вузла\nRDD 4", fillcolor=lightblue, style=filled]
+        Node2 [label="Розділ вузла\nRDD 3", fillcolor=lightblue, style=filled]
+        Node3 [label="Розділ вузла\nRDD 2", fillcolor=lightblue, style=filled]
+        Node4 [label="Розділ вузла\nRDD 1", fillcolor=lightblue, style=filled]
+    }
+
+    DataFile -> Driver
+    Driver -> Node1
+    Driver -> Node2
+    Driver -> Node3
+    Driver -> Node4
+}
+```
+
+## Декомпозиція RDD
+
+- Стійкі розподілені набори даних
+  + **Відмовостійкість**: Здатність протистояти збоям
+  + **Розподілені**: Розподілені між декількома машинами
+  + **Набори даних**: Колекція розділених даних, наприклад, масивів, таблиць, кортежів тощо.
+
+## Створення RDD. Як це зробити?
+
+- Розпаралелювання існуючої колекції об'єктів
+- Зовнішні набори даних:
+  + Файли в HDFS
+  + Об'єкти в Amazon S3 bucket
+  + рядки в текстовому файлі
+- З існуючих RDD
+
+## Розпаралелений збір (розпаралелювання)
+
+- `parallelize()` для створення RDD зі списків на Python
+
+```{python}
+numRDD = sc.parallelize([1,2,3,4])
+
+helloRDD = sc.parallelize("Hello world")
+
+type(helloRDD)
+```
+
+## Із зовнішніх наборів даних
+
+- `textFile()` для створення RDD із зовнішніх наборів даних
+
+```{python}
+fileRDD = sc.textFile("data/data.txt")
+
+type(fileRDD)
+```
+
+## Розуміння партицій у PySpark
+
+- Партиція (Partition) --- це логічний поділ великого розподіленого набору даних
+
+- метод `parallelize()`
+
+```{python}
+numRDD = sc.parallelize(range(10), numSlices = 6)
+```
+
+- метод `textFile()`
+
+```{python}
+#| eval: false
+fileRDD = sc.textFile("README.md", numSlices = 6)
+```
+
+Кількість партицій в RDD можна дізнатися за допомогою методу `getNumPartitions()`
+
+# RDD operations in PySpark {.unnumbered .unlisted}
+
+## Огляд PySpark operations {.smaller}
+
+```{dot}
+//| echo: false
+
+digraph SparkOperationsEmoji {
+    node [shape=box style=filled fontname="Helvetica"]
+
+    Transformations [label="🐛 ➡️ 🐛 ➡️ 🐛 ➡️ 🦋 Transformations", fillcolor="#c0f7a9"]
+    Actions [label="🖨️ Actions", fillcolor="#b3e5fc"]
+    Operations [label="Spark 🧠 Operations", fillcolor="#ffe066", style="filled,bold", color=black]
+
+    Transformations -> Operations
+    Actions -> Operations
+}
+```
+
+- Перетворення створюють нові RDD
+- Дії виконують обчислення на RDD
+
+## RDD Transformations {.tiny}
+
+- Трансформації виконують ліниві обчислення
+- Базові перетворення RDD
+  + `map()`
+  + `filter()`
+  + `flatMap()`
+  + `union()`
+
+```{dot}
+//| echo: false
+
+digraph RDDPipeline {
+    rankdir=LR;
+    node [shape=box, style=filled, fillcolor=lightgoldenrod];
+
+    Storage [shape=cylinder, fillcolor=lightgreen, label="Сховище"];
+    RDD1 [label="RDD1"];
+    RDD2 [label="RDD2"];
+    RDD3 [label="RDD3"];
+    Result [shape=ellipse, fillcolor=white, fontcolor=blue, label="Результат"];
+
+    Storage -> RDD1 [label="Rdd створюється шляхом\nчитання даних\nзі сховища"];
+    RDD1 -> RDD2 [label="transformation"];
+    RDD2 -> RDD3 [label="transformation"];
+    RDD3 -> Result [label="action"];
+}
+```
+
+## `map()` {.tiny}
+
+- перетворення `map()` застосовує функцію до всіх елементів у RDD
+
+```{dot}
+//| echo: false
+
+digraph MapTransformation {
+    rankdir=LR;
+    node [shape=ellipse, style=filled, fillcolor=deepskyblue, fontcolor=white];
+
+    // Input nodes
+    A1 [label="1"];
+    A2 [label="2"];
+    A3 [label="3"];
+    A4 [label="4"];
+
+    // Map operation
+    MAP [shape=circle, label="map\nx * x", fillcolor=dodgerblue];
+
+    // Output nodes
+    B1 [label="1"];
+    B2 [label="4"];
+    B3 [label="9"];
+    B4 [label="16"];
+
+    // Connections
+    A1 -> MAP -> B1;
+    A2 -> MAP -> B2;
+    A3 -> MAP -> B3;
+    A4 -> MAP -> B4;
+}
+```
+
+```{python}
+RDD = sc.parallelize([1,2,3,4])
+RDD_map = RDD.map(lambda x: x * x)
+```
+
+## `filter()` {.tiny}
+
+- `filter()` повертає новий RDD з елементами, які відповідають умові
+
+```{dot}
+//| echo: false
+
+digraph FilterTransformation {
+    rankdir=LR;
+    node [shape=ellipse, style=filled, fillcolor=deepskyblue, fontcolor=white];
+
+    // Input
+    A1 [label="1"];
+    A2 [label="2"];
+    A3 [label="3"];
+    A4 [label="4"];
+
+    // Operation
+    FILTER [shape=box, label="filter\nx : x > 2", fillcolor=dodgerblue];
+
+    // Output
+    B3 [label="3"];
+    B4 [label="4"];
+
+    // Connections
+    A1 -> FILTER;
+    A2 -> FILTER;
+    A3 -> FILTER -> B3;
+    A4 -> FILTER -> B4;
+}
+```
+
+```{python}
+RDD = sc.parallelize([1,2,3,4])
+RDD_filter = RDD.filter(lambda x: x > 2)
+```
+
+## `flatMap()` {.tiny}
+
+- `flatMap()` перетворює RDD у новий RDD, де кожен елемент може бути розгорнутий у кілька елементів
+
+```{dot}
+//| echo: false
+
+digraph FlatMapTransformation {
+    rankdir=TD;
+    node [shape=box, style=filled, fillcolor=deepskyblue, fontcolor=white];
+
+    // Input
+    A1 [label="['Hello world', 'How are you?']"];
+    // Operation
+    FLATMAP [shape=box, label="flatMap\nx : x.split(' ')", fillcolor=green];
+
+    // Output
+    B1 [label="['Hello', 'world', 'How', 'are', 'you?']"];
+    // Connections
+    A1 -> FLATMAP -> B1;
+}
+```
+
+```{python}
+RDD = sc.parallelize(["hello world", "how are you"])
+RDD_flatmap = RDD.flatMap(lambda x: x.split(" "))
+```
+
+## `union()` {.tiny}
+
+- `union()` об'єднує два RDD в один
+
+```{dot}
+//| echo: false
+
+digraph RDD_Pipeline {
+    node [fontname="Helvetica", style=filled, fontcolor=white]
+
+    inputRDD [label="inputRDD", shape=box, fillcolor="#2980b9"]
+    errorsRDD [label="errorsRDD", shape=box, fillcolor="#2980b9"]
+    warningsRDD [label="warningsRDD", shape=box, fillcolor="#2980b9"]
+    badlinesRDD [label="badlinesRDD", shape=box, fillcolor="#2980b9"]
+
+    filter1 [label="Filter", shape=rect, fillcolor="#a93226"]
+    filter2 [label="Filter", shape=rect, fillcolor="#a93226"]
+    union [label="Union", shape=rect, fillcolor="#a93226"]
+
+    inputRDD -> filter1 -> errorsRDD
+    inputRDD -> filter2 -> warningsRDD
+    errorsRDD -> union -> badlinesRDD
+    warningsRDD -> union
+}
+```
+
+```{python}
+#| eval: false
+inputRDD = sc.textFile("logs.txt")
+errorRDD = inputRDD.filter(lambda x: "error" in x.split())
+warningsRDD = inputRDD.filter(lambda x: "warnings" in x.split())
+combinedRDD = errorRDD.union(warningsRDD)
+```
+
+
+## RDD Actions
+
+Це операції, які повертають значення після виконання обчислень на RDD
+
+- Базові дії з RDD
+  + `collect()`
+  + `take(N)`
+  + `first()`
+  + `count()`
+
+## `collect()` та `take()`
+
+- `collect()` повертає всі елементи набору даних у вигляді масиву
+- `take(N)` повертає масив перших `N` елементів набору даних
+
+```{python}
+RDD_map.collect()
+```
+
+```{python}
+RDD_map.take(2)
+```
+
+## `first()` та `count()`
+
+- `first()` виводить перший елемент RDD
+
+```{python}
+RDD_map.first()
+```
+
+- `count()` повертає кількість елементів у RDD
+
+```{python}
+RDD_flatmap.count()
+```
+
+# Робота з Pair RDD в PySpark {.unnumbered .unlisted}
+
+## Вступ до Pair RDD у PySpark
+
+- Реальні набори даних зазвичай є парами ключ/значення
+- Кожен рядок є ключем і співвідноситься з одним або декількома значеннями
+- Pair RDD --- це спеціальна структура даних для роботи з такими наборами даних
+- Pair RDD: ключ --- це ідентифікатор, а значення --- це дані
+
+## Створення Pair RDD {.smaller}
+
+- Два найпоширеніші способи створення парних RDD
+  + Зі списку кортежу ключ-значення
+  + Зі звичайного RDD
+- Отримання даних у формі ключ/значення для парного RDD
+
+```{python}
+my_tuple = [('Sam', 23), ('Mary', 34), ('Peter', 25)]
+pairRDD_tuple = sc.parallelize(my_tuple)
+```
+
+\
+
+```{python}
+my_list = ['Sam 23', 'Mary 34', 'Peter 25']
+regularRDD = sc.parallelize(my_list)
+pairRDD_RDD = regularRDD.map(lambda s: (s.split(' ')[0], s.split(' ')[1]))
+```
+
+## Перетворення Pair RDD
+
+- Всі регулярні перетворення працюють на парі RDD
+- Потрібно передавати функції, які оперують парами значень ключів, а не окремими елементами
+- Приклади парних перетворень RDD
+  + `reduceByKey(func)`: Об'єднує значення з однаковим ключем
+  + `groupByKey()`: Згрупувати значення з однаковим ключем
+  + `sortByKey()`: Повернути RDD, відсортований за ключем
+  + `join()`: Об'єднати дві пари RDD на основі їх ключа
+
+## `reduceByKey(func)`
+
+- `reduceByKey(func)` об'єднує значення з однаковим ключем
+- Він виконує паралельні операції для кожного ключа в наборі даних
+- Це перетворення, а не дія
+
+```{python}
+regularRDD = sc.parallelize([("Messi", 23), ("Ronaldo", 34),
+                              ("Neymar", 22), ("Messi", 24)])
+
+pairRDD_reducebykey = regularRDD.reduceByKey(lambda x,y : x + y)
+pairRDD_reducebykey.collect()
+```
+
+## `sortByKey()`
+
+- `sortByKey()` повертає RDD, відсортований за ключем
+
+```{python}
+pairRDD_reducebykey_rev = pairRDD_reducebykey.map(lambda x: (x[1], x[0]))
+
+pairRDD_reducebykey_rev.sortByKey(ascending=False).collect()
+```
+
+## `groupByKey()`
+
+- `groupByKey()` згруповує значення з однаковим ключем
+
+```{python}
+airports = [("US", "JFK"),("UK", "LHR"),("FR", "CDG"),("US", "SFO")]
+
+regularRDD = sc.parallelize(airports)
+pairRDD_group = regularRDD.groupByKey().collect()
+
+for cont, air in pairRDD_group:
+  print(cont, list(air))
+```
+
+## `join()`
+
+- `join()` об'єднує дві пари RDD на основі їх ключа
+
+```{python}
+RDD1 = sc.parallelize([("Messi", 34),("Ronaldo", 32),("Neymar", 24)])
+RDD2 = sc.parallelize([("Ronaldo", 80),("Neymar", 120),("Messi", 100)])
+
+RDD1.join(RDD2).collect()
+```
+
+# Додаткові дії (actions) {.unnumbered .unlisted}
+
+## `reduce()`
+
+- `reduce()` об'єднує всі елементи RDD в один
+- Функція повинна бути комутативною (зміна порядку операндів не змінює результат) та асоціативною
+
+```{python}
+x = [1,3,4,6]
+RDD = sc.parallelize(x)
+RDD.reduce(lambda x, y : x + y)
+```
+
+## `saveAsTextFile()`
+
+- `saveAsTextFile()` зберігає RDD у текстовому файлі
+
+```{python}
+#| eval: false
+
+RDD.saveAsTextFile("tempFile")
+```
+
+- `coalesce()` можна використовувати для збереження RDD у вигляді одного текстового файлу
+
+```{python}
+#| eval: false
+
+RDD.coalesce(1).saveAsTextFile("tempFile")
+```
+
+## Action операції над парами RDD
+
+- Action RDD, доступні для парних RDD у PySpark
+- Парні дії RDD використовують дані ключ-значення
+- Кілька прикладів дій парного RDD включають
+  + `countByKey()`
+  + `collectAsMap()`
+
+## `countByKey()`
+
+- `countByKey()` доступний тільки для типу Pair RDD
+- `countByKey()` підраховує кількість елементів для кожного ключа
+
+```{python}
+rdd = sc.parallelize([("a", 1), ("b", 1), ("a", 1)])
+
+for kee, val in rdd.countByKey().items():
+  print(kee, val)
+```
+
+## `collectAsMap()`
+
+- `collectAsMap()` повернути пари ключ-значення в RDD у вигляді словника
+
+```{python}
+sc.parallelize([(1, 2), (3, 4)]).collectAsMap()
+```
+
+## PySpark SQL та DataFrames
+
+## PySpark DataFrames
+
+- PySpark SQL --- це бібліотека Spark для структурованих даних. Вона надає більше інформації про
+структуру даних та обчислення
+- PySpark DataFrame --- незмінна розподілена колекція даних з іменованими стовпцями
+- Призначений для обробки як структурованих (наприклад, реляційна база даних), так і напівструктурованих даних (наприклад, JSON)
+- API фреймів даних доступний у Python, R, Scala та Java
+- DataFrames в PySpark підтримують як SQL запити ( `SELECT * from table` ), так і вирази методи ( `df.select()` )
+
+## SparkSession --- точка входу для API DataFrame
+
+- SparkContext є основною точкою входу для створення RDD
+- SparkSession забезпечує єдину точку входу для взаємодії з фреймами даних Spark
+- SparkSession використовується для створення DataFrame, реєстрації DataFrame, виконання SQL запитів
+- SparkSession доступний в оболонці PySpark як spark
+
+## Створення DataFrame
+
+- Два різні методи створення DataFrame в PySpark
+  + З існуючих RDD за допомогою методу `createDataFrame()` SparkSession
+  + З різних джерел даних (CSV, JSON, TXT) за допомогою методу `read()` SparkSession
+- Схема контролює дані і допомагає DataFrames оптимізувати запити
+- Схема надає інформацію про назву стовпця, тип даних у стовпці, порожні значення тощо.
+
+## Створення DataFrame
+
+```{python}
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("DataFrame").getOrCreate()
+
+iphones_RDD = sc.parallelize([
+  ("XS", 2018, 5.65, 2.79, 6.24),
+  ("XR", 2018, 5.94, 2.98, 6.84),
+  ("X10", 2017, 5.65, 2.79, 6.13),
+  ("8Plus", 2017, 6.23, 3.07, 7.12)
+])
+
+names = ['Model', 'Year', 'Height', 'Width', 'Weight']
+
+iphones_df = spark.createDataFrame(iphones_RDD, schema=names)
+type(iphones_df)
+```
+
+## DataFrame з CSV/JSON/TXT
+
+```{python}
+#| eval: false
+df_csv = spark.read.csv("people.csv", header=True, inferSchema=True)
+
+df_json = spark.read.json("people.json")
+
+df_txt = spark.read.txt("people.txt")
+```
+
+- Шлях до файлу та два необов'язкові параметри
+- Два необов'язкові параметри
+  + `header=True`
+  + `inferSchema=True`
+
+# Взаємодія з DataFrame {.unnumbered .unlisted}
+
+## Оператори DataFrame у PySpark {.tiny}
+
+- Операції з DataFrame: Перетворення та дії
+
+:::: {.columns}
+
+::: {.column width="50%"}
+- Перетворення фрейму даних:
+  + `select()`
+  + `filter()`
+  + `groupby()`
+  + `orderby()`
+  + `dropDuplicates()`
+  + `withColumnRenamed()`
+:::
+
+::: {.column width="50%"}
+- Дії з фреймом даних:
+  + `head()`
+  + `show()`
+  + `count()`
+  + `columns`
+  + `describe()`
+:::
+
+::::
+
+::: {.callout-note}
+`printSchema()` є методом для будь-якого набору даних/фрейму даних Spark
+:::
+
+## `select()` та `show()` {.smaller}
+
+- `select()` вибирає стовпці з DataFrame
+- `show()` виводить перші рядки DataFrame
+
+```{python}
+from pyspark.sql import SparkSession
+from datetime import date as sysdate
+
+spark = SparkSession.builder.appName("DataFrame").getOrCreate()
+
+people = spark.read.csv("data/people.csv", header=True, inferSchema=True)
+
+people.select('name').show(5)
+```
+
+## `filter()`
+
+- `filter()` вибирає рядки з DataFrame, які відповідають умові
+
+```{python}
+people.filter(people.sex == 'female').show(5)
+```
+
+## `groupby()` та `count()`
+
+```{python}
+people.groupby('sex').count().show()
+```
+
+## `orderby()`
+
+```{python}
+people.orderBy('date of birth').show(5)
+```
+
+## `dropDuplicates()`
+
+```{python}
+print(people.select('name').count())
+
+print(people.select('name').dropDuplicates().count())
+```
+
+## `withColumnRenamed()`
+
+- `withColumnRenamed()` перейменовує стовпець у DataFrame
+
+```{python}
+people = people.withColumnRenamed("date of birth", "dob")
+people.show(5)
+```
+
+## `printSchema()`
+
+```{python}
+people.printSchema()
+```
+
+## `columns`
+
+- `columns` повертає список стовпців у DataFrame
+
+```{python}
+people.columns
+```
+
+## `describe()`
+
+- `describe()` повертає статистику для числових стовпців у DataFrame
+
+```{python}
+people.describe().show()
+```
+
+# PySpark SQL
+
+## DataFrame API vs SQL запити
+
+- У PySpark ви можете взаємодіяти з SparkSQL через DataFrame API та SQL запити
+- DataFrame API надає програмну мову, специфічну для домену (DSL) для даних
+- Перетворення та дії DataFrame легше конструювати програмно
+- SQL-запити можуть бути стислими, простішими для розуміння та перенесення
+- Операції над DataFrame також можна виконувати за допомогою SQL запитів
+
+## SQL запити
+
+- Метод SparkSession `sql()` виконує SQL-запит
+- Метод `sql()` отримує SQL-запит як аргумент і повертає результат у вигляді DataFrame
+
+```{python}
+people.createOrReplaceTempView("people")
+df_sql = spark.sql("SELECT * FROM people LIMIT 5")
+df_sql.show()
+```
+
+## SQL-запит
+
+```{python}
+query = '''SELECT name FROM people LIMIT 5'''
+df_sql = spark.sql(query)
+df_sql.show()
+```
+
+## Групування та агрегація
+
+```{python}
+query = '''SELECT sex, COUNT(*) as count FROM people GROUP BY sex'''
+df_sql = spark.sql(query)
+df_sql.show()
+```
+
+## Фільтрація
+
+```{python}
+query = '''SELECT * FROM people WHERE dob > '2000-01-01' '''
+df_sql = spark.sql(query)
+df_sql.show(5)
+```
+
+# Візуалізація даних у PySpark {.unnumbered .unlisted}
+
+## Візуалізація даних у PySpark
+
+Побудова графіків за допомогою фреймів даних PySpark виконується трьома методами
+
+- бібліотека `pyspark_dist_explore`
+- `toPandas()`
+- бібліотека `HandySpark`
+
+## `pyspark_dist_explore`
+
+- `pyspark_dist_explore` --- це бібліотека для візуалізації даних у PySpark
+- Наразі доступні три функції: `hist()` , `distplot()` та `pandas_histogram()`
+
+```{python}
+#| output-location: slide
+from pyspark_dist_explore import hist
+import matplotlib.pyplot as plt
+
+df = spark.read.csv("data/salaries.csv", header=True, inferSchema=True)
+
+fig, ax = plt.subplots()
+hist(ax, df.select('salary_in_usd'), bins = 20);
+```
+
+## `toPandas()`
+
+```{python}
+df_pandas = df.toPandas()
+df_pandas.hist(column='salary_in_usd', bins=20);
+```
+
+::: {.callout-note}
+Якщо ви маєте великі обсяги даних, використовувати `toPandas()` не рекомендується
+:::
+
+## Pandas vs PySpark
+
+- Pandas DataFrames --- це односерверні структури в пам'яті, що базуються на одному сервері, а операції над
+PySpark виконуються паралельно
+- Результат генерується, коли ми застосовуємо будь-яку операцію в Pandas, в той час як операції в PySpark
+DataFrame є лінивими
+- Pandas DataFrame є змінюваним, а PySpark DataFrame є незмінним
+- Pandas API підтримує більше операцій, ніж PySpark Dataframe API
+
+# PySpark MLlib
+
+## Огляд PySpark MLlib
+
+- MLlib - це компонент Apache Spark для машинного навчання
+- До складу MLlib входять різноманітні інструменти:
+  + Алгоритми ML: спільна фільтрація, класифікація та кластеризація
+  + Функціоналізація: вилучення ознак, перетворення, зменшення розмірності та вибірка
+  + Конвеєри: інструменти для побудови, оцінки та налаштування конвеєрів ML
+
+## Чому PySpark MLlib?
+
+- Scikit-learn - популярна бібліотека Python для інтелектуального аналізу даних та машинного навчання
+- Алгоритми Scikit-learn працюють тільки для невеликих наборів даних на одній машині
+- Алгоритми MLlib Spark призначені для паралельної обробки на кластері
+- Підтримує такі мови, як Scala, Java та R
+- Надає високорівневий API для побудови конвеєрів машинного навчання
+
+## Алгоритми PySpark MLlib
+
+- Класифікація (бінарна та багатокласова) та регресія: ЛLinear SVMs, logistic regression,
+decision trees, random forests, gradient-boosted trees, naive Bayes, linear least squares,
+Lasso, ridge regression, isotonic regression
+- Колаборативна фільтрація: Алгоритм змінних найменших квадратів (Alternating least squares, ALS)
+- Кластеризація: K-means, Gaussian mixture, Bisecting K-means and Streaming K-Means
+
+## Три «С» машинного навчання в PySpark MLlib
+
+- Collaborative filtering (рекомендаційні системи): Створення рекомендацій
+- Classification: Визначення, до якої з категорій належить нове спостереження
+- Clustering: Групування даних на основі схожих характеристик
+
+## PySpark MLlib imports
+
+- Collaborative filtering
+
+```{python}
+from pyspark.mllib.recommendation import ALS
+```
+
+- Classification
+
+```{python}
+from pyspark.mllib.classification import LogisticRegressionWithLBFGS
+```
+
+- Clustering
+
+```{python}
+from pyspark.mllib.clustering import KMeans
+```
+
+# Вступ до Collaborative filtering {.unnumbered .unlisted}
+
+## Collaborative filtering
+
+- Колаборативна фільтрація --- це пошук користувачів, які мають спільні інтереси
+- Колаборативна фільтрація зазвичай використовується для рекомендаційних систем
+- Підходи до спільної фільтрації:
+  + User-User: Знаходить користувачів, схожих на цільового користувача
+  + Item-Item: Знаходить і рекомендує елементи, схожі на елементи з цільовим користувачем
+
+## Клас `Rating` у `pyspark.mllib.recommendations`
+
+- Клас `Rating` --- це обгортка навколо кортежу (користувач, товар і рейтинг)
+- Корисний для розбору RDD та створення кортежу з користувача, товару та рейтингу
+
+```{python}
+from pyspark.mllib.recommendation import Rating
+
+r = Rating(user = 1, product = 2, rating = 5.0)
+print(r)
+```
+
+## `randomSplit()`
+
+- Метод `randomSplit()` PySpark випадковим чином розбиває дані із заданими вагами і повертає декілька RDD
+
+```{python}
+data = sc.parallelize([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+training, test=data.randomSplit([0.6, 0.4])
+training.collect()
+test.collect()
+```
+
+## Alternating Least Squares (ALS)
+
+- ALS у `spark.mllib` забезпечує колаборативну фільтрацію
+- `ALS.train(ratings, rank, iterations)`
+
+```{python}
+r1 = Rating(1, 1, 1.0)
+r2 = Rating(1, 2, 2.0)
+r3 = Rating(2, 1, 2.0)
+ratings = sc.parallelize([r1, r2, r3])
+ratings.collect()
+```
+
+```{python}
+model = ALS.train(ratings, rank=10, iterations=10)
+```
+
+## `predictAll()`
+
+- Метод `predictAll()` повертає список прогнозованих оцінок для вхідної пари користувач і товар
+- Метод отримує RDD без оцінок, щоб згенерувати рейтинги
+
+```{python}
+unrated_RDD = sc.parallelize([(1, 2), (1, 1)])
+
+predictions = model.predictAll(unrated_RDD)
+predictions.collect()
+```
+
+## Оцінка моделі
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+```{python}
+rates = ratings.map(lambda x: ((x[0], x[1]), x[2]))
+rates.collect()
+```
+
+```{python}
+preds = predictions.map(lambda x: ((x[0], x[1]), x[2]))
+preds.collect()
+```
+
+```{python}
+rates_preds = rates.join(preds)
+rates_preds.collect()
+```
+:::
+
+::: {.column width="50%"}
+
+```{python}
+MSE = rates_preds.map(lambda r: (r[1][0] - r[1][1])**2).mean()
+print("Mean Squared Error = " + str(MSE))
+```
+:::
+
+::::
+
+# Класифікація {.unnumbered .unlisted}
+
+## Робота з векторами {.smaller}
+
+- PySpark MLlib містить спеціальні типи даних `Vectors` та `LabelledPoint`
+- Два типи векторів
+  + Dense Vector: зберігає всі свої записи в масиві чисел з плаваючою комою
+  + Sparse Vector: зберігає лише ненульові значення та їхні індекси
+
+```{python}
+from pyspark.mllib.linalg import Vectors, SparseVector, DenseVector
+
+denseVec = Vectors.dense([1.0, 2.0, 3.0])
+sparseVec = Vectors.sparse(3, {0: 1.0, 2: 3.0})
+
+print(denseVec)
+print(sparseVec)
+```
+
+## `LabeledPoint`
+
+- `LabeledPoint` --- це обгортка для вхідних ознак і прогнозованого значення
+- Для бінарної класифікації логістичної регресії міткою є або 0 (від'ємне значення), або 1 (додатне значення)
+
+```{python}
+from pyspark.mllib.regression import LabeledPoint
+
+positive = LabeledPoint(1.0, [1.0, 0.0, 3.0])
+negative = LabeledPoint(0.0, [2.0, 1.0, 1.0])
+print(positive)
+print(negative)
+```
+
+## `HashingTF`
+
+- Алгоритм `HashingTF()` використовується для зіставлення значення ознаки з індексами у векторі ознак
+
+```{python}
+from pyspark.mllib.feature import HashingTF
+
+sentence = "hello hello world"
+words = sentence.split()
+tf = HashingTF(10000)
+tf.transform(words)
+```
+
+## Логістична регресія з використанням `LogisticRegressionWithLBFGS`
+
+```{python}
+data = [
+  LabeledPoint(0.0, [0.0, 1.0]),
+  LabeledPoint(1.0, [1.0, 0.0]),
+]
+
+RDD = sc.parallelize(data)
+
+model = LogisticRegressionWithLBFGS.train(RDD, iterations=10)
+model.predict([0.0, 1.0])
+model.predict([1.0, 0.0])
+```
+
+# Кластеризація {.unnumbered .unlisted}
+
+## Кластеризація
+
+Бібліотека PySpark MLlib наразі підтримує наступні моделі кластеризації
+
+- K-means
+- Gaussian mixture
+- Power iteration clustering (PIC)
+- Bisecting k-means
+- Streaming k-means
+
+## K-means
+
+```{python}
+RDD = sc.textFile("data/wine_data.csv") \
+  .filter(lambda line: not line.startswith("class_label")) \
+  .map(lambda x: x.split(",")) \
+  .map(lambda x: [float(x[0]), float(x[1]), float(x[2])])
+
+RDD.take(5)
+```
+
+## Навчання K-means
+
+```{python}
+from pyspark.mllib.clustering import KMeans
+
+model = KMeans.train(RDD, k = 3, maxIterations = 10)
+model.clusterCenters
+```
+
+## Оцінка моделі
+
+```{python}
+from math import sqrt
+
+def error(point):
+  center = model.centers[model.predict(point)]
+  return sqrt(sum([x**2 for x in (point - center)]))
+
+WSSSE = RDD.map(lambda point: error(point)).reduce(lambda x, y: x + y)
+print("Within Set Sum of Squared Error = " + str(WSSSE))
+```
+
+## Візуалізація
+
+```{python}
+#| output-location: slide
+from pyspark.sql import SparkSession
+import pandas as pd
+import matplotlib.pyplot as plt
+
+spark = SparkSession.builder.appName("KMeans").getOrCreate()
+
+wine_data_df = spark.createDataFrame(RDD, schema=["col0", "col1", "col2"])
+wine_data_df_pandas = wine_data_df.toPandas()
+
+cluster_centers_pandas = pd.DataFrame(
+    [center[1:] for center in model.clusterCenters],  # пропускаємо col0
+    columns=["col1", "col2"]
+)
+
+plt.scatter(wine_data_df_pandas["col1"], wine_data_df_pandas["col2"], c=wine_data_df_pandas["col0"])
+plt.scatter(cluster_centers_pandas["col1"], cluster_centers_pandas["col2"], c="red", marker="x")
+plt.title("KMeans Clustering")
+plt.show()
+```
+
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".02_files/libs/colored-particles/index.html"}
+
+```{python}
+#| echo: false
+sc.stop()
+```
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/mm_big_data/)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

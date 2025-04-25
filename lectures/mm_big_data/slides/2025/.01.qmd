@@ -1,0 +1,196 @@
+---
+title: "Not so big data"
+subtitle: "Моделі та методи обробки великих даних"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка, ФІТ
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .01_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: <a href="https://aranaur.rbind.io/lectures/mm_big_data/">🔗Моделі та методи обробки великих даних</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    # center: true
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    # controls-layout: bottom-right
+    chalkboard: true
+    logo: fit.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    # fig-width: 9
+    # fig-height: 5
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+  # gfm:
+  #   mermaid-format: png
+preload-iframes: true
+jupyter: python3
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+
+```{python}
+#| label: setup
+#| include: false
+
+# Import libraries
+import numpy as np
+from matplotlib import pyplot as plt
+import seaborn as sns
+import random
+import pandas as pd
+
+import sys
+
+from IPython.display import Markdown
+from tabulate import tabulate
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Polars vs. Pandas
+
+## Benchmarking
+
+::: {.columns}
+::: {.column}
+- [Benchmark](https://h2oai.github.io/db-benchmark/){preview-link="true"} від H2O.ai
+
+![](data/h20.png)
+:::
+::: {.column}
+- [Benchmark](https://duckdblabs.github.io/db-benchmark/){preview-link="true"} від DuckDB Labs
+
+![](data/duckdb.png)
+:::
+:::
+
+## Дані {.tiny}
+
+Спочатку ми отримаємо деякі дані про затримку рейсів.
+
+```{python}
+#| eval: false
+
+from pathlib import Path
+from zipfile import ZipFile
+import requests
+
+data_dir = Path("../data") # replace this with a directory of your choice
+dest = data_dir / "flights.csv.zip"
+
+if not dest.exists():
+    r = requests.get(
+        "https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_2022_1.zip",
+        verify=False,
+        stream=True,
+    )
+
+    data_dir.mkdir(exist_ok=True)
+    with dest.open("wb") as f:
+        for chunk in r.iter_content(chunk_size=102400):
+            if chunk:
+                f.write(chunk)
+
+    with ZipFile(dest) as zf:
+        zf.extract(zf.filelist[0].filename, path=data_dir)
+
+extracted = data_dir / "On_Time_Reporting_Carrier_On_Time_Performance_(1987_present)_2022_1.csv"
+```
+
+## Дані з Google Drive
+
+```{python}
+import gdown
+import io
+```
+
+:::: {.columns}
+
+::: {.column width="50%"}
+Polars
+
+```{python}
+import polars as pl
+
+# ID файлу
+file_id = "1UApDVdpgyeeZbJTvgCIjMjumGv_tWeQi"
+url = f"https://drive.google.com/uc?id={file_id}"
+
+# Завантажуємо файл у байтовий об'єкт
+response = gdown.download(url, quiet=True, fuzzy=True)
+
+# Відкриваємо як об'єкт у пам’яті
+with open(response, 'rb') as f:
+    df_pl = pl.read_csv(f)
+
+print(df_pl.head())
+```
+:::
+
+::: {.column width="50%"}
+```{python}
+import pandas as pd
+
+# ID файлу
+file_id = "1UApDVdpgyeeZbJTvgCIjMjumGv_tWeQi"
+url = f"https://drive.google.com/uc?id={file_id}"
+
+# Завантажуємо файл у байтовий об'єкт
+response = gdown.download(url, quiet=True, fuzzy=True)
+
+# Відкриваємо як об'єкт у пам’яті
+with open(response, 'rb') as f:
+    df_pd = pd.read_csv(f)
+
+print(df_pd.head())
+```
+:::
+
+::::
+
+
+
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".01_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/mm_big_data/)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
