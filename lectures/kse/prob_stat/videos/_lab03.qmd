@@ -1,0 +1,168 @@
+---
+title: "Lab 3: 🗳️ Election Fraud"
+subtitle: "Applied Statistics"
+affiliation: "Kyiv School of Economics"
+format: 
+  html: default
+toc: true
+number-sections: true
+echo: false
+
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+::: {.callout-note}
+This is just one possible scenario. You can design your own hypothesis and compare other groups or distributions.
+:::
+
+## 🎯 Context
+
+The phrase election fraud can mean many things including vote buying, casting two ballots in different locations, and stuffing ballot boxes with fake ballots. We’re going to focus on a version of the third, when the vote totals at a particular precinct are fiddled with by election officials.
+
+As an example, imagine that these were the vote totals at the end of the night at several precincts in your town
+
+| **Precinct** | **Candidate A** | **Candidate B** |
+|----------|-------------|-------------|
+| 1        | 53         | 37          |
+| 2        | 36         | 31         |
+| 3        | 68         | 55         |
+| 4        | 17         | 19         |
+| 5        | 24         | 27         |
+
+An official who was perpetrating election fraud would come in and alter these numbers before reporting them to the authorities, usually in a manner that favored one of the candidates, in this case candidate B. If the original ballot data is not retained, this sort of fraud may be difficult to detect and prove. This has led some to look to a statistical method based on something called [Benford's Law](https://en.wikipedia.org/wiki/Benford%27s_law).
+
+| **Precinct** | **Candidate A** | **Candidate B** |
+|----------|-------------|-------------|
+| 1        | 53         | ~~37~~ 77          |
+| 2        | 36         | 31         |
+| 3        | 68         | ~~55~~ 85         |
+| 4        | 17         | 19         |
+| 5        | 24         | 27         |
+
+### Benford’s Law A.K.A. "the first digit law"
+
+Benford's Law appears when looking at broad collections of numbers, and paying attention to only to the first digit of each number. For example, consider the populations of every country on earth. This demographic data lives inside the `gapminder` package. We can restrict our attention to data from two thousand and seven and select off the country name and population variables. Now Benford's Law is only concerned with the first digit, so here we see that that Afghanistan, Albania, and Algeria all start with three, Angola starts with one, and so on. If we do this for all one hundred and forty two countries in this data set and visualize the distribution in a bar chart, what do you think it would look like? Would it be uniform?
+
+
+```{r}
+#| warning: false
+#| code-fold: true
+library(tidyverse)
+library(gapminder)
+library(patchwork)
+
+country_plot <- gapminder |>
+  filter(year == 2007) |>
+  mutate(first_digit = as.numeric(substr(as.character(pop), 1, 1))) |>
+  ggplot(aes(x = first_digit)) +
+  geom_bar(fill = red_pink) +
+  labs(title = "First digit of country populations in 2007",
+       x = "First digit",
+       y = "Count") +
+  scale_x_continuous(breaks = 1:9) +
+  theme_minimal()
+
+benford_plot <- tibble(
+  first_digit = 1:9,
+  proportion = c(0.301, 0.176, 0.124, 0.096, 0.079, 0.067, 0.058, 0.051, 0.046)
+) |>
+  ggplot(aes(x = first_digit, y = proportion)) +
+  geom_col(fill = slate) +
+  labs(title = "Benford's Law",
+       x = "First digit",
+       y = "Proportion") +
+  scale_x_continuous(breaks = 1:9) +
+  theme_minimal()
+
+country_plot + benford_plot + plot_layout(ncol = 1)
+```
+
+It turns out it’s not, not by a long shot. The most common number is one, the second most common is two, and so on with the higher numbers being less common. This decaying distribution of first digits is what is captured precisely by Benford's Law. It proposes, for example, that exactly thirty-point-one percent of the first digits should be one, seventeen-point-six percent should be two, and so on.
+
+- If the election was fair then vote counts should follow Benford's Law.
+- If the election was fraudulent then vote counts should not follow Benford's Law.
+
+To think about why this pattern emerges, imagine if these populations were drawn randomly from the integers between 1 and 150. What proportion of these numbers lead with a 1? Well, there’s 1, there’s 10 through 19, then there’s the whole swath of 100 to 150. That’s more than 40% of these numbers. To see why two is the second most common, imagine if instead these numbers were between 1 and 250. That would be a lot of leading twos.
+
+The distribution of first digits becomes distributed according to Benford’s Law when the numbers span many orders of magnitude. The idea behind using Benford’s Law to detect election fraud is that in a free and fair election, the distribution of first digits should roughly follow Benford’s Law. If instead election officials are fiddling with the totals manually, they will tend to use leading digits drawn more uniformly between 1 and 9; more sevens, for example.
+
+This approach to detecting election fraud was prominently used in the 2009 presidential election in Iran.
+
+## 🧪 Iran election 2009
+
+In this election, the incumbent, Mahmoud Ahmadinejad, faced several challengers, the most prominent of whom was Mir-Hossein Mousavi. There were widespread claims of election fraud from both the international community and some parties within Iran.
+
+![](img/ahmedinejad-mousavi.png){fig-align="center" width="50%"}
+
+One of the key points of evidence that was used in arguing fraud were the vote counts, which are available in [`openintro`](https://openintrostat.github.io/openintro/index.html) package in a data set [`iran`](https://openintrostat.github.io/openintro/reference/iran.html).
+
+
+```{r}
+#| label: iran_data
+#| echo: true
+#| warning: false
+#| code-fold: true
+
+library(openintro)
+
+iran %>% 
+  select(city, ahmadinejad, mousavi, total_votes_cast) |>
+  DT::datatable()
+```
+
+### 🔧 Steps to follow
+
+1. 📥 Load the data and explore it
+2. 🧪 Compare the first digits of the vote counts for Ahmadinejad and Mousavi
+3. 📊 Visualize the empirical distribution of first digit
+4. 📝 Draw conclusions
+
+## 🧪 US election 2016
+
+Let’s turn to the voting data from the US presidential election of 2016 where the two primary party candidates were Donald Trump and Hilary Clinton. You’ll use the same hypotheses and the same analytical approach, extracting first digits and seeing how well they conform to Benford’s Law. While you could consider this analysis at many different scales, let’s focus in on a single state, Iowa.
+
+![](img/Iowa_in_United_States.svg){fig-align="center" width="50%"}
+
+
+```{r}
+#| label: iowa_data
+#| echo: true
+#| warning: false
+#| code-fold: true
+#| column: page
+
+iowa %>% 
+  DT::datatable()
+```
+
+### 🔧 Steps to follow
+
+1. 📥 Load the data and explore it
+2. 🧪 Compare the first digits of the vote counts for Trump and Clinton
+3. 📊 Visualize the empirical distribution of first digit
+4. 📝 Draw conclusions
+
+## 📝 Result
+Laboratory report in PDF/HTML[^html] format with:
+
+- Code
+- Graphs
+- Hypotheses and decisions
+- Short written interpretation
+
+[^html]: If you choose HTML, please host it via GitHub Pages or similar service. You can use the `quarto publish` command to publish your report.
