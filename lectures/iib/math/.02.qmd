@@ -34,7 +34,6 @@ format:
   # gfm:
   #   mermaid-format: png
 preload-iframes: true
-jupyter: python3
 execute: 
   echo: false
   warning: false
@@ -45,22 +44,12 @@ revealjs-plugins:
   - verticator
 ---
 
-```{python}
+```{r}
 #| label: setup
 #| include: false
 
-import numpy as numpy
-from seaborn import distplot
-from matplotlib import pyplot
-import seaborn
-import random
-
-import sys
-import pandas as pd
-
-from IPython.display import Markdown
-from tabulate import tabulate
-
+library(tidyverse)
+library(readxl)
 # Define colors
 red_pink   = "#e64173"
 turquoise  = "#20B2AA"
@@ -72,14 +61,409 @@ green      = "#8bb174"
 yellow     = "#D8BD44"
 purple     = "#6A5ACD"
 slate      = "#314f4f"
+
+data <- read_excel(here::here("lectures/iib/math/data/data_jobs_salary_all.xlsx")) %>% 
+  filter(job_country != "Russia") %>%
+  filter(job_country != "Belarus")
 ```
 
 # Основні види візуалізації даних
 
-## Точкова діаграма
+## Лінійні графіки
 
+```{r}
+data %>% 
+  mutate(month = lubridate::month(job_posted_date, label = TRUE)) %>% 
+  count(month) %>% 
+  ggplot(aes(x = month, y = n, group = 1)) +
+  geom_line(color = turquoise, size = 1.5) +
+  geom_point(color = turquoise, size = 3) +
+  labs(title = "Кількість вакансій за місяцями",
+       x = "Місяць",
+       y = "Кількість вакансій") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::comma)
+```
 
-# Дякую за увагу! {.unnumbered .unlisted background-iframe=".01_files/libs/colored-particles/index.html"}
+## Лінійні графіки + тренд
+
+```{r}
+data %>% 
+  mutate(month = lubridate::month(job_posted_date, label = TRUE)) %>% 
+  count(month) %>% 
+  ggplot(aes(x = month, y = n, group = 1)) +
+  geom_line(color = turquoise, size = 1.5) +
+  geom_point(color = turquoise, size = 3) +
+  geom_smooth(method = "lm", color = red_pink, se = FALSE) +
+  labs(title = "Кількість вакансій за місяцями з трендом",
+       x = "Місяць",
+       y = "Кількість вакансій") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::comma)
+```
+
+## Кругові діаграми
+
+```{r}
+data %>% 
+  group_by(job_no_degree_mention) %>%
+  summarise(count = n()) %>%
+  ggplot(aes(x = "", y = count, fill = job_no_degree_mention)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  geom_text(aes(label = scales::percent(count / sum(count))), 
+            position = position_stack(vjust = 0.5), color = "white") +
+  coord_polar(theta = "y") +
+  labs(title = "Розподіл вакансій за згадуванням ступеня",
+       fill = "Згадування ступеня",
+       x = "",
+       y = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank()) +
+  scale_fill_manual(values = c(red, turquoise)) +
+  scale_y_continuous(labels = scales::percent_format())
+```
+
+## Стовпчасті діаграми 1/3
+
+```{r}
+data %>% 
+  count(job_title_short) %>% 
+  ggplot(aes(x = job_title_short, y = n, fill = job_title_short)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Розподіл вакансій за назвами посад",
+       x = "Назва посади",
+       y = "Кількість вакансій") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Стовпчасті діаграми 2/3
+
+```{r}
+data %>% 
+  count(job_title_short) %>% 
+  ggplot(aes(x = reorder(job_title_short, -n), y = n, fill = job_title_short)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Розподіл вакансій за назвами посад",
+       x = "Назва посади",
+       y = "Кількість вакансій") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme(legend.position = "none")
+```
+
+## Стовпчасті діаграми 3/3
+
+```{r}
+data %>% 
+  count(job_title_short) %>% 
+  ggplot(aes(x = reorder(job_title_short, n), y = n, fill = job_title_short)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = n), 
+            position = position_dodge(width = 0.9), hjust = -0.25, size = 3) +
+  labs(title = "Розподіл вакансій за назвами посад",
+       x = "Назва посади",
+       y = "Кількість вакансій") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+```
+
+# Просунуті візуалізації
+
+## Точкова діаграма 1/2
+
+```{r}
+data %>% 
+  summarise(salary_year_md = median(salary_year_avg , na.rm = TRUE),
+            salary_hour_md = median(salary_hour_avg , na.rm = TRUE), .by = job_title_short) %>%
+  ggplot(aes(x = salary_year_md, y = salary_hour_md)) +
+  geom_point(size = 3) +
+  labs(title = "Річна та погодинна зарплата за посадами",
+       x = "Річна зарплата (USD)",
+       y = "Погодинна зарплата (USD)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_continuous(labels = scales::dollar_format())
+```
+
+## Точкова діаграма 2/2
+
+```{r}
+library(ggrepel)
+
+data %>% 
+  summarise(salary_year_md = median(salary_year_avg , na.rm = TRUE),
+            salary_hour_md = median(salary_hour_avg , na.rm = TRUE), .by = job_title_short) %>%
+  ggplot(aes(x = salary_year_md, y = salary_hour_md)) +
+  geom_point(size = 3) +
+  geom_text_repel(aes(label = job_title_short), 
+              size = 3, nudge_x = 0.1, nudge_y = 0.1, 
+              segment.color = "grey50", show.legend = FALSE) +
+  labs(title = "Річна та погодинна зарплата за посадами",
+       x = "Річна зарплата (USD)",
+       y = "Погодинна зарплата (USD)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_continuous(labels = scales::dollar_format())
+```
+
+## Мапи
+
+```{r}
+library(sf)
+library(patchwork)
+
+world_sf <- read_sf("https://raw.githubusercontent.com/holtzy/R-graph-gallery/master/DATA/world.geojson") %>%
+  filter(!name %in% c("Antarctica", "Greenland")) %>%
+  mutate(name = case_when(
+    name == "United States of America" ~ "United States",
+    name == "United Kingdom of Great Britain and Northern Ireland" ~ "United Kingdom",
+    name == "Republic of Korea" ~ "South Korea",
+    TRUE ~ name
+  ))
+
+world_jobs_count <- data %>%
+  filter(job_country != c("Russia", "Belarus", "Russia")) %>%
+  count(job_country) %>%
+  rename(name = job_country)
+
+world_salary_md <- data %>%
+  filter(job_country != c("Russia", "Belarus")) %>%
+  group_by(job_country) %>%
+  summarise(salary_year_md = median(salary_year_avg, na.rm = TRUE)) %>%
+  rename(name = job_country)
+
+world_sf <- world_sf %>% 
+  left_join(world_jobs_count, by = "name") %>%
+  left_join(world_salary_md, by = "name")
+
+p1 <- ggplot(world_sf) +
+  geom_sf(aes(fill = n), color = "white", size = 0.1) +
+  labs(title = "Кількість вакансій по країнам",
+  fill = "Кількість вакансій") +
+  scale_fill_gradient(low = turquoise, high = red_pink, na.value = "grey50") +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+p2 <- ggplot(world_sf) +
+  geom_sf(aes(fill = salary_year_md), color = "white", size = 0.1) +
+  labs(title = "Медіана річної зарплати по країнам",
+       fill = "Річна зарплата (USD)") +
+  scale_fill_gradient(low = purple, high = red_pink, na.value = "grey50") +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+p1 / p2 + plot_layout(ncol = 1) +
+  plot_annotation(title = "Візуалізація вакансій та зарплат по країнам",
+                  theme = theme(plot.title = element_text(hjust = 0.5)))
+```
+
+# Статистичні графіки
+
+## Гістограми
+
+```{r}
+data %>% 
+  ggplot(aes(x = salary_year_avg)) +
+  geom_histogram(fill = turquoise, color = "white", alpha = 0.7) +
+  labs(title = "Розподіл річної зарплати",
+       x = "Річна зарплата (USD)",
+       y = "Кількість вакансій") +
+  theme_minimal() +
+  scale_x_continuous(labels = scales::dollar_format()) +
+  scale_y_continuous(labels = scales::comma)
+```
+
+## Boxplot 1/3
+
+```{r}
+data %>% 
+  ggplot(aes(x = fct_reorder(job_title_short, salary_year_avg, .desc = TRUE),
+             y = salary_year_avg, fill = job_title_short)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Розподіл річної зарплати за посадами",
+       x = "Назва посади",
+       y = "Річна зарплата (USD)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_continuous(labels = scales::dollar_format()) +
+  theme(legend.position = "none") +
+  ylim(0, 300000)
+```
+
+## Boxplot 2/3
+
+```{r}
+data %>% 
+  ggplot(aes(x = fct_reorder(job_title_short, salary_year_avg, .desc = TRUE),
+             y = salary_year_avg, fill = job_title_short)) +
+  geom_boxplot(alpha = 0.7, outliers = FALSE) +
+  geom_jitter(color = "black", alpha = 0.05, size = 0.5, width = 0.2) +
+  labs(title = "Розподіл річної зарплати за посадами",
+       x = "Назва посади",
+       y = "Річна зарплата (USD)") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::dollar_format(), limits = c(0, 300000)) +
+  theme(legend.position = "none") +
+  coord_flip()
+```
+
+## Boxplot 3/3
+
+```{r}
+library(ggdist)
+
+data %>% 
+  ggplot(aes(x = fct_reorder(job_title_short, salary_year_avg, .desc = TRUE, .na_rm = TRUE),
+             y = salary_year_avg)) +
+  ggdist::stat_halfeye(aes(fill = job_title_short), 
+                       adjust = 0.5, width = 0.7, .width = 0, 
+                       point_colour = NA, justification = -.2) +
+  geom_boxplot(width = 0.15, outlier.shape = NA, alpha = 0.7) +
+  # geom_point(
+  #       shape = 95,
+  #       size = 15,
+  #       alpha = .01,
+  #       color = "#1D785A"
+  # ) +
+  labs(title = "Розподіл річної зарплати за посадами",
+       x = "Назва посади",
+       y = "Річна зарплата (USD)") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::dollar_format(), limits = c(0, 300000)) +
+  theme(legend.position = "none") +
+  coord_flip()
+```
+
+## Діаграма Паретто
+
+```{r}
+data %>% 
+  count(job_title_short) %>% 
+  arrange(desc(n)) %>%
+  mutate(cum_perc = cumsum(n) / sum(n)) %>%
+  ggplot(aes(x = reorder(job_title_short, -n), y = n, group = 1)) +
+  geom_bar(stat = "identity", fill = turquoise, alpha = 0.7) +
+  geom_line(aes(x = job_title_short, y = cum_perc * max(n)), color = red_pink, size = 1.2) +
+  geom_point(aes(x = job_title_short, y = cum_perc * max(n)), color = red_pink, size = 3) +
+  geom_text(aes(x = job_title_short, y = cum_perc * max(n), label = scales::percent(cum_perc)), 
+            color = red_pink, vjust = -0.9, size = 3) +
+  labs(title = "Діаграма Паретто: Розподіл вакансій за назвами посад",
+        x = "Назва посади",
+        y = "Кількість вакансій") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = turquoise) +
+  scale_color_manual(values = red_pink)
+```
+
+## Обираємо візуалізацію {.scrollable}
+
+![](data/rtaImage.png){fig-align="center"}
+
+# Case
+
+## Відсоток BTC-пулів 1/2
+
+![](img/btc_pools1.png){fig-align="center"}
+
+## Відсоток BTC-пулів 2/2
+
+![](img/btc_pools2.png){fig-align="center"}
+
+## Ринок сиру 1/15
+
+![](img/cheese_market1.png){fig-align="center"}
+
+## Ринок сиру 2/15
+
+Прибираємо 3D
+
+![](img/cheese_market2.png){fig-align="center"}
+
+## Ринок сиру 3/15
+
+Міняємо тип візуалізації
+
+![](img/cheese_market3.png){fig-align="center"}
+
+## Ринок сиру 4/15
+
+Прибираємо тінь
+
+![](img/cheese_market4.png){fig-align="center"}
+
+## Ринок сиру 5/15
+
+Міняємо фон
+
+![](img/cheese_market5.png){fig-align="center"}
+
+## Ринок сиру 6/15
+
+Прибираємо сітку
+
+![](img/cheese_market6.png){fig-align="center"}
+
+## Ринок сиру 7/15
+
+Прибираємо вісь
+
+![](img/cheese_market7.png){fig-align="center"}
+
+## Ринок сиру 8/15
+
+Змінимо розташування підписів
+
+![](img/cheese_market8.png){fig-align="center"}
+
+## Ринок сиру 9/15
+
+Прибираємо легенду
+
+![](img/cheese_market9.png){fig-align="center"}
+
+## Ринок сиру 10/15
+
+Міняємо палітру
+
+![](img/cheese_market10.png){fig-align="center"}
+
+## Ринок сиру 11/15
+
+Додаємо змістовний заголовок
+
+![](img/cheese_market11.png){fig-align="center"}
+
+## Ринок сиру 12/15
+
+Акценти на важливому
+
+![](img/cheese_market12.png){fig-align="center"}
+
+## Ринок сиру 13/15
+
+Додаємо джерело даних
+
+![](img/cheese_market13.png){fig-align="center"}
+
+## Ринок сиру 14/15
+
+Робота зі шрифтами
+
+![](img/cheese_market14.png){fig-align="center"}
+
+## Ринок сиру 15/15
+
+Фінальний вигляд
+
+![](img/cheese_market15.png){fig-align="center"}
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".02_files/libs/colored-particles/index.html"}
 
 <br> <br>
 
