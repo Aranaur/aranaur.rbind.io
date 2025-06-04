@@ -1,0 +1,580 @@
+---
+title: "Bootstrapping"
+subtitle: "Applied Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+footer: "Applied Statistics"
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    # toc: true
+    # toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    # fig-height: 9
+    # fig-width: 16
+    highlight-style: github
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import scipy.stats as stats
+import numpy
+import matplotlib.pyplot as pyplot
+from collections import Counter, defaultdict
+
+from scipy.stats import (
+    norm, binom, expon, t, chi2, pareto, ttest_ind, sem, beta, laplace, ttest_1samp
+)
+from statsmodels.stats.proportion import proportion_confint
+import numpy as numpy
+from seaborn import distplot
+from matplotlib import pyplot
+import seaborn
+from tqdm.notebook import tqdm
+
+import sys
+sys.path.append('.')
+
+import warnings
+warnings.filterwarnings("ignore")
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+## Task {.smaller}
+
+> You work as an analyst in a **cab company**. Recently, one of the company managers came to us with the idea that our application often selects a **driver who is very far away from the user**. And this leads to **churn of users** of our service.
+>
+> In order to evaluate in the future how much you have improved your driver selection algorithm, you decide to use the **75th percentile of the cab waiting time** distribution as the main quality metric of the algorithm. Your task now is to evaluate the current value of the metric in order to use this value as a baseline in the future.
+
+- Let $X$ &mdash; the sample metric of user cab wait time, $X_{[0.75]}$ &mdash; the 75th percentile of this sample.
+
+## Sample visualization
+
+```{python}
+#| label: sample
+#| fig-align: center
+#| echo: false
+
+sample = numpy.load("data/Bootstrap.npy")
+
+pyplot.figure(figsize=(10, 5))
+pyplot.title('Cab waiting time for users', fontsize=12)
+seaborn.histplot(sample, stat='density')
+pyplot.xlabel('Time (minutes)', fontsize=12)
+# 75-percentile line
+pyplot.axvline(numpy.percentile(sample, 75), color=red, linestyle='--', label='75th percentile')
+pyplot.show()
+```
+
+75th percentile score: `{python} round(numpy.percentile(sample, 75), 3)`
+
+<center>**We need to construct a confidence interval for it.**</center>
+
+## Idea 1: Monte Carlo simulation {.tiny}
+
+Let us go to a more straightforward sample, for which we already know everything: the distribution from which it is generated and the true quantile.
+
+```{python}
+#| include: false
+
+numpy.random.seed(42)
+N = 20000
+example_dist = stats.gamma(a=2, scale=3)
+example_sample = example_dist.rvs(N)
+
+theta = example_dist.ppf(0.75)
+theta_estim = numpy.percentile(example_sample, 75)
+```
+
+```{python}
+#| label: example-vis
+#| fig-align: center
+#| echo: false
+
+x = numpy.linspace(0, 30, 1000)
+
+pyplot.figure(figsize=(10, 5))
+pyplot.title('Example distribution', fontsize=12)
+seaborn.histplot(example_sample, stat='density', label='Sample')
+pyplot.plot(x, example_dist.pdf(x), label='True density')
+pyplot.xlabel('X', fontsize=12)
+# 75-percentile line
+pyplot.axvline(numpy.percentile(example_sample, 75), color=red, linestyle='--', label='75th percentile')
+pyplot.legend(fontsize=12)
+pyplot.show()
+```
+
+- Let $\theta$ &mdash; the true value of the quantile, which we do not know. In general, it can be any characteristic: expectation, variance, etc.
+- $\widehat{\theta}$ &mdash; the obtained estimate of $\theta$ from the sample.
+
+$\theta$ = `{python} round(theta, 3)`, $\widehat{\theta}$ = `{python} round(theta_estim, 3)`
+
+## Idea 1: Monte Carlo simulation (cont.) {.tiny}
+
+:::: {.columns}
+
+::: {.column width="40%"}
+How do I construct a confidence interval for $\theta$?
+
+<br>
+
+(@) **To do this, I suggest the first step is to construct a distribution $\Delta = \widehat{\theta} - \theta$**.
+
+- We sample `B` times from our example distribution.
+    - We consider `B` pretty large: for example, 10000.
+    - The size of each sample is equal to $N$, the original sample size.
+- Let's calculate $\widehat{\theta_i}$ in each case.
+- And then subtract $\theta$ from this value. We get `B` values $\Delta_i = \widehat{\theta_i} - \theta$.
+:::
+
+::: {.column width="60%"}
+
+```{python}
+#| include: false
+
+def get_estim_theta_sample(sample_len, gen_sample_func, theta_func, B=10000):
+    theta_estim_array = []
+    for _ in range(B):
+        curr_sample = gen_sample_func(sample_len)
+        theta_estim = theta_func(curr_sample)
+        theta_estim_array.append(theta_estim)
+    return theta_estim_array
+```
+
+```{python}
+#| echo: false
+#| fig-align: center
+
+gen_sample_func = lambda N: example_dist.rvs(N)
+theta_func = lambda sample: numpy.percentile(sample, 75)
+
+theta_estim_array = get_estim_theta_sample(len(example_sample), gen_sample_func, theta_func, B=10000)
+delta = theta_estim_array - theta
+
+pyplot.figure(figsize=(10, 5))
+pyplot.title('Histogram $\Delta$', fontsize=12)
+seaborn.histplot(delta, stat='density', alpha=0.5)
+pyplot.xlabel('$\Delta$', fontsize=12)
+pyplot.show()
+```
+:::
+
+::::
+
+## Idea 1: Monte Carlo simulation (cont.) {.smaller}
+
+(@) **Next, consider $\alpha/2, 1 - \alpha/2$ quantiles of this distribution**: $\Delta_{[\alpha/2]}, \Delta_{[1 - \alpha/2]}$. Then by definition of quantiles $P(\Delta_{[\alpha/2]} < \widehat{\theta} - \theta < \Delta_{[1 - \alpha/2]}) = 1 - \alpha$.
+(@) $P(\widehat{\theta} - \Delta_{[1 - \alpha/2]} < \theta < \widehat{\theta} - \Delta_{[\alpha/2]}) = 1 - \alpha$. 
+    - Thus, by the definition of a **confidence interval**, $CI = (\widehat{\theta} - \Delta_{[1 - \alpha/2]}, \widehat{\theta} - \Delta_{[\alpha/2]})$
+
+<br>
+
+```{python}
+#| include: false
+
+alpha = 0.05
+left_delta, right_delta = numpy.quantile(delta, [alpha/2, 1-alpha/2])
+
+left_bound, right_bound = theta_estim - right_delta, theta_estim - left_delta
+```
+
+True $\theta$ = `{python} round(theta, 3)`, $CI$ = `{python} round(left_bound, 3)` - `{python} round(right_bound, 3)`
+
+We constructed the provisional interval with the knowledge of $\theta$ and the actual sampling distribution, *but we don't know them*.
+
+## Idea 2: Empirical distribution {.smaller}
+
+Let's remember how $\Delta:\ \Delta = \widehat{\theta} - \theta$. We used the true value of $\theta$ and the true distribution to generate $\widehat{\theta}$ to calculate it.
+
+<br>
+
+[But what if we used approximations instead of the true $\theta$ and the true distribution?]{.hi}
+
+What's good about an empirical distribution?
+
+- Because all its characteristics are known.
+- And it converges to the true distribution at infinity.
+
+The bootstrap assumption is $\Delta \approx \Delta^*$, where $\Delta^*$ is the distribution of $\widehat{\theta}^* - \widehat{\theta}$. And $\widehat{\theta}^*$ is the estimate of $\theta$ from the bootstrap sample.
+
+
+```{python}
+#| include: false
+
+gen_sample_func = lambda N: numpy.random.choice(example_sample, replace=True, size=N)
+
+theta_func = lambda sample: numpy.percentile(sample, 75) # не изменилось
+
+theta_estim_asterisk_array = get_estim_theta_sample(len(example_sample), gen_sample_func, theta_func, B=10000)
+
+delta_asterisk = theta_estim_asterisk_array - theta_estim
+```
+
+## Idea 2: Empirical distribution (cont.)
+
+
+```{python}
+#| echo: false
+#| fig-align: center
+
+pyplot.figure(figsize=(10, 5))
+pyplot.title('Comparison histogram $\Delta$ with $\Delta^*$', fontsize=12)
+seaborn.histplot(delta, stat='density', alpha=0.5, label='$\Delta$')
+seaborn.histplot(delta_asterisk, stat='density', alpha=0.5, color=green, label='$\Delta^*$')
+pyplot.legend(fontsize=12)
+pyplot.xlabel('$\Delta$', fontsize=12)
+pyplot.show()
+```
+
+But based on our assumption, we can substitute 
+
+- $CI = (\widehat{\theta} - \Delta_{[1 - \alpha/2]}, \widehat{\theta} - \Delta_{[\alpha/2]})$ by
+- $CI = (\widehat{\theta} - \Delta^*_{[1 - \alpha/2]}, \widehat{\theta} - \Delta^*_{[\alpha/2]})$
+
+## Algorithm of the bootstrap method {.smaller}
+
+1. Calculate $\widehat{\theta}$ from the original sample.
+2. In a loop of size `B`:
+    1. Generate a sample with returns from the original sample. Size `N` &mdash; the original sample size.  This sample is called a **bootstrap sample**.
+    2. We count $\theta^*_i$ on this sample in the same way as we count $\widehat{\theta}$$ on the original sample.
+3. We save $\theta^*_1,\ ...,\ \theta^*_B$ into an array.
+4. Construct a confidence interval:
+    1. Count the left and right quantiles of $\theta^*_{[\alpha/2]}, \theta^*_{[1 - \alpha/2]}$.
+    2. $CI = (2\widehat{\theta} - \theta^*_{[1 - \alpha/2]}, 2\widehat{\theta} - \theta^*_{[\alpha/2]})$.
+
+```{python}
+#| include: false
+
+def raw_bootstrap(sample, theta_func, alpha = 0.05):
+    B = 10000
+    
+    theta_estim = theta_func(sample)
+    gen_sample_func = lambda N: numpy.random.choice(sample, replace=True, size=N)
+    
+    theta_estim_asterisk_array = get_estim_theta_sample(len(example_sample), gen_sample_func, theta_func, B)
+    left_theta_asterisk, right_theta_asterisk = numpy.quantile(theta_estim_asterisk_array, [alpha/2, 1-alpha/2])
+    left_bound, right_bound = 2 * theta_estim - right_theta_asterisk, 2 * theta_estim - left_theta_asterisk
+
+    return left_bound, right_bound
+
+def bootstrap_ci(sample, theta_func, alpha=0.05):
+    """
+        Функция для построения доверительного интервала через бутстрап
+        
+        Параметры:
+            - sample: изначальная выборка
+            - theta_func: функция генерации оценки theta по выборке.
+                - Например, lambda sample: numpy.percentile(sample, 75)
+            - alpha: уровень значимости критерия. Доверительный интервал будет ширины 1-alpha.
+        Возвращает:
+            - левую и правую границы дов. интервала.
+    """
+    
+    B = 2000 # Чтобы ускорить работу
+    N = len(sample)
+    theta_estim = theta_func(sample)
+    
+    theta_asterisk_array = []
+    for _ in range(B):
+        bootstrap_sample = numpy.random.choice(sample, replace=True, size=N)
+        theta_asterisk = theta_func(bootstrap_sample)
+        theta_asterisk_array.append(theta_asterisk)
+    left_theta_asterisk, right_theta_asterisk = numpy.quantile(theta_asterisk_array, [alpha/2, 1-alpha/2])
+    left_bound, right_bound = 2 * theta_estim - right_theta_asterisk, 2 * theta_estim - left_theta_asterisk
+
+    return left_bound, right_bound
+
+theta_func = lambda sample: numpy.percentile(sample, 75, axis=1) 
+
+def fast_bootstrap_ci(sample, theta_func, alpha=0.05):
+    """
+        Функция для построения доверительного интервала через бутстрап
+        
+        Параметры:
+            - sample: изначальная выборка
+            - theta_func: функция генерации оценки theta по выборке.
+                - Например, lambda sample: numpy.percentile(sample, 75)
+            - alpha: уровень значимости критерия. Доверительный интервал будет ширины 1-alpha.
+        Возвращает:
+            - левую и правую границы дов. интервала.
+    """
+    
+    B = 2000 # Чтобы ускорить работу
+    batch_size = B // 20
+    N = len(sample)
+    # Добавляем размерность к выборке, чтобы работать с массивом массивов.
+    theta_estim = theta_func(numpy.expand_dims(sample, axis=0)).ravel()
+    assert len(theta_estim) == 1
+    theta_estim = theta_estim[0]
+    
+    theta_asterisk_array = []
+    for _ in range(0, B, batch_size):
+        # Генерируем сразу batch_size выборок
+        bootstrap_sample = numpy.random.choice(sample, replace=True, size=(batch_size, N))
+        theta_asterisk = theta_func(bootstrap_sample).ravel()
+        assert len(theta_asterisk) == batch_size
+        theta_asterisk_array = numpy.concatenate([theta_asterisk_array, theta_asterisk])
+    left_theta_asterisk, right_theta_asterisk = numpy.quantile(theta_asterisk_array, [alpha/2, 1-alpha/2])
+    left_bound, right_bound = 2 * theta_estim - right_theta_asterisk, 2 * theta_estim - left_theta_asterisk
+
+    return left_bound, right_bound
+```
+
+## Bootstrap for the cab waiting time {.smaller}
+
+```{python}
+#| label: sample-2
+#| fig-align: center
+#| echo: false
+
+sample = numpy.load("data/Bootstrap.npy")
+
+pyplot.figure(figsize=(10, 5))
+pyplot.title('Cab waiting time for users', fontsize=12)
+seaborn.histplot(sample, stat='density')
+pyplot.xlabel('Time (minutes)', fontsize=12)
+# 75-percentile line
+pyplot.axvline(numpy.percentile(sample, 75), color=red, linestyle='--', label='75th percentile')
+pyplot.show()
+```
+
+75th percentile score: `{python} round(numpy.percentile(sample, 75), 3)`
+
+Bootstrap CI: `{python} fast_bootstrap_ci(sample, theta_func, alpha=0.05)`
+
+## Two-sample bootstrap
+
+Suppose you have a sample $X,\ Y$ of size $N, M$ respectively. Then:
+
+1. Calculate $\widehat{\theta_X}, \widehat{\theta_Y}$ from the original sample. Calculate the difference between them $\widehat{\theta} = \widehat{\theta_X} - \widehat{\theta_Y}$.
+2. In a loop of size `B`:
+    1. Generate new samples from samples `X` and `Y` with return sizes `N` and `M,` respectively.
+    2. Compute $\theta^*_{X, i},\ \theta^*_{Y, i}$ from these samples. $\theta^*_{i} = \theta^*_{X, i} - \theta^*_{Y, i}$
+3. Save $\theta^*_1,\ ...,\ \theta^*_B$ into an array.
+4. Construct a confidence interval using the formula above.
+
+## Types of confidence intervals in bootstrap {.smaller}
+
+1. Central: $CI = (2\widehat{\theta} - \theta^*_{[1 - \alpha/2]}, 2\widehat{\theta} - \theta^*_{[\alpha/2]})$. We have already considered it.
+2. Normal: $CI = (\widehat{\theta} \pm z_{1-\alpha/2}\cdot \sqrt{S^2_{\theta^*}})$ (if the $\widehat{\theta}$ statistic is normally distributed, we can calculate from the sample $\theta^*$ the standard deviation $\sqrt{S^2_{\theta^*}}$. we make the assumption that $\sqrt{S^2_{\theta^*}} \approx \sqrt{S^2_{\widehat{\theta}}}$).
+    
+3. Percentile: $CI = (\theta^*_{[\alpha/2]}, \theta^*_{[1 - \alpha/2]})$
+    - Theoretically, it works if there exists some monotone function $F$ such that $\hat U = F(\hat\theta(X_i))$ and $\hat U \sim \mathcal{N}(\varphi, c^2)$, where $\varphi = F(\theta)$. Where $X$ &mdash; the sample, $U$ &mdash; one observation of the random variable $\hat U$.
+
+## Bootstrap CI visualization {.smaller}
+
+```{python}
+#| label: bootstrap-vis
+#| fig-align: center
+#| include: false
+
+def fast_bootstrap_ci(sample, theta_func, alpha=0.05):
+
+    B = 1000 # Чтобы ускорить работу
+    batch_size = B // 20
+    N = len(sample)
+
+    # Добавляем размерность к выборке, чтобы работать с массивом массивов.
+    theta_estim = theta_func(numpy.expand_dims(sample, axis=0)).ravel()
+    assert len(theta_estim) == 1
+    theta_estim = theta_estim[0]
+
+    theta_asterisk_array = []
+    for _ in range(0, B, batch_size):
+        # Генерируем сразу batch_size выборок
+        bootstrap_sample = numpy.random.choice(sample, replace=True, size=(batch_size, N))
+        theta_asterisk = theta_func(bootstrap_sample).ravel()
+        assert len(theta_asterisk) == batch_size
+        theta_asterisk_array = numpy.concatenate([theta_asterisk_array, theta_asterisk])
+    left_theta_asterisk, right_theta_asterisk = numpy.quantile(theta_asterisk_array, [alpha/2, 1-alpha/2])
+    std = numpy.std(theta_asterisk_array)
+
+
+    central_left_bound, central_right_bound = 2 * theta_estim - right_theta_asterisk, 2 * theta_estim - left_theta_asterisk
+    percentile_left_bound, percentile_right_bound = left_theta_asterisk, right_theta_asterisk
+    norm_left_bound, norm_right_bound = theta_estim - norm().ppf(1-alpha/2) * std, theta_estim + norm().ppf(1-alpha/2) * std
+
+    return {
+        'central bootstrap': (central_left_bound, central_right_bound),
+        'percentile bootstrap': (percentile_left_bound, percentile_right_bound),
+        'norm bootstrap': (norm_left_bound, norm_right_bound)
+    }
+
+
+def mc_result_dict_creator(bad_cnt, MC_size):
+    # Создает словарь, в котором значения по умолчанию инициализируются словарем
+    mc_result = defaultdict(dict)
+    for method in bad_cnt:
+        fpr = bad_cnt[method] / MC_size
+        left_fpr, right_fpr = proportion_confint(count = bad_cnt[method], nobs = MC_size, alpha=0.05, method='wilson')
+        mc_result[method]['FPR'] = fpr
+        mc_result[method]['FPR, left_bound'] = left_fpr
+        mc_result[method]['FPR, right_bound'] = right_fpr
+    return mc_result
+
+def mc_bootstrap_checker(N, example_dist, theta, theta_func, alpha=0.05, MC_size = 1000):
+    numpy.random.seed(42)
+
+    # Создает словарь, в котором значения по умолчанию инициализируются 0
+    bad_cnt = defaultdict(lambda: 0)
+    for i in range(MC_size):
+        ex_sample = example_dist.rvs(N)
+
+        curr_res = fast_bootstrap_ci(ex_sample, theta_func, alpha=alpha)
+
+        for ci_type in curr_res:
+            left, right = curr_res[ci_type]
+            bad_cnt[ci_type] += 1 - (left < theta < right)
+
+    return mc_result_dict_creator(bad_cnt, MC_size)
+
+N_to_check = [50, 100, 500, 1000, 2000, 5000]
+
+example_dist = stats.expon(scale=5)
+theta = example_dist.ppf(0.5)
+theta_func = lambda sample: numpy.percentile(sample, 50, axis=1)
+
+final_results = {}
+for N in tqdm(N_to_check):
+    final_results[N] = mc_bootstrap_checker(N, example_dist, theta, theta_func, alpha=0.05, MC_size = 1000)
+
+
+def show_FPR(result_dict, methods, colors):
+    pyplot.figure(figsize=(18.5, 8))
+    pyplot.title('Dependence of FPR on sample size for different methods', fontsize=15)
+    N_array = list(result_dict.keys())
+    x_ticks = numpy.arange(0, len(N_array))
+
+    pyplot.hlines(0.05, x_ticks[0], x_ticks[-1],
+                   color='red', linestyle='-', label="$\\alpha$")
+    for method, color in zip(methods, colors):
+        FPR = []
+        left_bound = []
+        right_bound = []
+        for N in result_dict:
+            curr_dict = result_dict[N][method]
+            FPR.append(curr_dict['FPR'])
+            left_bound.append(curr_dict['FPR, left_bound'])
+            right_bound.append(curr_dict['FPR, right_bound'])
+
+        pyplot.plot(x_ticks, FPR, color=color, label=method)
+        pyplot.fill_between(x_ticks, left_bound, right_bound,
+                   color=color, alpha=0.2)
+
+    pyplot.legend(fontsize=15)
+    pyplot.xticks(x_ticks, N_array)
+    pyplot.xlabel('N', fontsize=15)
+    pyplot.ylabel('FPR', fontsize=15)
+    pyplot.grid(linewidth=0.2)
+
+    pyplot.show()
+```
+
+```{python}
+#| label: bootstrap-vis-2
+#| echo: false
+#| fig-align: center
+
+colors = [green, turquoise, blue]
+methods = ['central bootstrap', 'percentile bootstrap', 'norm bootstrap']
+show_FPR(final_results, methods, colors)
+```
+
+## $t$-test vs. bootstrap {.smaller}
+
+- Can bootstrap help when the $t$-test doesn't work?
+
+```{python}
+#| include: false
+
+def mc_ttest_checker(N, example_dist, theta, alpha=0.05, MC_size = 1000):
+    numpy.random.seed(42)
+
+    bad_cnt = defaultdict(lambda: 0)
+    for i in range(MC_size):
+        ex_sample = example_dist.rvs(N)
+
+        ttest_pval = ttest_1samp(ex_sample, popmean=theta).pvalue
+        bad_cnt['ttest'] += (ttest_pval < alpha)
+
+    return mc_result_dict_creator(bad_cnt, MC_size)
+
+
+N_to_check = [5, 10, 20, 50, 100, 200, 500, 1000]
+
+example_dist = stats.expon(scale=5)
+theta = example_dist.mean()
+theta_func = lambda sample: numpy.mean(sample, axis=1)
+
+boot_results = {}
+ttest_results = {}
+final_results = {}
+for N in tqdm(N_to_check):
+    boot_results = mc_bootstrap_checker(N, example_dist, theta, theta_func, alpha=0.05, MC_size = 1000)
+    ttest_results = mc_ttest_checker(N, example_dist, theta, alpha=0.05, MC_size = 1000)
+    final_results[N] = dict(boot_results, **ttest_results)
+```
+
+```{python}
+#| echo: false
+#| fig-align: center
+
+colors = [green, turquoise, blue, yellow]
+methods = ['central bootstrap', 'percentile bootstrap', 'norm bootstrap', 'ttest']
+show_FPR(final_results, methods, colors)
+```
+
+## Summary
+
+Bootstrap &mdash; a method of constructing a confidence interval for any characteristic of a distribution: 
+
+- Substituting the proper distribution for the empirical distribution
+- Generating the final sample $\theta^*$ using Monte Carlo to estimate the quantiles of the distribution correctly.
+
+## Basic questions about bootstrap {.smaller}
+
+1. When does a bootstrap work?
+    - When the samples are large enough. Both heuristics that make up a bootstrap work if:
+        - $N$ is large enough. The empirical distribution better approximates theactuale distribution, and we estimate $\Delta^*$ more accurately.
+        - $B$ is large enough. This way, we more accurately construct the quantiles of the $\Delta^*$ distribution.
+        - We can't always control the first parameter, but we can always control the second.
+2. Can we generate bootstrap samples of a different size than $N$?
+    - No, we can't. This follows from the Monte Carlo step where we are trying to estimate $\widehat{\theta} - \theta$, and $\widehat{\theta}$ is constructed from a sample of size N.
+3. What is the sample size of size `B`?
+    - Recommendation: `B = 10000`.
+    - Is it possible to take a smaller size? Yes, but it is necessary to check the correctness using Monte Carlo.
