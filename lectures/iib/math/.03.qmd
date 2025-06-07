@@ -1,0 +1,535 @@
+---
+title: "Описова статистика"
+subtitle: "Математика для керівника"
+author: "Ігор Мірошниченко"
+institute: Міжнародний інститут бізнесу
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .03_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: Математика для керівника
+format:
+  revealjs: 
+    code-line-numbers: false
+    # center: true
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    # controls-layout: bottom-right
+    chalkboard: true
+    logo: img/iib.jpg
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    # fig-width: 9
+    # fig-height: 5
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+  # gfm:
+  #   mermaid-format: png
+preload-iframes: true
+execute: 
+  echo: false
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(readxl)
+library(gt)
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+data <- read_excel(here::here("lectures/iib/math/data/data_jobs_salary_all.xlsx")) %>% 
+  filter(job_country != "Russia") %>%
+  filter(job_country != "Belarus")
+```
+
+# Центральна тенденція
+
+## Середнє арифметичне
+
+$$
+\bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_i
+$$
+
+```{r}
+data %>% 
+    summarise(mean_salary = mean(salary_year_avg, na.rm = TRUE), .by = job_title_short) %>% 
+    arrange(desc(mean_salary)) %>% 
+    gt() %>%
+    fmt_currency(columns = everything(), currency = "USD", rows = everything()) %>%
+    cols_label(job_title_short = "Професія", mean_salary = "Середня заробітна плата") %>%
+    tab_options(table.font.size = 16, table.width = "100%") %>%
+    cols_align(align = "center") %>%
+    tab_style(
+      style = list(
+        cell_fill(color = navy),
+        cell_text(color = "white", weight = "bold")
+      ),
+      locations = cells_column_labels()
+    )
+```
+
+## Медіана
+
+Медіана --- це значення, яке розділяє впорядкований набір даних на дві рівні частини. Якщо кількість спостережень парна, то медіана визначається як середнє арифметичне двох центральних значень.
+
+$$
+\tilde{x} = \begin{cases}
+\frac{x_{(n/2)} + x_{(n/2 + 1)}}{2}, & \text{якщо } n \text{ парне} \\
+x_{((n+1)/2)}, & \text{якщо } n \text{ непарне}
+\end{cases}
+$$
+
+```{r}
+data %>% 
+    summarise(median_salary = median(salary_year_avg, na.rm = TRUE), .by = job_title_short) %>% 
+    arrange(desc(median_salary)) %>% 
+    gt() %>%
+    fmt_currency(columns = everything(), currency = "USD", rows = everything()) %>%
+    cols_label(job_title_short = "Професія", median_salary = "Медіана заробітної плати") %>%
+    tab_options(table.font.size = 16, table.width = "100%") %>%
+    cols_align(align = "center") %>%
+    tab_style(
+      style = list(
+        cell_fill(color = navy),
+        cell_text(color = "white", weight = "bold")
+      ),
+      locations = cells_column_labels()
+    )
+```
+
+## Мода
+
+Мода --- це значення, яке зустрічається найчастіше в наборі даних. Якщо жодне значення не повторюється, то мода не визначена. Якщо декілька значень зустрічаються з однаковою частотою, то набір даних може мати декілька мод.
+
+$$
+\text{mode}(x) = \arg\max_{x_i} f(x_i)
+$$
+
+```{r}
+data %>% 
+    count(job_title_short, sort = TRUE) %>%
+    gt() %>%
+    cols_label(job_title_short = "Професія", n = "Кількість вакансій") %>%
+    tab_options(table.font.size = 16, table.width = "100%") %>%
+    cols_align(align = "center") %>%
+    # higlight the most frequent job title
+    tab_style(
+      style = list(
+        cell_fill(color = navy),
+        cell_text(color = "white", weight = "bold")
+      ),
+      locations = cells_column_labels()
+    ) %>%
+    tab_style(
+      style = list(
+        cell_fill(color = turquoise),
+        cell_text(color = "white", weight = "bold")
+      ),
+      locations = cells_body(
+        columns = job_title_short,
+        rows = job_title_short == "Data Analyst"
+      )
+    )
+```
+
+## Медіана vs. Середнє
+
+Медіана та середнє арифметичне можуть давати різні результати, особливо в присутності викидів.
+
+Медіана є більш стійкою до викидів, тоді як середнє може бути значно спотворене ними.
+
+```{r}
+data %>% 
+    summarise(mean_salary = mean(salary_year_avg, na.rm = TRUE), 
+              median_salary = median(salary_year_avg, na.rm = TRUE), 
+              .by = job_title_short) %>% 
+    arrange(desc(mean_salary)) %>% 
+    gt() %>%
+    fmt_currency(columns = everything(), currency = "USD", rows = everything()) %>%
+    cols_label(job_title_short = "Професія", mean_salary = "Середня заробітна плата", median_salary = "Медіана заробітної плати") %>%
+    tab_options(table.font.size = 16, table.width = "100%") %>%
+    cols_align(align = "center") %>%
+    tab_style(
+      style = list(
+        cell_fill(color = navy),
+        cell_text(color = "white", weight = "bold")
+      ),
+      locations = cells_column_labels()
+    )
+```
+
+## Усічене середнє
+
+Усічене середнє --- це середнє арифметичне, яке обчислюється після видалення певного відсотка найвищих і найнижчих значень. Це дозволяє зменшити вплив викидів.
+
+$$
+\bar{x}_{\text{trim}} = \frac{1}{n - 2k} \sum_{i=k+1}^{n-k} x_i
+$$
+
+```{r}
+data %>% 
+    summarise(mean_salary = mean(salary_year_avg, na.rm = TRUE),
+    trimmed_mean_salary = mean(salary_year_avg, na.rm = TRUE, trim = 0.1),
+    median_salary = median(salary_year_avg, na.rm = TRUE),
+    .by = job_title_short) %>% 
+    arrange(desc(trimmed_mean_salary)) %>% 
+    gt() %>%
+    fmt_currency(columns = everything(), currency = "USD", rows = everything()) %>%
+    cols_label(job_title_short = "Професія", 
+               mean_salary = "Середня заробітна плата", 
+               trimmed_mean_salary = "Усічене середнє", 
+               median_salary = "Медіана заробітної плати") %>%
+    tab_options(table.font.size = 16, table.width = "100%") %>%
+    cols_align(align = "center") %>%
+    tab_style(
+      style = list(
+        cell_fill(color = navy),
+        cell_text(color = "white", weight = "bold")
+      ),
+      locations = cells_column_labels()
+    )
+```
+
+# Варіація
+
+## Розмах
+
+Розмах --- це різниця між найбільшим і найменшим значенням у наборі даних.
+
+$$
+R = x_{\text{max}} - x_{\text{min}}
+$$
+
+```{r}
+data %>% 
+    summarise(range_salary = max(salary_year_avg, na.rm = TRUE) - min(salary_year_avg, na.rm = TRUE), 
+              .by = job_title_short) %>% 
+    arrange(desc(range_salary)) %>% 
+    gt() %>%
+    fmt_currency(columns = everything(), currency = "USD", rows = everything()) %>%
+    cols_label(job_title_short = "Професія", range_salary = "Розмах заробітної плати") %>%
+    tab_options(table.font.size = 16, table.width = "100%") %>%
+    cols_align(align = "center") %>%
+    tab_style(
+      style = list(
+        cell_fill(color = navy),
+        cell_text(color = "white", weight = "bold")
+      ),
+      locations = cells_column_labels()
+    )
+```
+
+## Дисперсія
+
+Дисперсія --- це середнє квадратичне відхилення від середнього арифметичного. Вона показує, наскільки значення розкидані навколо середнього.
+
+$$
+\sigma^2 = \frac{1}{n-1} \sum_{i=1}^{n} (x_i - \bar{x})^2
+$$
+
+```{r}
+data %>% 
+    summarise(variance_salary = var(salary_year_avg, na.rm = TRUE), 
+              .by = job_title_short) %>% 
+    arrange(desc(variance_salary)) %>% 
+    gt() %>%
+    fmt_currency(columns = everything(), currency = "USD", rows = everything()) %>%
+    cols_label(job_title_short = "Професія", variance_salary = "Дисперсія заробітної плати") %>%
+    tab_options(table.font.size = 16, table.width = "100%") %>%
+    cols_align(align = "center") %>%
+    tab_style(
+      style = list(
+        cell_fill(color = navy),
+        cell_text(color = "white", weight = "bold")
+      ),
+      locations = cells_column_labels()
+    )
+```
+
+## Стандартне відхилення
+
+Стандартне відхилення --- це квадратний корінь з дисперсії. Воно показує, наскільки значення в середньому відхиляються від середнього арифметичного.
+
+$$
+\sigma = \sqrt{\sigma^2} = \sqrt{\frac{1}{n-1} \sum_{i=1}^{n} (x_i - \bar{x})^2}
+$$
+
+```{r}
+data %>% 
+    summarise(sd_salary = sd(salary_year_avg, na.rm = TRUE), 
+              .by = job_title_short) %>% 
+    arrange(desc(sd_salary)) %>% 
+    gt() %>%
+    fmt_currency(columns = everything(), currency = "USD", rows = everything()) %>%
+    cols_label(job_title_short = "Професія", sd_salary = "Стандартне відхилення заробітної плати") %>%
+    tab_options(table.font.size = 16, table.width = "100%") %>%
+    cols_align(align = "center") %>%
+    tab_style(
+      style = list(
+        cell_fill(color = navy),
+        cell_text(color = "white", weight = "bold")
+      ),
+      locations = cells_column_labels()
+    )
+```
+
+## Коефіцієнт варіації
+
+Коефіцієнт варіації --- це відношення стандартного відхилення до середнього арифметичного, виражене у відсотках. Він показує, наскільки варіативність даних відноситься до їх середнього значення.
+
+$$
+CV = \frac{\sigma}{\bar{x}} \times 100\%
+$$
+
+```{r}
+data %>% 
+    summarise(cv_salary = (sd(salary_year_avg, na.rm = TRUE) / mean(salary_year_avg, na.rm = TRUE)) * 100, 
+              .by = job_title_short) %>% 
+    arrange(desc(cv_salary)) %>% 
+    gt() %>%
+    fmt_percent(columns = everything(), rows = everything(), decimals = 2) %>%
+    cols_label(job_title_short = "Професія", cv_salary = "Коефіцієнт варіації заробітної плати") %>%
+    tab_options(table.font.size = 16, table.width = "100%") %>%
+    cols_align(align = "center") %>%
+    tab_style(
+      style = list(
+        cell_fill(color = navy),
+        cell_text(color = "white", weight = "bold")
+      ),
+      locations = cells_column_labels()
+    )
+```
+
+## Квантилі
+
+Квантилі --- це значення, які ділять впорядкований набір даних на рівні частини. Наприклад, медіана є 0.5-квантилем, а квартилі ділять дані на чотири рівні частини.
+
+```{r}
+data %>% 
+    summarise(q1_salary = quantile(salary_year_avg, 0.25, na.rm = TRUE), 
+              q2_salary = quantile(salary_year_avg, 0.5, na.rm = TRUE), 
+              q3_salary = quantile(salary_year_avg, 0.75, na.rm = TRUE), 
+              .by = job_title_short) %>% 
+    arrange(desc(q3_salary)) %>% 
+    gt() %>%
+    fmt_currency(columns = everything(), currency = "USD", rows = everything()) %>%
+    cols_label(job_title_short = "Професія", 
+               q1_salary = "1-й квартиль", 
+               q2_salary = "Медіана (2-й квартиль)", 
+               q3_salary = "3-й квартиль") %>%
+    tab_options(table.font.size = 16, table.width = "100%") %>%
+    cols_align(align = "center") %>%
+    tab_style(
+      style = list(
+        cell_fill(color = navy),
+        cell_text(color = "white", weight = "bold")
+      ),
+      locations = cells_column_labels()
+    )
+```
+
+## Міжквартильний розмах
+
+Міжквартильний розмах (IQR) --- це різниця між третім і першим квартилями. Він показує, наскільки розкидані середні 50% даних.
+
+$$
+IQR = Q3 - Q1
+$$
+
+```{r}
+data %>% 
+    summarise(iqr_salary = IQR(salary_year_avg, na.rm = TRUE), 
+              .by = job_title_short) %>% 
+    arrange(desc(iqr_salary)) %>% 
+    gt() %>%
+    fmt_currency(columns = everything(), currency = "USD", rows = everything()) %>%
+    cols_label(job_title_short = "Професія", iqr_salary = "Міжквартильний розмах заробітної плати") %>%
+    tab_options(table.font.size = 16, table.width = "100%") %>%
+    cols_align(align = "center") %>%
+    tab_style(
+      style = list(
+        cell_fill(color = navy),
+        cell_text(color = "white", weight = "bold")
+      ),
+      locations = cells_column_labels()
+    )
+```
+
+## Середнє абсолютне відхилення
+
+Середнє абсолютне відхилення (MAD) --- це середнє значення абсолютних відхилень від середнього арифметичного. Воно показує, наскільки в середньому значення відхиляються від середнього.
+
+$$
+MAD = \frac{1}{n} \sum_{i=1}^{n} |x_i - \bar{x}|
+$$
+
+```{r}
+data %>% 
+    summarise(mad_salary = mean(abs(salary_year_avg - mean(salary_year_avg, na.rm = TRUE)), na.rm = TRUE), 
+              .by = job_title_short) %>% 
+    arrange(desc(mad_salary)) %>% 
+    gt() %>%
+    fmt_currency(columns = everything(), currency = "USD", rows = everything()) %>%
+    cols_label(job_title_short = "Професія", mad_salary = "Середнє абсолютне відхилення заробітної плати") %>%
+    tab_options(table.font.size = 16, table.width = "100%") %>%
+    cols_align(align = "center") %>%
+    tab_style(
+      style = list(
+        cell_fill(color = navy),
+        cell_text(color = "white", weight = "bold")
+      ),
+      locations = cells_column_labels()
+    )
+```
+
+# Статистичні графіки
+
+## Гістограми
+
+```{r}
+data %>% 
+  ggplot(aes(x = salary_year_avg)) +
+  geom_histogram(fill = turquoise, color = "white", alpha = 0.7) +
+  labs(title = "Розподіл річної зарплати",
+       x = "Річна зарплата (USD)",
+       y = "Кількість вакансій") +
+  theme_minimal() +
+  scale_x_continuous(labels = scales::dollar_format()) +
+  scale_y_continuous(labels = scales::comma)
+```
+
+## Boxplot
+
+![](https://aranaur.quarto.pub/what-is-statistics/img/02/box-plot-interpretationpng.png){fig-align="center"}
+
+## Boxplot 1/3
+
+```{r}
+data %>% 
+  ggplot(aes(x = fct_reorder(job_title_short, salary_year_avg, .desc = TRUE),
+             y = salary_year_avg, fill = job_title_short)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Розподіл річної зарплати за посадами",
+       x = "Назва посади",
+       y = "Річна зарплата (USD)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_continuous(labels = scales::dollar_format()) +
+  theme(legend.position = "none") +
+  ylim(0, 300000)
+```
+
+## Boxplot 2/3
+
+```{r}
+data %>% 
+  ggplot(aes(x = fct_reorder(job_title_short, salary_year_avg, .desc = TRUE),
+             y = salary_year_avg, fill = job_title_short)) +
+  geom_boxplot(alpha = 0.7, outliers = FALSE) +
+  geom_jitter(color = "black", alpha = 0.05, size = 0.5, width = 0.2) +
+  labs(title = "Розподіл річної зарплати за посадами",
+       x = "Назва посади",
+       y = "Річна зарплата (USD)") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::dollar_format(), limits = c(0, 300000)) +
+  theme(legend.position = "none") +
+  coord_flip()
+```
+
+## Boxplot 3/3
+
+```{r}
+library(ggdist)
+
+data %>% 
+  ggplot(aes(x = fct_reorder(job_title_short, salary_year_avg, .desc = TRUE, .na_rm = TRUE),
+             y = salary_year_avg)) +
+  ggdist::stat_halfeye(aes(fill = job_title_short), 
+                       adjust = 0.5, width = 0.7, .width = 0, 
+                       point_colour = NA, justification = -.2) +
+  geom_boxplot(width = 0.15, outlier.shape = NA, alpha = 0.7) +
+  # geom_point(
+  #       shape = 95,
+  #       size = 15,
+  #       alpha = .01,
+  #       color = "#1D785A"
+  # ) +
+  labs(title = "Розподіл річної зарплати за посадами",
+       x = "Назва посади",
+       y = "Річна зарплата (USD)") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::dollar_format(), limits = c(0, 300000)) +
+  theme(legend.position = "none") +
+  coord_flip()
+```
+
+
+## Boxplot
+
+![](https://aranaur.quarto.pub/what-is-statistics/img/02/boxplots.gif){fig-align="center"}
+
+## Діаграма Паретто
+
+```{r}
+data %>% 
+  count(job_title_short) %>% 
+  arrange(desc(n)) %>%
+  mutate(cum_perc = cumsum(n) / sum(n)) %>%
+  ggplot(aes(x = reorder(job_title_short, -n), y = n, group = 1)) +
+  geom_bar(stat = "identity", fill = turquoise, alpha = 0.7) +
+  geom_line(aes(x = job_title_short, y = cum_perc * max(n)), color = red_pink, size = 1.2) +
+  geom_point(aes(x = job_title_short, y = cum_perc * max(n)), color = red_pink, size = 3) +
+  geom_text(aes(x = job_title_short, y = cum_perc * max(n), label = scales::percent(cum_perc)), 
+            color = red_pink, vjust = -0.9, size = 3) +
+  labs(title = "Діаграма Паретто: Розподіл вакансій за назвами посад",
+        x = "Назва посади",
+        y = "Кількість вакансій") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = turquoise) +
+  scale_color_manual(values = red_pink)
+```
+
+## Обираємо візуалізацію {.scrollable}
+
+![](data/rtaImage.png){fig-align="center"}
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".03_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

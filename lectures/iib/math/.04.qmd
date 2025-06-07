@@ -1,0 +1,229 @@
+---
+title: "Кореляція та регресія"
+subtitle: "Математика для керівника"
+author: "Ігор Мірошниченко"
+institute: Міжнародний інститут бізнесу
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .04_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: Математика для керівника
+format:
+  revealjs: 
+    code-line-numbers: false
+    # center: true
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    # controls-layout: bottom-right
+    chalkboard: true
+    logo: img/iib.jpg
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    # fig-width: 9
+    # fig-height: 5
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+  # gfm:
+  #   mermaid-format: png
+preload-iframes: true
+execute: 
+  echo: false
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(readxl)
+library(gt)
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+data <- read_excel(here::here("lectures/iib/math/data/data_jobs_salary_all.xlsx")) %>% 
+  filter(job_country != "Russia") %>%
+  filter(job_country != "Belarus")%>% 
+  mutate(month = month(job_posted_date))
+
+data_upg <- data %>% 
+  filter(job_country %in% c("United States", "Poland", "Germany")) %>% 
+  group_by(job_country, job_title_short) %>%
+  summarise(
+    avg_salary = mean(salary_year_avg, na.rm = TRUE)
+  ) 
+```
+
+# Показники кореляції
+
+## Кореляція
+
+Кореляція — це статистичний показник, який вимірює ступінь зв'язку між двома змінними. Вона може бути позитивною, негативною або відсутньою.
+
+```{r}
+data_upg %>%
+  pivot_wider(
+    names_from = job_country,
+    values_from = avg_salary
+  ) %>%
+  gt() %>%
+  tab_header(
+    title = "Середня зарплата за професіями"
+  )
+```
+
+## Показники кореляції
+
+Показники кореляції вимірюють ступінь лінійного зв'язку між двома змінними. Найпоширеніші показники:
+
+- **Коефіцієнт кореляції Пірсона**: вимірює лінійну залежність між двома змінними. Значення від -1 до 1, де 1 означає ідеальну позитивну кореляцію, -1 — ідеальну негативну, а 0 — відсутність кореляції.
+- **Коефіцієнт кореляції Спірмена**: вимірює монотонну залежність між двома змінними. Використовується для не-нормальних розподілів або порядкових даних.
+- **Коефіцієнт кореляції Кендалла**: також вимірює монотонну залежність, але є більш стійким до викидів.
+
+## Коефіцієнт кореляції Пірсона
+
+Коефіцієнт кореляції Пірсона визначається як:
+
+$$
+r = \frac{\sum (X_i - \bar{X})(Y_i - \bar{Y})}{\sqrt{\sum (X_i - \bar{X})^2} \sqrt{\sum (Y_i - \bar{Y})^2}}
+$$
+
+```{r}
+#| label: pearson_correlation
+
+data_upg %>%
+  pivot_wider(
+    names_from = job_country,
+    values_from = avg_salary
+  ) %>%
+  select(-job_title_short) %>%
+  cor(method = "pearson") %>%
+  round(2) %>%
+  as.data.frame() %>%
+  gt() %>%
+  tab_header(
+    title = "Коефіцієнт кореляції Пірсона"
+  )
+```
+
+## Коефіцієнт кореляції Спірмена
+
+Коефіцієнт кореляції Спірмена визначається як:
+
+$$
+\rho = 1 - \frac{6 \sum d_i^2}{n(n^2 - 1)}
+$$
+
+```{r}
+#| label: spearman_correlation
+
+data_upg %>%
+  pivot_wider(
+    names_from = job_country,
+    values_from = avg_salary
+  ) %>%
+  select(-job_title_short) %>%
+  cor(method = "spearman") %>%
+  round(2) %>%
+  as.data.frame() %>%
+  gt() %>%
+  tab_header(
+    title = "Коефіцієнт кореляції Спірмена"
+  )
+```
+
+## Кореляція != причинність
+Кореляція не означає причинність. Навіть якщо дві змінні корелюють, це не означає, що одна викликає іншу. Можливі інші фактори або випадковість.
+
+![](https://tylervigen.com/spurious/correlation/image/1522_the-distance-between-saturn-and-the-sun_correlates-with_google-searches-for-how-to-make-baby.svg){fig-align="center"}
+
+::: {.footer}
+[Spurious Correlations](https://tylervigen.com/spurious-correlations)
+:::
+
+# Регресія
+
+## Лінійна регресія {.smaller}
+
+Лінійна регресія — це метод статистичного аналізу, який використовується для моделювання залежності між незалежною змінною (X) та залежною змінною (Y). Модель лінійної регресії має вигляд:
+
+$$
+Y = \beta_0 + \beta_1 X + \epsilon
+$$
+
+де:
+
+- $Y$ — залежна змінна (наприклад, зарплата),
+- $X$ — незалежна змінна (наприклад, досвід роботи),
+- $\beta_0$ — вільний член (перетин з віссю Y),
+- $\beta_1$ — коефіцієнт регресії (нахил лінії),
+- $\epsilon$ — випадкова помилка.
+
+## Метод найменших квадратів
+
+Метод найменших квадратів (OLS) використовується для оцінки параметрів регресійної моделі. Він мінімізує суму квадратів відхилень між спостережуваними значеннями та значеннями, передбаченими моделлю.
+
+$$
+\hat{\beta_1} = \frac{\sum (X_i - \bar{X})(Y_i - \bar{Y})}{\sum (X_i - \bar{X})^2}
+$$
+
+$$
+\hat{\beta_0} = \bar{Y} - \hat{\beta_1} \bar{X}
+$$
+
+## Коефіцієнт детермінації (R²)
+
+Коефіцієнт детермінації (R²) вимірює, яка частина варіації залежної змінної пояснюється незалежною змінною. Він варіюється від 0 до 1, де 1 означає, що модель ідеально пояснює дані.
+
+$$
+R^2 = 1 - \frac{\sum (Y_i - \hat{Y_i})^2}{\sum (Y_i - \bar{Y})^2}
+$$
+
+## Інтерпретація коефіцієнтів
+
+Коефіцієнти регресії ($\beta_0$ і $\beta_1$) інтерпретуються наступним чином:
+
+- $\beta_0$ — це очікуване значення залежної змінної, коли незалежна змінна дорівнює нулю.
+- $\beta_1$ — це зміна в очікуваному значенні залежної змінної при збільшенні незалежної змінної на одиницю.
+
+## Прогнозування
+
+Регресійна модель може бути використана для прогнозування значень залежної змінної на основі нових значень незалежної змінної. Наприклад, якщо ми маємо модель, яка передбачає зарплату на основі досвіду роботи, ми можемо використовувати цю модель для прогнозування зарплати для нових працівників.
+
+$$Y_{new} = \hat{\beta_0} + \hat{\beta_1} X_{new}$$
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".04_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
