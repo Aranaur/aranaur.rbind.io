@@ -1,0 +1,749 @@
+---
+title: "Ratio-metrics and Linearization"
+subtitle: "Applied Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+footer: "Applied Statistics"
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    # toc: true
+    # toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    # fig-height: 9
+    # fig-width: 16
+    highlight-style: github
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: false
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+from scipy.stats import (
+    norm, binom, expon, t, pareto, ttest_1samp, ttest_ind, sem, uniform, bernoulli
+)
+from statsmodels.stats.api import CompareMeans, DescrStatsW
+from statsmodels.stats.proportion import proportion_confint
+import numpy as numpy
+from seaborn import distplot
+from matplotlib import pyplot
+import seaborn
+from tqdm.notebook import tqdm
+
+import sys
+sys.path.append('.')
+
+import warnings
+warnings.filterwarnings("ignore")
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Independent and dependent samples
+
+## Task
+
+> You are an analyst at OLX. Recently, a product manager approached you and requested to change the color of the “write a message” button in ads from [blue]{.blue} to [red]{.red}.
+
+::: {.callout-important icon="false"}
+# Question
+
+Will this increase the conversion rate for button clicks?
+:::
+
+## Data
+
+Conversion rate is defined as the ratio of the number of users who started a chat conversation to the number of users who visited the ad page.
+
+```{python}
+import pandas as pd
+from great_tables import GT, style, loc
+
+# Create the DataFrame
+data = pd.DataFrame({
+    "User ID": [1, 2, 3, 4, "Total"],
+    "Visits the ad page": [5, 4, 0, 6, 15],
+    "Start a chat conversation": [5, 1, 0, 4, 10]
+})
+
+# Create the table using GT
+
+(
+  GT(data)
+    .tab_header(title="Conversion Rate Data")
+)
+```
+
+$$
+\begin{align*}
+\text{Conversion Rate} &= \frac{\text{Number of Conversations}}{\text{Number of Visits}} \\
+&= \frac{10}{15} = \frac{2}{3} \approx 0.67
+\end{align*}
+$$
+
+## Split the data
+
+For example: users 1 and 3 will be in the **control group**, and users 2 and 4 will be in the **test group**.
+
+```{python}
+(
+  GT(data)
+    .tab_header(title="Conversion Rate Data")
+    .tab_style(
+        style=style.fill(color="lightblue"),
+        locations=loc.body(columns=["User ID", "Visits the ad page", "Start a chat conversation"], rows=[0, 2])
+        )
+    .tab_style(
+        style=style.fill(color="lightyellow"),
+        locations=loc.body(columns=["User ID", "Visits the ad page", "Start a chat conversation"], rows=[1, 3])
+        )
+)
+```
+
+Which test to use?
+
+## T-test: visits to the ad page {.tiny}
+
+```{dot}
+
+digraph ABTest {
+  rankdir=LR
+  node [shape=box, style=filled, fillcolor=white, fontname="Arial"]
+
+  subgraph cluster_test {
+    label="Test"
+    style=rounded
+
+    T2 [label="user 2", shape=plaintext]
+    T2a [label="0"]
+    T2b [label="0"]
+    T2c [label="0"]
+    T2d [label="1"]
+
+    T2 -> T2a -> T2b -> T2c -> T2d
+
+    T4 [label="user 4", shape=plaintext]
+    T4a [label="0"]
+    T4b [label="1"]
+    T4c [label="1"]
+    T4d [label="1"]
+    T4e [label="1"]
+    T4f [label="1"]
+
+    T4 -> T4a -> T4b -> T4c -> T4d -> T4e -> T4f
+  }
+
+    subgraph cluster_control {
+    label="Control"
+    style=rounded
+
+    K1 [label="user 1", shape=plaintext]
+    K1a [label="1"]
+    K1b [label="1"]
+    K1c [label="1"]
+    K1d [label="1"]
+    K1e [label="1"]
+
+    K1 -> K1a -> K1b -> K1c -> K1d -> K1e
+
+    K3 [label="user 3", shape=plaintext]
+    K3a [label=""]
+
+    K3 -> K3a
+}
+}
+```
+
+Let's:
+
+- $M_O^C,\ M_O^T$ are random variables in the *test* and *control* groups, equal to 1 or 0.
+- $O$ at the bottom means that the statistical unit of measurement is the number of announcements *opened* by the user.
+- $M$ means whether correspondence has begun in the *messenger*.
+
+## T-test: visits to the ad page
+
+Hypothesis:
+
+$$
+H_0: \mathbb{E}\overline{M_O^C} = \mathbb{E} \overline{M_O^T}\ VS.\ H_1: \mathbb{E}\overline{M_O^C} < \mathbb{E} \overline{M_O^T}
+$$
+
+::: {.callout-caution icon="false" appearance="minimal"}
+Can we use the t-test here?
+:::
+
+. . .
+
+What if the entire **difference between the groups** is **due to different users** rather than the effect between the test and control groups?
+
+For example, the *first user does not like to call and always writes in the chat*, while the others do not.
+
+## T-test: visits to the ad page {.tiny}
+
+Monte Carlo simulation:
+
+- Function to generate artificial user $i$
+    + In the first stage, we generate the **number of ads the user clicked on the website**. Let this number be $O_i$, which we generate from a normal distribution for simplicity.
+    + In the second stage, we generate the **conversion** $p_i$ of clicking on the "write message" button.
+    + Thus, for each user, we will obtain a sample of size $O_i$ with conversion $p_i$. To speed up the process, we will assume that the number of chats will be exactly $[O_i \cdot p_i]$ (the integer part of $O_i \cdot p_i$).
+- In this case, users will be taken from a single distribution: there will be no difference between users in the test and control groups.
+
+## T-test: visits to the ad page {.tiny}
+
+1. `O_array`: number of visits to the ad page by each user in the group, generated from a normal distribution.
+2. `p_array`: conversion rate for each user, generated from a uniform distribution.
+3. `sample_size`: total number of visits to the ad page in the group.
+4. `M_sum`: total number of chats started in the group, calculated as the sum of the products of `O_array` and `p_array`.
+5. Return a sample consisting of `M_sum` ones (chats started) and the rest zeros (no chats started).
+
+- $N = 1000$: number of simulations
+- $\alpha = 0.05$: significance level
+- $n = 1000$: number of visits to the ad page in each group
+
+```{python}
+#| label: generate_incorrect_group_sample
+#| echo: true
+#| code-fold: true
+
+def generate_incorrect_group_sample(group_size, p=0.3):
+        
+    O_array = norm(loc=10, scale=1).rvs(size=group_size).astype(int)
+    p_array = uniform().rvs(size=group_size)
+    
+    sample_size = numpy.sum(O_array)
+    M_sum = numpy.sum((O_array * p_array).astype(int))
+    
+    return [1] * M_sum + [0] * (sample_size - M_sum)
+
+
+numpy.random.seed(42)
+mc_size = 1000
+bad_cnt = 0
+alpha = 0.05
+group_size = 1000
+
+for _ in range(mc_size):
+    test_sample = generate_incorrect_group_sample(group_size)
+    control_sample = generate_incorrect_group_sample(group_size)
+    
+    pvalue = ttest_ind(test_sample, control_sample, equal_var=True, alternative='two-sided').pvalue
+
+    bad_cnt += (pvalue <= alpha)
+
+print(f"FPR: {round(bad_cnt / mc_size, 4)}")
+print(f"CI={proportion_confint(count = bad_cnt, nobs = mc_size, alpha=0.05, method='wilson')}")
+```
+
+Why?
+
+. . . 
+
+The **t-test** assumes that the data is **independent and identically distributed** (i.i.d.), which is not true in this case.
+
+## T-test: visits to the ad page {.smaller}
+
+- **One user** was in the **test**, and one was in the **control**, each of whom clicked on the ad 10,000 times. 
+- The first user's conversion rate for writing in the chat is **1**, and the second's is **0**, always. One is **afraid of phone** calls, and the other **loves to talk** on the phone, so they will never write in the chat.
+- Then we will have a **conversion** of **1 in the test** and **0 in the control**. 
+- The **t-test will reject** everything: it will have two samples of size 10,000: one of ones, the other of zeros.
+- If we **swapped** the users, the **opposite** would happen: the control would be better than the test.
+
+::: {.callout-note icon="false" appearance="minimal"}
+The problem is that we only have two users, and the t-test is not applicable. So we “multiplied” them and obtained samples of size 10,000, and we are applying the t-test.
+:::
+
+## Baseline. T-test: users
+
+::: {.callout-note icon="false" appearance="minimal"}
+Not conversion from opening an ad to chat, but an increase in chats!
+:::
+
+Hypothesis:
+
+$$
+H_1: \mathbb{E}\overline{M^C} < \mathbb{E} \overline{M^T}
+$$
+
+$M^C,\ M^T$ --- average number of visits to the messenger by users in the test and control groups.
+
+In this case, we look at the **average user** rather than the **open advertisement**, as in the previous case.
+
+We also eliminate dependencies in selections: opening a chat by one user does not affect the opening of a chat by another user.
+
+## Baseline. Monte Carlo simulation
+
+1. `O_array`: number of visits to the ad page by each user in the group, generated from a normal distribution.
+2. `p_array`: conversion rate for each user, generated from a uniform distribution.
+3. `M_array`: number of chats started by each user, calculated as the product of `O_array` and `p_array`.
+4. Return a sample consisting of `M_array`.
+
+```{python}
+#| label: generate_incorrect_group_sample_1
+#| echo: true
+#| code-fold: true
+
+def generate_group_sample(group_size):
+        
+    O_array = norm(loc=50, scale=5).rvs(size=group_size).astype(int)
+    p_array = uniform().rvs(size=group_size)
+    
+    M_array = (O_array * p_array).astype(int)
+        
+    return {
+        "O_array": O_array,
+        "message_array": M_array
+    }
+
+
+numpy.random.seed(42)
+mc_size = 1000
+bad_cnt = 0
+alpha = 0.05
+group_size = 1000
+
+for _ in range(mc_size):
+    test_sample = generate_group_sample(group_size)
+    control_sample = generate_group_sample(group_size)
+    
+    pvalue = ttest_ind(test_sample['message_array'], control_sample['message_array'],
+                       equal_var=False, alternative='two-sided').pvalue
+    bad_cnt += (pvalue <= alpha)
+
+print(f"FPR: {round(bad_cnt / mc_size, 4)}")
+print(f"CI={proportion_confint(count = bad_cnt, nobs = mc_size, alpha=0.05, method='wilson')}")
+```
+
+# Sensitivity enhancement
+
+## Question
+
+> What is the maximum number of chats any OLX user can have? 
+
+. . .
+
+It's unclear. But what if you know he only **visited** the page with **one ad**? Then you can easily answer the question: **1 chat**.
+
+This means the **number of chats** may strongly **correlate** with **user ad visits**. 
+
+And we don't want to lose this information: if we can use it, we can create a **more powerful criterion**!
+
+## Hypothesis
+
+Let:
+
+- $O^C,\ O^T$ --- the number of user ad views in the control and test groups.
+- $M^C,\ M^T$ --- the number of visits to the messenger by users in the test and control groups.
+
+$$
+\begin{align}
+&H_0: \mathbb{E} \dfrac{\sum M^T}{\sum O^T} - \mathbb{E} \dfrac{\sum M^C}{\sum O^C} = 0\ vs.\ \\ &H_1: \mathbb{E} \dfrac{\sum M^T}{\sum O^T} - \mathbb{E} \dfrac{\sum M^C}{\sum O^C} > 0
+\end{align}
+$$
+
+## Confidence interval
+
+Ultimately, we are interested in calculating the statistics 
+
+$$
+K = \dfrac{\sum M_T}{\sum O_T} - \dfrac{\sum M_C}{\sum O_C}
+$$ 
+
+and constructing a confidence interval for it. **But how?**
+
+. . .
+
+<br>
+
+<center>[**Bootstrap!**]{.red}</center>
+
+## Bootstrap
+
+::: {.callout-important icon="false" appearance="minimal"}
+In this case, it is essential to remember that in Bootstrap, you need to **sample** both the **number of chats** and **the number of visits** to the ad **simultaneously**, because they *depend on a single user*!
+:::
+
+1. **Sample** the number of chats and the number of visits to the ad page in the test and control groups.
+2. **Calculate** the statistic $K$ for the sample.
+3. **Repeat** steps 1-2 many times (e.g., 10000 times).
+
+```{python}
+#| label: bootstrap_ratio
+#| echo: true
+#| code-fold: true
+
+def ratio_bootstrap(message_array, message_control, n_test, n_control, alpha=0.05):
+    theta_func = lambda MT, MC, OT, OC: numpy.sum(MT, axis=1) / numpy.sum(OT, axis=1) - numpy.sum(MC, axis=1) / numpy.sum(OC, axis=1)
+    
+    
+    B = 1000
+    batch_size = B // 20
+
+    
+    theta_asterisk_array = []
+
+    test_size = len(message_array)
+    control_size = len(message_control)
+
+    test_inds_array = numpy.arange(0, test_size)
+    control_inds_array = numpy.arange(0, control_size)
+    for _ in range(0, B, batch_size):
+        
+        boot_t_inds = numpy.random.choice(test_inds_array, replace=True, size=(batch_size, test_size))
+        boot_c_inds = numpy.random.choice(control_inds_array, replace=True, size=(batch_size, control_size))
+        
+        # Wrong way to sample with replacement
+        # boot_MT = numpy.random.choice(message_array, replace=True, size=(batch_size, test_size))
+        # boot_MC = numpy.random.choice(message_control, replace=True, size=(batch_size, control_size))
+        # boot_OT = numpy.random.choice(n_test, replace=True, size=(batch_size, test_size))
+        # boot_OC = numpy.random.choice(n_control, replace=True, size=(batch_size, control_size))
+        boot_MT = message_array[boot_t_inds]
+        boot_MC = message_control[boot_c_inds]
+        boot_OT = n_test[boot_t_inds]
+        boot_OC = n_control[boot_c_inds]
+        
+        theta_asterisk = theta_func(
+            boot_MT, boot_MC, boot_OT, boot_OC
+        ).ravel()
+        assert len(theta_asterisk) == batch_size
+        theta_asterisk_array = numpy.concatenate([theta_asterisk_array, theta_asterisk])
+    left_theta_asterisk, right_theta_asterisk = numpy.quantile(theta_asterisk_array, [alpha / 2, 1 - alpha / 2])
+    
+    
+    percentile_left_bound, percentile_right_bound = left_theta_asterisk, right_theta_asterisk
+    return percentile_left_bound, percentile_right_bound
+
+
+numpy.random.seed(8)
+
+bad_cnt_correct_bootstrap = 0
+
+for _ in range(mc_size):
+    test_sample = generate_group_sample(group_size)
+    control_sample = generate_group_sample(group_size)
+
+  
+    left_bound_correct, right_bound_correct = ratio_bootstrap(
+        test_sample['message_array'], 
+        control_sample['message_array'], 
+        test_sample['O_array'], 
+        control_sample['O_array']
+    )
+   
+    bad_cnt_correct_bootstrap += ((left_bound_correct > 0) | (right_bound_correct < 0))
+
+corr_fpr = round(bad_cnt_correct_bootstrap / mc_size, 4)
+corr_left, corr_right = proportion_confint(count = bad_cnt_correct_bootstrap, 
+                                           nobs = mc_size, alpha=0.05, method='wilson')
+print(f"FPR, correct bootstrap: {round(corr_fpr, 4)},"\
+      f" [{round(corr_left, 4)}, {round(corr_right, 4)}]")
+```
+
+## t-test vs ratio-metrics power {.smaller}
+
+To generate an AB test, we will slightly **modify** the user sample generation function: we will add the ability to change conversions in the test and control.
+
+```{python}
+#| label: generate_group_sample_2
+#| echo: true
+#| code-fold: true
+
+def generate_group_sample_equal_cr(group_size, p=0.1):
+        
+    O_array = norm(loc=50, scale=5).rvs(size=group_size).astype(int)
+    
+    p_array = norm(loc=p, scale=p / 10).rvs(group_size)
+    p_array = numpy.maximum(p_array, 0)
+    
+    M_array = (O_array * p_array).astype(int)
+        
+    return {
+        "O_array": O_array,
+        "message_array": M_array
+    }
+
+numpy.random.seed(8)
+
+power_ratio_cnt = 0
+power_means_cnt = 0
+
+for _ in range(mc_size):
+    test_sample = generate_group_sample_equal_cr(group_size, p=0.101)
+    control_sample = generate_group_sample_equal_cr(group_size, p=0.1)
+
+    left_bound_ratio, right_bound_ratio = ratio_bootstrap(
+        test_sample['message_array'], 
+        control_sample['message_array'], 
+        test_sample['O_array'], 
+        control_sample['O_array']
+    )
+    
+    pvalue_means = ttest_ind(test_sample['message_array'], control_sample['message_array'],
+                       equal_var=False, alternative='two-sided').pvalue
+    
+   
+    power_ratio_cnt += (left_bound_ratio > 0)
+    power_means_cnt += (pvalue_means < 0.05)
+
+
+power_ratio = round(power_ratio_cnt / mc_size, 4)
+ratio_left, ratio_right = proportion_confint(
+    count = power_ratio_cnt, nobs = mc_size, alpha=0.05, method='wilson')
+print(f"power, ratio: {round(power_ratio, 4)},"\
+      f" [{round(ratio_left, 4)}, {round(ratio_right, 4)}]")
+
+
+power_means = round(power_means_cnt / mc_size, 4)
+means_left, means_right = proportion_confint(count = power_means_cnt, 
+                                           nobs = mc_size, alpha=0.05, method='wilson')
+print(f"power, means: {round(power_means, 4)},"\
+      f" [{round(means_left, 4)}, {round(means_right, 4)}]")
+```
+
+- In the ratio metric we compare $p^T\ vs.\ p^C$ (since $\dfrac{O \cdot p}{O} = p$). 
+- In the t-test, we compare $M^T\ vs.\ M^C$, or ${O^T \cdot p^T}\ vs.\ {O^C \cdot p^C}$, which is a noisier value due to the random variable O.
+
+## The danger of using ratio metrics {.smaller}
+
+::: {.callout-warning icon="false" appearance="minimal"}
+The main problem with ratio metrics is that you **add a denominator** to your metric, which **can also change** based on your changes to the website.
+:::
+
+$H_1: \mathbb{E} \dfrac{\sum M^T}{\sum O^T} - \mathbb{E} \dfrac{\sum M^C}{\sum O^C} > 0$ will be **inconsistent** with $H_1: \mathbb{E} M^T -  \mathbb{E} M^C > 0$.
+
+Therefore, it is helpful to measure the change in the ratio metric and **check the denominator using a t-test**! 
+
+Therefore, your plan for working with ratio metrics is as follows:
+
+- If you are sure you **have not affected** the *denominator*, **check the change in the ratio metric**.
+- If there is a chance that you **may have affected the denominator**, *check both* the ratio metric and the denominator.
+
+# Linearization
+
+## Scaling Task {.smaller}
+
+Let's imagine you have joined a new company where AB testing is poorly organized: everyone does it however they want, making many mistakes in the process.
+
+You decide to **create a unified system for AB testing** with the following features:
+
+- It **standardizes** all AB tests in the company. This reduces the number of incorrectly created AB tests. If all analysts conducted AB tests, collected data, and applied criteria, any error in the code would lead to disastrous results.
+- It **significantly reduces** the time required to create and analyze AB tests, which is also very important for large companies.
+- It **highlights** which other experiments are running in the company, which helps to avoid conducting two conflicting tests.
+
+In this case, bootstrapping is not the best solution, as it is **slow** and **requires a lot of memory**.
+
+## Part 1. Taylor series  {.tiny}
+
+Let's recall what a [Taylor series](https://en.wikipedia.org/wiki/Taylor_series) is and how it can be used to write any function:
+
+$f(x) = \sum_{k=0}^{n}\dfrac{f^{(k)}(x_0)}{k!}(x - x_0)^k + o((x - x_0)^{n}), x \rightarrow x_0$.
+
+If we expand the function only up to the first derivative, then:
+
+$f(x) = f(x_0) + f'(x_0)(x-x_0) + o((x - x_0)) \approx f(x_0) + f'(x_0)(x-x_0), x \rightarrow x_0$
+
+And if you have a function of two variables, then:
+
+$f(x, y) \approx f(\theta) + f'_x(\theta)(x-x_0) + f'_y(\theta)(y-y_0), (x, y) \rightarrow \theta, \theta := (x_0, y_0)$.
+
+Now, let $f(x, y) = \dfrac{x}{y}$. Then
+
+$$\begin{align}
+\dfrac{x}{y} &\approx \dfrac{x_0}{y_0} + \left(\dfrac{1}{y_0}\right)(x - x_0) + \left(-\dfrac{x_0}{y^2_0}\right)(y-y_0) \\
+&= \dfrac{x_0}{y_0} + \dfrac{1}{y_0}\left(x - x_0 - \dfrac{x_0}{y_0}y + x_0\dfrac{y_0}{y_0}\right) \\
+&= \dfrac{x_0}{y_0} + \dfrac{1}{y_0}\left(x - \dfrac{x_0}{y_0}y \right)
+\end{align}
+$$
+
+::: {.footer}
+[3Blue1Brown: Taylor series](https://www.youtube.com/watch?v=3d6DsjIBzJ4)
+:::
+
+## Part 2. Decomposition {.tiny}
+
+Now let's recall our ratio metric of interest: it is $\dfrac{\sum_i^n {X_i}}{\sum_i^n {Y_i}}$, where all values for all users of the site are summed.
+
+Let's move from the sum to the average: $\dfrac{\sum_i^n {X_i}}{\sum_i^n {Y_i}} = \dfrac{\overline{X}}{\overline{Y}}$.
+
+What interesting fact do we know about the average? According to the [Law of Large Numbers](https://en.wikipedia.org/wiki/Law_of_large_numbers), we know that:
+
+- $\overline{X} \stackrel{p}{\rightarrow} \mathbb{E} X$, 
+- $\overline{Y} \stackrel{p}{\rightarrow} \mathbb{E} Y$, 
+- $(\overline{X}, \overline{Y}) \stackrel{p}{\rightarrow} (\mathbb{E} X, \mathbb{E} Y)$
+
+Let's then expand $\dfrac{\overline{X}}{\overline{Y}}$ using Taylor's formula at the point $(\mathbb{E} X, \mathbb{E} Y)$ with respect to the two variables $\overline{X}, \overline{Y}$.
+
+$$
+    \dfrac{\overline{X}}{\overline{Y}} \approx \dfrac{\mathbb{E} X}{\mathbb{E} Y} + \dfrac{1}{\mathbb{E} Y}\left(\overline{X} - \dfrac{\mathbb{E} X}{\mathbb{E} Y}\overline{Y} \right)
+$$
+
+## Part 3. Divide the result by $N$ users {.tiny}
+
+$$\begin{align}
+    \dfrac{\overline{X}}{\overline{Y}} &\approx \dfrac{\mathbb{E} X}{\mathbb{E} Y} + \dfrac{1}{\mathbb{E} Y}\left(\overline{X} - \dfrac{\mathbb{E} X}{\mathbb{E} Y}\overline{Y} \right) \\
+    &=\dfrac{\mathbb{E} X}{\mathbb{E} Y} +  \dfrac{1}{\mathbb{E} Y} \cdot \dfrac{1}{N}\sum_{i}^N \left(X_i - \dfrac{\mathbb{E} X}{\mathbb{E} Y} Y_i \right) \\
+    &=  \dfrac{1}{N}\sum_{i}^N \left(\dfrac{\mathbb{E} X}{\mathbb{E} Y} + \dfrac{1}{\mathbb{E} Y}\left(X_i - \dfrac{\mathbb{E} X}{\mathbb{E} Y} Y_i \right) \right)
+\end{align}
+$$
+
+Let us denote by $Z'_i := \dfrac{\mathbb{E} X}{\mathbb{E} Y} + \dfrac{1}{\mathbb{E} Y}\left(X_i - \dfrac{\mathbb{E} X}{\mathbb{E} Y} Y_i \right)$. 
+
+Then
+
+$$\begin{align}
+    &\dfrac{\overline{X}}{\overline{Y}} \approx \overline Z',\\
+    &\mathbb{E} \dfrac{\overline{X}}{\overline{Y}} \approx \mathbb{E} \overline Z'
+\end{align}
+$$
+
+::: {.callout-note icon="false" appearance="minimal"}
+All $Z'_i$ are **independent** and **identically distributed** (i.i.d.) random variables, so we can use the **t-test** to check the hypothesis about the average value of $Z'$. But we don't knnow the value of $\mathbb{E} X$ and $\mathbb{E} Y$.
+:::
+
+## Part 4. Substitute the values {.tiny}
+
+$$
+Z_i = \dfrac{\overline X}{\overline Y} + \dfrac{1}{\overline Y}\left(X_i - \dfrac{\overline X}{\overline Y} Y_i \right)
+$$
+
+Then we can write:
+
+$$
+(\overline{X}, \overline{Y}) \stackrel{p}{\rightarrow} (\mathbb{E} X, \mathbb{E} Y)
+$$
+
+and
+
+$$
+\begin{align}
+Z_i \stackrel{p}{\rightarrow} \dfrac{\mathbb{E} X}{\mathbb{E} Y} + \dfrac{1}{\mathbb{E} Y}\left(X_i - \dfrac{\mathbb{E} X}{\mathbb{E} Y} Y_i \right) = Z'_i
+\end{align}
+$$
+
+::: {.callout}
+For large sample sizes, $\mathbb{E} Z \approx \mathbb{E} Z'$. This means that $\mathbb{E} Z \approx \mathbb{E} Z' \approx \mathbb{E} \dfrac{\overline{X}}{\overline{Y}}$. 
+
+By applying the t-test to sample $Z$, we can compare $\dfrac{\overline{X}}{\overline{Y}}$
+:::
+
+## Linearization vs bootstrap: FPR
+
+```{python}
+#| label: linearization
+#| echo: true
+#| code-fold: true
+
+def linearisation(numerator, denominator):
+    E_num = numpy.mean(numerator)
+    E_den = numpy.mean(denominator)
+    return E_num / E_den + 1 / E_den * (numerator - E_num / E_den * denominator)
+
+numpy.random.seed(8)
+
+bad_cnt_linearisation = 0
+bad_cnt_bootstrap = 0
+
+for _ in range(mc_size):
+    test_sample = generate_group_sample_equal_cr(group_size)
+    control_sample = generate_group_sample_equal_cr(group_size)
+    test_Z = linearisation(test_sample['O_array'], test_sample['message_array'])
+    control_Z = linearisation(control_sample['O_array'], control_sample['message_array'])
+
+    # Запускаю критерий и строю доверительный интервал
+    left_bound, right_bound = ratio_bootstrap(
+        test_sample['O_array'], 
+        control_sample['O_array'], 
+        test_sample['message_array'], 
+        control_sample['message_array']
+    )
+    pvalue_linearise = ttest_ind(test_Z, control_Z, equal_var=False, alternative='two-sided').pvalue
+    
+   
+    bad_cnt_linearisation += (pvalue_linearise < 0.05)
+    bad_cnt_bootstrap += ((left_bound > 0) | (right_bound < 0))
+
+
+bootstrap_fpr = round(bad_cnt_bootstrap / mc_size, 4)
+bootstrap_left, bootstrap_right = proportion_confint(count = bad_cnt_bootstrap, 
+                                               nobs = mc_size, alpha=0.05, method='wilson')
+print(f"FPR, bootstrap: {round(bootstrap_fpr, 4)},"\
+      f" [{round(bootstrap_left, 4)}, {round(bootstrap_right, 4)}]")
+
+linearise_fpr = round(bad_cnt_linearisation / mc_size, 4)
+linearise_left, linearise_right = proportion_confint(count = bad_cnt_linearisation, 
+                                           nobs = mc_size, alpha=0.05, method='wilson')
+print(f"FPR, linearisation: {round(linearise_fpr, 4)},"\
+      f" [{round(linearise_left, 4)}, {round(linearise_right, 4)}]")
+```
+
+So we can use the **linearization** method to **calculate the ratio metric** and **apply the t-test** to it.
+
+## Linearization vs bootstrap: time
+
+```{python}
+#| label: linearization-time
+#| echo: true
+#| code-fold: true
+
+group_size = 10000
+test_sample = generate_group_sample_equal_cr(group_size)
+control_sample = generate_group_sample_equal_cr(group_size)
+
+import time
+start = time.time()
+left_bound, right_bound = ratio_bootstrap(
+                                test_sample['O_array'], 
+                                control_sample['O_array'], 
+                                test_sample['message_array'], 
+                                control_sample['message_array']
+                            )
+end = time.time()
+print(f"Bootstrap time: {round(end - start, 2)} seconds")
+
+start = time.time()
+test_Z = linearisation(test_sample['O_array'], test_sample['message_array'])
+control_Z = linearisation(control_sample['O_array'], control_sample['message_array'])
+
+pvalue_linearise = ttest_ind(test_Z, control_Z, equal_var=False, alternative='two-sided').pvalue
+end = time.time()
+print(f"Linearisation time: {round(end - start, 2)} seconds")
+print(f"p-value: {pvalue_linearise}")
+if pvalue_linearise < 0.05:
+    print("Reject H0")
+else:
+    print("Do not reject H0")
+print(f"Confidence interval: [{left_bound}, {right_bound}]")
+```
+
+
