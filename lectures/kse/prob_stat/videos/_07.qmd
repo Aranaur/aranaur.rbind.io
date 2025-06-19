@@ -1,0 +1,737 @@
+---
+title: "Dispersion reduction methods"
+subtitle: "Applied Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+footer: "Applied Statistics"
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    # toc: true
+    # toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    # fig-height: 9
+    # fig-width: 16
+    highlight-style: github
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup-r
+#| include: false
+
+library(tidyverse)
+
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Stratification
+
+## Task {.tiny}
+
+> Suppose we have an **online grocery store** with delivery and want to **increase the average revenue per user**. To do this, we **sent letters** advertising the service to active customers.
+
+Scenario:
+
+- Define the **target metric**.
+- Formulate a **statistical hypothesis** and criteria for testing it.
+- Record the **minimum expected effect** and acceptable probabilities of **Type I** and **Type II errors**.
+- Estimate the required **group size**.
+- Form an **experimental and a control group**.
+- **Experiment**.
+- **Evaluate** the results of the experiment.
+
+## Pipelines {.tiny}
+
+1. **Target metric**: Average revenue per user (ARPU).
+2. **Statistical hypothesis**: The average revenue per user in the experimental group is greater than in the control group.
+   - Null hypothesis ($H_0$): $\mu_{\text{exp}} \leq \mu_{\text{control}}$
+   - Alternative hypothesis ($H_1$): $\mu_{\text{exp}} \neq \mu_{\text{control}}$
+3. **Minimum expected effect**: 
+    + on historical data, the average revenue per user is $250$ UAH with a standard deviation of $80$ UAH. We expect an increase of at least $10$ UAH.
+    + **Type I error probability**: We set the significance level $\alpha = 0.05$.
+    + **Type II error probability**: We set the power of the test $1 - \beta = 0.8$.
+4. **Required group size**:
+
+$$
+n = \frac{(Z_{1 - \alpha/2} + Z_{1 - \beta})^2 \cdot (\sigma_{\text{control}}^2 + \sigma_{\text{exp}}^2)}{\Delta^2}
+$$
+
+where:
+- $Z_{1 - \alpha/2}$ is the critical value for the significance level $\alpha$,
+- $Z_{1 - \beta}$ is the critical value for the power of the test $\beta$.
+- $\sigma_{\text{control}}$ and $\sigma_{\text{exp}}$ are the standard deviations of the control and experimental groups, respectively,
+- $\Delta$ is the minimum expected effect.
+
+## Group size
+
+```{r}
+alpha  <- 0.05
+beta  <- 0.2
+mu_control <- 250
+effect <- 10
+mu_exp <- mu_control + effect
+std  <- 80
+
+z_alpha <- qnorm(1 - alpha / 2)
+z_beta <- qnorm(1 - beta)
+var  <-  2 * std^2 # assuming equal variance
+sample_size  <- ceiling((z_alpha + z_beta)^2 * var / effect^2)
+cat("Required group size:", sample_size, "\n")
+```
+
+## FPR and Power {.tiny}
+
+Let's check the **FPR** and **Power** of the test with Monte Carlo simulation:
+
+```{r}
+#| code-fold: true
+set.seed(123)
+
+results <- map_dfr(1:1000, ~ {
+    control_one <- rnorm(sample_size, mu_control, std)
+    control_two <- rnorm(sample_size, mu_control, std)
+    exp <- rnorm(sample_size, mu_exp, std)
+
+    FPR <- t.test(control_one, control_two, var.equal = TRUE)$p.value < alpha
+    power <- t.test(control_one, exp, var.equal = TRUE)$p.value < alpha
+
+    tibble(FPR = FPR, Power = power)
+})
+
+FPR_mean <- mean(results$FPR)
+FPR_ci <- binom.test(sum(results$FPR), nrow(results), p = alpha, conf.level = 0.95)$conf.int
+Power_mean <- mean(results$Power)
+Power_ci <- binom.test(sum(results$Power), nrow(results), p = 1 - beta, conf.level = 0.95)$conf.int
+cat("FPR:", FPR_mean, "\n", 
+    "FPR CI:", FPR_ci, "\n",
+    "Power:", Power_mean, "\n", 
+    "Power CI:", Power_ci, "\n")
+```
+
+::: {.callout-important icon="false" appearance="simple"}
+1. In practice, the exact values of distribution parameters are unknown, so estimates are used instead.
+2. It is recommended to take group sizes somewhat larger than the calculated.
+:::
+
+## Form experimental and control groups
+
+Let's assume we have a total of $10000$ users, and we will randomly assign $1005$ users to the experimental group and $1005$ users to the control group.
+
+```{r}
+set.seed(123)
+n_total <- 10000
+control_user_ids <- sample(1:n_total, sample_size)
+exp_user_ids <- setdiff(1:n_total, control_user_ids) %>% 
+    sample(sample_size)
+
+user_groups <- bind_rows(
+    tibble(user_id = control_user_ids, group = "control"),
+    tibble(user_id = exp_user_ids, group = "exp")
+)
+```
+
+## Experiment {.smaller}
+
+Let's assume we have the following revenue data for the users in the experimental and control groups:
+
+```{r}
+set.seed(123)
+revenue_data <- tibble(
+    user_id = 1:n_total,
+    revenue = ifelse(user_id %in% control_user_ids, 
+                     rnorm(sample_size, mu_control, std), 
+                     rnorm(sample_size, mu_exp, std))
+)
+revenue_data %>% slice_sample(n = 5)
+```
+
+## Evaluate results {.smaller}
+
+```{r}
+revenue_data_exp <- revenue_data %>%
+    left_join(user_groups, by = "user_id") %>%
+    drop_na() %>% 
+    mutate(group = factor(group, levels = c("exp", "control")))
+
+results <- revenue_data_exp %>%
+    group_by(group) %>%
+    summarise(mean_revenue = mean(revenue), 
+              sd_revenue = sd(revenue), 
+              n = n())
+t_test_result <- t.test(revenue ~ group, data = revenue_data_exp, var.equal = TRUE)
+cat("T-test p-value:", t_test_result$p.value, "\n",
+    "CI:", t_test_result$conf.int, "\n")
+```
+
+## Stratification {.smaller}
+
+> We have a **loyalty program**, but not all store users are registered. The behavior of *registered* users may **differ** from that of *unregistered* users. Information about registration in the loyalty program can increase the **experiment's sensitivity**.
+
+**Covariates** can be used to **reduce variance** and increase the **sensitivity** of the experiment by **stratifying the sample**.
+
+Let's:
+
+- The shares of strata in the population are equal and amount to 50%.
+- The average weekly revenue in the first stratum is 200 UAH, in the second stratum is 300 UAH.
+- The standard deviation in the first and second stratum is 62 UAH.
+
+## Strata's visualization {.smaller}
+
+```{r}
+#| layout-ncol: 2
+set.seed(123)
+strata_data <- tibble(
+    stratum = rep(c("Unregistered", "Registered"), each = 1000),
+    revenue = c(rnorm(1000, 200, 62), rnorm(1000, 300, 62))
+)
+ggplot(strata_data, aes(x = revenue, fill = stratum)) +
+    geom_density(position = "identity", alpha = 0.5, adjust = 1.5) +
+    labs(title = "Revenue Distribution by Stratum") +
+    theme_minimal() +
+    scale_fill_manual(values = c("Unregistered" = red_pink, "Registered" = turquoise))
+
+ggplot(strata_data, aes(x = revenue)) +
+    geom_density(position = "identity", alpha = 0.5, adjust = 1.5, fill=blue) +
+    labs(title = "Revenue Distribution by Stratum") +
+    theme_minimal()
+```
+
+::: {.callout-note icon="false" appearance="simple"}
+When users are randomly distributed across groups, the strata sizes may be unequal.
+:::
+
+## AA test with stratification {.smaller}
+
+Let's conduct an AA test with stratification to check FPR.
+
+```{r}
+#| code-fold: true
+set.seed(123)
+
+get_stratified_data <- function(stratum, n) {
+    tibble(
+        user_id = sample(1:10000, n),
+        revenue = rnorm(n, mean = ifelse(stratum == "Registered", 300, 200), sd = 62),
+        stratum = stratum
+    )
+}
+stratum_sizes <- c(Registered = 5000, Unregistered = 5000)
+
+result <- map_lgl(1:1000, ~ {
+    stratified_data <- bind_rows(
+        get_stratified_data("Registered", stratum_sizes["Registered"]),
+        get_stratified_data("Unregistered", stratum_sizes["Unregistered"])
+    )
+    
+    control_user_stratified <- stratified_data %>%
+        group_by(stratum) %>%
+        slice_sample(n = ceiling(sample_size / 2)) %>%
+        ungroup()
+    
+    exp_user_stratified <- stratified_data %>%
+        filter(!user_id %in% control_user_stratified$user_id) %>%
+        group_by(stratum) %>%
+        slice_sample(n = ceiling(sample_size / 2)) %>%
+        ungroup()
+    
+    user_groups_stratified <- bind_rows(
+        control_user_stratified %>% mutate(group = "control"),
+        exp_user_stratified %>% mutate(group = "exp")
+    )
+    
+    t.test(revenue ~ group, data = user_groups_stratified, var.equal = TRUE)$p.value < 0.05
+})
+
+cat("FPR:", mean(result), "\n",
+    "FPR CI:", binom.test(sum(result), length(result), p = 0.05, conf.level = 0.95)$conf.int, "\n")
+```
+
+## Power with stratification {.tiny}
+
+Let's conduct a power analysis with stratification to check the power of the test.
+
+```{r}
+#| code-fold: true
+
+set.seed(123)
+
+get_stratified_data_power <- function(stratum, n, effect = 10) {
+    tibble(
+        user_id = sample(1:10000, n),
+        revenue = rnorm(n, mean = ifelse(stratum == "Registered", 300, 200) + effect, sd = 62),
+        stratum = stratum
+    )
+}
+stratum_sizes_power <- c(Registered = 5000, Unregistered = 5000)
+result_power <- map_lgl(1:1000, ~ {
+    stratified_data_power <- bind_rows(
+        get_stratified_data_power("Registered", stratum_sizes_power["Registered"]),
+        get_stratified_data_power("Unregistered", stratum_sizes_power["Unregistered"])
+    )
+    
+    control_user_stratified <- stratified_data_power %>%
+        group_by(stratum) %>%
+        slice_sample(n = ceiling(sample_size / 2)) %>%
+        ungroup()
+    
+    exp_user_stratified <- stratified_data_power %>%
+        filter(!user_id %in% control_user_stratified$user_id) %>%
+        mutate(revenue = revenue + effect) %>% 
+        group_by(stratum) %>%
+        slice_sample(n = ceiling(sample_size / 2)) %>%
+        ungroup()
+    
+    user_groups_stratified <- bind_rows(
+        control_user_stratified %>% mutate(group = "control"),
+        exp_user_stratified %>% mutate(group = "exp")
+    )
+    
+    t.test(revenue ~ group, data = user_groups_stratified, var.equal = TRUE)$p.value < 0.05
+})
+cat("Power:", mean(result_power), "\n",
+    "Power CI:", binom.test(sum(result_power), length(result_power), p = 0.8, conf.level = 0.95)$conf.int, "\n")
+```
+
+::: {.callout-important icon="false" appearance="simple"}
+Stratified sampling made it possible to **reduce** the probabilities of **Type I and Type II** errors.
+
+But we **didn't get quite the test we wanted** initially.
+:::
+
+## Stratified mean {.tiny}
+
+When calculating the **stratified average**, we calculate the simple **average for each stratum separately**. Then, we calculate their **weighted sum**, where the stratum's weight is the stratum's share in the population.
+
+$$
+\hat{X}_{str} = \sum_{i=1}^{k} w_i \bar{X}_i
+$$
+
+where:
+
+- $k$ is the number of strata,
+- $w_i$ is the weight of the $i$-th stratum,
+- $\bar{X}_i$ is the average of the $i$-th stratum.
+
+## Stratified variance {.tiny}
+
+The **stratified variance** is calculated as follows:
+
+$$
+Var_{str} = \frac{1}{N} \sum_{i=1}^{k} w_i \sigma_i^2
+$$
+
+where:
+
+- $N$ is the total sample size,
+- $\sigma_i^2$ is the variance of the $i$-th stratum.
+
+## t-test with stratification {.tiny}
+
+$$
+t = \frac{\hat{X}_{strat, B} - \hat{X}_{strat, A}}{\sqrt{\sigma_{strat, B}^2  + \sigma_{strat, A}^2}} \sim t_{\gamma}
+$$
+
+where:
+
+- $\hat{X}_{strat, B}$ and $\hat{X}_{strat, A}$ are the stratified averages of the experimental and control groups, respectively,
+- $\sigma_{strat, B}^2$ and $\sigma_{strat, A}^2$ are the stratified variances of the experimental and control groups, respectively.
+
+## AA and AB tests with stratification {.tiny}
+
+Let's conduct AA and AB tests with stratification to check FPR and Power.
+
+```{r}
+#| code-fold: true
+
+set.seed(321)
+
+get_stratified_data_aa_ab <- function(stratum, n) {
+    tibble(
+        user_id = sample(1:10000, n),
+        revenue = rnorm(n, mean = ifelse(stratum == "Registered", 300, 200), sd = 62),
+        stratum = stratum
+    )
+}
+
+stratum_sizes_aa_ab <- c(Registered = 5000, Unregistered = 5000)
+result_aa <- map_lgl(1:1000, ~ {
+    stratified_data_aa <- bind_rows(
+        get_stratified_data_aa_ab("Registered", stratum_sizes_aa_ab["Registered"]),
+        get_stratified_data_aa_ab("Unregistered", stratum_sizes_aa_ab["Unregistered"])
+    )
+    
+    control_user_stratified <- stratified_data_aa %>%
+        group_by(stratum) %>%
+        slice_sample(n = ceiling(sample_size / 2)) %>%
+        ungroup()
+    
+    exp_user_stratified <- stratified_data_aa %>%
+        filter(!user_id %in% control_user_stratified$user_id) %>%
+        group_by(stratum) %>%
+        slice_sample(n = ceiling(sample_size / 2)) %>%
+        ungroup()
+    
+    user_groups_stratified <- bind_rows(
+        control_user_stratified %>% mutate(group = "control"),
+        exp_user_stratified %>% mutate(group = "exp")
+    )
+    
+    strat_a_mean <- user_groups_stratified %>%
+        filter(group == "control") %>%
+        group_by(stratum) %>%
+        summarise(mean_revenue = mean(revenue), .groups = "drop") %>% 
+        summarise(mean_revenue = mean(mean_revenue))
+    strat_b_mean <- user_groups_stratified %>%
+        filter(group == "exp") %>%
+        group_by(stratum) %>%
+        summarise(mean_revenue = mean(revenue), .groups = "drop") %>%
+        summarise(mean_revenue = mean(mean_revenue))
+    strat_a_var <- user_groups_stratified %>%
+        filter(group == "control") %>%
+        group_by(stratum) %>%
+        summarise(var_revenue = var(revenue), .groups = "drop") %>%
+        summarise(var_revenue = mean(var_revenue))
+    strat_b_var <- user_groups_stratified %>%
+        filter(group == "exp") %>%
+        group_by(stratum) %>%
+        summarise(var_revenue = var(revenue), .groups = "drop") %>%
+        summarise(var_revenue = mean(var_revenue))
+    delta_mean <- strat_b_mean$mean_revenue - strat_a_mean$mean_revenue
+    std <- sqrt(strat_a_var$var_revenue / nrow(control_user_stratified) + strat_b_var$var_revenue / nrow(exp_user_stratified))
+    t = delta_mean / std
+    pvalue <- 2 * pt(abs(t), df = nrow(user_groups_stratified) - 2, lower.tail = FALSE)
+    pvalue < 0.05
+})
+
+
+cat("FPR AA:", mean(result_aa), "\n",
+    "FPR CI AA:", binom.test(sum(result_aa), length(result_aa), p = 0.05, conf.level = 0.95)$conf.int, "\n")
+```
+
+## AB test with effect {.tiny}
+
+```{r}
+#| code-fold: true
+set.seed(123)
+
+result_ab <- map_lgl(1:1000, ~ {
+    stratified_data_ab <- bind_rows(
+        get_stratified_data_aa_ab("Registered", stratum_sizes_aa_ab["Registered"]),
+        get_stratified_data_aa_ab("Unregistered", stratum_sizes_aa_ab["Unregistered"])
+    )
+    
+    control_user_stratified <- stratified_data_ab %>%
+        group_by(stratum) %>%
+        slice_sample(n = ceiling(sample_size / 2)) %>%
+        ungroup()
+    
+    exp_user_stratified <- stratified_data_ab %>%
+        filter(!user_id %in% control_user_stratified$user_id) %>%
+        mutate(revenue = revenue + 10) %>%  # Adding effect
+        group_by(stratum) %>%
+        slice_sample(n = ceiling(sample_size / 2)) %>%
+        ungroup()
+    
+    user_groups_stratified <- bind_rows(
+        control_user_stratified %>% mutate(group = "control"),
+        exp_user_stratified %>% mutate(group = "exp")
+    )
+    
+    strat_a_mean <- user_groups_stratified %>%
+        filter(group == "control") %>%
+        group_by(stratum) %>%
+        summarise(mean_revenue = mean(revenue), .groups = "drop") %>% 
+        summarise(mean_revenue = mean(mean_revenue))
+    strat_b_mean <- user_groups_stratified %>%
+        filter(group == "exp") %>%
+        group_by(stratum) %>%
+        summarise(mean_revenue = mean(revenue), .groups = "drop") %>%
+        summarise(mean_revenue = mean(mean_revenue))
+    strat_a_var <- user_groups_stratified %>%
+        filter(group == "control") %>%
+        group_by(stratum) %>%
+        summarise(var_revenue = var(revenue), .groups = "drop") %>%
+        summarise(var_revenue = mean(var_revenue))
+    strat_b_var <- user_groups_stratified %>%
+        filter(group == "exp") %>%
+        group_by(stratum) %>%
+        summarise(var_revenue = var(revenue), .groups = "drop") %>%
+        summarise(var_revenue = mean(var_revenue))
+    delta_mean <- strat_b_mean$mean_revenue - strat_a_mean$mean_revenue
+    std <- sqrt(strat_a_var$var_revenue / nrow(control_user_stratified) + strat_b_var$var_revenue / nrow(exp_user_stratified))
+    t = delta_mean / std
+    pvalue <- 2 * pt(abs(t), df = nrow(user_groups_stratified) - 2, lower.tail = FALSE)
+    pvalue < 0.05
+})
+cat("Power AB:", mean(result_ab), "\n",
+    "Power CI AB:", binom.test(sum(result_ab), length(result_ab), p = 0.8, conf.level = 0.95)$conf.int, "\n")
+```
+
+# CUPED
+
+## Basic idea {.smaller}
+
+```{r}
+#| label: cuped-setup
+#| echo: false
+#| fig-align: center
+
+data <- tibble(
+    users = 1:10,
+    week_1 = c(100, 120, 110, 130, 140, 150, 160, 170, 180, 190),
+    week_2 = c(100, 120, 110, 130, 140, 150, 160, 170, 180, 190),
+    week_3 = c(100, 120, 110, 130, 140, 150, 160, 170, 180, 190),
+    week_4 = c(100, 120, 110, 130, 140, 150, 160, 170, 180, 190),
+    week_5 = c(100, 125, 110, 132, 140, 151, 160, 172, 180, 195),
+    group = rep(c("A", "B"), times = 5)
+) %>% 
+    pivot_longer(cols = starts_with("week_"), 
+                 names_to = "week", 
+                 values_to = "revenue")
+
+data %>% 
+    # show only week 5 but with all weeks at x-axis
+    filter(week == "week_5") %>%
+    ggplot(aes(x = week, y = revenue, color = group)) +
+    geom_point(size = 3) +
+    geom_text(aes(label = revenue), hjust = -1) +
+    labs(title = "Revenue by Week and Group") +
+    theme_minimal() +
+    scale_color_manual(values = c("A" = red_pink, "B" = turquoise)) +
+    theme(legend.position = "bottom") +
+    scale_x_discrete(limits = c("week_1", "week_2", "week_3", "week_4", "week_5"))
+```
+
+## Looking in the past
+
+```{r}
+#| label: cuped-plot-2
+#| echo: false
+#| fig-align: center
+
+diffs <- c(100, 125, 110, 132, 140, 151, 160, 172, 180, 195) - c(100, 120, 110, 130, 140, 150, 160, 170, 180, 190)
+
+data %>% 
+    ggplot(aes(x = week, y = revenue, color = group, group = users)) +
+    geom_point(size = 3) +
+    geom_line() +
+    geom_text(data = data %>% filter(week == "week_5"), aes(label = diffs), hjust = -1) +
+    labs(title = "Revenue by Week and Group") +
+    theme_minimal() +
+    scale_color_manual(values = c("A" = red_pink, "B" = turquoise)) +
+    theme(legend.position = "bottom") +
+    scale_x_discrete(limits = c("week_1", "week_2", "week_3", "week_4", "week_5"))
+```
+
+## CUPED formula
+
+**CUPED** (**C**ontrolled-experiment **U**sing **P**re-Experiment **E**xternal **D**ata) — a method for reducing dispersion in A/B tests by adjusting the target metric Y using covariate X (pre-experiment data).
+
+
+$$
+Y_{cuped} = Y - \theta \cdot (X)
+$$
+
+where:
+
+- $Y_{cuped}$ is the adjusted target metric,
+- $Y$ is the original target metric,
+- $\theta$ is the coefficient that minimizes the variance of $Y_{cuped}$,
+- $X$ is the covariate (pre-experiment data).
+
+## Estimating theta {.tiny}
+
+Goal: minimize the variance of $Y_{cuped}$.
+
+Steps:
+
+1. Variance of $Y_{cuped}$:
+
+$$
+Var(Y_{cuped}) = Var(Y) - 2\theta Cov(X, Y) + \theta^2 Var(X)
+$$
+
+2. Differentiate with respect to $\theta$ and set to zero:
+
+$$
+\frac{d}{d\theta} Var(Y_{cuped}) = 2\theta Var(X) -2 Cov(X, Y) = 0
+$$
+
+3. Solve for $\theta$:
+
+$$
+\theta = \frac{Cov(X, Y)}{Var(X)}
+$$
+
+Final formula for variance of $Y_{cuped}$:
+
+$$
+Var(Y_{cuped}) = Var(Y)(1 - r^2)
+$$
+
+where $r$ is the correlation coefficient between $X$ and $Y$.
+
+## Examples of covariates {.tiny}
+
+> Any metric that correlates with the target metric that **will not be affected by the treatment**.
+
+1. **The same metrics as before the test**
+    + For Retention: Retention for the previous month
+    + For CTR: CTR for the last week
+2. **Synthetic predictors**
+    + ML prediction of metrics based on historical data
+3. **Ideas for other metrics**
+    + Average session time for the last 7 days
+    + Frequency of feature usage before the experiment
+4. **Demographics/Technical parameters**
+    + Age, country, device type (if stable)
+
+## Cases
+
+1. Netflix (from the paper by [Huizhi Xie, Juliette Aurisset, 2016](https://www.kdd.org/kdd2016/papers/files/adp0945-xieA.pdf)):
+    + For streaming hours among existing users:
+        - CUPED reduced dispersion by 40%
+        - Covariate: streaming hours per month before the experiment
+2. Microsoft ([Laura Cosgrove, Jen Townsend, and Jonathan Litz, 2022](https://www.microsoft.com/en-us/research/articles/deep-dive-into-variance-reduction/)):
+    + CTR:
+        - CUPED was akin to adding 20% more traffic to analysis of a majority of metrics
+        - Covariate: CTR over the last 2 weeks
+
+## Main points {.smaller}
+
+1. Correlation is key
+    + Minimum requirement $|r| > 0.3$.
+2. Covariate stability
+    + The covariate should not depend on the experimental intervention.
+3. For new users
+    + The effect is weaker due to a lack of historical data (in Netflix: 5-15% reduction in variance)
+4. Good old OLS
+    + CUPED is equivalent to OLS regression with fixed $\theta$.
+
+## CUPED in R {.tiny}
+
+Functions for generating data, calculating $\theta$, and performing CUPED:
+
+```{r}
+#| code-fold: true
+
+library(mvtnorm) # for rmvnorm
+
+generate_data <- function(sample_size, corr, mean = 2000, sigma = 300) {
+  means <- c(mean, mean) # mean for both metrics
+  cov_matrix <- sigma^2 * matrix(c(1, corr, corr, 1), nrow = 2) # covariance matrix
+  data <- rmvnorm(sample_size, mean = means, sigma = cov_matrix) %>% round() # generate correlated data
+  
+  tibble(
+    metric = data[, 1], # target metric (e.g., revenue)
+    covariate = data[, 2] # covariate (e.g., pre-experiment data)
+  )
+}
+
+calculate_theta <- function(metrics, covariates) {
+  cov_xy <- cov(covariates, metrics) # covariance between covariate and metric
+  var_x <- var(covariates) # variance of covariate
+  theta <- cov_xy / var_x # calculate theta
+  return(theta)
+}
+
+check_ttest <- function(df_control, df_pilot) {
+  t.test(df_control$metric, df_pilot$metric)$p.value
+}
+
+check_cuped <- function(df_control, df_pilot, df_theta) {
+  theta <- calculate_theta(df_theta$metric, df_theta$covariate)
+  cuped_control <- df_control$metric - theta * df_control$covariate
+  cuped_pilot   <- df_pilot$metric   - theta * df_pilot$covariate
+  t.test(cuped_control, cuped_pilot)$p.value
+}
+```
+
+## CUPED in R {.tiny}
+
+Test the CUPED method with Monte Carlo simulation:
+
+```{r}
+#| code-fold: true
+#| fig-align: center
+
+simulate_pvalues <- function(n_iter = 10000, sample_size = 1000, corr = 0.7, effect = 20) {
+  map_dfr(seq_len(n_iter), function(i) {
+    df_control <- generate_data(sample_size, corr)
+    df_pilot <- generate_data(sample_size, corr)
+    df_theta <- bind_rows(df_control, df_pilot)
+
+    # A/A: без ефекту
+    p_aa <- check_cuped(df_control, df_pilot, df_theta)
+
+    # A/B: з ефектом
+    df_pilot_ab <- df_pilot %>% mutate(metric = metric + effect)
+    df_theta_ab <- bind_rows(df_control, df_pilot_ab)
+
+    p_ab_cuped <- check_cuped(df_control, df_pilot_ab, df_theta_ab)
+    p_ab_ttest <- check_ttest(df_control, df_pilot_ab)
+
+    tibble(
+      method   = c("cuped A/A", "cuped A/B", "ttest A/B"),
+      p_value  = c(p_aa, p_ab_cuped, p_ab_ttest)
+    )
+  })
+}
+
+set.seed(42)
+
+# Генерація та графік
+df_pvalues <- simulate_pvalues(n_iter = 10000, sample_size = 1000, corr = 0.7, effect = 20)
+
+df_pvalues %>%
+  ggplot(aes(x = p_value, fill = method)) +
+  geom_histogram(position = "identity", alpha = 0.5, bins = 50) +
+  labs(title = "Distribution of p-values for A/A and A/B tests",
+       x = "p-value",
+       y = "Frequency") +
+  scale_fill_manual(values = c("cuped A/A" = red_pink, 
+                                "cuped A/B" = turquoise, 
+                                "ttest A/B" = orange)) +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  facet_wrap(~ method, scales = "free_y") +
+  xlim(0, 1)
+
+df_pvalues %>%
+  group_by(method) %>%
+  summarise(
+    FPR = mean(p_value < 0.05 & method == "cuped A/A"),
+    Power = mean(p_value < 0.05 & method %in% c("cuped A/B", "ttest A/B"))
+  )
+```
