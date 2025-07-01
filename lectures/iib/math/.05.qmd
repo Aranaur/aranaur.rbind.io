@@ -1,0 +1,547 @@
+---
+title: "Часові ряди"
+subtitle: "Математика для керівника"
+author: "Ігор Мірошниченко"
+institute: Міжнародний інститут бізнесу
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .05_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: Математика для керівника
+format:
+  revealjs: 
+    code-line-numbers: false
+    # center: true
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    # controls-layout: bottom-right
+    chalkboard: true
+    logo: img/iib.jpg
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    # fig-width: 9
+    # fig-height: 5
+    fig-format: svg
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+  # gfm:
+  #   mermaid-format: png
+preload-iframes: true
+execute: 
+  echo: false
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(readxl)
+library(gt)
+library(fpp3)
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+data <- read_excel(here::here("lectures/iib/math/data/forecast.xlsx"))
+```
+
+## Компоненти часових рядів
+
+Вважається, що в часових рядах є чотири компоненти:
+
+- тренд, $T$;
+- сезонна складова, $S$;
+- циклічна складова, $C$;
+- випадкова компонента, $R$.
+
+## Тренд {.tiny}
+
+**Тренд** --- це загальна тенденція до зростання або падіння, яка спостерігається в даних протягом тривалого періоду часу. 
+
+Типові приклади трендів включають:
+
+- зростання цін на акції протягом кількох років;
+- збільшення населення в місті протягом десятиліть;
+- зростання температури внаслідок глобального потепління.
+
+Основні види трендів:
+
+- **Лінійний тренд**: дані зростають або падають лінійно, наприклад, зростання доходів компанії протягом кількох років.
+- **Логістичний тренд**: дані зростають або падають, але зменшують темп з часом, наприклад, зростання продажів нового продукту, яке спочатку швидке, а потім сповільнюється.
+- **Експоненціальний тренд**: дані зростають або падають експоненціально, наприклад, зростання кількості користувачів соціальної мережі протягом кількох місяців.
+
+## Тренд: візуалізація
+
+```{r}
+#| label: trend-plot
+#| fig-align: center
+
+gen_data <- tibble(
+  date = seq(as.Date("2010-01-01"), as.Date("2020-12-31"), by = "month"),
+  line_trend = seq(1, 132, length.out = 132) + rnorm(132, sd = 5),
+  log_trend = log(seq(1, 132, length.out = 132) + rnorm(132, sd = 5)),
+  exp_trend = rnorm(132, sd = 100) + exp(seq(1, 132, length.out = 132) / 20)
+)
+
+gen_data %>%
+  pivot_longer(cols = -date, names_to = "trend_type", values_to = "value") %>%
+  ggplot(aes(x = date, y = value, color = trend_type)) +
+  geom_line() +
+  geom_smooth(method = "loess", se = FALSE, aes(color = trend_type), linetype = "dashed") +
+  labs(title = "Тренди в даних", x = "Дата", y = "Значення") +
+  scale_color_manual(values = c("line_trend" = red_pink, 
+                                 "log_trend" = turquoise, 
+                                 "exp_trend" = orange)) +
+  theme_minimal() +
+  facet_wrap(~trend_type, scales = "free_y", ncol = 1) +
+  theme(legend.position = "none")
+```
+
+## Сезонність
+
+**Сезонність** --- це регулярні коливання в даних, які повторюються через певні проміжки часу, зазвичай протягом року.
+
+Типові приклади сезонності включають:
+
+- збільшення продажів морозива влітку та зменшення в зимку;
+- збільшення кількості туристів влітку та зменшення в зимку;
+- збільшення кількості покупок подарунків перед святами, такими як Різдво або День святого Валентина.
+
+## Сезонність: візуалізація
+
+```{r}
+#| label: seasonality-plot
+#| fig-align: center
+
+tibble(
+  month = factor(month.abb, levels = month.abb),
+  sales = rnorm(12, 100, 500) + 
+           c(0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220) +
+           rnorm(12, sd = 30)
+) %>%
+  ggplot(aes(x = month, y = sales, group = 1)) +
+  geom_line(color = red_pink) +
+  geom_point(color = red_pink) +
+  labs(title = "Сезонність у продажах", x = "Місяць", y = "Продажі") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Циклічність
+
+**Циклічність** --- це коливання в даних, які повторюються через нерегулярні проміжки часу, зазвичай пов'язані з економічними або соціальними змінами.
+
+Типові приклади циклічності включають:
+
+- економічні цикли, такі як рецесії та відновлення;
+- циклічні зміни в попиті на товари та послуги, такі як збільшення попиту на автомобілі під час економічного зростання та зменшення під час рецесії;
+- циклічні зміни в попиті на енергію, такі як збільшення попиту на електроенергію влітку через кондиціонери та зменшення взимку.
+
+## Випадкова складова
+
+**Випадкова складова** --- це випадкові коливання в даних, які не можуть бути пояснені трендом, сезонністю або циклічністю. Вони можуть бути викликані різними факторами, такими як випадкові події, помилки вимірювання або інші непередбачувані обставини.
+
+## Загальна візуалізація
+
+```{r}
+#| label: components-plot
+#| fig-align: center
+
+us_retail_employment <- us_employment |>
+  filter(year(Month) >= 1990, Title == "Retail Trade") |>
+  select(-Series_ID)
+
+dcmp <- us_retail_employment |>
+  model(stl = STL(Employed))
+
+components(dcmp) |> autoplot()
+```
+
+## Моделі декомпозиції
+
+Моделі декомпозиції дозволяють розділити часовий ряд на його складові частини, такі як тренд, сезонність та випадкові коливання. Це допомагає краще зрозуміти структуру даних і зробити прогнози.
+
+Види моделей декомпозиції:
+
+- **Адітивна модель**: $Y_t = T_t + S_t + C_t + R_t$, де $Y_t$ --- значення часового ряду в момент часу $t$, $T_t$ --- тренд, $S_t$ --- сезонна складова, $C_t$ --- циклічна складова, $R_t$ --- випадкова складова.
+- **Мультиплікативна модель**: $Y_t = T_t \cdot S_t \cdot C_t \cdot R_t$, де всі складові частини взаємодіють між собою.
+
+## Адитивна модель
+
+- Продажі ($Y$) = 21 109 гривень
+- Тренд ($T$) = 20 000 гривень
+- Сезонний фактор ($S$) = 1500 гривень (хороший місяць для продажів)
+- Циклічний ($C$) = -800 гривень (спад ділової активності)
+- Випадкова ($R$) = 409 гривень (випадкові коливання)
+
+$$
+Y = T + S + C + R = 20 000 + 1500 - 800 + 409 = 21 109
+$$
+
+## Мультиплікативна модель
+
+- Продажі ($Y$) = 21 109 гривень
+- Тренд ($T$) = 20 000 гривень
+- Сезонний фактор ($S$) = 1.1 (хороший місяць для продажів, +10% до тренду)
+- Циклічний ($C$) = 0.95 (спад ділової активності, -5% до тренду)
+- Випадкова ($R$) = 1.01 (випадкові коливання, +1% до тренду)
+
+$$
+Y = T \cdot S \cdot C \cdot R = 20 000 \cdot 1.1 \cdot 0.95 \cdot 1.01 = 21 109
+$$
+
+## Адитивна vs. Мультиплікативна модель
+
+В адитивній моделі всі компоненти знаходяться в тих же одиницях, що і вихідна змінна (у наведеному вище прикладі).  
+
+У мультиплікативній моделі тренд виражений в тих же одиницях, що і змінна, а інші три компоненти є просто множниками.
+
+## Декомпозиція та прогнозування {.smaller}
+
+Метод полягає в тому, щоб прогнозувати кожен компонент окремо, а потім об'єднувати їх через одну з моделей, щоб сформувати прогноз самої змінної. 
+
+1. Прогнозування тренду: використовувати методи екстраполяції, такі як лінійна регресія або ковзне середнє.
+2. Прогнозування сезонності: використовувати історичні дані для виявлення сезонних патернів.
+3. Прогнозування циклічності: аналізувати економічні та соціальні фактори, які можуть вплинути на циклічні коливання.
+4. Прогнозування випадкової складової: використовувати статистичні методи для оцінки випадкових коливань.
+
+## Приклад 1 {.smaller}
+
+::: {.columns}
+::: {.column}
+```{r}
+#| label: forecast-data
+
+tibble(
+  year = rep(c(2022, 2023, 2024), each = 4),
+  quarter = rep(c("Q1", "Q2", "Q3", "Q4"), times = 3),
+  sales = c(42, 41, 52, 39, 45, 48, 61, 46, 52, 51, 60, 46)
+) %>% 
+gt() %>%
+  tab_header(
+    title = "Продажі за кварталами",
+    subtitle = "Дані за 2022-2024 роки"
+  ) %>%
+  cols_label(
+    sales = "Продажі",
+    year = "Рік",
+    quarter = "Квартал"
+  ) %>%
+  fmt_number(
+    columns = vars(sales),
+    decimals = 0
+  ) %>%
+  tab_spanner(
+    label = "Квартали",
+    columns = vars(year, quarter)
+  )
+```
+:::
+::: {.column}
+```{r}
+#| label: forecast-example
+#| fig-align: center
+
+tibble(
+  sales = c(42, 41, 52, 39, 45, 48, 61, 46, 52, 51, 60, 46),
+  year = rep(c(2022, 2023, 2024), each = 4),
+  quarter = rep(c("Q1", "Q2", "Q3", "Q4"), times = 3),
+  n_row = 1:12
+) %>% 
+  mutate(quarter = factor(quarter, levels = c("Q1", "Q2", "Q3", "Q4"))) %>%
+  ggplot(aes(x = n_row, y = sales)) +
+  geom_line(color = red_pink) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = navy) +
+  labs(title = "Продажі за кварталами", x = "Номер кварталу", y = "Продажі") +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  scale_x_continuous(breaks = 1:12, labels = paste0("Q", 1:4, " ", rep(2022:2024, each = 4)))
+```
+
+$$
+y = 42 + 1.01 \cdot t
+$$
+:::
+:::
+
+## Приклад 2 {.smaller}
+
+::: {.columns}
+::: {.column}
+```{r}
+#| label: forecast-data-2
+
+tibble(
+  year = rep(c(2021, 2022, 2023, 2024), each = 4),
+  quarter = rep(c("Q1", "Q2", "Q3", "Q4"), times = 4),
+  sales = c(24.8, 36.3,38.1,47.5,31.2,42,43.4,55.9,40,48.8,54,69.1,54.7,57.8,60.3,68.9)
+) %>%
+gt() %>%
+  tab_header(
+    title = "Продажі за кварталами",
+    subtitle = "Дані за 2021-2024 роки"
+  ) %>%
+  cols_label(
+    sales = "Продажі",
+    year = "Рік",
+    quarter = "Квартал"
+  ) %>%
+  fmt_number(
+    columns = vars(sales),
+    decimals = 1
+  ) %>%
+  tab_spanner(
+    label = "Квартали",
+    columns = vars(year, quarter)
+  )
+```
+:::
+::: {.column}
+```{r}
+#| label: forecast-example-2
+#| fig-align: center
+
+tibble(
+  sales = c(24.8, 36.3, 38.1, 47.5, 31.2, 42, 43.4, 55.9, 40, 48.8, 54, 69.1, 54.7, 57.8, 60.3, 68.9),
+  year = rep(c(2021, 2022, 2023, 2024), each = 4),
+  quarter = rep(c("Q1", "Q2", "Q3", "Q4"), times = 4),
+  n_row = 1:16
+) %>% 
+  mutate(quarter = factor(quarter, levels = c("Q1", "Q2", "Q3", "Q4"))) %>%
+  ggplot(aes(x = n_row, y = sales)) +
+  geom_line(color = red_pink) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = navy) +
+  labs(title = "Продажі за кварталами", x = "Номер кварталу", y = "Продажі") +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  scale_x_continuous(breaks = seq(1,16), labels = paste0("Q", rep(1:4, times=4), " ", rep(2021:2024, each=4)))
+```
+$$
+b_1 = \frac{n \sum t_i y_i - \sum t_i \sum y_i}{n \sum t_i^2 - (\sum t_i)^2} = 2.3244 \\
+b_0 = \bar{y} - b_1 \cdot \bar{t} = 28.54 \\
+y = 28.54 + 2.3244 \cdot t
+$$
+:::
+:::
+
+## Оцінювання сезонності
+
+Адитивна модель:
+
+$$Y = T + S \\
+S = Y - T
+$$
+
+Мультиплікативна модель:
+
+$$
+Y = T \cdot S \\
+S = \frac{Y}{T}
+$$
+
+## Приклад 3 {.tiny}
+
+::: {.columns}
+::: {.column}
+```{r}
+#| label: forecast-data-3
+
+tibble(
+  year = rep(c(2022, 2023, 2024), each = 4),
+  quarter = rep(c("Q1", "Q2", "Q3", "Q4"), times = 3),
+  sales = c(42, 41, 52, 39, 45, 48, 61, 46, 52, 51, 60, 46)
+) %>% 
+gt() %>%
+  tab_header(
+    title = "Продажі за кварталами",
+    subtitle = "Дані за 2022-2024 роки"
+  ) %>%
+  cols_label(
+    sales = "Продажі",
+    year = "Рік",
+    quarter = "Квартал"
+  ) %>%
+  fmt_number(
+    columns = vars(sales),
+    decimals = 0
+  ) %>%
+  tab_spanner(
+    label = "Квартали",
+    columns = vars(year, quarter)
+  )
+```
+
+$$
+T = 42 + 1.01 \cdot t
+$$
+:::
+
+::: {.column}
+$$ 
+t = 1; \ T = 42 + 1.01 \cdot 1 = 43.01
+$$
+$$
+S = \frac{Y}{T} = \frac{42}{43.01} = 0.976
+$$
+$$
+t = 12; \ T = 42 + 1.01 \cdot 12 = 54.12
+$$
+$$
+S = \frac{Y}{T} = \frac{46}{54.12} = 0.850
+$$
+
+| Рік   | Q1 | Q2 | Q3 | Q4 |
+|-------|-----------|-----------|-----------|-----------|
+| 2022  | 0.9765    | 0.9314    | 1.1548    | 0.8471    |
+| 2023  | 0.9564    | 0.9988    | 1.2431    | 0.9185    |
+| 2024  | 1.0178    | 0.9789    | 1.1297    | 0.8500    |
+| **Всього**  | **2.9507**   | **2.9091**   | **3.5276**   | **2.6156**   |
+| **Середнє** | **0.9836**   | **0.9697**   | **1.1759**   | **0.8719**   |
+
+:::
+:::
+
+## Кінцевий прогноз
+
+::: {.columns}
+::: {.column}
+$$
+\hat{Y} = \hat{T} + \hat{S}
+$$
+:::
+::: {.column}
+$$
+\hat{Y} = \hat{T} \cdot \hat{S}
+$$
+:::
+:::
+
+```{r}
+aus_holidays <- tourism |>
+  filter(Purpose == "Holiday") |>
+  summarise(Trips = sum(Trips)/1e3)
+fit <- aus_holidays |>
+  model(
+    additive = ETS(Trips ~ error("A") + trend("A") +
+                                                season("A")),
+    multiplicative = ETS(Trips ~ error("M") + trend("A") +
+                                                season("M"))
+  )
+fc <- fit |> forecast(h = "3 years")
+fc |>
+  autoplot(aus_holidays, level = NULL) +
+  labs(title="Australian domestic tourism",
+       y="Overnight trips (millions)") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+## Ковзна середня
+
+::: {.columns}
+::: {.column}
+Ще один варіант визначення тренду --- ковзна середня.
+
+$$
+T_t = \frac{\sum_{j=-k}^{k} Y_{t+j}}{m}
+$$
+
+де $m$ --- кількість спостережень, $k$ --- кількість спостережень з кожного боку від поточного.
+:::
+::: {.column}
+![](https://otexts.com/fpp3/fpp_files/figure-html/aus-exports-compare-1.png)
+:::
+:::
+
+
+## Частоти часових рядів
+
+
+| Часовий ряд | Частота | Приклад |
+|-------------|---------|---------|
+| Щохвилинний | 60 | Курс валют кожну хвилину |
+| Щоденний | 7 | Температура повітря кожен день |
+| Щоквартальний | 4 | Продажі компанії кожен квартал |
+| Щомісячний | 12 | Кількість відвідувачів сайту кожен місяць |
+| Щотижневий | 52 | Кількість продажів кожен тиждень |
+
+## Множинні прогнози
+
+```{r}
+google_stock <- gafa_stock |>
+  filter(Symbol == "GOOG", year(Date) >= 2015) |>
+  mutate(day = row_number()) |>
+  update_tsibble(index = day, regular = TRUE)
+
+google_2015 <- google_stock |> filter(year(Date) == 2015)
+
+fit <- google_2015 |>
+  model(NAIVE(Close))
+sim <- fit |> generate(h = 30, times = 5, bootstrap = TRUE)
+
+google_2015 |>
+  ggplot(aes(x = day)) +
+  geom_line(aes(y = Close)) +
+  geom_line(aes(y = .sim, colour = as.factor(.rep)),
+    data = sim) +
+  labs(title="Google daily closing stock price", y="$US" ) +
+  guides(colour = "none")
+```
+
+## Якість прогнозів
+
+::: {.columns}
+::: {.column}
+$$
+\text{MAE} = \frac{1}{n} \sum_{t=1}^{n} |Y_t - \hat{Y}_t|
+$$
+
+$$
+\text{RMSE} = \sqrt{\frac{1}{n} \sum_{t=1}^{n} (Y_t - \hat{Y}_t)^2}
+$$
+
+$$
+\text{MAPE} = \frac{1}{n} \sum_{t=1}^{n} \left| \frac{Y_t - \hat{Y}_t}{Y_t} \right| \cdot 100\%
+$$
+:::
+::: {.column}
+![](https://otexts.com/fpp3/fpp_files/figure-html/traintest-1.png){fig-align="center"}
+:::
+:::
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".04_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
