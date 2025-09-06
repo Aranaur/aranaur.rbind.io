@@ -1,0 +1,147 @@
+---
+title: "Assignment 01: Welcome to R"
+subtitle: "STAT 150: R for Data Science"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+format:
+  html: 
+    highlight-style: github
+    theme: [default, custom.scss]
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+---
+
+# Exercise 1: Pearson {#exr-1}
+
+Let's look how you can read formulas in math notation and translate them into R code.
+
+Your first task is to compute the **Pearson linear correlation coefficient**[^pearson] using its mathematical formula:
+
+$$
+r = \frac{\sum_{i=1}^n \left(x_i - \frac{1}{n}\sum_{j=1}^n x_j\right)\left(y_i - \frac{1}{n}\sum_{j=1}^n y_j\right)}
+         {\sqrt{\sum_{i=1}^n \left(x_i - \frac{1}{n}\sum_{j=1}^n x_j\right)^2} \sqrt{\sum_{i=1}^n \left(y_i - \frac{1}{n}\sum_{j=1}^n y_j\right)^2}}
+$$
+
+[^pearson]: You will use this formula in couple of courses, so it is worth memorizing it.
+
+::: {.callout-note collapse="true"}
+## Explanation of Pearson correlation
+
+{{< video https://www.youtube.com/watch?v=xZ_z8KWkhXE >}}
+:::
+
+Let `x` and `y` be two vectors of identical lengths `n`, say. Next code chunk generates two such vectors of length `n = 100`:
+
+```{r}
+#| eval: false
+n <- 100
+x <- runif(n, 0, 10)
+y <- 2 * x + runif(n, -1, 1)
+```
+
+
+::: {.callout-warning}
+Do not use the built-in `cor()` function.
+:::
+
+::: {.callout-tip}
+1. In this exercise, you need to calculate the correlation coefficient manually using the formula above. And please, do not use loops, as they are not necessary here.
+2. Functions that may be useful: `mean()`, `length()`, `sqrt()`.
+3. Read the documentation for the `runif()`. Why does it return different values each time you run it? How can you make it return the same values each time?
+:::
+
+
+# Exercise 2: Cryptocurrency Trading {#exr-2}
+
+You trade two types of cryptocurrencies: Bitcoin (`BTC`) and Ethereum (`ETH`). Over the course of a week of trading, you achieved the following results. This code generates random earnings/losses for each day of the week:
+
+```{r}
+#| eval: false
+n <- 7
+BTC <- round(rnorm(n, mean = 100, sd = 200))
+ETH <- round(rnorm(n, mean = 100, sd = 200))
+```
+
+1. Add names to the vectors `BTC` and `ETH` corresponding to the days of the week, starting from Monday.
+2. Calculate the total profit/loss for each cryptocurrency over the week.
+3. Calculate the average daily profit/loss for each cryptocurrency.
+4. Determine the day with the highest profit for each cryptocurrency.
+5. Which cryptocurrency was more profitable over the week?
+
+::: {.callout-important}
+In data science, it is essential to ask questions and find answers to them. So you can start to think of more questions you can ask about this data and find answers to them using R.
+:::
+
+# Exercise 3: Planets {#exr-3}
+
+::: {.callout-caution collapse="true"}
+## 🎥 Solar System Planets 🙃
+
+<center> {{< video video/solar-system.mp4 height="300" >}} </center>
+
+:::
+
+In this exercise, you will work with [data](data/exoplanets.csv)[^exoplanets] about the exoplanets in our galaxy. You will analyze their characteristics and compare them to the planets in our solar system.
+
+[^exoplanets]: The dataset is adapted from the [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/). It contains information about various exoplanets discovered outside our solar system.
+
+::: {.callout-important}
+## Interesting
+In [NASA's Exoplanet Catalog](https://science.nasa.gov/exoplanets/exoplanet-catalog/) you can find hypothetical visualizations of exoplanets.
+:::
+
+```{r}
+exoplanets_df <- read.csv("data/exoplanets_unique.csv")
+```
+
+```{r}
+#| echo: false
+#| column: screen
+
+col_names <- names(exoplanets_df)
+
+exoplanets_df|> 
+  dplyr::slice_sample(n = 5) |>
+  gt::gt()
+```
+
+The data frame `exoplanets_df` contains the following columns:
+
+| Column Name        | Description                                      |
+|--------------------|--------------------------------------------------|
+| `loc_rowid`      | Unique identifier for each row in the dataset      |
+| `pl_name`          | Name of the exoplanet                             |
+| `hostname`        | Name of the host star                              |
+| `pl_letter`      | Letter designation of the exoplanet                |
+| `sy_snum`        | Number of stars in the host star system            |
+| `sy_pnum`        | Number of planets in the host star system          |
+| `dics_year`    | Year of discovery                                 |
+| `pl_orbper`      | Orbital period of the exoplanet (in days)          |
+| `pl_rade`        | Radius of the exoplanet (in Earth radii)            |
+| `pl_massee`      | Mass of the exoplanet (in Earth masses)              |
+| `pl_eqt`        | Equilibrium temperature of the exoplanet (in Kelvin) |
+| `st_spectype`  | Spectral type of the host star                      |
+| `st_teff`      | Effective temperature of the host star (in Kelvin)  |
+| `st_dist`      | Distance to the host star (in parsecs)              |
+
+
+1. Display the structure of the `exoplanets_df` data frame using the `str()` function. How many rows and columns does it have? What are the data types of each column?
+2. Calculate the average radius (`pl_rade`) and mass (`pl_massee`) of the exoplanets in the dataset. How do these values compare to Earth's radius (1 Earth radius) and mass (1 Earth mass)?
+3. Identify the exoplanet with the highest equilibrium temperature (`pl_eqt`). What is its name and temperature? Convert the temperature from Kelvin to Celsius using the formula: $C = K - 273.15$.
+4. How many exoplanets were discovered last year?
+5. Select 5 random (or not) exoplanets from the dataset. Compare their characteristics with the ones of the planets in our solar system from the table below:
+
+| Planet | Diameter (km) | Rings | Moons | Mean Temperature (C) | Orbit Period (days) |
+|--------|---------------|-------|-------|----------------------|----------------------|
+| Mercury | 4879 | False | 0 | 167 | 88 |
+| Venus | 12104 | False | 0 | 464 | 225 |
+| Earth | 12756 | False | 1 | 15 | 365 |
+| Mars | 6792 | False | 2 | -65 | 687 |
+| Jupiter | 142984 | True | 95 | -110 | 4333 |
+| Saturn | 120536 | True | 146 | -140 | 10759 |
+| Uranus | 51118 | True | 28 | -195 | 30687 |
+| Neptune | 49528 | True | 16 | -200 | 60190 |
+

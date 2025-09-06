@@ -1,0 +1,468 @@
+---
+title: "Основи 🔥PyTorch"
+subtitle: "Технології комп'ютерного зору"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка, ФІТ
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .01_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: <a href="https://aranaur.rbind.io/lectures">🔗Технології комп'ютерного зору</a>
+format:
+  revealjs: 
+    transition: fade
+    chalkboard: true
+    logo: fit.png
+    slide-number: true
+    # toc: true
+    # toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-width: 9
+    fig-height: 5
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+#   gfm:
+#     mermaid-format: png
+preload-iframes: true
+jupyter: python3
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+---
+
+# Вступ
+
+## Що таке PyTorch? {.smaller}
+
+- Один з найбільш популярних фреймворків для глибокого навчання, розроблений Facebook (Meta).
+- User-friendly код для глибокого навчання на Python (з можливістю запуску на GPU/GPUs)
+- Доступ до багатьох готових моделей глибокого навчання (Torch Hub/[torchvision.models](https://docs.pytorch.org/vision/stable/models.html))
+- Повний стек: попередня обробка даних, моделювання даних, розгортання моделі у вашій програмі/хмарі
+- Спочатку розроблений і використовуваний внутрішньо компанією Facebook/Meta (зараз є відкритим кодом і використовується такими компаніями, як Tesla, Microsoft, OpenAI)
+
+## Чому PyTorch?
+
+![](img/pytorch_members.png)
+
+## Що таке GPU/TPU? {.smaller}
+
+::: {.columns}
+::: {.column}
+![](img/GPU.jpg){width="70%"}
+
+GPU (Graphics Processing Unit)
+:::
+::: {.column}
+![](img/TPU.jpg){width="70%"}
+
+TPU (Tensor Processing Unit)
+:::
+:::
+
+![](img/CUDA.jpg)
+
+## Що таке тензор? 1/2
+
+![](img/tensor.jpg)
+
+## Що таке тензор? 2/2
+
+![](img/tensor2.jpg)
+
+# Вступ до 🔥PyTorch
+
+## Встановлення 🔥PyTorch
+
+- Відвідайте [сайт PyTorch: Get Started](https://pytorch.org/get-started/locally/) для отримання інструкцій щодо встановлення.
+- Виберіть вашу операційну систему, пакетний менеджер та версію CUDA (якщо ви плануєте використовувати GPU).
+- Скопіюйте команду встановлення та виконайте її у вашому терміналі.
+
+```bash
+pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+```
+
+## Імпорт PyTorch
+
+```{python}
+import torch
+
+print(torch.__version__)
+print(torch.cuda.is_available())
+```
+
+## Створення тензора: скаляр
+
+Скаляр --- це одне число, а в термінології тензорів --- це тензор нульового рангу.
+
+```{python}
+scalar = torch.tensor(7)
+print(scalar)
+print(f'Ранг тензора: {scalar.ndim}')
+print(f'Значення тензора: {scalar.item()}')
+```
+
+## Створення тензора: вектор
+
+Вектор --- це послідовність чисел, а в термінології тензорів --- це тензор першого рангу.
+
+```{python}
+vector = torch.tensor([1, 2, 3])
+print(vector)
+print(f'Ранг тензора: {vector.ndim}')
+print(f'Розмір тензора: {vector.shape}')
+```
+
+::: {.callout-note icon="false" appearance="simple"}
+Ранг тензора можна визначити за кількістю дужок `[`
+:::
+
+## Створення тензора: матриця
+
+Матриця --- це таблиця чисел, а в термінології тензорів --- це тензор другого рангу.
+
+```{python}
+matrix = torch.tensor([[1, 2, 3],
+                       [4, 5, 6]])
+print(matrix)
+print(f'Ранг тензора: {matrix.ndim}')
+print(f'Розмір тензора: {matrix.shape}')
+```
+
+## Створення тензора: тензор 😅
+
+```{python}
+tensor = torch.tensor([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
+print(tensor)
+print(f'Ранг тензора: {tensor.ndim}')
+print(f'Розмір тензора: {tensor.shape}')
+```
+
+---
+
+![](img/00-scalar-vector-matrix-tensor.png)
+
+## Генератор випадкових величин
+
+Тензори можуть бути створені з випадковими значеннями за допомогою функції `torch.rand` (рівномірний розподіл) або `torch.randn` (нормальний розподіл) з параметром `size`.
+
+```{python}
+torch.manual_seed(73)
+random_tensor = torch.rand(2, 3, 2)
+print(random_tensor)
+```
+
+## Нульовий та одиничний тензор
+
+```{python}
+#| output-location: column
+zeros = torch.zeros(size=(3, 4))
+zeros, zeros.dtype
+```
+
+<br>
+
+```{python}
+#| output-location: column
+ones = torch.ones(size=(3, 4))
+ones, ones.dtype
+```
+
+## Послідовність
+
+`torch.arange(start, end, step)`
+
+```{python}
+range_tensor = torch.arange(0, 10, 2)
+range_tensor, range_tensor.dtype
+```
+
+::: {.callout-note icon="false" appearance="simple"}
+`torch.range()` є застарілим варіантом
+:::
+
+---
+
+Іноді може знадобитися один тензор певного типу з такою самою формою, як інший тензор.
+
+```{python}
+torch.zeros_like(range_tensor), torch.ones_like(range_tensor)
+```
+
+## Типи даних {.smaller}
+
+У PyTorch доступно багато різних [типів даних тензора](https://docs.pytorch.org/docs/stable/tensors.html#data-types).
+
+::: {.columns}
+::: {.column width="40%"}
+**Найпопулярніші:**
+
+- `torch.float32`: за замовчуванням для чисел з плаваючою комою
+- `torch.float64`: подвоєна точність
+- `torch.float16`: напівточність
+- `torch.int64`: цілі числа
+- `torch.uint8`: беззнакові цілі числа
+:::
+::: {.column}
+
+- `dtype`: тип даних тензора
+- `device`: пристрій, на якому розміщено тензор
+- `requires_grad`: чи потрібно відстежувати градієнти для цього тензора
+
+```{python}
+float_32_tensor = torch.tensor([3.0, 6.0, 9.0],
+                               dtype=None,
+                               device="cuda" if torch.cuda.is_available() else "cpu",
+                               requires_grad=False)
+
+float_32_tensor.shape, float_32_tensor.dtype, float_32_tensor.device
+```
+:::
+:::
+
+## Інформація про тензор {.smaller}
+
+::: {.columns}
+::: {.column width="40%"}
+- `shape`: форма тензора
+- `dtype`: тип даних тензора
+- `device`: пристрій, на якому розміщено тензор
+- `requires_grad`: чи потрібно відстежувати градієнти для цього тензора
+:::
+::: {.column}
+```{python}
+torch.manual_seed(73)
+torch.set_default_device("cuda" if torch.cuda.is_available() else "cpu")
+
+some_tensor = torch.rand(3, 4)
+
+print(some_tensor)
+print(f"Форма тензора: {some_tensor.shape}")
+print(f"Тип даних тензора: {some_tensor.dtype}")
+print(f"Пристрій тензора: {some_tensor.device}")
+print(f"Відстеження градієнтів: {some_tensor.requires_grad}")
+```
+:::
+:::
+
+## Арифметика з тензорами 1/2
+
+```{python}
+tensor = torch.tensor([1, 2, 3])
+print(tensor + 10)
+print(tensor - 10)
+print(tensor * 10)
+print(tensor / 10)
+```
+
+## Арифметика з тензорами 2/2
+
+- `torch.add(tensor, 10)`
+- `torch.sub(tensor, 10)`
+- `torch.mul(tensor, 10)`
+- `torch.div(tensor, 10)`
+
+## Множення матриць {.tiny}
+
+Одна з найпопулярніших операцій ML та DL.
+
+Використовується метод `torch.matmul()`[^torch-mm] або оператор `@`.
+
+[^torch-mm]: Також можна використати скорочений запис `torch.mm()`.
+
+::: {.callout-important icon="false"}
+1. **Внутрішні розміри** повинні збігатися:
+
+- `(3, 2) @ (3, 2)` не спрацює
+- `(2, 3) @ (3, 2)` спрацює
+- `(3, 2) @ (2, 3)` спрацює
+2. Результуюча матриця має форму **зовнішніх розмірів**:
+
+- `(2, 3) @ (3, 2)` -> `(2, 2)`
+- `(3, 2) @ (2, 3)` -> `(3, 3)`
+:::
+
+## Різниця між `*` та `torch.matmul()` {.tiny}
+
+| Операція  |  Код |  Розрахунок  |
+|-----------|-------------|-------|
+| Множення елементів | `tensor  * tensor` | `[1*1, 2*2, 3*3]` = `[1, 4, 9]`  |
+| Множення матриць | `tensor.matmul(tensor)` | `[1*1 + 2*2 + 3*3]` = `[14]` |
+
+```{python}
+tensor = torch.tensor([1.0, 2.0, 3.0])
+print(tensor * tensor)
+print(torch.matmul(tensor, tensor))
+print(tensor @ tensor)
+```
+
+## Метод `torch.matmul()` швидший за `*`
+
+```{python}
+#| output-location: column
+
+%%time
+value = 0
+for i in range(len(tensor)):
+  value += tensor[i] * tensor[i]
+value
+```
+
+<br>
+
+```{python}
+#| output-location: column
+
+%%time
+torch.matmul(tensor, tensor)
+```
+
+## Найпоширеніша помилка 1/2 {.tiny}
+
+```{python}
+#| error: true
+tensor_A = torch.tensor([[1, 2],
+                         [3, 4],
+                         [5, 6]], dtype=torch.float32)
+
+tensor_B = torch.tensor([[7, 10],
+                         [8, 11], 
+                         [9, 12]], dtype=torch.float32)
+
+torch.matmul(tensor_A, tensor_B)
+```
+
+## Найпоширеніша помилка 2/2
+
+- `tensor.T`: транспонування тензора
+
+```{python}
+torch.matmul(tensor_A, tensor_B.T)
+```
+
+## min, max, mean, sum...
+
+```{python}
+torch.manual_seed(73)
+tensor = torch.rand(10)
+
+print(f"Мінімум: {torch.min(tensor)}")
+print(f"Максимум: {torch.max(tensor)}")
+print(f"Середнє: {torch.mean(tensor)}")
+print(f"Сума: {torch.sum(tensor)}")
+```
+
+## Позиційний min та max
+
+- `torch.argmax()`: повертає індекс максимального значення
+- `torch.argmin()`: повертає індекс мінімального значення
+
+```{python}
+print(f"Позиційний мінімум: {torch.argmin(tensor)}")
+print(f"Позиційний максимум: {torch.argmax(tensor)}")
+```
+
+## Зміна типів даних {.smaller}
+
+Якщо один тензор знаходиться `torch.float64`, а інший --- `torch.float32`, можуть виникнути деякі помилки. Але це легко виправити:
+
+- `tensor = tensor.to(torch.float32)`
+- `tensor = tensor.type(torch.float32)`
+
+```{python}
+tensor_32 = torch.rand(10)
+print(f"Початковий тип: {tensor_32.dtype}")
+
+tensor_64 = tensor_32.to(torch.float64)
+print(f"Новий тип: {tensor_64.dtype}")
+
+tensor_16 = tensor_32.type(torch.float16)
+print(f"Новий тип: {tensor_16.dtype}")
+```
+
+## Reshaping
+
+```{python}
+tensor = torch.rand(10)
+print(f"Початкова форма: {tensor.shape}")
+
+tensor = tensor.reshape(5, 2)
+print(f"Нова форма: {tensor.shape}")
+```
+
+::: footer
+[`torch.reshape()` vs `torch.view()`](https://stackoverflow.com/a/54507446/7900723)
+:::
+
+## Stacking
+
+```{python}
+tensor_A = torch.rand(10)
+tensor_B = torch.rand(10)
+
+# Вертикальне об'єднання
+stacked_v = torch.vstack((tensor_A, tensor_B))
+print(f"Складена форма (вертикально): {stacked_v.shape}")
+
+# Горизонтальне об'єднання
+stacked_h = torch.hstack((tensor_A, tensor_B))
+print(f"Складена форма (горизонтально): {stacked_h.shape}")
+```
+
+## Індексація
+
+```{python}
+#| output-location: column
+tensor = torch.arange(1, 10).reshape(1, 3, 3)
+
+print(f"Перша квадратна дужка:\n{tensor[0]}") 
+print(f"Друга квадратна дужка: {tensor[0][0]}") 
+print(f"Третя квадратна дужка: {tensor[0][0][0]}")
+```
+
+<br>
+
+```{python}
+#| output-location: column
+print(tensor[:, 0])
+print(tensor[:, :, 1])
+print(tensor[:, 1, 1])
+print(tensor[0, 0, :])
+```
+
+## Тензори PyTorch та NumPy
+
+- `torch.from_numpy(ndarray)`: масив NumPy -> тензор PyTorch.
+- `torch.Tensor.numpy()`: тензор PyTorch -> масив NumPy.
+
+```{python}
+import numpy as np
+
+array = np.arange(1.0, 8.0) # <1>
+tensor = torch.from_numpy(array).to(torch.float32) # <2>
+array, tensor
+```
+
+1. `array`: масив NumPy, тип даних `float64`.
+2. `tensor`: тензор PyTorch, тип даних `float32`.
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".01_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

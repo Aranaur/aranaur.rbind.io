@@ -1,0 +1,322 @@
+---
+title: "Робочий процес 🔥PyTorch"
+subtitle: "Технології комп'ютерного зору"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка, ФІТ
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .02_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: <a href="https://aranaur.rbind.io/lectures">🔗Технології комп'ютерного зору</a>
+format:
+  revealjs: 
+    transition: fade
+    chalkboard: true
+    logo: fit.png
+    slide-number: true
+    # toc: true
+    # toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-width: 9
+    fig-height: 5
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+#   gfm:
+#     mermaid-format: png
+preload-iframes: true
+jupyter: python3
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{python}
+#| include: false
+
+import torch
+from torch import nn
+import matplotlib.pyplot as plt
+
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Базовий робочий процес PyTorch
+
+## Основні кроки
+
+1. Перетворіть ваші дані, незалежно від їхнього типу, на числа (representation).
+2. Виберіть або створіть модель, щоб якнайкраще вивчити представлення.
+
+## Лінійна регресія: дані
+
+```{python}
+#| output-location: column
+
+# Відомі параметри
+weight = 0.7
+bias = 0.3
+
+# Створення даних
+start = 0
+end = 1
+step = 0.02
+X = torch.arange(start, end, step).unsqueeze(dim=1)
+y = weight * X + bias
+
+X[:10], y[:10]
+```
+
+## Лінійна регресія: train/test
+
+```{python}
+#| output-location: column
+
+train_split = int(0.8 * len(X))
+X_train, y_train = X[:train_split], y[:train_split]
+X_test, y_test = X[train_split:], y[train_split:]
+
+len(X_train), len(y_train), len(X_test), len(y_test)
+```
+
+## Лінійна регресія: графік
+
+```{python}
+#| output-location: column
+
+def plot_predictions(train_data=X_train, 
+                     train_labels=y_train, 
+                     test_data=X_test, 
+                     test_labels=y_test, 
+                     predictions=None):
+  """
+  Plots training data, test data and compares predictions.
+  """
+  plt.scatter(train_data, train_labels, c=blue, s=4, label="Training data")
+  plt.scatter(test_data, test_labels, c=turquoise, s=4, label="Testing data")
+
+  if predictions is not None:
+    plt.scatter(test_data, predictions, c=red_pink, s=4, label="Predictions")
+    
+  plt.legend(prop={"size": 14});
+
+plot_predictions();
+```
+
+## Лінійна регресія: ініціалізація моделі {.smaller}
+
+```{python}
+class LinearRegressionModel(nn.Module): # <1>
+    def __init__(self):
+        super().__init__()
+        self.weights = nn.Parameter(torch.randn(1, # <2>
+                                                dtype=torch.float), # <3>
+                                   requires_grad=True) # <4>
+
+        self.bias = nn.Parameter(torch.randn(1,  # <2>
+                                             dtype=torch.float), # <3>
+                                requires_grad=True) # <4>
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # <5>
+        return self.weights * x + self.bias # <6>
+```
+
+1. Наслідуємо від `nn.Module`
+2. Ініціалізуємо ваги та зсув (bias)
+3. Вказуємо тип даних
+4. Вказуємо, що параметри потрібно оптимізувати
+5. Визначаємо метод прямого проходу (forward pass)
+6. Визначаємо лінійну модель
+
+::: footer
+[Python's OOP guide](https://realpython.com/python3-object-oriented-programming/)
+:::
+
+## Лінійна регресія: базова модель
+
+```{python}
+torch.manual_seed(73)
+model_0 = LinearRegressionModel()
+list(model_0.parameters()), model_0.state_dict()
+```
+
+## Лінійна регресія: прогноз
+
+- `torch.inference_mode()` - контекстний менеджер, який вимикає обчислення градієнтів (еквівалент `torch.no_grad():`)
+
+::: {.columns}
+::: {.column}
+```{python}
+with torch.inference_mode(): 
+    y_preds = model_0(X_test)
+y_preds[:10]
+```
+:::
+::: {.column}
+![](img/inference_mode.gif)
+:::
+:::
+
+::: footer
+[X: PyTorch Twitter](https://x.com/PyTorch/status/1437838231505096708)
+:::
+
+## Лінійна регресія: графік прогнозу
+
+```{python}
+plot_predictions(predictions=y_preds);
+```
+
+## Лінійна регресія: функція втрат
+
+```{python}
+loss_fn = nn.L1Loss() # <1>
+
+optimizer = torch.optim.SGD(params=model_0.parameters(), # <2>
+                        lr=0.01) # <3>
+```
+
+1. Використовуємо середню абсолютну помилку (MAE)
+2. Використовуємо стохастичний градієнтний спуск (SGD)
+3. Встановлюємо швидкість навчання (learning rate)
+
+## Лінійна регресія: цикл навчання {.tiny}
+
+```{python}
+#| output-location: column
+torch.manual_seed(42)
+
+epochs = 100
+
+train_loss_values = []
+test_loss_values = []
+epoch_count = []
+
+for epoch in range(epochs):
+    
+    model_0.train() # <1>
+    
+    y_pred = model_0(X_train) # <2>
+    
+    loss = loss_fn(y_pred, y_train) # <3>
+    
+    optimizer.zero_grad() # <4>
+    
+    loss.backward() # <5>
+    
+    optimizer.step() # <6>
+    
+    if epoch % 10 == 0:
+        model_0.eval() # <7>
+        with torch.inference_mode():
+            test_pred = model_0(X_test)
+            test_loss = loss_fn(test_pred, y_test.type(torch.float))
+            train_loss_values.append(loss.detach().numpy())
+            test_loss_values.append(test_loss.detach().numpy())
+            epoch_count.append(epoch)
+        print(f"Epoch: {epoch} | MAE train: {loss:.4f} | MAE test: {test_loss:.4f}")
+```
+
+1. Переключаємо модель у режим навчання
+2. Робимо прогноз на навчальних даних
+3. Обчислюємо втрати на навчальних даних
+4. Обнуляємо градієнти
+5. Обчислюємо градієнти
+6. Оновлюємо параметри моделі
+7. Переключаємо модель у режим оцінки
+
+## Лінійна регресія: графік втрат
+
+```{python}
+# Plot the loss curves
+plt.plot(epoch_count, train_loss_values, label="Train loss")
+plt.plot(epoch_count, test_loss_values, label="Test loss")
+plt.title("Training and test loss curves")
+plt.ylabel("Loss")
+plt.xlabel("Epochs")
+plt.legend();
+```
+
+## Лінійна регресія: параметри моделі
+
+```{python}
+print("Модель навчилася наступним значенням для weights і bias:")
+print(model_0.state_dict())
+print("\nА оригінальні значення для weights і bias такі:")
+print(f"weights: {weight}, bias: {bias}")
+```
+
+## Лінійна регресія: прогноз {.tiny}
+
+1. Встановіть модель у режим оцінювання: `model.eval()`.
+2. Зробіть прогнози, використовуючи контекстний менеджер режиму виведення: `with torch.inference_mode():`.
+3. Усі прогнози слід робити з об'єктами на одному пристрої (наприклад, дані та модель тільки на GPU або дані та модель тільки на CPU).
+
+```{python}
+#| output-location: column
+model_0.eval()
+with torch.inference_mode():
+  y_preds = model_0(X_test)
+y_preds, plot_predictions(predictions=y_preds);
+```
+
+## Збереження моделей {.tiny}
+
+1. Створимо каталог для збереження моделей під назвою `models` за допомогою модуля `pathlib`.
+2. Створимо шлях до файлу, в якому буде збережено модель.
+3. Викличемо `torch.save(obj, f)`, де `obj` --- це `state_dict()` цільової моделі, а `f` --- ім'я файлу, в якому буде збережено модель.
+
+```{python}
+from pathlib import Path
+
+HOME = Path.cwd()
+MODEL_PATH = HOME / "models"
+MODEL_PATH.mkdir(parents=True, exist_ok=True)
+
+MODEL_NAME = "01_pytorch_workflow_model_0.pth"
+MODEL_SAVE_PATH = MODEL_PATH / MODEL_NAME
+
+torch.save(obj=model_0.state_dict(),
+           f=MODEL_SAVE_PATH)
+```
+
+## Завантаження моделей
+
+```{python}
+loaded_model_0 = LinearRegressionModel()
+
+loaded_model_0.load_state_dict(torch.load(f=MODEL_SAVE_PATH))
+```
+
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".02_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
