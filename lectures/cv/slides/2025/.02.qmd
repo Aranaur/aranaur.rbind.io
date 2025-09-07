@@ -304,6 +304,276 @@ loaded_model_0 = LinearRegressionModel()
 loaded_model_0.load_state_dict(torch.load(f=MODEL_SAVE_PATH))
 ```
 
+# Задача класифікації
+
+## Архітектура {.tiny}
+
+| **Гіперпараметр** | **Бінарна класифікація** | **Багатокласова класифікація** |
+| --- | --- | --- |
+| **Форма вхідного шару** (`in_features`) | Така сама, як кількість ознак (наприклад, 5 для віку, статі, зросту, ваги, статусу куріння при прогнозуванні серцевих захворювань) | Така сама, як для бінарної класифікації |
+| **Прихований шар (шари)** | Залежить від конкретної задачі, мінімум = 1, максимум = необмежений | Така сама, як для бінарної класифікації |
+| **Нейрони на прихований шар** | Залежно від проблеми, зазвичай від 10 до 512 | Так само, як у бінарній класифікації |
+| **Форма вихідного шару** (`out_features`) | 1 (один клас або інший) | 1 на клас (наприклад, 3 для фотографії їжі, людини або собаки) |
+| **Активація прихованого шару** | Зазвичай [ReLU](https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU) (випрямлена лінійна одиниця), але [може бути багато інших](https://en.wikipedia.org/wiki/Activation_function#Table_of_activation_functions) | Так само, як і в бінарній класифікації |
+| **Активація виходу** | [Sigmoid](https://en.wikipedia.org/wiki/Sigmoid_function) ([`torch.sigmoid`](https://pytorch.org/docs/stable/generated/torch.sigmoid.html) в PyTorch)| [Softmax](https://en.wikipedia.org/wiki/Softmax_function) ([`torch.softmax`](https://pytorch.org/docs/stable/generated/torch.nn.Softmax.html) в PyTorch) |
+| **Функція втрат** | [Бінарна крос-ентропія](https://en.wikipedia.org/wiki/Cross_entropy#Cross-entropy_loss_function_and_logistic_regression) ([`torch.nn.BCELoss`](https://pytorch.org/docs/stable/generated/torch.nn.BCELoss.html) в PyTorch) | Крос-ентропія ([`torch.nn.CrossEntropyLoss`](https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html) в PyTorch) |
+| **Оптимізатор** | [SGD](https://pytorch.org/docs/stable/generated/torch.optim.SGD.html) (стохастичний градієнтний спуск), [Adam](https://pytorch.org/docs/stable/generated/torch.optim. Adam.html) (дивіться [`torch.optim`](https://pytorch.org/docs/stable/optim.html) для додаткових опцій) | Те саме, що й бінарна класифікація |
+
+## Приклад: `make_circles()`
+
+```{python}
+#| output-location: column
+from sklearn.datasets import make_circles
+
+n_samples = 1000
+
+X, y = make_circles(n_samples,
+                    noise=0.03,
+                    random_state=73)
+
+print(f"Перші 5 X даних:\n{X[:5]}")
+print(f"\nПерші 5 y міток:\n{y[:5]}")
+```
+
+## Графік даних {.tiny}
+
+```{python}
+#| output-location: column
+import pandas as pd
+circles = pd.DataFrame({"X1": X[:, 0],
+    "X2": X[:, 1],
+    "label": y
+})
+circles.head(10), circles.label.value_counts()
+```
+
+<br>
+
+```{python}
+#| output-location: column
+
+import matplotlib.pyplot as plt
+plt.scatter(x=X[:, 0], 
+            y=X[:, 1], 
+            c=y, 
+            cmap=plt.cm.RdYlBu);
+```
+
+## Розмірність даних {.small}
+
+```{python}
+X_sample = X[0]
+y_sample = y[0]
+print(f"Значення X: {X_sample} і те саме для y: {y_sample}")
+print(f"Форми для одного зразка X: {X_sample.shape} і те саме для y: {y_sample.shape}")
+```
+
+## Тензор та train/test split {.small}
+
+```{python}
+#| output-location: column
+
+import torch
+X = torch.from_numpy(X).type(torch.float)
+y = torch.from_numpy(y).type(torch.float)
+
+X[:5], y[:5]
+```
+
+<br>
+
+```{python}
+#| output-location: column
+
+from sklearn.model_selection import train_test_split
+
+X_train, X_test, y_train, y_test = train_test_split(X, 
+                                                    y, 
+                                                    test_size=0.2,
+                                                    random_state=73)
+
+len(X_train), len(X_test), len(y_train), len(y_test)
+```
+
+## Побудова моделі {.small}
+
+```{python}
+#| output-location: column
+
+import torch
+from torch import nn
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Using device: {device}")
+
+class CircleModelV0(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layer_1 = nn.Linear(in_features=2, out_features=5)
+        self.layer_2 = nn.Linear(in_features=5, out_features=1)
+    
+    def forward(self, x):
+        return self.layer_2(self.layer_1(x))
+
+model_0 = CircleModelV0().to(device)
+model_0
+```
+
+::: footer
+[Tensorflow playground](https://playground.tensorflow.org/#activation=tanh&batchSize=10&dataset=circle&regDataset=reg-plane&learningRate=0.03&regularizationRate=0&noise=0&networkShape=5,2&seed=0.32296&showTestData=false&discretize=false&percTrainData=50&x=true&y=true&xTimesY=false&xSquared=false&ySquared=false&cosX=false&sinX=false&cosY=false&sinY=false&collectStats=false&problem=classification&initZero=false&hideText=false)
+:::
+
+## Альтернатива: `nn.Sequential` {.small}
+
+```{python}
+#| output-location: column
+
+model_0 = nn.Sequential(
+    nn.Linear(in_features=2, out_features=5),
+    nn.Linear(in_features=5, out_features=1)
+).to(device)
+
+print(model_0)
+
+untrained_preds = model_0(X_test.to(device))
+print(f"Довжина предикторів: {len(untrained_preds)}, Форма: {untrained_preds.shape}")
+print(f"Довжина тестових зразків: {len(y_test)}, Форма: {y_test.shape}")
+print(f"\nПерші 10 прогнозів:\n{untrained_preds[:10]}")
+print(f"\nПерші 10 тестових міток:\n{y_test[:10]}")
+```
+
+## Функція втрат та оптимізатор 1/3 {.tiny}
+
+| Функція втрат/оптимізатор | Тип задачі | Код PyTorch |
+| ----- | ----- | ----- |
+| Оптимізатор стохастичного градієнтного спуску (SGD) | Класифікація, регресія та багато інших. | [`torch.optim.SGD()`](https://pytorch.org/docs/stable/generated/torch.optim.SGD.html) |
+| Оптимізатор Adam | Класифікація, регресія та багато інших. | [`torch.optim.Adam()`](https://pytorch.org/docs/stable/generated/torch.optim.Adam.html) |
+| Двійкова крос-ентропійна втрата | Двійкова класифікація | [`torch.nn.BCELossWithLogits`](https://pytorch.org/docs/stable/generated/torch.nn.BCEWithLogitsLoss.html) або [`torch.nn.BCELoss`](https://pytorch.org/docs/stable/generated/torch.nn.BCELoss.html) |
+| Втрата перехресної ентропії | Багатокласова класифікація | [`torch.nn.CrossEntropyLoss`](https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html) |
+| Середня абсолютна похибка (MAE) або втрата L1 | Регресія | [`torch.nn.L1Loss`](https://pytorch.org/docs/stable/generated/torch.nn.L1Loss.html) | 
+| Середньоквадратична похибка (MSE) або втрата L2 | Регресія | [`torch.nn.MSELoss`](https://pytorch.org/docs/stable/generated/torch.nn.MSELoss.html#torch.nn.MSELoss) |  
+
+## Функція втрат та оптимізатор 2/3
+
+- `torch.nn.BCELoss()`: створює функцію втрат, яка вимірює бінарну крос ентропію між ціллю (міткою) та вхідними даними (ознаками).
+- `torch.nn.BCEWithLogitsLoss()`: це те саме, що й вище, за винятком того, що він має вбудований сигмоїдний шар (`nn.Sigmoid`).
+
+::: {.callout-tip icon="false"}
+У [документації](https://pytorch.org/docs/stable/generated/torch.nn.BCEWithLogitsLoss.html) до функції `torch.nn.BCEWithLogitsLoss()` зазначено, що вона є більш чисельно стабільною, ніж використання функції `torch.nn.BCELoss()` після шару `nn.Sigmoid`.
+:::
+
+## Функція втрат та оптимізатор 3/3
+
+```{python}
+loss_fn = nn.BCEWithLogitsLoss()
+
+optimizer = torch.optim.SGD(params=model_0.parameters(), 
+                            lr=0.1)
+```
+
+Додамо метрику точності (accuracy) для оцінки моделі.
+
+```{python}
+def accuracy_fn(y_true, y_pred):
+    correct = torch.eq(y_true, y_pred).sum().item()
+    acc = (correct / len(y_pred)) * 100 
+    return acc
+```
+
+## Цикл навчання {.tiny}
+
+::: {.callout-note icon="false" collapse="true"}
+## Етапи циклу навчання PyTorch
+
+1. **Forward pass** --- модель проходить всі навчальні дані один раз, виконуючи обчислення функції `forward()` (`model(x_train)`).
+2. **Calculate the loss** --- вихідні дані моделі (прогнози) порівнюються з фактичними даними і оцінюються, щоб визначити, наскільки вони помилкові (`loss = loss_fn(y_pred, y_train)`).
+3. **Zero gradients** --- градієнти оптимізаторів встановлюються на нуль, щоб їх можна було перерахувати для конкретного етапу навчання (`optimizer.zero_grad()`).
+4. **Backward pass** --- обчислює градієнт втрати щодо кожного параметра моделі, який потрібно оновити (кожен параметр з `requires_grad=True`). Це відоме як зворотне поширення, тому і називається "зворотним" (`loss.backward()`).
+5. **Optimizer step** --- оновлення параметрів з `requires_grad=True` щодо градієнтів втрати, щоб поліпшити їх (`optimizer.step()`).
+:::
+
+Передамо модель, дані та мітки на потрібний пристрій (CPU або GPU).
+
+```{python}
+#| output-location: column
+y_logits = model_0(X_test.to(device))[:5]
+y_logits
+```
+
+Отримаємо ймовірності за допомогою сигмоїдної функції активації.
+
+```{python}
+#| output-location: column
+
+y_pred_probs = torch.sigmoid(y_logits)
+y_pred_probs
+```
+
+## Отримаємо класові мітки (0 або 1) на основі ймовірностей.
+
+- якщо ймовірність > 0.5, то клас = 1
+- якщо ймовірність <= 0.5, то клас = 0
+
+```{python}
+y_preds = torch.round(y_pred_probs)
+
+y_pred_labels = torch.round(torch.sigmoid(model_0(X_test.to(device))[:5]))
+
+print(torch.eq(y_preds.squeeze(), y_pred_labels.squeeze()))
+
+y_preds.squeeze()
+```
+
+## Повний цикл навчання {.tiny .scrollable}
+
+```{python}
+#| output-location: column
+torch.manual_seed(73)
+
+epochs = 100
+
+X_train, y_train = X_train.to(device), y_train.to(device)
+X_test, y_test = X_test.to(device), y_test.to(device)
+
+for epoch in range(epochs):
+    model_0.train()
+
+    # 1. Forward pass
+    y_logits = model_0(X_train).squeeze() # <1>
+    y_pred = torch.round(torch.sigmoid(y_logits)) # <2>
+  
+    # 2. Calculate loss/accuracy
+    loss = loss_fn(y_logits,
+                   y_train) 
+    acc = accuracy_fn(y_true=y_train, 
+                      y_pred=y_pred) 
+
+    # 3. Optimizer zero grad
+    optimizer.zero_grad()
+
+    # 4. Loss backwards
+    loss.backward()
+
+    # 5. Optimizer step
+    optimizer.step()
+
+    ### Testing
+    model_0.eval()
+    with torch.inference_mode():
+        # 1. Forward pass
+        test_logits = model_0(X_test).squeeze() 
+        test_pred = torch.round(torch.sigmoid(test_logits))
+        # 2. Caculate loss/accuracy
+        test_loss = loss_fn(test_logits,
+                            y_test)
+        test_acc = accuracy_fn(y_true=y_test,
+                               y_pred=test_pred)
+
+    # Print out what's happening every 10 epochs
+    if epoch % 10 == 0:
+        print(f"Epoch: {epoch} | Loss: {loss:.5f}, Accuracy: {acc:.2f}% | Test loss: {test_loss:.5f}, Test acc: {test_acc:.2f}%")
+```
+
 
 # Дякую за увагу! {.unnumbered .unlisted background-iframe=".02_files/libs/colored-particles/index.html"}
 
