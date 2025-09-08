@@ -67,7 +67,7 @@ slate      = "#314f4f"
 ## Лінійна регресія: дані
 
 ```{python}
-#| output-location: column
+
 
 # Відомі параметри
 weight = 0.7
@@ -86,8 +86,6 @@ X[:10], y[:10]
 ## Лінійна регресія: train/test
 
 ```{python}
-#| output-location: column
-
 train_split = int(0.8 * len(X))
 X_train, y_train = X[:train_split], y[:train_split]
 X_test, y_test = X[train_split:], y[train_split:]
@@ -98,7 +96,7 @@ len(X_train), len(y_train), len(X_test), len(y_test)
 ## Лінійна регресія: графік
 
 ```{python}
-#| output-location: column
+#| output-location: slide
 
 def plot_predictions(train_data=X_train, 
                      train_labels=y_train, 
@@ -368,23 +366,20 @@ print(f"Значення X: {X_sample} і те саме для y: {y_sample}")
 print(f"Форми для одного зразка X: {X_sample.shape} і те саме для y: {y_sample.shape}")
 ```
 
-## Тензор та train/test split {.small}
+## Тензор та train/test split {.tiny}
 
+::: {.columns}
+::: {.column width="40%"}
 ```{python}
-#| output-location: column
-
 import torch
 X = torch.from_numpy(X).type(torch.float)
 y = torch.from_numpy(y).type(torch.float)
 
 X[:5], y[:5]
 ```
-
-<br>
-
+:::
+::: {.column}
 ```{python}
-#| output-location: column
-
 from sklearn.model_selection import train_test_split
 
 X_train, X_test, y_train, y_test = train_test_split(X, 
@@ -394,8 +389,10 @@ X_train, X_test, y_train, y_test = train_test_split(X,
 
 len(X_train), len(X_test), len(y_train), len(y_test)
 ```
+:::
+:::
 
-## Побудова моделі {.small}
+## Побудова моделі {.smaller}
 
 ```{python}
 #| output-location: column
@@ -423,7 +420,7 @@ model_0
 [Tensorflow playground](https://playground.tensorflow.org/#activation=tanh&batchSize=10&dataset=circle&regDataset=reg-plane&learningRate=0.03&regularizationRate=0&noise=0&networkShape=5,2&seed=0.32296&showTestData=false&discretize=false&percTrainData=50&x=true&y=true&xTimesY=false&xSquared=false&ySquared=false&cosX=false&sinX=false&cosY=false&sinY=false&collectStats=false&problem=classification&initZero=false&hideText=false)
 :::
 
-## Альтернатива: `nn.Sequential` {.small}
+## Альтернатива: `nn.Sequential` {.smaller}
 
 ```{python}
 #| output-location: column
@@ -574,6 +571,388 @@ for epoch in range(epochs):
         print(f"Epoch: {epoch} | Loss: {loss:.5f}, Accuracy: {acc:.2f}% | Test loss: {test_loss:.5f}, Test acc: {test_acc:.2f}%")
 ```
 
+## Прогнози та оцінювання {.smaller}
+
+```{python}
+#| code-fold: true
+
+import requests
+from pathlib import Path 
+
+# Download helper functions from Learn PyTorch repo (if not already downloaded)
+if Path("helper_functions.py").is_file():
+  print("helper_functions.py already exists, skipping download")
+else:
+  print("Downloading helper_functions.py")
+  request = requests.get("https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/refs/heads/main/lectures/cv/slides/2025/helper_functions.py")
+  with open("helper_functions.py", "wb") as f:
+    f.write(request.content)
+
+from helper_functions import plot_predictions, plot_decision_boundary
+```
+
+<br>
+
+```{python}
+#| output-location: column
+plt.figure(figsize=(12, 6))
+plt.subplot(1, 2, 1)
+plt.title("Train")
+plot_decision_boundary(model_0, X_train, y_train)
+plt.subplot(1, 2, 2)
+plt.title("Test")
+plot_decision_boundary(model_0, X_test, y_test)
+```
+
+## Покращення моделі 1/3 {.tiny}
+
+| Техніка вдосконалення моделі | Що вона робить? |
+| ----- | ----- |
+| **Додавання додаткових шарів** | Кожен шар *потенційно* збільшує можливості навчання моделі, оскільки кожен шар здатний вивчати певні нові закономірності в даних. Більша кількість шарів часто називається *поглибленням* нейронної мережі. |
+| **Додавання більше прихованих одиниць** | Подібно до вищезазначеного, більше прихованих одиниць на шар означає *потенційне* збільшення навчальних можливостей моделі. Більше прихованих одиниць часто називають *розширенням* нейронної мережі. |
+| **Довше навчання (більше епох)** | Ваша модель може навчитися більше, якщо матиме більше можливостей для аналізу даних. |
+| **Зміна функцій активації** | Деякі дані просто не можна представити лише прямими лініями (як ми бачили), і в цьому може допомогти використання нелінійних функцій активації. |
+| **Зміна швидкості навчання** | Швидкість навчання оптимізатора визначає, наскільки модель повинна змінювати свої параметри на кожному кроці: занадто багато --- і модель перескочить, занадто мало --- і вона не навчиться достатньо. |
+| **Зміна функції втрат** | Різні проблеми вимагають різних функцій втрат. Наприклад, бінарна функція втрат перехресної ентропії не працюватиме з проблемою багатокласової класифікації. |
+| **Використовуйте перенесення навчання** | Візьміть попередньо навчену модель з області проблем, схожої на вашу, і налаштуйте її під свою проблему. |
+
+## Покращення моделі 2/3 {.tiny}
+
+- Додамо ще один прихований шар і збільшимо кількість нейронів у прихованих шарах.
+
+```{python}
+#| output-location: column
+
+
+class CircleModelV1(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layer_1 = nn.Linear(in_features=2, out_features=10)
+        self.layer_2 = nn.Linear(in_features=10, out_features=10)
+        self.layer_3 = nn.Linear(in_features=10, out_features=1)
+        
+    def forward(self, x):
+        return self.layer_3(self.layer_2(self.layer_1(x)))
+
+model_1 = CircleModelV1().to(device)
+loss_fn = nn.BCEWithLogitsLoss()
+optimizer = torch.optim.SGD(model_1.parameters(), lr=0.1)
+
+model_1
+```
+
+## Покращення моделі 3/3 {.tiny}
+
+```{python}
+#| output-location: column
+
+torch.manual_seed(73)
+
+epochs = 1000
+
+X_train, y_train = X_train.to(device), y_train.to(device)
+X_test, y_test = X_test.to(device), y_test.to(device)
+
+for epoch in range(epochs):
+    y_logits = model_1(X_train).squeeze()
+    y_pred = torch.round(torch.sigmoid(y_logits))
+
+    loss = loss_fn(y_logits, y_train)
+    acc = accuracy_fn(y_true=y_train, 
+                      y_pred=y_pred)
+
+    optimizer.zero_grad()
+
+    loss.backward()
+
+    optimizer.step()
+
+    model_1.eval()
+    with torch.inference_mode():
+        test_logits = model_1(X_test).squeeze() 
+        test_pred = torch.round(torch.sigmoid(test_logits))
+        test_loss = loss_fn(test_logits,
+                            y_test)
+        test_acc = accuracy_fn(y_true=y_test,
+                               y_pred=test_pred)
+
+    if epoch % 100 == 0:
+        print(f"Epoch: {epoch} | Loss: {loss:.5f}, Accuracy: {acc:.2f}% | Test loss: {test_loss:.5f}, Test acc: {test_acc:.2f}%")
+```
+
+## Прогнози та оцінювання (знову) {.smaller}
+
+```{python}
+#| output-location: column
+plt.figure(figsize=(12, 6))
+plt.subplot(1, 2, 1)
+plt.title("Train")
+plot_decision_boundary(model_1, X_train, y_train)
+plt.subplot(1, 2, 2)
+plt.title("Test")
+plot_decision_boundary(model_1, X_test, y_test)
+```
+
+## Врахуємо нелінійність {.smaller}
+
+- Додамо нелінійність за допомогою [функції](https://pytorch.org/docs/stable/nn.html#non-linear-activations-weighted-sum-nonlinearity) активації [ReLU](https://en.wikipedia.org/wiki/Rectifier_(neural_networks)).
+
+```{python}
+#| output-location: column
+from torch import nn
+class CircleModelV2(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layer_1 = nn.Linear(in_features=2, out_features=10)
+        self.layer_2 = nn.Linear(in_features=10, out_features=10)
+        self.layer_3 = nn.Linear(in_features=10, out_features=1)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+       return self.layer_3(self.relu(self.layer_2(self.relu(self.layer_1(x)))))
+
+model_3 = CircleModelV2().to(device)
+loss_fn = nn.BCEWithLogitsLoss()
+optimizer = torch.optim.SGD(model_3.parameters(), lr=0.1)
+
+print(model_3)
+```
+
+## Навчання моделі з ReLU {.tiny}
+
+```{python}
+#| output-location: column
+
+torch.manual_seed(73)
+epochs = 1000
+
+X_train, y_train = X_train.to(device), y_train.to(device)
+X_test, y_test = X_test.to(device), y_test.to(device)
+
+for epoch in range(epochs):
+    y_logits = model_3(X_train).squeeze()
+    y_pred = torch.round(torch.sigmoid(y_logits))
+    
+    loss = loss_fn(y_logits, y_train)
+    acc = accuracy_fn(y_true=y_train, 
+                      y_pred=y_pred)
+    
+    optimizer.zero_grad()
+
+    loss.backward()
+
+    optimizer.step()
+
+    model_3.eval()
+    with torch.inference_mode():
+      test_logits = model_3(X_test).squeeze()
+      test_pred = torch.round(torch.sigmoid(test_logits))
+      test_loss = loss_fn(test_logits, y_test)
+      test_acc = accuracy_fn(y_true=y_test,
+                             y_pred=test_pred)
+
+    if epoch % 100 == 0:
+        print(f"Epoch: {epoch} | Loss: {loss:.5f}, Accuracy: {acc:.2f}% | Test Loss: {test_loss:.5f}, Test Accuracy: {test_acc:.2f}%")
+```
+
+## Візуалізація  {.smaller}
+
+```{python}
+#| output-location: column
+
+model_3.eval()
+with torch.inference_mode():
+    y_preds = torch.round(torch.sigmoid(model_3(X_test))).squeeze()
+y_preds[:10], y[:10]
+```
+
+<br>
+
+```{python}
+#| output-location: column
+
+# Plot decision boundaries for training and test sets
+plt.figure(figsize=(12, 6))
+plt.subplot(1, 2, 1)
+plt.title("Train")
+plot_decision_boundary(model_1, X_train, y_train) # model_1 = no non-linearity
+plt.subplot(1, 2, 2)
+plt.title("Test")
+plot_decision_boundary(model_3, X_test, y_test) # model_3 = has non-linearity
+```
+
+# Багатокласова класифікація
+
+## Генерація даних {.tiny}
+
+1. Створіть дані з декількома класами за допомогою `make_blobs()`.
+2. Перетворіть дані в тензори (за замовчуванням `make_blobs()` використовує масиви NumPy).
+3. Розділіть дані на навчальні та тестові набори за допомогою `train_test_split()`.
+4. Візуалізуйте дані.
+
+```{python}
+#| output-location: column
+
+import torch
+import matplotlib.pyplot as plt
+from sklearn.datasets import make_blobs
+from sklearn.model_selection import train_test_split
+
+NUM_CLASSES = 4
+NUM_FEATURES = 2
+RANDOM_SEED = 73
+
+X_blob, y_blob = make_blobs(n_samples=1000,
+    n_features=NUM_FEATURES,
+    centers=NUM_CLASSES,
+    cluster_std=1.5,
+    random_state=RANDOM_SEED
+)
+
+X_blob = torch.from_numpy(X_blob).type(torch.float)
+y_blob = torch.from_numpy(y_blob).type(torch.LongTensor)
+print(X_blob[:5], y_blob[:5])
+
+X_blob_train, X_blob_test, y_blob_train, y_blob_test = train_test_split(X_blob,
+    y_blob,
+    test_size=0.2,
+    random_state=RANDOM_SEED
+)
+
+plt.figure(figsize=(10, 7))
+plt.scatter(X_blob[:, 0], X_blob[:, 1], c=y_blob, cmap=plt.cm.RdYlBu);
+```
+
+## Побудова моделі {.smaller}
+
+```{python}
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+from torch import nn
+
+# Build model
+class BlobModel(nn.Module):
+    def __init__(self, input_features, output_features, hidden_units=8):
+        super().__init__()
+        self.linear_layer_stack = nn.Sequential(
+            nn.Linear(in_features=input_features, out_features=hidden_units),
+            # nn.ReLU(), # <1>
+            nn.Linear(in_features=hidden_units, out_features=hidden_units),
+            # nn.ReLU(), # <1>
+            nn.Linear(in_features=hidden_units, out_features=output_features),
+        )
+    
+    def forward(self, x):
+        return self.linear_layer_stack(x)
+
+model_4 = BlobModel(input_features=NUM_FEATURES, 
+                    output_features=NUM_CLASSES, 
+                    hidden_units=8).to(device)
+model_4
+```
+
+1. Чи потребує наш набір даних нелінійних шарів? (спробуйте видалити коментар і подивіться, чи зміняться результати)
+
+## Функція втрат та оптимізатор {.small}
+
+```{python}
+
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(model_4.parameters(), 
+                            lr=0.1) # <1>
+```
+
+1. Спробуйте змінити швидкість навчання тут і подивіться, що станеться з ефективністю моделі
+
+## Цикл навчання {.tiny}
+
+```{python}
+#| output-location: column
+
+torch.manual_seed(73)
+
+epochs = 100
+
+X_blob_train, y_blob_train = X_blob_train.to(device), y_blob_train.to(device)
+X_blob_test, y_blob_test = X_blob_test.to(device), y_blob_test.to(device)
+
+for epoch in range(epochs):
+    model_4.train()
+
+    y_logits = model_4(X_blob_train)
+    y_pred = torch.softmax(y_logits, dim=1).argmax(dim=1)
+
+    loss = loss_fn(y_logits, y_blob_train) 
+    acc = accuracy_fn(y_true=y_blob_train,
+                      y_pred=y_pred)
+
+    optimizer.zero_grad()
+
+    loss.backward()
+
+    optimizer.step()
+
+    model_4.eval()
+    with torch.inference_mode():
+      test_logits = model_4(X_blob_test)
+      test_pred = torch.softmax(test_logits, dim=1).argmax(dim=1)
+      test_loss = loss_fn(test_logits, y_blob_test)
+      test_acc = accuracy_fn(y_true=y_blob_test,
+                             y_pred=test_pred)
+
+    if epoch % 10 == 0:
+        print(f"Epoch: {epoch} | Loss: {loss:.5f}, Acc: {acc:.2f}% | Test Loss: {test_loss:.5f}, Test Acc: {test_acc:.2f}%") 
+```
+
+## Прогнози {.smaller}
+
+```{python}
+#| output-location: column
+
+model_4.eval()
+with torch.inference_mode():
+    y_logits = model_4(X_blob_test)
+
+y_logits[:10]
+```
+
+<br>
+
+```{python}
+#| output-location: column
+
+y_pred_probs = torch.softmax(y_logits, dim=1)
+
+y_preds = y_pred_probs.argmax(dim=1)
+
+print(f"Predictions: {y_preds[:10]}\nLabels: {y_blob_test[:10]}")
+print(f"Test accuracy: {accuracy_fn(y_true=y_blob_test, y_pred=y_preds)}%")
+```
+
+## Візуалізація {.smaller}
+
+```{python}
+#| output-location: column
+
+plt.figure(figsize=(12, 6))
+plt.subplot(1, 2, 1)
+plt.title("Train")
+plot_decision_boundary(model_4, X_blob_train, y_blob_train)
+plt.subplot(1, 2, 2)
+plt.title("Test")
+plot_decision_boundary(model_4, X_blob_test, y_blob_test)
+```
+
+## Метрики класифікації {.tiny}
+
+| **Назва метрики/Метод оцінки** | **Визначення** | **Код** |
+| --- | --- | --- |
+| Accuracy | Скільки з 100 прогнозів ваша модель вгадала правильно? Наприклад, точність 95% означає, що вона вгадала 95/100 прогнозів. | [`torchmetrics.Accuracy()`](https://torchmetrics.readthedocs.io/en/stable/classification/accuracy.html#id3) або [`sklearn.metrics.accuracy_score()`](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.accuracy_score.html) |
+| Precision | Частка справжніх позитивних результатів у загальній кількості зразків. Вища точність призводить до меншої кількості помилкових позитивних результатів (модель прогнозує 1, коли мала б бути 0). | [`torchmetrics.Precision()`](https://torchmetrics.readthedocs.io/en/stable/classification/precision.html#id4) або [`sklearn.metrics.precision_score()`](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.precision_score.html) |
+| Recall | Частка справжніх позитивних результатів від загальної кількості справжніх позитивних і помилкових негативних результатів (модель прогнозує 0, коли мала б бути 1). Вищий показник recall призводить до меншої кількості помилкових негативних результатів. | [`torchmetrics.Recall()`](https://torchmetrics.readthedocs.io/en/stable/classification/recall.html#id5) або [`sklearn.metrics.recall_score()`](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.recall_score.html) |
+| F1-score | Поєднує точність і відкликання в один показник. 1 — найкращий результат, 0 — найгірший. | [`torchmetrics. F1Score()`](https://torchmetrics.readthedocs.io/en/stable/classification/f1_score.html#f1score) або [`sklearn.metrics.f1_score()`](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.f1_score.html) |
+| [Confusion matrix](https://www.dataschool.io/simple-guide-to-confusion-matrix-terminology/)  | Порівнює прогнозовані значення з істинними значеннями у вигляді таблиці. Якщо правильність становить 100%, усі значення в матриці будуть розташовані від верхнього лівого кута до нижнього правого кута (діагональна лінія). | [`torchmetrics.ConfusionMatrix`](https://torchmetrics.readthedocs.io/en/stable/classification/confusion_matrix.html#confusionmatrix) або [`sklearn.metrics.plot_confusion_matrix()`](https://scikit-learn.org/stable/modules/generated/sklearn.metrics. ConfusionMatrixDisplay.html#sklearn.metrics.ConfusionMatrixDisplay.from_predictions) |
+| Classification report | Збірка деяких основних метрик класифікації, таких як точність, відтворюваність та f1-score. | [`sklearn.metrics.classification_report()`](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.classification_report.html) |
 
 # Дякую за увагу! {.unnumbered .unlisted background-iframe=".02_files/libs/colored-particles/index.html"}
 
