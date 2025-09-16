@@ -74,7 +74,7 @@ slate      = "#314f4f"
 :::
 :::
 
-## Завантаження даних з google drive
+## Завантаження даних з google drive {.tiny}
 
 ```{python}
 #| output-location: column
@@ -106,7 +106,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
 print('Тимчасову папку та її вміст видалено.')
 ```
 
-## Структура даних {.tiny}
+## Структура даних {.smaller}
 
 ```{python}
 #| code-fold: true
@@ -162,7 +162,7 @@ directory_to_scan = Path('data/pizza_steak_sushi')
 list_directory_structure_limited(directory_to_scan)
 ```
 
-## Перегляд зображень 1/2
+## Перегляд зображень 1/2 {.smaller}
 
 ```{python}
 #| output-location: column
@@ -189,7 +189,7 @@ print(f"Image width: {img.width}")
 img
 ```
 
-## Перегляд зображень 2/2
+## Перегляд зображень 2/2  {.smaller}
 
 ```{python}
 #| output-location: column
@@ -222,7 +222,7 @@ from torchvision import datasets, transforms
 | **Текст** | [`torchtext.datasets`](https://pytorch.org/text/stable/datasets.html) |
 | **Система рекомендацій** | [`torchrec.datasets`](https://pytorch.org/torchrec/torchrec.datasets.html) |
 
-## Перетворення зображень в тензори
+## Перетворення зображень в тензори {.tiny}
 
 ::: {.columns}
 ::: {.column}
@@ -267,12 +267,12 @@ def plot_transformed_images(image_paths, transform, n=3, seed=73):
 
 plot_transformed_images(image_path_list, 
                         transform=data_transform, 
-                        n=3)
+                        n=1)
 ```
 
 1. `permute()` змінить форму зображення відповідно до matplotlib (за замовчуванням PyTorch використовує [C, H, W], а Matplotlib — [H, W, C])
 
-## Завантаження рисунків з `ImageFolder`
+## Завантаження рисунків з `ImageFolder` {.tiny}
 
 - `torchvision.datasets.ImageFolder` - завантажує зображення з папок
 
@@ -305,7 +305,7 @@ print(f"Classes: {class_names}")
 print(f"Code of classes: {class_dict}")
 ```
 
-## Перевірка 2/2
+## Перевірка 2/2 {.smaller}
 
 ```{python}
 #| output-location: column
@@ -370,7 +370,7 @@ print(f"Label shape: {label.shape}")
 
 ![](https://pytorch.org/wp-content/uploads/2024/11/Cumulative20Accuracy20Improvements20for20ResNet50.png)
 
-## Спробуємо аугментацію {.tiny}
+## Спробуємо аугментацію
 
 - `num_magnitude_bins` - кількість рівнів інтенсивності аугментації
 
@@ -422,7 +422,7 @@ simple_transform = transforms.Compose([
 ---
 
 ```{python}
-#| output-location: column
+#| output-location: slide
 from torchvision import datasets
 train_data_simple = datasets.ImageFolder(root=train_dir, transform=simple_transform)
 test_data_simple = datasets.ImageFolder(root=test_dir, transform=simple_transform)
@@ -496,7 +496,7 @@ model_0 = TinyVGG(input_shape=3,
 model_0
 ```
 
-## Модель 0: forward pass на одному зображенні
+## Модель 0: forward pass на одному зображенні {.tiny}
 
 1. Отримайте пакет зображень і міток з DataLoader.
 2. Отримайте одне зображення з пакета і розгорніть його за допомогою `unsqueeze()`, щоб розмір пакета становив 1 (тобто його форма відповідала моделі).
@@ -506,8 +506,6 @@ model_0
 ---
 
 ```{python}
-#| output-location: column
-
 img_batch, label_batch = next(iter(train_dataloader_simple))
 
 img_single, label_single = img_batch[0].unsqueeze(dim=0), label_batch[0]
@@ -714,6 +712,8 @@ print(f"Total training time: {end_time-start_time:.3f} seconds")
 
 ```{python}
 #| output-location: column
+
+from typing import Tuple, Dict, List
 
 def plot_loss_curves(results: Dict[str, List[float]]):
     
@@ -933,13 +933,13 @@ plt.xlabel("Epochs")
 plt.legend();
 ```
 
-## Прогнозування з власними зображеннями
+## Завантажимо власне фото
 
 ```{python}
 # Download custom image
 import requests
 
-# Setup custom image path
+data_path = Path("data/")
 custom_image_path = data_path / "yar-pizza.jpeg"
 
 # Download the image if it doesn't already exist
@@ -952,6 +952,191 @@ if not custom_image_path.is_file():
 else:
     print(f"{custom_image_path} already exists, skipping download.")
 ```
+
+## Передаємо власне фото в модель
+
+```{python}
+#| output-location: column
+import torchvision
+
+# Read in custom image
+custom_image_uint8 = torchvision.io.read_image(str(custom_image_path))
+
+# Print out image data
+print(f"Custom image tensor:\n{custom_image_uint8}\n")
+print(f"Custom image shape: {custom_image_uint8.shape}\n")
+print(f"Custom image dtype: {custom_image_uint8.dtype}")
+```
+
+## Конвертуємо 1/2 {.smaller .scrollable}
+
+```{python}
+#| error: true
+#| output-location: column
+
+model_1.eval()
+with torch.inference_mode():
+    model_1(custom_image_uint8.to(device))
+```
+
+## Конвертуємо 2/2
+
+```{python}
+#| output-location: column
+
+custom_image = torchvision.io.read_image(str(custom_image_path)).type(torch.float32)
+
+custom_image = custom_image / 255. 
+
+print(f"Custom image tensor:\n{custom_image}\n")
+print(f"Custom image shape: {custom_image.shape}\n")
+print(f"Custom image dtype: {custom_image.dtype}")
+```
+
+## Перегляд зображення {.smaller}
+
+```{python}
+#| output-location: column
+plt.imshow(custom_image.permute(1, 2, 0))
+plt.title(f"Image shape: {custom_image.shape}")
+plt.axis(False);
+```
+
+## Змінюємо розмір
+
+```{python}
+custom_image_transform = transforms.Compose([
+    transforms.Resize((64, 64)),
+])
+
+custom_image_transformed = custom_image_transform(custom_image)
+
+print(f"Original shape: {custom_image.shape}")
+print(f"New shape: {custom_image_transformed.shape}")
+```
+
+## Спробуємо передати в модель {.scrollable}
+
+```{python}
+#| error: true
+
+model_1.eval()
+with torch.inference_mode():
+    custom_image_pred = model_1(custom_image_transformed)
+```
+
+## Виправляємо: передаємо на обраний пристрій  {.scrollable}
+
+```{python}
+#| error: true
+#| output-location: column
+
+model_1.eval()
+with torch.inference_mode():
+    custom_image_pred = model_1(custom_image_transformed.to(device))
+```
+
+## Виправляємо: додаємо batch dimension
+
+```{python}
+model_1.eval()
+with torch.inference_mode():
+    custom_image_transformed_with_batch_size = custom_image_transformed.unsqueeze(dim=0)
+    
+    print(f"Custom image transformed shape: {custom_image_transformed.shape}")
+    print(f"Unsqueezed custom image shape: {custom_image_transformed_with_batch_size.shape}")
+    
+    custom_image_pred = model_1(custom_image_transformed.unsqueeze(dim=0).to(device))
+```
+
+---
+
+::: {.callout-note}
+- **Неправильні типи даних** — наша модель очікує `torch.float32`, тоді як наше оригінальне зображення було `uint8`.
+- **Неправильний пристрій** — наша модель була на цільовому пристрої (у нашому випадку — GPU), тоді як наші цільові дані ще не були переміщені на цільовий пристрій.
+- **Неправильні форми** — наша модель очікувала вхідне зображення форми [N, C, H, W] або [batch_size, color_channels, height, width], тоді як наш власний тензор зображення мав форму [color_channels, height, width].
+:::
+
+## Прогноз
+
+```{python}
+# Print out prediction logits
+print(f"Prediction logits: {custom_image_pred}")
+
+# Convert logits -> prediction probabilities (using torch.softmax() for multi-class classification)
+custom_image_pred_probs = torch.softmax(custom_image_pred, dim=1)
+print(f"Prediction probabilities: {custom_image_pred_probs}")
+
+# Convert prediction probabilities -> prediction labels
+custom_image_pred_label = torch.argmax(custom_image_pred_probs, dim=1)
+print(f"Prediction label: {custom_image_pred_label}")
+```
+
+## Виводимо мітку класу
+
+```{python}
+custom_image_pred_class = class_names[custom_image_pred_label.cpu()]
+custom_image_pred_class
+```
+
+## Збираємо все в купу {.tiny}
+
+```{python}
+def pred_and_plot_image(model: torch.nn.Module, 
+                        image_path: str, 
+                        class_names: List[str] = None, 
+                        transform=None,
+                        device: torch.device = device):
+    
+    # 1. Load in image and convert the tensor values to float32
+    target_image = torchvision.io.read_image(str(image_path)).type(torch.float32)
+    
+    # 2. Divide the image pixel values by 255 to get them between [0, 1]
+    target_image = target_image / 255. 
+    
+    # 3. Transform if necessary
+    if transform:
+        target_image = transform(target_image)
+    
+    # 4. Make sure the model is on the target device
+    model.to(device)
+    
+    # 5. Turn on model evaluation mode and inference mode
+    model.eval()
+    with torch.inference_mode():
+        # Add an extra dimension to the image
+        target_image = target_image.unsqueeze(dim=0)
+    
+        # Make a prediction on image with an extra dimension and send it to the target device
+        target_image_pred = model(target_image.to(device))
+        
+    # 6. Convert logits -> prediction probabilities (using torch.softmax() for multi-class classification)
+    target_image_pred_probs = torch.softmax(target_image_pred, dim=1)
+
+    # 7. Convert prediction probabilities -> prediction labels
+    target_image_pred_label = torch.argmax(target_image_pred_probs, dim=1)
+    
+    # 8. Plot the image alongside the prediction and prediction probability
+    plt.imshow(target_image.squeeze().permute(1, 2, 0)) # make sure it's the right size for matplotlib
+    if class_names:
+        title = f"Pred: {class_names[target_image_pred_label.cpu()]} | Prob: {target_image_pred_probs.max().cpu():.3f}"
+    else: 
+        title = f"Pred: {target_image_pred_label} | Prob: {target_image_pred_probs.max().cpu():.3f}"
+    plt.title(title)
+    plt.axis(False);
+```
+
+## Використовуємо функцію {.tiny}
+
+```{python}
+#| output-location: column
+pred_and_plot_image(model=model_1,
+                    image_path=custom_image_path,
+                    class_names=class_names,
+                    transform=custom_image_transform,
+                    device=device)
+```
+
 
 # Дякую за увагу! {.unnumbered .unlisted background-iframe=".04_files/libs/colored-particles/index.html"}
 
