@@ -1,0 +1,970 @@
+---
+title: "Власні набори даних 🔥PyTorch"
+subtitle: "Технології комп'ютерного зору"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка, ФІТ
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .04_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: <a href="https://aranaur.rbind.io/lectures">🔗Технології комп'ютерного зору</a>
+format:
+  revealjs: 
+    transition: fade
+    chalkboard: true
+    logo: fit.png
+    slide-number: true
+    # toc: true
+    # toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-width: 9
+    fig-height: 5
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+#   gfm:
+#     mermaid-format: png
+preload-iframes: true
+jupyter: python3
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{python}
+#| include: false
+
+import torch
+from torch import nn
+import matplotlib.pyplot as plt
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+## Збір даних
+
+::: {.columns}
+::: {.column}
+- Візьмемо підвибірку з [Food-101](https://data.vision.ee.ethz.ch/cvl/datasets_extra/food-101/)
+- 101 клас їжі
+- 101000 зображень
+- 75000 для тренування
+- 25000 для тестування
+:::
+::: {.column}
+- `torchvision.datasets.Food101`
+- [`pizza_steak_sushi.zip`](https://drive.google.com/file/d/1Jf8jhskDmN3DxP0yk9PET5Kr44OnwUgU/view?usp=sharing)
+:::
+:::
+
+## Завантаження даних з google drive
+
+```{python}
+#| output-location: column
+import gdown
+import tempfile
+import zipfile
+import os
+
+file_url = 'https://drive.google.com/file/d/1Jf8jhskDmN3DxP0yk9PET5Kr44OnwUgU/view?usp=sharing'
+file_id = file_url.split('/')[-2]
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    print(f'Створено тимчасову папку: {tmpdir}')
+
+    zip_path = os.path.join(tmpdir, 'pizza_steak_sushi.zip')
+
+    print('Завантаження файлу...')
+    gdown.download(id=file_id, output=zip_path, quiet=False)
+    print('Завантаження завершено.')
+
+    extract_path = 'data/pizza_steak_sushi'
+    os.makedirs(extract_path, exist_ok=True)
+
+    print(f'Розархівація файлу в {extract_path}...')
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(extract_path)
+    print('Розархівація завершена.')
+
+print('Тимчасову папку та її вміст видалено.')
+```
+
+## Структура даних {.tiny}
+
+```{python}
+#| code-fold: true
+
+from pathlib import Path
+
+def list_directory_structure_limited(path):
+    """
+    Головна функція для виклику. Виводить назву кореневої папки.
+    """
+    if not path.is_dir():
+        print(f'Помилка: Директорія {path} не знайдена.')
+        return
+
+    print(f'Структура директорії {path} (по 2 файли в папці):')
+    print(f'{path.name}/')
+    _walk_directory_limited(path, prefix="")
+
+def _walk_directory_limited(path, prefix=""):
+    """
+    Рекурсивна допоміжна функція для обходу та виведення структури.
+    """
+    try:
+        all_items = list(path.iterdir())
+    except PermissionError:
+        print(f"{prefix}└── [Немає доступу]")
+        return
+
+    dirs = sorted([p for p in all_items if p.is_dir()])
+    files = sorted([p for p in all_items if p.is_file()])
+
+    files_to_show = files[:2]
+    hidden_files_count = len(files) - len(files_to_show)
+
+    items_to_display = dirs + files_to_show
+
+    for i, item_path in enumerate(items_to_display):
+        is_last_item = (i == len(items_to_display) - 1) and (hidden_files_count == 0)
+        pointer = '└── ' if is_last_item else '├── '
+
+        print(f'{prefix}{pointer}{item_path.name}')
+
+        if item_path.is_dir():
+            extension = '    ' if is_last_item else '│   '
+            _walk_directory_limited(item_path, prefix=prefix + extension)
+
+    if hidden_files_count > 0:
+        print(f'{prefix}└── ... та ще {hidden_files_count} файлів')
+
+
+directory_to_scan = Path('data/pizza_steak_sushi')
+
+list_directory_structure_limited(directory_to_scan)
+```
+
+## Перегляд зображень 1/2
+
+```{python}
+#| output-location: column
+
+import random
+from PIL import Image
+
+image_path = Path('data/pizza_steak_sushi')
+
+random.seed(73)
+
+image_path_list = list(image_path.glob("*/*/*.jpg"))
+
+random_image_path = random.choice(image_path_list)
+
+image_class = random_image_path.parent.stem
+
+img = Image.open(random_image_path)
+
+print(f"Random image path: {random_image_path}")
+print(f"Image class: {image_class}")
+print(f"Image height: {img.height}") 
+print(f"Image width: {img.width}")
+img
+```
+
+## Перегляд зображень 2/2
+
+```{python}
+#| output-location: column
+import numpy as np
+import matplotlib.pyplot as plt
+
+img_as_array = np.asarray(img)
+
+plt.figure(figsize=(10, 7))
+plt.imshow(img_as_array)
+plt.title(f"Image class: {image_class} | Image shape: {img_as_array.shape} $\\rightarrow$ [height, width, color_channels]")
+plt.axis(False);
+```
+
+## Підготовка даних {.tiny}
+
+1. Рисунки $\rightarrow$ тензори
+2. Перетворіть в `torch.utils.data.Dataset`, а потім в `torch.utils.data.DataLoader`.
+
+```{python}
+import torch
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
+```
+
+| **Задача** | **Готові набори даних та функції** |
+| ----- | ----- |
+| **Зір** | [`torchvision.datasets`](https://pytorch.org/vision/stable/datasets.html) |
+| **Аудіо** | [`torchaudio.datasets`](https://pytorch.org/audio/stable/datasets.html) |
+| **Текст** | [`torchtext.datasets`](https://pytorch.org/text/stable/datasets.html) |
+| **Система рекомендацій** | [`torchrec.datasets`](https://pytorch.org/torchrec/torchrec.datasets.html) |
+
+## Перетворення зображень в тензори
+
+::: {.columns}
+::: {.column}
+- `torchvision.transforms` - бібліотека для перетворення зображень
+- `transforms.Resize()` - змінює розмір зображення
+- `transforms.RandomHorizontalFlip()` - випадкове горизонтальне відображення
+- `transforms.ToTensor()` - перетворює зображення в тензор
+- `torchvision.transforms.Compose()` - об'єднує кілька перетворень
+:::
+::: {.column}
+
+```{python}
+data_transform = transforms.Compose([
+    transforms.Resize(size=(64, 64)),
+    transforms.RandomHorizontalFlip(p=0.5),
+    transforms.ToTensor()
+])
+```
+:::
+:::
+
+## Функція перетворення {.tiny}
+
+```{python}
+#| output-location: column
+def plot_transformed_images(image_paths, transform, n=3, seed=73):
+    random.seed(seed)
+    random_image_paths = random.sample(image_paths, k=n)
+    for image_path in random_image_paths:
+        with Image.open(image_path) as f:
+            fig, ax = plt.subplots(1, 2)
+            ax[0].imshow(f) 
+            ax[0].set_title(f"Original \nSize: {f.size}")
+            ax[0].axis("off")
+
+            transformed_image = transform(f).permute(1, 2, 0) # <1>
+            ax[1].imshow(transformed_image) 
+            ax[1].set_title(f"Transformed \nSize: {transformed_image.shape}")
+            ax[1].axis("off")
+
+            fig.suptitle(f"Class: {image_path.parent.stem}", fontsize=16)
+
+plot_transformed_images(image_path_list, 
+                        transform=data_transform, 
+                        n=3)
+```
+
+1. `permute()` змінить форму зображення відповідно до matplotlib (за замовчуванням PyTorch використовує [C, H, W], а Matplotlib — [H, W, C])
+
+## Завантаження рисунків з `ImageFolder`
+
+- `torchvision.datasets.ImageFolder` - завантажує зображення з папок
+
+```{python}
+#| output-location: column
+from torchvision import datasets
+
+train_dir = image_path / "train"
+test_dir = image_path / "test"
+
+train_data = datasets.ImageFolder(root=train_dir,
+                                  transform=data_transform,
+                                  target_transform=None) 
+
+test_data = datasets.ImageFolder(root=test_dir, 
+                                 transform=data_transform)
+
+print(f"Train data:\n{train_data}\nTest data:\n{test_data}")
+```
+
+## Перевірка 1/2
+
+```{python}
+class_names = train_data.classes
+class_dict = train_data.class_to_idx
+
+print(f"Length of training data: {len(train_data)}")
+print(f"Length of testing data: {len(test_data)}")
+print(f"Classes: {class_names}")
+print(f"Code of classes: {class_dict}")
+```
+
+## Перевірка 2/2
+
+```{python}
+#| output-location: column
+img, label = train_data[0][0], train_data[0][1]
+print(f"Image tensor:\n{img}")
+print(f"Image shape: {img.shape}")
+print(f"Image datatype: {img.dtype}")
+print(f"Image label: {label}")
+print(f"Label datatype: {type(label)}")
+```
+
+## Перегляд тензорів зображень
+
+```{python}
+img_permute = img.permute(1, 2, 0)
+
+print(f"Original shape: {img.shape} -> [color_channels, height, width]")
+print(f"Image permute shape: {img_permute.shape} -> [height, width, color_channels]")
+
+plt.figure(figsize=(10, 7))
+plt.imshow(img.permute(1, 2, 0))
+plt.axis("off")
+plt.title(class_names[label], fontsize=14);
+```
+
+## Передаємо дані в DataLoader {.smaller}
+
+- `torch.utils.data.DataLoader` - створює ітератор над датасетом
+- `batch_size` - кількість зразків в одному пакеті
+- `num_workers` - кількість потоків для завантаження даних (`os.cpu_count()-1`)
+
+```{python}
+from torch.utils.data import DataLoader
+print(f"Number of CPU cores: {os.cpu_count()}")
+train_dataloader = DataLoader(dataset=train_data, 
+                              batch_size=1,
+                              num_workers=os.cpu_count()-1,
+                              shuffle=True)
+
+test_dataloader = DataLoader(dataset=test_data, 
+                             batch_size=1, 
+                             num_workers=os.cpu_count()-1, 
+                             shuffle=False)
+
+train_dataloader, test_dataloader
+```
+
+## Перевірка форми даних
+
+```{python}
+img, label = next(iter(train_dataloader))
+
+print(f"Image shape: {img.shape} -> [batch_size, color_channels, height, width]")
+print(f"Label shape: {label.shape}")
+```
+
+## Аугментація даних
+
+- [Ілюстрації](https://docs.pytorch.org/vision/main/auto_examples/transforms/plot_transforms_illustrations.html) аугментації.
+- `transforms.TrivialAugmentWide()` - випадкове аугментування зображень.
+- `transforms.Compose()` - об'єднує кілька перетворень.
+
+![](https://pytorch.org/wp-content/uploads/2024/11/Cumulative20Accuracy20Improvements20for20ResNet50.png)
+
+## Спробуємо аугментацію {.tiny}
+
+- `num_magnitude_bins` - кількість рівнів інтенсивності аугментації
+
+```{python}
+from torchvision import transforms
+
+train_transforms = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.TrivialAugmentWide(num_magnitude_bins=31),
+    transforms.ToTensor()
+])
+
+test_transforms = transforms.Compose([
+    transforms.Resize((224, 224)), 
+    transforms.ToTensor()
+])
+```
+
+::: {.callout-note icon="false" appearance="simple"}
+Зазвичай аугментація не застосовується до тестових даних.
+:::
+
+## Перевірка аугментації
+
+```{python}
+image_path_list = list(image_path.glob("*/*/*.jpg"))
+
+plot_transformed_images(
+    image_paths=image_path_list,
+    transform=train_transforms,
+    n=3,
+    seed=None
+)
+```
+
+## Модель 0: TinyVGG без аугментації
+
+- Завантажимо дані, спочатку перетворивши кожну з наших папок для навчання та тестування на набір даних за допомогою `torchvision.datasets.ImageFolder()`
+- Потім перетворимо їх на `DataLoader` за допомогою `torch.utils.data.DataLoader()`.
+- Ми встановимо `batch_size=32` та `num_workers` на кількість процесорів на нашій машині.
+
+```{python}
+simple_transform = transforms.Compose([ 
+    transforms.Resize((64, 64)),
+    transforms.ToTensor(),
+])
+```
+
+---
+
+```{python}
+#| output-location: column
+from torchvision import datasets
+train_data_simple = datasets.ImageFolder(root=train_dir, transform=simple_transform)
+test_data_simple = datasets.ImageFolder(root=test_dir, transform=simple_transform)
+
+import os
+from torch.utils.data import DataLoader
+
+BATCH_SIZE = 32
+NUM_WORKERS = os.cpu_count()
+print(f"Creating DataLoader's with batch size {BATCH_SIZE} and {NUM_WORKERS} workers.")
+
+train_dataloader_simple = DataLoader(train_data_simple, 
+                                     batch_size=BATCH_SIZE, 
+                                     shuffle=True, 
+                                     num_workers=NUM_WORKERS)
+
+test_dataloader_simple = DataLoader(test_data_simple, 
+                                    batch_size=BATCH_SIZE, 
+                                    shuffle=False, 
+                                    num_workers=NUM_WORKERS)
+
+train_dataloader_simple, test_dataloader_simple
+```
+
+## Модель 0: клас [TinyVGG](https://poloclub.github.io/cnn-explainer/) {.tiny}
+
+```{python}
+#| output-location: column
+class TinyVGG(nn.Module):
+    def __init__(self, input_shape: int, hidden_units: int, output_shape: int) -> None:
+        super().__init__()
+        self.conv_block_1 = nn.Sequential(
+            nn.Conv2d(in_channels=input_shape, 
+                      out_channels=hidden_units, 
+                      kernel_size=3,
+                      stride=1,
+                      padding=1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=hidden_units, 
+                      out_channels=hidden_units,
+                      kernel_size=3,
+                      stride=1,
+                      padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2,
+                         stride=2)
+        )
+        self.conv_block_2 = nn.Sequential(
+            nn.Conv2d(hidden_units, hidden_units, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(hidden_units, hidden_units, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2)
+        )
+        self.classifier = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(in_features=hidden_units*16*16,
+                      out_features=output_shape)
+        )
+    
+    def forward(self, x: torch.Tensor):
+        x = self.conv_block_1(x)
+        x = self.conv_block_2(x)
+        x = self.classifier(x)
+        return x
+
+torch.manual_seed(73)
+model_0 = TinyVGG(input_shape=3,
+                  hidden_units=10, 
+                  output_shape=len(train_data.classes)).to(device)
+model_0
+```
+
+## Модель 0: forward pass на одному зображенні
+
+1. Отримайте пакет зображень і міток з DataLoader.
+2. Отримайте одне зображення з пакета і розгорніть його за допомогою `unsqueeze()`, щоб розмір пакета становив 1 (тобто його форма відповідала моделі).
+3. Виконайте інференцію на одному зображенні (обов'язково надішліть зображення на цільовий пристрій).
+4. Виведіть на екран інформацію про те, що відбувається, і перетворіть необроблені вихідні логіти моделі на ймовірності прогнозування за допомогою `torch.softmax()` (оскільки ми працюємо з багатокласовими даними), а потім перетворіть ймовірності прогнозування на мітки прогнозування за допомогою `torch.argmax()`.
+
+---
+
+```{python}
+#| output-location: column
+
+img_batch, label_batch = next(iter(train_dataloader_simple))
+
+img_single, label_single = img_batch[0].unsqueeze(dim=0), label_batch[0]
+print(f"Single image shape: {img_single.shape}\n")
+
+model_0.eval()
+with torch.inference_mode():
+    pred = model_0(img_single.to(device))
+    
+print(f"Output logits:\n{pred}\n")
+print(f"Output prediction probabilities:\n{torch.softmax(pred, dim=1)}\n")
+print(f"Output prediction label:\n{torch.argmax(torch.softmax(pred, dim=1), dim=1)}\n")
+print(f"Actual label:\n{label_single}")
+```
+
+## Модель 0: `torchinfo` {.tiny}
+
+- `torchinfo.summary()` - виводить інформацію про модель PyTorch
+
+```{python}
+#| output-location: column
+try: 
+    import torchinfo
+except:
+    !pip install torchinfo
+    import torchinfo
+    
+from torchinfo import summary
+summary(model_0, input_size=[1, 3, 64, 64])
+```
+
+## Модель 0: `train_step()` {.tiny}
+
+1. `train_step()` - виконує один крок навчання
+2. `test_step()` - виконує один крок тестування
+3. `train()` - виконує цикл навчання
+
+```{python}
+def train_step(model: torch.nn.Module, 
+               dataloader: torch.utils.data.DataLoader, 
+               loss_fn: torch.nn.Module, 
+               optimizer: torch.optim.Optimizer):
+    # Put model in train mode
+    model.train()
+    
+    # Setup train loss and train accuracy values
+    train_loss, train_acc = 0, 0
+    
+    # Loop through data loader data batches
+    for batch, (X, y) in enumerate(dataloader):
+        # Send data to target device
+        X, y = X.to(device), y.to(device)
+
+        # 1. Forward pass
+        y_pred = model(X)
+
+        # 2. Calculate  and accumulate loss
+        loss = loss_fn(y_pred, y)
+        train_loss += loss.item() 
+
+        # 3. Optimizer zero grad
+        optimizer.zero_grad()
+
+        # 4. Loss backward
+        loss.backward()
+
+        # 5. Optimizer step
+        optimizer.step()
+
+        # Calculate and accumulate accuracy metrics across all batches
+        y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
+        train_acc += (y_pred_class == y).sum().item()/len(y_pred)
+
+    # Adjust metrics to get average loss and accuracy per batch 
+    train_loss = train_loss / len(dataloader)
+    train_acc = train_acc / len(dataloader)
+    return train_loss, train_acc
+```
+
+## Модель 0: `test_step()` {.tiny}
+
+```{python}
+def test_step(model: torch.nn.Module, 
+              dataloader: torch.utils.data.DataLoader, 
+              loss_fn: torch.nn.Module):
+    # Put model in eval mode
+    model.eval() 
+    
+    # Setup test loss and test accuracy values
+    test_loss, test_acc = 0, 0
+    
+    # Turn on inference context manager
+    with torch.inference_mode():
+        # Loop through DataLoader batches
+        for batch, (X, y) in enumerate(dataloader):
+            # Send data to target device
+            X, y = X.to(device), y.to(device)
+    
+            # 1. Forward pass
+            test_pred_logits = model(X)
+
+            # 2. Calculate and accumulate loss
+            loss = loss_fn(test_pred_logits, y)
+            test_loss += loss.item()
+            
+            # Calculate and accumulate accuracy
+            test_pred_labels = test_pred_logits.argmax(dim=1)
+            test_acc += ((test_pred_labels == y).sum().item()/len(test_pred_labels))
+            
+    # Adjust metrics to get average loss and accuracy per batch 
+    test_loss = test_loss / len(dataloader)
+    test_acc = test_acc / len(dataloader)
+    return test_loss, test_acc
+```
+
+## Модель 0: об'єднуємо в `train()` {.tiny}
+
+```{python}
+from tqdm.auto import tqdm
+
+# 1. Take in various parameters required for training and test steps
+def train(model: torch.nn.Module, 
+          train_dataloader: torch.utils.data.DataLoader, 
+          test_dataloader: torch.utils.data.DataLoader, 
+          optimizer: torch.optim.Optimizer,
+          loss_fn: torch.nn.Module = nn.CrossEntropyLoss(),
+          epochs: int = 5):
+    
+    # 2. Create empty results dictionary
+    results = {"train_loss": [],
+        "train_acc": [],
+        "test_loss": [],
+        "test_acc": []
+    }
+    
+    # 3. Loop through training and testing steps for a number of epochs
+    for epoch in tqdm(range(epochs)):
+        train_loss, train_acc = train_step(model=model,
+                                           dataloader=train_dataloader,
+                                           loss_fn=loss_fn,
+                                           optimizer=optimizer)
+        test_loss, test_acc = test_step(model=model,
+            dataloader=test_dataloader,
+            loss_fn=loss_fn)
+        
+        # 4. Print out what's happening
+        print(
+            f"Epoch: {epoch+1} | "
+            f"train_loss: {train_loss:.4f} | "
+            f"train_acc: {train_acc:.4f} | "
+            f"test_loss: {test_loss:.4f} | "
+            f"test_acc: {test_acc:.4f}"
+        )
+
+        # 5. Update results dictionary
+        # Ensure all data is moved to CPU and converted to float for storage
+        results["train_loss"].append(train_loss.item() if isinstance(train_loss, torch.Tensor) else train_loss)
+        results["train_acc"].append(train_acc.item() if isinstance(train_acc, torch.Tensor) else train_acc)
+        results["test_loss"].append(test_loss.item() if isinstance(test_loss, torch.Tensor) else test_loss)
+        results["test_acc"].append(test_acc.item() if isinstance(test_acc, torch.Tensor) else test_acc)
+
+    # 6. Return the filled results at the end of the epochs
+    return results
+```
+
+## Модель 0: тренуємо! {.tiny}
+
+```{python}
+#| output-location: column
+# Set random seeds
+torch.manual_seed(73) 
+torch.cuda.manual_seed(73)
+
+# Set number of epochs
+NUM_EPOCHS = 5
+
+# Recreate an instance of TinyVGG
+model_0 = TinyVGG(input_shape=3, # number of color channels (3 for RGB) 
+                  hidden_units=10, 
+                  output_shape=len(train_data.classes)).to(device)
+
+# Setup loss function and optimizer
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(params=model_0.parameters(), lr=0.001)
+
+# Start the timer
+from timeit import default_timer as timer 
+start_time = timer()
+
+# Train model_0 
+model_0_results = train(model=model_0, 
+                        train_dataloader=train_dataloader_simple,
+                        test_dataloader=test_dataloader_simple,
+                        optimizer=optimizer,
+                        loss_fn=loss_fn, 
+                        epochs=NUM_EPOCHS)
+
+# End the timer and print out how long it took
+end_time = timer()
+print(f"Total training time: {end_time-start_time:.3f} seconds")
+```
+
+## Модель 0: графіки результатів {.tiny}
+
+```{python}
+#| output-location: column
+
+def plot_loss_curves(results: Dict[str, List[float]]):
+    
+    # Get the loss values of the results dictionary (training and test)
+    loss = results['train_loss']
+    test_loss = results['test_loss']
+
+    # Get the accuracy values of the results dictionary (training and test)
+    accuracy = results['train_acc']
+    test_accuracy = results['test_acc']
+
+    # Figure out how many epochs there were
+    epochs = range(len(results['train_loss']))
+
+    # Setup a plot 
+    plt.figure(figsize=(15, 7))
+
+    # Plot loss
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, loss, label='train_loss')
+    plt.plot(epochs, test_loss, label='test_loss')
+    plt.title('Loss')
+    plt.xlabel('Epochs')
+    plt.legend()
+
+    # Plot accuracy
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, accuracy, label='train_accuracy')
+    plt.plot(epochs, test_accuracy, label='test_accuracy')
+    plt.title('Accuracy')
+    plt.xlabel('Epochs')
+    plt.legend();
+```
+
+---
+
+```{python}
+plot_loss_curves(model_0_results)
+```
+
+---
+
+![](img/loss_curves.jpg)
+
+::: footer
+[Google, Overfitting: Interpreting loss curves](https://developers.google.com/machine-learning/crash-course/overfitting/interpreting-loss-curves)
+:::
+
+## Що робити при перенавчанні?
+
+::: incremental
+- Збільшити кількість даних
+- Регуляризація
+- Спростити модель
+- [Аугментація даних](https://developers.google.com/machine-learning/glossary#data-augmentation)
+- [Transfer learning](https://developers.google.com/machine-learning/glossary#transfer-learning)
+- Dropout-шари
+- Зменшення кроку навчання
+- [Рання зупинка](https://developers.google.com/machine-learning/glossary#early_stopping)
+:::
+
+## Що робити при недонавчанні?
+
+- Збільшити складність моделі
+- Тренувати довше
+- Зменшити регуляризацію
+- Використовувати інші архітектури
+- [Transfer learning](https://developers.google.com/machine-learning/glossary#transfer-learning)
+
+## Модель 1: TinyVGG з аугментацією
+
+```{python}
+train_transform_trivial_augment = transforms.Compose([
+    transforms.Resize((64, 64)),
+    transforms.TrivialAugmentWide(num_magnitude_bins=31),
+    transforms.ToTensor() 
+])
+
+test_transform = transforms.Compose([
+    transforms.Resize((64, 64)),
+    transforms.ToTensor()
+])
+```
+
+## Модель 1: DataLoader з аугментацією {.tiny}
+
+```{python}
+#| output-location: column
+train_data_augmented = datasets.ImageFolder(train_dir, transform=train_transform_trivial_augment)
+test_data_simple = datasets.ImageFolder(test_dir, transform=test_transform)
+
+train_data_augmented, test_data_simple
+```
+
+---
+
+```{python}
+# Turn Datasets into DataLoader's
+import os
+BATCH_SIZE = 32
+NUM_WORKERS = os.cpu_count()
+
+torch.manual_seed(42)
+train_dataloader_augmented = DataLoader(train_data_augmented, 
+                                        batch_size=BATCH_SIZE, 
+                                        shuffle=True,
+                                        num_workers=NUM_WORKERS)
+
+test_dataloader_simple = DataLoader(test_data_simple, 
+                                    batch_size=BATCH_SIZE, 
+                                    shuffle=False, 
+                                    num_workers=NUM_WORKERS)
+
+train_dataloader_augmented, test_dataloader
+```
+
+## Модель 1: перегляд {.tiny}
+
+```{python}
+#| output-location: column
+torch.manual_seed(73)
+model_1 = TinyVGG(
+    input_shape=3,
+    hidden_units=10,
+    output_shape=len(train_data_augmented.classes)).to(device)
+model_1
+```
+
+## Модель 1: тренуємо! {.tiny}
+
+```{python}
+#| output-location: column
+
+# Set random seeds
+torch.manual_seed(73) 
+torch.cuda.manual_seed(73)
+
+# Set number of epochs
+NUM_EPOCHS = 5
+
+# Setup loss function and optimizer
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(params=model_1.parameters(), lr=0.001)
+
+# Start the timer
+from timeit import default_timer as timer 
+start_time = timer()
+
+# Train model_1
+model_1_results = train(model=model_1, 
+                        train_dataloader=train_dataloader_augmented,
+                        test_dataloader=test_dataloader_simple,
+                        optimizer=optimizer,
+                        loss_fn=loss_fn, 
+                        epochs=NUM_EPOCHS)
+
+# End the timer and print out how long it took
+end_time = timer()
+print(f"Total training time: {end_time-start_time:.3f} seconds")
+```
+
+## Модель 1: результати {.tiny}
+
+```{python}
+plot_loss_curves(model_1_results)
+```
+
+## Порівняння моделей 1/2
+
+```{python}
+import pandas as pd
+model_0_df = pd.DataFrame(model_0_results)
+model_1_df = pd.DataFrame(model_1_results)
+model_0_df
+```
+
+## Порівняння моделей 2/2
+
+```{python}
+#| code-fold: true
+# Setup a plot 
+plt.figure(figsize=(15, 10))
+
+# Get number of epochs
+epochs = range(len(model_0_df))
+
+# Plot train loss
+plt.subplot(2, 2, 1)
+plt.plot(epochs, model_0_df["train_loss"], label="Model 0")
+plt.plot(epochs, model_1_df["train_loss"], label="Model 1")
+plt.title("Train Loss")
+plt.xlabel("Epochs")
+plt.legend()
+
+# Plot test loss
+plt.subplot(2, 2, 2)
+plt.plot(epochs, model_0_df["test_loss"], label="Model 0")
+plt.plot(epochs, model_1_df["test_loss"], label="Model 1")
+plt.title("Test Loss")
+plt.xlabel("Epochs")
+plt.legend()
+
+# Plot train accuracy
+plt.subplot(2, 2, 3)
+plt.plot(epochs, model_0_df["train_acc"], label="Model 0")
+plt.plot(epochs, model_1_df["train_acc"], label="Model 1")
+plt.title("Train Accuracy")
+plt.xlabel("Epochs")
+plt.legend()
+
+# Plot test accuracy
+plt.subplot(2, 2, 4)
+plt.plot(epochs, model_0_df["test_acc"], label="Model 0")
+plt.plot(epochs, model_1_df["test_acc"], label="Model 1")
+plt.title("Test Accuracy")
+plt.xlabel("Epochs")
+plt.legend();
+```
+
+## Прогнозування з власними зображеннями
+
+```{python}
+# Download custom image
+import requests
+
+# Setup custom image path
+custom_image_path = data_path / "yar-pizza.jpeg"
+
+# Download the image if it doesn't already exist
+if not custom_image_path.is_file():
+    with open(custom_image_path, "wb") as f:
+        # When downloading from GitHub, need to use the "raw" file link
+        request = requests.get("https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/refs/heads/main/lectures/cv/slides/2025/img/yar-pizza.jpg")
+        print(f"Downloading {custom_image_path}...")
+        f.write(request.content)
+else:
+    print(f"{custom_image_path} already exists, skipping download.")
+```
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".04_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
