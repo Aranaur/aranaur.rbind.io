@@ -1,0 +1,696 @@
+---
+title: "Data visualization: ggplot2 and beyond"
+subtitle: "STAT150 | R for Data Science"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .04_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=3374">🔗STAT150 | R for Data Science</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Basic concepts {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## The grammar of graphics
+
+![](img/grammar-of-graphics.png)
+
+## Tidy data
+
+![](img/tidy.jpg)
+
+## Examples
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![](img/exm1.png){height="600px"}
+:::
+
+::: {.column width="50%"}
+![](img/exm2.png){height="600px"}
+:::
+
+::::
+
+## Examples
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![](img/exm3.jpeg)
+:::
+
+::: {.column width="50%"}
+![](img/exm4.png){height="600px"}
+:::
+
+::::
+
+## Examples
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![](img/exm5.png){height="600px"}
+:::
+
+::: {.column width="50%"}
+![](img/exm6.png)
+:::
+
+::::
+
+# ggplot2 {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## 🐧 `palmerpenguins`
+
+:::: {.columns}
+
+::: {.column width="40%"}
+![](img/palmerpenguins.png)
+:::
+
+::: {.column width="60%"}
+
+```{r}
+#| label: penguins-install
+#| eval: false
+
+install.packages("palmerpenguins")
+```
+
+<br>
+
+```{r}
+#| label: penguins-load
+
+library(palmerpenguins)
+```
+:::
+
+::::
+
+```{r}
+#| label: penguins-data
+
+head(penguins)
+```
+
+## Meet the Palmer penguins
+
+![](img/lter_penguins.png){fig-align="center"}
+
+## Bill dimensions
+
+![](img/culmen_depth.png){fig-align="center"}
+
+## `ggplot()`
+
+```{r}
+#| label: ggplot
+#| fig-align: center
+
+library(ggplot2)
+```
+
+<br>
+
+```{r}
+#| label: ggplot-example
+#| fig-align: center
+ggplot()
+```
+
+## `ggplot()` + data
+
+```{r}
+#| label: ggplot-data
+#| fig-align: center
+#| code-line-numbers: "2"
+
+ggplot(
+  data = penguins
+)
+```
+
+## `ggplot()` + data + aesthetics
+
+```{r}
+#| label: ggplot-aesthetics
+#| fig-align: center
+#| code-line-numbers: "3"
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm)
+)
+```
+
+## `ggplot()` + data + aesthetics + geometry
+
+[Scatter plot]{.hi}
+```{r}
+#| label: ggplot-geometry
+#| fig-align: center
+#| code-line-numbers: "5"
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm)
+) +
+  geom_point()
+```
+
+## Shapes
+
+![](img/shape.png){fig-align="center"}
+
+## Shapes for points
+
+```{r}
+#| label: ggplot-shape
+#| fig-align: center
+#| code-line-numbers: "5"
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm)
+) +
+  geom_point(shape = 17)
+```
+
+## Shapes for aesthetics
+
+```{r}
+#| label: ggplot-shape-aesthetics
+#| fig-align: center
+#| code-line-numbers: "3"
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, shape = species)
+) +
+  geom_point()
+```
+
+## Size
+
+```{r}
+#| label: ggplot-size
+#| fig-align: center
+#| code-line-numbers: "3"
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, size = body_mass_g)
+) +
+  geom_point()
+```
+
+## Transparency
+
+```{r}
+#| label: ggplot-alpha
+#| fig-align: center
+#| code-line-numbers: "5"
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, size = body_mass_g)
+) +
+  geom_point(alpha = 0.5)
+```
+
+## Color
+
+```{r}
+#| label: ggplot-color
+#| fig-align: center
+#| code-line-numbers: "3"
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, color = species)
+) +
+  geom_point()
+```
+
+## Manual color
+
+```{r}
+#| label: ggplot-color-manual
+#| fig-align: center
+#| code-line-numbers: "6"
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, color = species)
+) +
+  geom_point() +
+  scale_color_manual(values = c("#19a6b3","#f26c0d","#5e3894"))
+```
+
+## `RColorBrewer`
+
+```{r}
+#| label: ggplot-color-brewer
+#| fig-align: center
+#| code-line-numbers: "1,8"
+
+library(RColorBrewer)
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, color = species)
+) +
+  geom_point() +
+  scale_color_brewer(palette = "Set1")
+```
+
+# Themes {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## `ggthemes`
+
+```{r}
+#| label: ggplot-color-themes
+#| fig-align: center
+#| code-line-numbers: "1,8"
+
+library(ggthemes)
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, color = species)
+) +
+  geom_point() +
+  scale_color_tableau()
+```
+
+## `theme_bw()`
+
+```{r}
+#| label: ggplot-theme-bw
+#| fig-align: center
+#| code-line-numbers: "7"
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, color = species)
+) +
+  geom_point() +
+  scale_color_manual(values = c("#19a6b3","#f26c0d","#5e3894")) +
+  theme_bw()
+```
+
+## `theme_minimal()`
+
+```{r}
+#| label: ggplot-theme-minimal
+#| fig-align: center
+#| code-line-numbers: "7"
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, color = species)
+) +
+  geom_point() +
+  scale_color_manual(values = c("#19a6b3","#f26c0d","#5e3894")) +
+  theme_minimal()
+```
+
+# Labels {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## `labs()` {.smaller}
+
+```{r}
+#| label: ggplot-labs
+#| fig-align: center
+#| code-line-numbers: "8-15"
+#| output-location: column
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, color = species)
+) +
+  geom_point() +
+  scale_color_manual(values = c("#19a6b3","#f26c0d","#5e3894")) +
+  theme_minimal() +
+  labs(
+    title = "Bill dimensions of penguins",
+    subtitle = "Palmer penguins dataset",
+    caption = "Source: palmerpenguins package",
+    x = "Bill length, mm",
+    y = "Bill depth, mm",
+    color = "Species"
+  )
+```
+
+# Legends {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## `theme(legend.position = "top")` {.smaller}
+
+```{r}
+#| label: ggplot-legend-top
+#| fig-align: center
+#| code-line-numbers: "16"
+#| output-location: column
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, color = species)
+) +
+  geom_point() +
+  scale_color_manual(values = c("#19a6b3","#f26c0d","#5e3894")) +
+  theme_minimal() +
+  labs(
+    title = "Bill dimensions of penguins",
+    subtitle = "Palmer penguins dataset",
+    caption = "Source: palmerpenguins package",
+    x = "Bill length, mm",
+    y = "Bill depth, mm",
+    color = "Species"
+  ) +
+  theme(legend.position = "top")
+```
+
+## `theme(legend.position = "none")` {.smaller}
+
+```{r}
+#| label: ggplot-legend-none
+#| fig-align: center
+#| code-line-numbers: "16"
+#| output-location: column
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, color = species)
+) +
+  geom_point() +
+  scale_color_manual(values = c("#19a6b3","#f26c0d","#5e3894")) +
+  theme_minimal() +
+  labs(
+    title = "Bill dimensions of penguins",
+    subtitle = "Palmer penguins dataset",
+    caption = "Source: palmerpenguins package",
+    x = "Bill length, mm",
+    y = "Bill depth, mm",
+    color = "Species"
+  ) +
+  theme(legend.position = "none")
+```
+
+# Other geometries {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## `geom_smooth()` {.smaller}
+
+```{r}
+#| label: ggplot-smooth
+#| fig-align: center
+#| code-line-numbers: "6"
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, color = species, shape = species)
+) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE) +
+  scale_color_manual(values = c("darkorange","purple","cyan4")) +
+  theme_minimal()
+```
+
+## Bubble plot
+
+```{r}
+#| label: ggplot-bubble
+#| fig-align: center
+#| code-line-numbers: "3"
+
+ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, size = body_mass_g, color = species)
+) +
+  geom_point(alpha = 0.5) +
+  scale_color_manual(values = c("darkorange","purple","cyan4")) +
+  theme_minimal()
+```
+
+## Bar plot
+
+```{r}
+#| label: ggplot-bar
+#| fig-align: center
+#| code-line-numbers: "5"
+
+ggplot(
+  data = penguins, 
+  aes(x = species, fill = species)
+) +
+  geom_bar() +
+  theme_minimal()
+```
+
+## Dodge bar plot
+
+```{r}
+#| label: ggplot-bar-dodge
+#| fig-align: center
+#| code-line-numbers: "5"
+
+ggplot(
+  data = penguins, 
+  aes(x = species, fill = sex)
+) +
+  geom_bar(position = "dodge") +
+  theme_minimal()
+```
+
+## Histogram
+
+```{r}
+#| label: ggplot-hist
+#| fig-align: center
+#| code-line-numbers: "3,5"
+
+ggplot(
+  data = penguins, 
+  aes(x = body_mass_g, fill = species)
+) +
+  geom_histogram(alpha = 0.5) +
+  theme_minimal()
+```
+
+## Density plot
+
+```{r}
+#| label: ggplot-density
+#| fig-align: center
+#| code-line-numbers: "3,5"
+
+ggplot(
+  data = penguins, 
+  aes(x = body_mass_g, fill = species)
+) +
+  geom_density(alpha = 0.5) +
+  theme_minimal()
+```
+
+## Facets
+
+```{r}
+#| label: ggplot-facets
+#| fig-align: center
+#| code-line-numbers: "5,7"
+
+ggplot(
+  data = penguins, 
+  aes(x = body_mass_g, fill = species)
+) +
+  geom_density() +
+  theme_minimal() +
+  facet_wrap(~ species) # or facet_grid(. ~ species)
+```
+
+## Box plot
+
+```{r}
+#| label: ggplot-box
+#| fig-align: center
+#| code-line-numbers: "5"
+
+ggplot(
+  data = penguins, 
+  aes(x = species, y = body_mass_g, fill = species)
+) +
+  geom_boxplot() +
+  theme_minimal()
+```
+
+## Box plot with jitter
+
+```{r}
+#| label: ggplot-box-jitter
+#| fig-align: center
+#| code-line-numbers: "3,4"
+
+ggplot(data = penguins, aes(x = species, y = flipper_length_mm)) +
+  geom_boxplot(aes(color = species), width = 0.3, show.legend = FALSE) +
+  geom_jitter(aes(color = species), alpha = 0.5, show.legend = FALSE, position = position_jitter(width = 0.2, seed = 0)) +
+  scale_color_manual(values = c("darkorange", "purple", "cyan4")) +
+  labs(x = "Species",
+       y = "Flipper length (mm)") +
+  theme_minimal()
+```
+
+# ggplot2 extensions {background-iframe=".04_files/libs/colored-particles/index.html"}
+
+## `patchwork` {.tiny}
+
+```{r}
+#| label: ggplot-patchwork
+#| fig-align: center
+#| output-location: column
+
+library(patchwork)
+
+p1 <- ggplot(
+  data = penguins, 
+  aes(x = bill_length_mm, y = bill_depth_mm, color = species)
+) +
+  geom_point() +
+  scale_color_manual(values = c("#19a6b3","#f26c0d","#5e3894")) +
+  theme_minimal()
+
+p2 <- ggplot(
+  data = penguins, 
+  aes(x = body_mass_g, fill = species)
+) +
+  geom_density(alpha = 0.5) +
+  theme_minimal() +
+  facet_grid(~ species)
+
+p3 <- ggplot(
+  data = penguins, 
+  aes(x = species, y = body_mass_g, fill = species)
+) +
+  geom_boxplot() +
+  theme_minimal()
+
+(p1 | p2) / p3
+```
+
+::: footer
+[🔗patchwork)](https://patchwork.data-imaginist.com/)
+:::
+
+## `ggstatsplot`
+
+```{r}
+#| label: ggplot-ggstatsplot
+#| fig-align: center
+
+library(ggstatsplot)
+
+ggscatterstats(
+  data = penguins, 
+  x = bill_length_mm, 
+  y = bill_depth_mm, 
+  color = species
+)
+```
+
+::: footer
+[🔗ggstatsplot](https://indrajeetpatil.github.io/ggstatsplot/)
+:::
+
+## `GGally`
+
+```{r}
+#| label: ggplot-GGally
+#| fig-align: center
+
+library(GGally)
+
+ggpairs(
+  data = penguins, 
+  columns = c("bill_length_mm", "bill_depth_mm", "flipper_length_mm", "body_mass_g"),
+  mapping = aes(color = species)
+)
+```
+
+## Additional resources
+
+- [🔗ggplot2 documentation](https://ggplot2.tidyverse.org/)
+- [🔗Data visualization with ggplot2 cheatsheet](hhttps://rstudio.github.io/cheatsheets/data-visualization.pdf)
+    + [🔗Data visualization with ggplot2 book](https://ggplot2-book.org/)
+    + [🔗R4DS: Data visualization](https://r4ds.hadley.nz/data-visualize)
+- [🔗ggplot2 extensions - gallery](https://exts.ggplot2.tidyverse.org/gallery/)
+- [🔗The R Graph Gallery](https://r-graph-gallery.com/)
+
+
+
+# Questions? {.unnumbered .unlisted background-iframe=".04_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=2554)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

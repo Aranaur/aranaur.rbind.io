@@ -1,0 +1,386 @@
+---
+title: "🔥PyTorch Transfer Learning "
+subtitle: "Технології комп'ютерного зору"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка, ФІТ
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .06_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: <a href="https://aranaur.rbind.io/lectures">🔗Технології комп'ютерного зору</a>
+format:
+  revealjs: 
+    transition: fade
+    chalkboard: true
+    logo: fit.png
+    slide-number: true
+    # toc: true
+    # toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-width: 9
+    fig-height: 5
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+#   gfm:
+#     mermaid-format: png
+preload-iframes: true
+jupyter: python3
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{python}
+#| include: false
+
+import torch
+from torch import nn
+import matplotlib.pyplot as plt
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+## Що таке Transfer Learning?
+
+- **Використання знань**, отриманих при розв'язанні **однієї задачі**, для розв'язання **іншої задачі**
+- У контексті глибокого навчання, це часто означає використання **попередньо навчених моделей**
+- Особливо корисно у комп'ютерному зорі, де великі набори даних (наприклад, ImageNet) використовуються для навчання моделей, які потім можуть бути адаптовані до специфічних задач
+
+## Для чого потрібен Transfer Learning?
+
+Використання Transfer Learning має дві основні переваги:
+
+- Можливість використовувати існуючу модель (зазвичай архітектуру нейронної мережі), яка вже довела свою ефективність у вирішенні завдань.
+- Можливість використовувати робочу модель, яка вже навчилася розпізнавати закономірності на даних, схожих на наші. Це часто дозволяє досягти чудових результатів з меншою кількістю власних даних.
+
+## Де шукати попередньо навчені моделі?
+
+- PyTorch: `torchvision.models`, `torchtext.models`, `torchaudio.models`, `torchrec.models`
+- HuggingFace Hub: [моделі](https://huggingface.co/models) та [набори даних](https://huggingface.co/datasets).
+- `timm` (PyTorch Image Models): [репозиторій](https://github.com/huggingface/pytorch-image-models)
+- Trending Papers with Code: [репозиторій](https://huggingface.co/papers/trending)
+
+## Починаємо... {.tiny .scrollable}
+
+```{python}
+import torch
+import torchvision
+
+print(f"torch version: {torch.__version__}")
+print(f"torchvision version: {torchvision.__version__}")
+
+import matplotlib.pyplot as plt
+from torch import nn
+from torchvision import transforms
+from torchinfo import summary
+
+from going_modular.going_modular import data_setup, engine
+
+# Setup device agnostic code
+device = "cuda" if torch.cuda.is_available() else "cpu"
+device
+
+import gdown
+import tempfile
+import zipfile
+import os
+from pathlib import Path
+
+file_url = 'https://drive.google.com/file/d/1Jf8jhskDmN3DxP0yk9PET5Kr44OnwUgU/view?usp=sharing'
+file_id = file_url.split('/')[-2]
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    print(f'Створено тимчасову папку: {tmpdir}')
+
+    zip_path = os.path.join(tmpdir, 'pizza_steak_sushi.zip')
+
+    print('Завантаження файлу...')
+    gdown.download(id=file_id, output=zip_path, quiet=False)
+    print('Завантаження завершено.')
+
+    extract_path = 'going_modular/pizza_steak_sushi'
+    os.makedirs(extract_path, exist_ok=True)
+
+    print(f'Розархівація файлу в {extract_path}...')
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(extract_path)
+    print('Розархівація завершена.')
+
+print('Тимчасову папку та її вміст видалено.')
+
+# Setup Dirs
+data_path = Path("going_modular/")
+train_dir = data_path / "pizza_steak_sushi/train"
+test_dir = data_path / "pizza_steak_sushi/test"
+```
+
+## Готуємо дані {.smaller}
+
+- Раніше потрібно було в "ручному" режимі готувати дані відповідно до вимог моделі.
+- Зараз більшість попередньо навчених моделей мають вбудовані трансформації, які можна застосувати до даних.
+
+```
+weights = torchvision.models.EfficientNet_B0_Weights.DEFAULT
+```
+
+- `EfficientNet_B0_Weights` --- це клас, який містить інформацію про ваги моделі EfficientNet_B0, попередньо навчену на наборі даних ImageNet.
+- `DEFAULT` --- стандартний набір вагів, рекомендований для використання з цією моделлю.
+
+::: {.callout-note icon="false"}
+Залежно від обраної архітектури моделі, ви також можете побачити інші опції, такі як `IMAGENET_V1` та `IMAGENET_V2`, де, як правило, чим вищий номер версії, тим краще. Докладнішу інформацію дивіться в [документації](https://pytorch.org/vision/main/models.html) `torchvision.models`.
+:::
+
+## Готуємо дані {.smaller}
+
+```{python}
+weights = torchvision.models.EfficientNet_B0_Weights.DEFAULT
+weights
+```
+
+Тепер ми можемо отримати трансформації, які використовувалися під час навчання моделі EfficientNet_B0 на ImageNet.
+
+```{python}
+# Get the transforms used to create our pretrained weights
+auto_transforms = weights.transforms()
+auto_transforms
+```
+
+## DataLoaders 
+
+```{python}
+train_dataloader, test_dataloader, class_names = data_setup.create_dataloaders(train_dir=train_dir,
+                                                                               test_dir=test_dir,
+                                                                               transform=auto_transforms,
+                                                                               batch_size=32)
+
+train_dataloader, test_dataloader, class_names
+```
+
+## Архітектури в PyTorch {.smaller}
+
+- [ResNet](https://arxiv.org/abs/1512.03385): `torchvision.models.resnet18()`, `torchvision.models.resnet50()`...
+- [EfficientNet](https://arxiv.org/abs/1905.11946): `torchvision.models.efficientnet_b0()`, `torchvision.models.efficientnet_b1()`...
+- [VGG](https://arxiv.org/abs/1409.1556): `torchvision.models.vgg16()`
+- [Vision Transformers](https://arxiv.org/abs/2010.11929) (ViT): `torchvision.models.vit_b_16()`, `torchvision.models.vit_b_32()`...
+- [ConvNext](https://arxiv.org/abs/2201.03545): `torchvision.models.convnext_tiny()`, `torchvision.models.convnext_small()`...
+
+## Яку модель обрати? {.smaller}
+
+Компроміс між ефективністю, швидкодією та складністю:
+
+- Почніть з простої моделі, наприклад, ResNet або EfficientNet.
+- Якщо у вас є обчислювальні ресурси, спробуйте більш складні моделі, такі як Vision Transformers або ConvNext.
+- Використовуйте `torchinfo.summary()` для порівняння кількості параметрів і складності моделей.
+
+Приклади:
+
++ [Nutrify](https://nutrify.app/) --- додаток для розпізнавання їжі, який використовує `efficientnet_b0`.
++ [Comma.ai](https://comma.ai/) --- компанія, яка розробляє автономні автомобілі, використовує [`efficientnet_b2`](https://geohot.github.io/blog/jekyll/update/2021/10/29/an-architecture-for-life.html).
+
+## Готуємо модель {.scrollable}
+
+Використаємо [EfficientNet_B0](https://docs.pytorch.org/vision/main/models/generated/torchvision.models.efficientnet_b0.html). Версія цієї попередньо навченої моделі для PyTorch здатна досягти точності ~77,7% у 1000 класах ImageNet.
+
+```{dot}
+//| echo: false
+digraph G {
+    rankdir="TD";
+    node [shape=box, style=solid];
+
+    input [label="Input\n224x224x3"];
+    conv1 [label="Conv3x3\n112x112x32"];
+    mbconv1_1 [label="MBConv1, 3x3\n112x112x16"];
+    mbconv6_1 [label="MBConv6, 3x3\n56x56x24", color="brown", fontcolor="brown"];
+    mbconv6_2 [label="MBConv6, 3x3\n56x56x24", color="brown", fontcolor="brown"];
+    mbconv6_3 [label="MBConv6, 5x5\n28x28x40", color="blue", fontcolor="blue"];
+    mbconv6_4 [label="MBConv6, 5x5\n28x28x40", color="blue", fontcolor="blue"];
+    mbconv6_5 [label="MBConv6, 3x3\n28x28x80", color="brown", fontcolor="brown"];
+    mbconv6_6 [label="MBConv6, 3x3\n28x28x80", color="brown", fontcolor="brown"];
+    mbconv6_7 [label="MBConv6, 3x3\n28x28x80", color="brown", fontcolor="brown"];
+    mbconv6_8 [label="MBConv6, 5x5\n14x14x112", color="blue", fontcolor="blue"];
+    mbconv6_9 [label="MBConv6, 5x5\n14x14x112", color="blue", fontcolor="blue"];
+    mbconv6_10 [label="MBConv6, 5x5\n14x14x112", color="blue", fontcolor="blue"];
+    mbconv6_11 [label="MBConv6, 5x5\n7x7x192", color="blue", fontcolor="blue"];
+    mbconv6_12 [label="MBConv6, 5x5\n7x7x192", color="blue", fontcolor="blue"];
+    mbconv6_13 [label="MBConv6, 5x5\n7x7x192", color="blue", fontcolor="blue"];
+    mbconv6_14 [label="MBConv6, 3x3\n7x7x320", color="brown", fontcolor="brown"];
+
+    input -> conv1;
+    conv1 -> mbconv1_1;
+    mbconv1_1 -> mbconv6_1;
+    mbconv6_1 -> mbconv6_2;
+    mbconv6_2 -> mbconv6_3;
+    mbconv6_3 -> mbconv6_4;
+    mbconv6_4 -> mbconv6_5;
+    mbconv6_5 -> mbconv6_6;
+    mbconv6_6 -> mbconv6_7;
+    mbconv6_7 -> mbconv6_8;
+    mbconv6_8 -> mbconv6_9;
+    mbconv6_9 -> mbconv6_10;
+    mbconv6_10 -> mbconv6_11;
+    mbconv6_11 -> mbconv6_12;
+    mbconv6_12 -> mbconv6_13;
+    mbconv6_13 -> mbconv6_14;
+}
+```
+
+## Готуємо модель
+
+```{python}
+weights = torchvision.models.EfficientNet_B0_Weights.DEFAULT
+model = torchvision.models.efficientnet_b0(weights=weights).to(device)
+model
+```
+
+---
+
+Модель складається з трьох основних частин:
+
+- `features` --- це основна частина моделі, яка відповідає за витягування ознак з вхідних зображень. Вона складається з кількох шарів згортки (convolutional layers), які послідовно обробляють вхідне зображення, витягуючи все більш складні та абстрактні ознаки.
+- `avgpool` --- це шар глобального середнього пулінгу (global average pooling layer), який зменшує розмірність вихідних ознак, отриманих з `features`, шляхом усереднення значень по кожному каналу.
+- `classifier` --- це повнозв'язний шар (fully connected layer), який приймає вхідні ознаки після `avgpool` і перетворює їх у вихідні класи. У випадку EfficientNet_B0, цей шар має 1000 вихідних нейронів, що відповідає 1000 класам ImageNet.
+
+## Інформація про модель {.smaller}
+
+Використаємо `torchinfo.summary()` для отримання детальної інформації про модель:
+
+- `model`: модель, яку ми хочемо проаналізувати.
+- `input_size`: розмір вхідних даних, які модель приймає (включаючи розмір батчу).
+- `col_names`: назви колонок, які ми хочемо бачити в звіті.
+- `col_width`: ширина колонок для кращої читабельності.
+- `row_settings`: налаштування для відображення певних рядків, таких як параметри та пам'ять.
+
+```{python}
+#| output-location: slide
+summary(model=model, 
+        input_size=(32, 3, 224, 224),
+        col_names=["input_size", "output_size", "num_params", "trainable"],
+        col_width=20,
+        row_settings=["var_names"]
+)
+```
+
+## Заморожуємо ваги {.smaller}
+
+- Заморожування вагів (freezing weights) означає, що ми не будемо оновлювати ці ваги під час навчання моделі на новому наборі даних.
+- Це корисно, коли ми хочемо використовувати попередньо навчену модель як фіксований екстрактор ознак, не змінюючи її внутрішні параметри.
+
+```{python}
+for param in model.features.parameters():
+    param.requires_grad = False
+```
+
+## Змінюємо класифікатор {.smaller}
+
+- `out_features` --- кількість вихідних нейронів у класифікаторі, яке ми хочемо змінити.
+
+```{python}
+torch.manual_seed(73)
+torch.cuda.manual_seed(73)
+
+output_shape = len(class_names)
+
+model.classifier = torch.nn.Sequential(
+    torch.nn.Dropout(p=0.2, inplace=True), 
+    torch.nn.Linear(in_features=1280, 
+                    out_features=output_shape,
+                    bias=True)).to(device)
+```
+
+---
+
+```{python}
+#| echo: false
+summary(model, 
+        input_size=(32, 3, 224, 224),
+        verbose=0,
+        col_names=["input_size", "output_size", "num_params", "trainable"],
+        col_width=20,
+        row_settings=["var_names"]
+)
+```
+
+## Готуємо функцію втрат та оптимізатор
+
+```{python}
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+```
+
+## Навчаємо модель {.smaller}
+
+- `train()` --- функція знаходиться в скрипті `engine.py`
+
+```{python}
+#| label: train
+#| output-location: slide
+torch.manual_seed(73)
+torch.cuda.manual_seed(73)
+
+from timeit import default_timer as timer 
+start_time = timer()
+
+results = engine.train(model=model,
+                       train_dataloader=train_dataloader,
+                       test_dataloader=test_dataloader,
+                       optimizer=optimizer,
+                       loss_fn=loss_fn,
+                       epochs=5,
+                       device=device)
+
+end_time = timer()
+print(f"[INFO] Total training time: {end_time-start_time:.3f} seconds")
+```
+
+## Оцінюємо модель
+
+```{python}
+#| output-location: slide
+try:
+    from helper_functions import plot_loss_curves
+except:
+    print("[INFO] Couldn't find helper_functions.py, downloading...")
+    with open("helper_functions.py", "wb") as f:
+        import requests
+        request = requests.get("https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/refs/heads/main/lectures/cv/slides/2025/helper_functions.py")
+        f.write(request.content)
+    from helper_functions import plot_loss_curves
+
+plot_loss_curves(results)
+```
+
+## Прогнозуємо на нових зображеннях {.smaller}
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".04_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
