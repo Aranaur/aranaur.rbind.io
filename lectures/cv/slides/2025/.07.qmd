@@ -1,0 +1,525 @@
+---
+title: "Реплікація статті з 🔥PyTorch"
+subtitle: "Технології комп'ютерного зору"
+author: "Ігор Мірошниченко"
+institute: КНУ імені Тараса Шевченка, ФІТ
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .07_files/libs/colored-particles/index.html
+language: _language-ua.yml
+footer: <a href="https://aranaur.rbind.io/lectures">🔗Технології комп'ютерного зору</a>
+format:
+  revealjs: 
+    transition: fade
+    chalkboard: true
+    logo: fit.png
+    slide-number: true
+    # toc: true
+    # toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-width: 9
+    fig-height: 5
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+#   gfm:
+#     mermaid-format: png
+preload-iframes: true
+jupyter: python3
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{python}
+#| include: false
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+## Що таке реплікація наукової статті?
+
+- Реплікація (від англ. replication) --- це процес **відтворення** результатів наукового дослідження з використанням тих самих методів, даних та умов, що й у оригінальному дослідженні.
+- Це дозволяє використати останні **новинки** в наукових дослідженнях, перевірити їхню достовірність та **зрозуміти**, як вони працюють на практиці.
+- Реплікація є важливою частиною наукового процесу, оскільки вона допомагає **підтвердити** або **спростувати** результати досліджень, а також сприяє розвитку нових ідей та методів.
+
+## З чого складається стаття? {.smaller}
+
+- **Анотація** (Abstract): Короткий огляд основних цілей, методів, результатів та висновків дослідження.
+- **Вступ** (Introduction): Опис проблеми, огляд літератури та постановка цілей дослідження.
+- **Методологія** (Methodology): Детальний опис методів, які використовувалися для проведення дослідження.
+- **Результати** (Results): Представлення основних результатів дослідження, часто з використанням таблиць та графіків.
+- **Висновки** (Conclusion): Підсумок основних висновків дослідження та їх значення.
+- **Посилання** (References): Список джерел, які були використані в дослідженні.
+- **Додатки** (Appendices): Додаткова інформація, яка може бути корисною для розуміння дослідження, але не є критичною для основного тексту.
+
+## Де шукати статті?
+
+- [arXiv](https://arxiv.org/) --- безкоштовний архів наукових статей з різних галузей науки, включаючи комп'ютерні науки, фізику, математику та інші.
+- [Google Scholar](https://scholar.google.com/) --- пошукова система для наукових статей, дисертацій, книг та інших академічних ресурсів.
+- [Hugging Face Papers with Code](https://huggingface.co/papers/trending) --- платформа, яка надає доступ до наукових статей з відкритим кодом, що дозволяє легко знаходити та використовувати новітні дослідження в галузі машинного навчання.
+- [GitHub](https://github.com/lucidrains/vit-pytorch) --- платформа для хостингу та спільної роботи над проектами, яка також містить багато наукових статей та ресурсів.
+
+## Vanilla Vision Transformer
+
+ViT --- це модель глибокого навчання, яка використовує архітектуру трансформера для обробки зображень. Вона була запропонована в статті ["An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale"](https://arxiv.org/abs/2010.11929) (Dosovitskiy et al., 2020).
+
+---
+
+![ViT Architecture](img/vit.gif)
+
+## Стартуємо... {.smaller}
+
+```{python}
+import torch
+import torchvision
+print(f"torch version: {torch.__version__}")
+print(f"torchvision version: {torchvision.__version__}")
+
+import matplotlib.pyplot as plt
+
+from torch import nn
+from torchvision import transforms
+from torchinfo import summary
+from going_modular.going_modular import data_setup, engine
+from helper_functions import download_data, set_seeds, plot_loss_curves
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Using device: {device}")
+
+from pathlib import Path
+data_path = Path("going_modular/")
+train_dir = data_path / "pizza_steak_sushi/train"
+test_dir = data_path / "pizza_steak_sushi/test"
+```
+
+## Datasets та DataLoaders
+
+- Функція `create_dataloaders()` у файлі `going_modular/going_modular.py` створює DataLoaders для тренувального та тестового наборів даних.
+- Але спочатку потрібно трансформувати зображення. Див. [таблицю 3](https://arxiv.org/pdf/2010.11929).
+
+![](img/vif-01.jpg)
+
+## Трансформації
+
+```{python}
+IMG_SIZE = 224
+
+manual_transforms = transforms.Compose([
+    transforms.Resize((IMG_SIZE, IMG_SIZE)),
+    transforms.ToTensor(),
+])
+print(f"Manually created transforms: {manual_transforms}")
+```
+
+## Передаємо у DataLoader
+
+- Розмір батчу у статі - 4096, але у нас може не бути стільки пам'яті.
+- Використаємо 32.
+- Якщо все ок, можна збільшити.
+
+```{python}
+BATCH_SIZE = 32
+
+train_dataloader, test_dataloader, class_names = data_setup.create_dataloaders(
+    train_dir=train_dir,
+    test_dir=test_dir,
+    transform=manual_transforms,
+    batch_size=BATCH_SIZE,
+    num_workers=0
+)
+
+train_dataloader, test_dataloader, class_names
+```
+
+## Входи, виходи, шари та блоки
+
+- Вхід: зображення з трьома класами (піца, стейк, суші).
+- Вихід: ймовірності належності до кожного з трьох класів.
+- Шари: приймає вхідні дані, виконує обчислення та передає вихідні дані наступному шару.
+- Блоки: сукупність шарів, які працюють разом для виконання певної функції.
+- Архітектура (модель): сукупність блоків, які працюють разом для виконання складного завдання.
+
+---
+
+::: {.columns}
+::: {.column}
+```{mermaid}
+%%| echo: false
+graph LR
+    A[Inputs] --> B{Layer};
+    B --> C[Outputs];
+    
+    subgraph " "
+        direction TB
+        D["<b>Attention(Q, K, V) = softmax(QK<sup>T</sup>/√d<sub>k</sub>)V"]
+    end
+
+    B-.->D
+    
+    style B fill:#7FFFD4,stroke:#7FFFD4,color:#000
+    style D fill:#000,stroke:#000,color:#fff
+```
+:::
+::: {.column}
+```{mermaid}
+%%| echo: false
+graph LR
+    Inputs --> L1;
+
+    subgraph Block
+        direction LR
+        L1[Layer]
+        L2[Layer]
+        L3[Layer]
+    end
+    
+    L3 --> Outputs;
+    
+    style Block fill:#1E90FF,stroke:#1E90FF,color:white
+    style L1 fill:#7FFFD4,stroke:#7FFFD4,color:#000
+    style L2 fill:#7FFFD4,stroke:#7FFFD4,color:#000
+    style L3 fill:#7FFFD4,stroke:#7FFFD4,color:#000
+```
+:::
+:::
+
+---
+
+```{mermaid}
+%%| echo: false
+graph LR
+    Inputs --> Model;
+    subgraph Model
+        direction LR
+        subgraph Block_1
+            direction LR
+            L1[Layer]
+            L2[Layer]
+            L3[Layer]
+        end
+        subgraph Block_2
+            direction LR
+            L4[Layer]
+            L5[Layer]
+            L6[Layer]
+        end
+        etc[...]
+    end
+    Model --> Outputs;
+
+    style Model fill:#FA8072,stroke:#FA8072,color:white
+    style Block_1 fill:#1E90FF,stroke:#1E90FF,color:white
+    style Block_2 fill:#1E90FF,stroke:#1E90FF,color:white
+    style L1 fill:#7FFFD4,stroke:#7FFFD4,color:#000
+    style L2 fill:#7FFFD4,stroke:#7FFFD4,color:#000
+    style L3 fill:#7FFFD4,stroke:#7FFFD4,color:#000
+    style L4 fill:#7FFFD4,stroke:#7FFFD4,color:#000
+    style L5 fill:#7FFFD4,stroke:#7FFFD4,color:#000
+    style L6 fill:#7FFFD4,stroke:#7FFFD4,color:#000
+```
+
+## Архітектура Vision Transformer {.smaller}
+
+- Рисунок 1.: Графічне представлення архітектури ViT.
+- Формули 1-4 у розділі 3.1: математичне представлення основних компонентів ViT.
+- Таблиця 1: гіперпараметри моделі ViT.
+
+::: {layout-ncol=3}
+
+![](img/vif-02.jpg)
+
+![](img/vif-03.jpg)
+
+![](img/vif-04.jpg)
+
+:::
+
+## Рисунок 1 {.tiny}
+
+- **Patch + Position Embedding** (вхідні дані) - Зображення розбивається на фрагменти (patches) з додаванням інформації про позицію (position embeddings).
+- **Linear projection of flattened patches (Embedded Patches)** - Фрагменти зображення перетворюються на ембендінги.
+- **Norm** - це скорочення від «Layer Normalization» або «LayerNorm», техніки для регуляризації (зменшення перенавчання) нейронної мережі (`torch.nn.LayerNorm()`).
+- **Multi-Head Attention** - це шар Multi-Headed Self-Attention або, скорочено, «MSA» (`torch.nn.MultiheadAttention()`).
+- **MLP** (або багатошаровий перцептрон) — MLP часто може означати будь-яку сукупність шарів прямого поширення (або, у випадку PyTorch, сукупність шарів з методом `forward()`). У статті про ViT автори називають MLP «блоком MLP», який містить два шари `torch.nn.Linear()` з нелінійною активацією `torch.nn.GELU()` між ними і шар `torch.nn.Dropout()` після кожного з них.
+- **Transformer Encoder** — це сукупність шарів, перерахованих вище. Загальна архітектура ViT складається з декількох Transformer encoders, розташованих один над одним. Символ "+" на малюнку вказує на те, що вихід одного Transformer encoder є входом для наступного.
+- **MLP Head** — це вихідний шар архітектури, який перетворює вивчені особливості вхідних даних у вихідні дані класу.
+
+## Patch + Position Embedding
+
+```{python}
+height = 224 # H
+width = 224 # W
+color_channels = 3 # C
+patch_size = 16 # P
+
+number_of_patches = int((height * width) / patch_size**2)
+print(f"Number of patches: {number_of_patches}")
+```
+
+## Patch + Position Embedding
+
+- **Вхідні дані:** зображення спочатку має вигляд 2D розміром ${H \times W \times C}$.
+- **Вихідні дані:** зображення перетворюється на послідовність сплощених 2D фрагментів розміром ${N \times\left(P^{2} \cdot C\right)}$.
+
+```{python}
+embedding_layer_input_shape = (height, width, color_channels)
+
+embedding_layer_output_shape = (number_of_patches, patch_size**2 * color_channels)
+
+print(f"Input shape (single 2D image): {embedding_layer_input_shape}")
+print(f"Output shape (single 2D image flattened into patches): {embedding_layer_output_shape}")
+```
+
+## Як це виглядає?
+
+```{python}
+#| output-location: column
+# Get a batch of images
+image_batch, label_batch = next(iter(train_dataloader))
+
+# Get a single image from the batch
+image, label = image_batch[0], label_batch[0]
+
+# View the batch shapes
+print(image.shape, label)
+
+plt.imshow(image.permute(1, 2, 0)) # adjust for matplotlib
+plt.title(class_names[label])
+plt.axis(False);
+```
+
+## Як це виглядає?
+
+```{python}
+#| output-location: column
+
+image_permuted = image.permute(1, 2, 0)
+
+# Index to plot the top row of patched pixels
+patch_size = 16
+plt.figure(figsize=(patch_size, patch_size))
+plt.imshow(image_permuted[:patch_size, :, :]);
+```
+
+## Як це виглядає? {.tiny}
+
+```{python}
+# | output-location: slide
+img_size = 224
+patch_size = 16
+num_patches = img_size/patch_size
+assert img_size % patch_size == 0, "Image size must be divisible by patch size"
+print(f"Number of patches per row: {num_patches}\nPatch size: {patch_size} pixels x {patch_size} pixels")
+
+fig, axs = plt.subplots(nrows=1,
+                        ncols=img_size // patch_size,
+                        figsize=(num_patches, num_patches),
+                        sharex=True,
+                        sharey=True)
+
+for i, patch in enumerate(range(0, img_size, patch_size)):
+    axs[i].imshow(image_permuted[:patch_size, patch:patch+patch_size, :]);
+    axs[i].set_xlabel(i+1)
+    axs[i].set_xticks([])
+    axs[i].set_yticks([])
+```
+
+## Як це виглядає?
+
+```{python}
+# | output-location: slide
+
+img_size = 224
+patch_size = 16
+num_patches = img_size/patch_size
+assert img_size % patch_size == 0, "Image size must be divisible by patch size"
+print(f"Number of patches per row: {num_patches}\
+        \nNumber of patches per column: {num_patches}\
+        \nTotal patches: {num_patches*num_patches}\
+        \nPatch size: {patch_size} pixels x {patch_size} pixels")
+
+fig, axs = plt.subplots(nrows=img_size // patch_size,
+                        ncols=img_size // patch_size,
+                        figsize=(num_patches, num_patches),
+                        sharex=True,
+                        sharey=True)
+
+for i, patch_height in enumerate(range(0, img_size, patch_size)):
+    for j, patch_width in enumerate(range(0, img_size, patch_size)):
+
+        axs[i, j].imshow(image_permuted[patch_height:patch_height+patch_size,
+                                        patch_width:patch_width+patch_size,
+                                        :])
+
+        axs[i, j].set_ylabel(i+1,
+                             rotation="horizontal",
+                             horizontalalignment="right",
+                             verticalalignment="center")
+        axs[i, j].set_xlabel(j+1)
+        axs[i, j].set_xticks([])
+        axs[i, j].set_yticks([])
+        axs[i, j].label_outer()
+
+fig.suptitle(f"{class_names[label]} -> Patchified", fontsize=16)
+plt.show()
+```
+
+## `torch.nn.Conv2d()` {.smaller}
+
+- Ми можемо використовувати `torch.nn.Conv2d()` для розбиття зображення на фрагменти (patches).
+- Параметри:
+    - `in_channels`: кількість каналів у вхідних даних (3 для RGB-зображень).
+    - `out_channels`: кількість фільтрів (потрібно встановити рівним розміру ембедінгу, наприклад, 768).
+    - `kernel_size`: розмір фрагмента (patch size), наприклад, 16.
+    - `stride`: крок ковзання фільтра (stride), також встановлюється рівним розміру фрагмента.
+    - `padding`: кількість пікселів, які додаються до країв зображення (0 для без додаткового паддінгу).
+
+```{python}
+from torch import nn
+
+patch_size=16
+
+conv2d = nn.Conv2d(in_channels=3, 
+                   out_channels=768,
+                   kernel_size=patch_size,
+                   stride=patch_size,
+                   padding=0)
+```
+
+---
+
+```{python}
+# View single image
+plt.imshow(image.permute(1, 2, 0)) # adjust for matplotlib
+plt.title(class_names[label])
+plt.axis(False);
+
+image_out_of_conv = conv2d(image.unsqueeze(0))
+print(image_out_of_conv.shape)
+```
+
+---
+
+Візуалізуємо вихідні дані після шару `Conv2d`
+
+```{python}
+import random
+random_indexes = random.sample(range(0, 758), k=5)
+print(f"Showing random convolutional feature maps from indexes: {random_indexes}")
+
+fig, axs = plt.subplots(nrows=1, ncols=5, figsize=(12, 12))
+
+for i, idx in enumerate(random_indexes):
+    image_conv_feature_map = image_out_of_conv[:, idx, :, :]
+    axs[i].imshow(image_conv_feature_map.squeeze().detach().numpy())
+    axs[i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[]);
+```
+
+---
+
+Переглянемо окрему ознаку в тензорному форматі
+
+```{python}
+# Get a single feature map in tensor form
+single_feature_map = image_out_of_conv[:, 0, :, :]
+single_feature_map, single_feature_map.requires_grad
+```
+
+## `torch.nn.Flatten()` {.tiny}
+
+Перетворюємо вихідні дані після шару `Conv2d` у формат, придатний для лінійного шару
+
+```{python}
+# Current tensor shape
+print(f"Current tensor shape: {image_out_of_conv.shape} -> [batch, embedding_dim, feature_map_height, feature_map_width]")
+```
+
+- `start_dim=2`: починаємо сплощення з третього виміру (індексація починається з 0).
+- `end_dim=3`: закінчуємо сплощення на четвертому вимірі.
+
+```{python}
+
+flatten = nn.Flatten(start_dim=2,
+                     end_dim=3)
+```
+
+## Все разом {.tiny}
+
+1. Беремо одне зображення.
+2. Пропустити його через конволюційний шар (conv2d), щоб перетворити зображення на 2D-карти ознак (вбудовування патчів).
+3. Сплавити 2D-карту ознак в одну послідовність.
+
+```{python}
+#| output-location: slide
+plt.imshow(image.permute(1, 2, 0))
+plt.title(class_names[label])
+plt.axis(False);
+print(f"Original image shape: {image.shape}")
+
+image_out_of_conv = conv2d(image.unsqueeze(0))
+print(f"Image feature map shape: {image_out_of_conv.shape}")
+
+image_out_of_conv_flattened = flatten(image_out_of_conv)
+print(f"Flattened image feature map shape: {image_out_of_conv_flattened.shape}")
+```
+
+## `torch.Tensor.permute()`
+
+- Після сплощення, щоб отримати остаточний формат ембедінгу патчів, потрібно змінити порядок вимірів тензора.
+
+```{python}
+image_out_of_conv_flattened_reshaped = image_out_of_conv_flattened.permute(0, 2, 1)
+print(f"Patch embedding sequence shape: {image_out_of_conv_flattened_reshaped.shape} -> [batch_size, num_patches, embedding_size]")
+```
+
+---
+
+Візуалізуємо окрему ознаку після сплощення
+
+```{python}
+single_flattened_feature_map = image_out_of_conv_flattened_reshaped[:, :, 0]
+plt.figure(figsize=(22, 22))
+plt.imshow(single_flattened_feature_map.detach().numpy())
+plt.title(f"Flattened feature map shape: {single_flattened_feature_map.shape}")
+plt.axis(False);
+```
+
+---
+
+Переглянемо окрему ознаку у тензорному форматі
+
+```{python}
+single_flattened_feature_map, single_flattened_feature_map.requires_grad, single_flattened_feature_map.shape
+```
+
+# Дякую за увагу! {.unnumbered .unlisted background-iframe=".07_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Матеріали курсу](https://aranaur.rbind.io/lectures/)
+
+{{< iconify mdi envelope >}} ihor.miroshnychenko\@knu.ua
+
+{{< iconify ic baseline-telegram >}} [Data Mirosh](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
