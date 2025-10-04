@@ -1,0 +1,612 @@
+---
+title: "Advanced imports and data manipulations"
+subtitle: "STAT150 | R for Data Science"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .06_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=3374">🔗STAT150 | R for Data Science</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Google Sheets
+
+## Prerequisites
+
+```{r}
+#| warning: false
+#| message: false
+library(googlesheets4)
+library(tidyverse)
+```
+
+## Reading data
+
+- `read_sheet()` reads data from a Google Sheet into a tibble.
+- `range_read()` reads a specific range of cells.
+- `gs4_create()` creates a new Google Sheet.
+- `sheet_write()` writes data to a Google Sheet.
+
+## Authentication
+
+- The first time you use `googlesheets4`, it will prompt you to authenticate with your Google account.
+- You can use `gs4_auth()` to manage authentication.
+- Use `gs4_deauth()` to access public sheets without authentication.
+
+```{r}
+gs4_auth(email = "imiroshnychenko@kse.org.ua")
+```
+
+::: footer
+[googlesheets4 auth](https://googlesheets4.tidyverse.org/articles/auth.html)
+:::
+
+## Sheet ID Extraction
+
+```{r}
+url <- "https://docs.google.com/spreadsheets/d/1yV6Vg1H0buf93PmlTJApvZ2-aaR6mfFedQmIKrpgANU/edit?usp=sharing"
+students_sheet_id  <- str_extract(url, "(?<=/d/)[a-zA-Z0-9-_]+")
+```
+
+- `(?<=/d/)`: ensures the match comes after `/d/`
+- `[a-zA-Z0-9-_]+`: matches one or more characters that are either uppercase letters, lowercase letters, digits, hyphens, or underscores
+
+## Reading a Sheet
+
+```{r}
+students  <- read_sheet(
+  students_sheet_id,
+  na = c("", "NA"),
+  sheet = "r4ds"
+  )
+students
+```
+
+## Examples from the package
+
+```{r}
+deaths_url <- gs4_example("deaths")
+deaths <- read_sheet(deaths_url, range = "A5:F15")
+deaths
+```
+
+## Writing to a Sheet
+
+- `sheet_write()` writes a data frame to a specified sheet within a Google Sheets document.
+
+```{r}
+new_sheet <- tibble(
+  ABC = LETTERS,
+  norm = rnorm(length(LETTERS))
+)
+
+sheet_write(new_sheet, ss = students_sheet_id, sheet = "random_data")
+```
+
+# Databases
+
+## Prerequisites
+
+```{r}
+#| warning: false
+#| message: false
+
+if (!requireNamespace("pacman")) install.packages("pacman")
+
+pacman::p_load(
+  DBI,
+  duckdb,
+  arrow,
+  tidyverse
+)
+
+Sys.setenv(NOT_CRAN = "true")
+if (!requireNamespace("polars")) install.packages("polars", repos = "https://community.r-multiverse.org")
+if (!requireNamespace("tidypolars")) install.packages("tidypolars", repos = "https://community.r-multiverse.org")
+```
+
+## Types of Databases
+
+- Row-oriented databases (e.g., PostgreSQL, MySQL, SQLite)
+    + Suitable for transactional applications
+- Column-oriented databases (e.g., DuckDB, ClickHouse)
+    + Optimized for analytical queries
+    + Store data in columns rather than rows
+
+## Types of DBMS
+
+DBMS (Database Management System) is software for creating and managing databases.
+
+- Client-server:
+    + PostgreSQL, MySQL, Microsoft SQL Server, Oracle Database
+- Cloud:
+    + Amazon RedShift, Google BigQuery, Snowflake
+- In-process:
+    + SQLite, DuckDB
+
+## NYC taxi data
+
+We will use [New York City taxi](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) data.
+
+- Yellow taxi trips in NYC for the year 2012
+- Data is partitioned by month
+- Each month's data is stored in a separate Parquet file
+- [Parquet](https://parquet.apache.org/) is a columnar storage file format optimized for use with big data processing frameworks
+- The final dataset is ~8.5 GB compressed on disk and can take 10-20 minutes to download, depending on your internet connection.
+
+## NYC taxi data sources {.tiny}
+
+::: {.panel-tabset}
+
+### From S3
+
+```{r}
+#| eval: false
+library(arrow)
+library(dplyr)
+
+data_path = "nyc-taxi"
+
+open_dataset("s3://voltrondata-labs-datasets/nyc-taxi/year=2012") |>
+    write_dataset(data_path, partitioning = "month")
+```
+
+### From Google drive \w R
+
+```{r}
+#| eval: false
+library(googledrive)
+library(purrr)
+
+data_path = "nyc-taxi"
+
+jp_folder = "https://drive.google.com/drive/folders/1t4gHy4eJM47nQE3Z2mh4tid6eLbl6goJ"
+folder_id = drive_get(as_id(jp_folder))
+
+files = drive_ls(folder_id)
+
+pmap(files, function(name, id, ...) { # 
+  local_dir <- file.path(data_path, name)
+  dir.create(local_dir, recursive = TRUE, showWarnings = FALSE)
+  
+  # список файлів у підпапці
+  i_dir <- drive_ls(as_id(id))
+  
+  # завантаження файлів
+  pwalk(list(i_dir$id, i_dir$name), function(file_id, file_name) {
+    try({
+      drive_download(
+        as_id(file_id),
+        path = file.path(local_dir, file_name),
+        overwrite = FALSE
+      )
+    })
+  })
+})
+```
+:::
+
+## File structure {.tiny}
+
+- `fs` package provides cross-platform file system operations
+
+```{r}
+#| output-location: column
+library(fs)
+
+data_path = "nyc-taxi"
+dir_tree(data_path)
+```
+
+::: footer
+[fs package](https://fs.r-lib.org/)
+:::
+
+## Size on disk
+
+- Calculate the total size of all Parquet files in the `nyc-taxi` directory and its subdirectories
+
+```{r}
+fs::dir_ls(data_path, recurse = TRUE, glob = "*.parquet") |> 
+  fs::file_size() |> 
+  sum() / (1024^3) |>
+  round(2) |> 
+  paste("GB")
+```
+
+## Machine specs {.smaller}
+
+- `benchmarkme` package provides functions to benchmark your R setup and get system information
+
+. . .
+
+```{r}
+cat("CPU:\n", benchmarkme::get_cpu()$model_name, "\n")
+cat("RAM:\n", benchmarkme::get_ram() / (1024^3), "GB\n")
+```
+
+# DuckDB
+
+## Load libraries
+
+- `DBI` provides a common interface for interacting with databases in R.
+- `duckdb` is an in-process SQL OLAP database management system.
+- `dbConnect()` establishes a connection to a DuckDB database.
+
+```{r}
+library(duckdb)
+con = dbConnect(duckdb(), shutdown = TRUE)
+```
+
+## Bigger than RAM
+
+- DuckDB is designed to handle datasets larger than the available RAM.
+- It uses efficient on-disk storage and processing techniques to manage large datasets.
+- It employs vectorized execution and columnar storage to optimize performance.
+
+::: footer
+[No Memory? No Problem. External Aggregation in DuckDB](https://duckdb.org/2024/03/29/external-aggregation.html)
+:::
+
+## First example
+
+> What is the average tip per passenger count?
+
+. . .
+
+```{sql}
+#| eval: false
+SELECT
+  passenger_count,
+  AVG(tip_amount) AS mean_tip
+FROM 'nyc-taxi/**/*.parquet'
+GROUP BY passenger_count
+ORDER BY passenger_count
+```
+
+## DuckDB's "friendly SQL"
+
+- DuckDB allows you to use a more concise SQL syntax for certain operations.
+
+```{sql}
+#| eval: false
+FROM 'nyc-taxi/**/*.parquet'
+SELECT
+  passenger_count,
+  AVG(tip_amount) AS mean_tip
+GROUP BY ALL
+ORDER BY ALL
+```
+
+::: footer
+[Friendly SQL](https://duckdb.org/docs/stable/sql/dialect/friendly_sql.html)
+:::
+
+## Let's run it
+
+```{r}
+#| output-location: column
+tic = Sys.time()
+dat1 = dbGetQuery(
+  con,
+  "
+  FROM 'nyc-taxi/**/*.parquet'
+  SELECT
+    passenger_count,
+    AVG(tip_amount) AS mean_tip
+  GROUP BY ALL
+  ORDER BY ALL
+  "
+)
+toc = Sys.time()
+
+dat1
+
+toc - tic
+```
+
+Wow! ~20 millions of rows in that dataset!
+
+## Aggregation {.smaller}
+
+> How does the average tip change over the months?
+
+```{r}
+#| output-location: column
+tic = Sys.time()
+dat2 = dbGetQuery(
+  con,
+  "
+  FROM 'nyc-taxi/**/*.parquet'
+  SELECT
+    month,
+    passenger_count,
+    AVG(tip_amount) AS mean_tip
+  WHERE month <= 3
+  GROUP BY ALL
+  "
+    )
+toc = Sys.time()
+
+head(dat2)
+toc - tic
+```
+
+Why it faster than the previous query? Reason: Subsetting along our [Hive-partitioned](https://duckdb.org/docs/stable/data/partitioning/hive_partitioning.html) parquet dataset allows DuckDB to take shortcuts.
+
+## `EXPLAIN` query plan {.tiny}
+
+- `EXPLAIN` provides a detailed query execution plan, showing how DuckDB will execute the SQL query.
+
+```{r}
+#| output-location: column
+dbGetQuery(
+  con,
+  "
+  EXPLAIN
+    FROM 'nyc-taxi/**/*.parquet'
+    SELECT
+      month,
+      passenger_count,
+      AVG(tip_amount) AS mean_tip
+    WHERE month <= 3
+    GROUP BY ALL
+  "
+)
+```
+
+## More examples {.tiny}
+
+> What is the average tip and fare per passenger count and trip distance?
+
+```{r}
+#| output-location: column
+
+tic = Sys.time()
+dat3 = dbGetQuery(
+  con,
+  "
+  FROM 'nyc-taxi/**/*.parquet'
+  SELECT
+    passenger_count,
+    trip_distance,
+    AVG(tip_amount) AS mean_tip,
+    AVG(fare_amount) AS mean_fare
+  GROUP BY ALL
+"
+)
+toc = Sys.time()
+
+nrow(dat3)
+head(dat3)
+toc - tic
+```
+
+## Pivot {.smaller}
+
+- `UNPIVOT` transforms columns into rows, effectively rotating the data.
+- `PIVOT` transforms rows into columns, allowing for aggregation of data.
+
+```{r}
+#| output-location: column
+
+tic = Sys.time()
+dat_long = dbGetQuery(
+  con,
+  "
+  WITH tmp_table AS (
+    FROM 'nyc-taxi/**/*.parquet'
+    SELECT
+      passenger_count,
+      trip_distance,
+      AVG(tip_amount) AS mean_tip,
+      AVG(fare_amount) AS mean_fare
+    GROUP BY ALL
+  )
+  UNPIVOT tmp_table
+  ON mean_tip, mean_fare
+  INTO
+    NAME variable
+    VALUE amount
+  "
+)
+toc = Sys.time()
+
+head(dat_long)
+toc - tic
+```
+
+## Create new tables
+
+- `CREATE TABLE AS` creates a new table and populates it with the result of a query.
+
+```{r}
+#| output-location: column
+
+tic = Sys.time()
+dbExecute(
+    con,
+    "
+    CREATE TABLE taxi2 AS
+      FROM 'nyc-taxi/**/*.parquet'
+      SELECT
+        passenger_count,
+        trip_distance,
+        AVG(tip_amount) AS mean_tip,
+        AVG(fare_amount) AS mean_fare
+      GROUP BY ALL
+    "
+)
+toc = Sys.time()
+
+dbListTables(con)
+```
+
+## Back to reshaping {.smaller}
+
+- `UNPIVOT` on the newly created table
+
+```{r}
+#| output-location: column
+
+dbGetQuery(
+  con,
+  "
+  UNPIVOT taxi2
+  ON mean_tip, mean_fare
+  INTO
+    NAME variable
+    VALUE amount
+  LIMIT 5
+  "
+)
+```
+
+## Joins {.smaller}
+
+What this query does?
+
+```{r}
+#| output-location: column-fragment
+
+tic = Sys.time()
+dbGetQuery(
+  con,
+  "
+  WITH 
+    mean_tips AS (
+      FROM 'nyc-taxi/**/*.parquet'
+      SELECT
+        month,
+        AVG(tip_amount) AS mean_tip
+      GROUP BY month
+    ),
+    mean_fares AS (
+      FROM 'nyc-taxi/**/*.parquet'
+      SELECT
+        month,
+        AVG(fare_amount) AS mean_fare
+      GROUP BY month 
+    )
+  FROM mean_tips
+  LEFT JOIN mean_fares
+  USING (month)
+  SELECT *
+  ORDER BY mean_tips.month
+  "
+)
+toc = Sys.time()
+toc - tic
+```
+
+## Windowing {.tiny}
+
+- `OVER` clause defines a [window](https://duckdb.org/2021/10/13/windowing.html) (set of rows) for the function to operate on.
+
+> What is the average tip and trip distance for each decile of trip distance?
+
+```{r}
+#| output-location: column-fragment
+
+tic = Sys.time()
+dbGetQuery(
+  con,
+  "
+  WITH trip_deciles AS (
+    FROM 'nyc-taxi/**/*.parquet'
+    SELECT
+      tip_amount,
+      trip_distance,
+      NTILE(10) OVER (ORDER BY trip_distance) AS decile
+    USING SAMPLE 1%
+  )
+  FROM trip_deciles
+  SELECT
+    decile,
+    AVG(trip_distance) AS mean_distance,
+    AVG(tip_amount) AS mean_tip
+  GROUP BY ALL
+  ORDER BY ALL
+  "
+)
+toc = Sys.time()
+
+toc - tic
+```
+
+::: {.callout-warning}
+I'm using a 1% random sample of my data here (see the [`USING SAMPLE 1%`](https://duckdb.org/docs/stable/sql/query_syntax/sample) statement). Why? 
+:::
+
+## Close connection
+
+```{r}
+dbDisconnect(con)
+```
+
+# Questions? {.unnumbered .unlisted background-iframe=".06_files/libs/colored-particles/index.html"}
+
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=3374)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
