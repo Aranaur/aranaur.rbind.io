@@ -592,8 +592,621 @@ I'm using a 1% random sample of my data here (see the [`USING SAMPLE 1%`](https:
 dbDisconnect(con)
 ```
 
-# Questions? {.unnumbered .unlisted background-iframe=".06_files/libs/colored-particles/index.html"}
 
+# DuckDB + dplyr
+
+
+## Load libraries
+```{r}
+library(duckdb)
+library(dplyr, warn.conflicts = FALSE)
+library(tidyr, warn.conflicts = FALSE)
+```
+
+## Create a database connection
+
+- `dplyr::tbl()` creates a lazy table reference to a database table.
+
+```{r}
+con <- dbConnect(duckdb(), shutdown = TRUE)
+
+nyc <- tbl(con, "read_parquet('nyc-taxi/**/*.parquet', hive_partitioning = true)") # <1>
+```
+
+1. `nyc = tbl(con, "nyc-taxi/**/*.parquet")` will also work, but safer to use the read_parquet function.
+
+## First example
+
+This next command runs instantly because all **computation is deferred** (i.e., lazy eval). In other words, it is just a **query object**.
+
+```{r}
+q1 <-  nyc |>
+  summarize(
+    mean_tip = mean(tip_amount),
+    .by = passenger_count
+  )
+```
+
+## Explaining the query {.tiny}
+
+- `explain()` shows the SQL query that will be sent to the database when the query is executed.
+
+```{r}
+#| output-location: column
+explain(q1)
+```
+
+## Show the SQL query
+
+- `show_query()` displays the SQL query that will be executed.
+
+```{r}
+show_query(q1)
+```
+
+## Execute the query {.tiny}
+
+- `collect()` executes the query and retrieves the results into R.
+
+```{r}
+#| output-location: column
+tic <-  Sys.time()
+dat1 <- collect(q1)
+toc <- Sys.time()
+
+dat1
+```
+
+## Aggregation {.smaller}
+
+> How does the average tip and fare change over the months and passenger count?
+
+```{r}
+#| output-location: column
+q2 <- nyc |>
+  filter(month <= 3) |>
+  summarize(
+    across(c(tip_amount, fare_amount), mean),
+    .by = c(month, passenger_count)
+  )
+q2
+```
+
+## Explain the query {.tiny .scrollable}
+
+```{r}
+#| output-location: column
+explain(q2)
+```
+
+## More aggregation {.smaller}
+
+```{r}
+#| output-location: column
+q3 <- nyc |>
+  group_by(passenger_count, trip_distance) |>
+  summarize(
+    across(c(tip_amount, fare_amount), mean),
+  ) 
+collect(q3)
+```
+
+## Pivot {.smaller}
+
+```{r}
+#| output-location: column
+
+q3 |>
+  pivot_longer(tip_amount:fare_amount) |>
+  collect()
+```
+
+## Joins {.smaller}
+
+```{r}
+#| output-location: column
+mean_tips  <- nyc |> summarise(
+  mean_tips = mean(tip_amount),
+  .by = month)
+
+mean_fares <- nyc |> summarise(
+  mean_fares = mean(fare_amount),
+  .by = month)
+
+left_join(
+  mean_fares,
+  mean_tips
+  ) |>
+  collect()
+```
+
+## Windowing
+
+::: {.callout-caution}
+Sampling with dplyr is less efficient than DuckDB's native `USING SAMPLE` SQL, so creating deciles on large data may be slower.
+:::
+
+# Arrow + duckdb
+
+## Load libraries
+
+- `arrow` provides a high-performance interface for reading and writing Parquet files.
+
+```{r}
+#| warning: false
+#| message: false
+library(arrow)
+library(duckdb)
+library(dplyr)
+library(tidyr)
+```
+
+## Dataset
+
+With `arrow`, you can access the dataset directly using `open_dataset()` - no need to connect to a database.
+
+```{r}
+nyc2 <- open_dataset("nyc-taxi")
+```
+
+## Take a look
+
+Printing `nyc2` shows its column names and types.
+
+```{r}
+#| output-location: column
+
+nyc2
+```
+
+## To duckdb {.tiny}
+
+Use `to_duckdb()` to convert the Arrow dataset for use with DuckDB and `dplyr`.
+
+Arrow and DuckDB work together efficiently --- [no data is copied](https://duckdb.org/2021/12/03/duck-arrow.html), just pointers are shared for fast access.
+
+```{r}
+#| output-location: column
+to_duckdb(nyc2)
+```
+
+## Example {.smaller}
+
+All dplyr verbs work as expected.
+
+```{r}
+#| output-location: column
+nyc2 |>
+  to_duckdb() |>
+  summarise(
+    mean_tip = mean(tip_amount),
+    .by = passenger_count
+  ) |>
+  collect()
+```
+
+## Experimental: `duckplyr` {.smaller}
+
+[`duckplyr`](https://duckplyr.tidyverse.org/) is a [new package](https://duckdb.org/2024/04/02/duckplyr.html) that lets you use `dplyr` syntax, but powered by DuckDB for fast data manipulation.
+
+You can swap `library(dplyr)` for `library(duckplyr)` and get efficient queries, even on regular R data frames.
+
+```{r}
+#| output-location: column
+library(duckplyr, warn.conflicts = FALSE)
+
+duckplyr_df_from_parquet("nyc-taxi/**/*.parquet") |>
+  summarise(
+    mean_tip = mean(tip_amount),
+    .by = passenger_count
+  )
+```
+
+# Polars
+
+## Load libraries
+
+- `polars` is a fast DataFrame library implemented in Rust.
+
+```{r}
+#| warning: false
+library(polars)
+```
+
+## Scan data
+
+- `scan_parquet()` reads Parquet files into a Polars DataFrame.
+
+```{r}
+nyc <- pl$scan_parquet("nyc-taxi/**/*.parquet", hive_partitioning=TRUE)
+nyc
+```
+
+## First example
+
+Polars operations are registered as queries until they are collected.
+
+```{r}
+q1 <- (
+    nyc
+    $group_by("passenger_count")
+    $agg(
+        pl$col("tip_amount")$mean()#$alias("mean_tip") ## alias is optional
+    )
+    $sort("passenger_count")
+)
+q1
+```
+
+## Polars style
+
+Polars chains methods with `$`, similar to Python. For multiline queries, wrap in parentheses and put each method on a new line.
+
+```{r}
+#| eval: false
+nyc$group_by(
+    "passenger_count"
+)$agg(
+    pl$col("tip_amount")$mean()
+)$sort("passenger_count")
+```
+
+## Collect the result {.smaller}
+
+- `collect()` executes the query and retrieves the results into R.
+
+```{r}
+#| output-location: column
+tic = Sys.time()
+dat1 = q1$collect()
+toc = Sys.time()
+
+dat1
+toc - tic
+```
+
+## Aggregation {.smaller}
+
+- How does the average tip change over the months and passenger count?
+- `q2` is a query object until collected.
+- `q2$explain()` shows the optimized query plan.
+
+```{r}
+#| output-location: column
+q2 <- (
+    nyc
+    $filter(pl$col("month") <= 3)
+    $group_by("month", "passenger_count")
+    $agg(pl$col("tip_amount")$mean()$alias("mean_tip"))
+    $sort("passenger_count")
+) 
+
+# q2              
+cat(q2$explain())
+```
+
+## Run and collect {.smaller}
+
+```{r}
+#| output-location: column
+
+tic = Sys.time()
+dat2 = q2$collect()
+toc = Sys.time()
+
+dat2
+toc - tic
+```
+
+## High-dimensional grouping example {.smaller}
+
+- This query provides an example where `polars` is noticeably **slower** than DuckDB.
+
+```{r}
+#| output-location: column
+q3 <- (
+    nyc
+    $group_by("passenger_count", "trip_distance")
+    $agg(
+        pl$col("tip_amount")$mean()$alias("mean_tip"),
+        pl$col("fare_amount")$mean()$alias("mean_fare")
+        )
+    $sort("passenger_count", "trip_distance")
+)
+
+tic <- Sys.time()
+dat3 <- q3$collect()
+toc <- Sys.time()
+
+dat3
+toc - tic
+```
+
+## Pivot {.smaller}
+
+- `pivot` $\rightarrow$ long to wide transformation
+- `unpivot` $\rightarrow$ wide to long transformation
+
+```{r}
+#| output-location: column
+
+dat3$unpivot(index = c("passenger_count", "trip_distance"))
+```
+
+## Joins {.smaller}
+
+```{r}
+#| output-location: column
+
+mean_tips  = nyc$group_by("month")$agg(pl$col("tip_amount")$mean())
+mean_fares = nyc$group_by("month")$agg(pl$col("fare_amount")$mean())
+
+(
+    mean_tips
+    $join(
+        mean_fares,
+        on = "month",
+        how = "left"
+    )
+    $collect()
+)
+```
+
+## Experimental: `tidypolars` {.smaller}
+
+[`tidypolars`](https://tidypolars.tidyverse.org/) provides a `dplyr`-like interface for `polars`.
+
+```{r}
+library(polars)
+library(tidypolars)
+library(dplyr, warn.conflicts = FALSE)
+library(tidyr, warn.conflicts = FALSE)
+
+nyc = scan_parquet_polars("nyc-taxi/**/*.parquet")
+
+nyc |> 
+    summarise(mean_tip = mean(tip_amount), .by = passenger_count) |>
+    compute() # collect() -> return a data.frame
+```
+
+# BigQuery with R
+
+## About BigQuery
+
+BigQuery is a serverless, highly scalable, and cost-effective multi-cloud data warehouse designed for business agility.
+
+- Accessibility: Access data from anywhere with an internet connection.
+- Economy. Pay only for the storage and compute resources you use.
+- Data availability. Several [sample tables](https://cloud.google.com/bigquery/public-data/#sample_tables) to get you started. And some [public datasets](https://www.reddit.com/r/bigquery/wiki/datasets/) too.
+
+## GCP
+
+- You need a Google Cloud Platform (GCP) account.
+- Create a new project in the [GCP Console](https://console.cloud.google.com/).
+- Enable the BigQuery API for your project.
+
+## Sign up for GCP
+
+![](img/gcp-1.jpg)
+
+## Sign up for GCP
+
+![](img/gcp-2.jpg)
+
+## Sign up for GCP
+
+::: {.columns}
+::: {.column}
+![](img/gcp-3.jpg)
+:::
+::: {.column}
+```
+Щоб завершити операцію використовуйте код: GOOGLE*MZW 123456
+```
+:::
+:::
+
+## Project ID
+
+- You can find your Project ID in the GCP Console dashboard.
+
+```{r}
+library(bigrquery)
+
+billing_id = Sys.getenv("GCP_PROJECT") # usethis::edit_r_environ()
+```
+
+## Example 1. US birth data
+
+```{r}
+library(DBI)
+library(dplyr)
+
+bq_con <- 
+  dbConnect(
+    bigrquery::bigquery(),
+    project = "publicdata",
+    dataset = "samples",
+    billing = billing_id
+    )
+
+dbListTables(bq_con)
+```
+
+## Example 1. US birth data
+
+- `natality`: Describes all United States births registered in the 50 States, the District of Columbia, and New York City from 1969 to 2008.
+- ~ 22 GB
+
+```{r}
+#| output-location: column
+natality <- tbl(bq_con, "natality")
+head(natality)
+```
+
+## Example 1. US birth data
+
+> How has the average birth weight changed over time?
+
+```{r}
+bw <- 
+  natality |>
+  filter(!is.na(state)) |> ## optional to remove some outliers
+  group_by(year) |>
+  summarise(weight_pounds = mean(weight_pounds, na.rm=TRUE)) |>
+  collect()
+```
+
+## Example 1. US birth data
+
+```{r}
+library(ggplot2)
+bw |>
+  ggplot(aes(year, weight_pounds)) +
+  geom_line()
+```
+
+## Example 1. US birth data
+
+Collecting by state
+
+```{r}
+bw_st <- 
+  natality |>
+  filter(!is.na(state)) |>
+  group_by(year, state, is_male) |>
+  summarise(weight_pounds = mean(weight_pounds, na.rm=TRUE)) |>
+  mutate(gender = ifelse(is_male, "Male", "Female")) |>
+  collect()
+```
+
+## Example 1. US birth data {.smaller}
+
+> Which states had the highest average birth weights in 2000 and 2008?
+
+```{r}
+#| output-location: column
+states <- c("CA","DC","OR","TX","VT")
+bw_st <- bw_st |> arrange(gender, year)
+
+bw_st |>
+  ggplot(aes(year, weight_pounds, group=state)) +
+  geom_line(col="grey75", lwd = 0.25) +
+  geom_line(
+    data = bw_st |> filter(state %in% states),
+    aes(col=fct_reorder2(state, year, weight_pounds)),
+    lwd=0.75
+    ) +
+  facet_wrap(~gender) +
+  scale_color_brewer(palette = "Set1", name=element_blank()) +
+  labs(
+    title = "Mean birth weight, by US state over time",
+    subtitle = "Selected states highlighted",
+    x = NULL, y = "Pounds",
+    caption = "STAT150 | Data sourced from Google BigQuery"
+    ) +
+  theme_minimal()
+```
+
+```{r}
+#| eval: false
+dbDisconnect(bq_con)
+```
+
+## Example 2. Global Fishing Watch
+
+- [Global Fishing Watch](https://globalfishingwatch.org/) (GFW) is a nonprofit organization that uses technology to promote ocean sustainability.
+
+```{r}
+#| output-location: column
+gfw_con <- 
+  dbConnect(
+    bigrquery::bigquery(),
+    project = "global-fishing-watch",
+    dataset = "global_footprint_of_fisheries",
+    billing = billing_id
+    )
+
+dbListTables(gfw_con)
+```
+
+## Example 2. Global Fishing Watch {.smaller}
+
+- `fishing_effort` table contains estimates of fishing effort (in hours) for all industrial fishing vessels with AIS data from 2012 to 2016.
+
+```{r}
+#| output-location: column
+
+effort <- tbl(gfw_con, "fishing_effort")
+effort
+```
+
+## Example 2. Global Fishing Watch {.smaller}
+
+> Which country had the highest fishing effort?
+
+```{r}
+effort |>
+  group_by(flag) |>
+  summarise(total_fishing_hours = sum(fishing_hours, na.rm=TRUE)) |>
+  arrange(desc(total_fishing_hours)) |>
+  collect()
+```
+
+## Example 2. Global Fishing Watch {.smaller}
+
+::: {.columns}
+::: {.column}
+```{r}
+resolution <- 1
+
+globe <-
+  effort |>
+  filter(fishing_hours > 0) |>
+  mutate(
+    lat_bin = lat_bin/100,
+    lon_bin = lon_bin/100
+    ) |>
+  mutate(
+    lat_bin_center = floor(lat_bin/resolution)*resolution + 0.5*resolution,
+    lon_bin_center = floor(lon_bin/resolution)*resolution + 0.5*resolution
+    ) |>
+  group_by(lat_bin_center, lon_bin_center) |>
+  summarise(fishing_hours = sum(fishing_hours, na.rm=TRUE)) |>
+  collect()
+```
+:::
+::: {.column}
+
+```{r}
+#| output-location: slide
+#| fig-align: center
+#| fig-width: 16
+#| fig-height: 9
+globe |>
+  filter(fishing_hours > 1) |>
+  ggplot() +
+  geom_tile(aes(x=lon_bin_center, y=lat_bin_center, fill=fishing_hours))+
+  scale_fill_viridis_c(
+    name = "Fishing hours (log scale)",
+    trans = "log",
+    breaks = scales::log_breaks(n = 5, base = 10),
+    labels = scales::comma
+    ) +
+  labs(
+    title = "Global fishing effort",
+    subtitle = paste0("Effort binned at the ", resolution, "° level."),
+    y = NULL, x = NULL,
+    caption = "STAT150 | Data from Global Fishing Watch"
+    ) +
+  theme_minimal() +
+  theme(axis.text=element_blank())
+```
+:::
+:::
+
+
+# Questions? {.unnumbered .unlisted background-iframe=".06_files/libs/colored-particles/index.html"}
 
 <br> <br>
 
