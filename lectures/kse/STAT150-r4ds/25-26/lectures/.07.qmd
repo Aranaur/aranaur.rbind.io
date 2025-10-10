@@ -1,0 +1,618 @@
+---
+title: "Spatial analysis in R"
+subtitle: "STAT150 | R for Data Science"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .07_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=3374">🔗STAT150 | R for Data Science</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(sf)
+library(patchwork)
+library(glue)
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Maps {background-iframe=".07_files/libs/colored-particles/index.html"}
+
+## John Snow and 1854 cholera epidemic
+
+::: {.columns}
+::: {.column}
+![[John Snow](https://en.wikipedia.org/wiki/John_Snow)](img/800px-John_Snow.jpg){fig-align="center" width="400px"}
+:::
+::: {.column .fragment}
+- 10% of the population of Soho died in a week (!!)
+- Miasma theory said it was because the air was bad
+:::
+:::
+
+---
+
+![](img/Snow-cholera-map-1.jpg){fig-align="center" width="800px"}
+
+## The Broad Street pump
+
+::: {.columns}
+::: {.column}
+![](img/Snow-cholera-map.jpg){fig-align="center" width="400px"}
+:::
+::: {.column}
+![](img/John_Snow_memorial_and_pub.jpg){fig-align="center" width="400px"}
+:::
+:::
+
+## Outright lies
+
+::: {.columns}
+::: {.column}
+![](img/wp-bad-map.jpg){fig-align="center" width="400px"}
+:::
+::: {.column}
+![](img/bad-map-meme.png){fig-align="center" width="400px"}
+:::
+:::
+
+## Fake maps and junk maps
+
+::: {.columns}
+::: {.column}
+![](img/bot-designed-maps.png){fig-align="center" width="400px"}
+:::
+::: {.column}
+![](img/candy-map.jpg){fig-align="center" width="400px"}
+:::
+:::
+
+## Points can be useless
+
+![](img/heatmap.png){fig-align="center" width="600px"}
+
+## Choropleths can be great
+
+![](img/choropleth-example.png){fig-align="center" width="600px"}
+
+::: footer
+[2019 Fall Foliage Report in The Smoky Mountains](https://pigeonforgechamber.com/2019-fall-foliage-report-in-the-smoky-mountains/)
+:::
+
+## Choropleths can distort
+
+![](img/election.jpeg){fig-align="center" width="600px"}
+
+## Land doesn't vote
+
+```{=html}
+<center>
+<video width="50%" style="display: block; margin: 0 auto;" controls muted autoplay loop>
+  <source src="img/election-map.mp4" type="video/webm">
+</video>
+</center>
+```
+
+## Cartograms
+
+::: {.columns}
+::: {.column width="33%"}
+![](img/countymap3070384.png){fig-align="center"}
+:::
+::: {.column width="33%"}
+![](img/538-hexagon-cartogram.png){fig-align="center"}
+:::
+::: {.column width="34%"}
+![](img/countycart30701024.png){fig-align="center"}
+:::
+:::
+
+---
+
+![](img/Election2015_WinnerChangeMaps.jpg){fig-align="center" width="800px"}
+
+---
+
+![](img/2016_election_map_large.png){fig-align="center" width="600px"}
+
+---
+
+```{=html}
+<iframe width="1600" height="1000" src="https://www.jasondavies.com/maps/transition/" title="Map Projection Transitions"></iframe>
+```
+
+::: footer
+[Map Projection Transitions](https://www.jasondavies.com/maps/transition/)
+:::
+
+---
+
+```{=html}
+<iframe width="1600" height="1000" src="https://thetruesize.com/#?borders=1~!MTY5NDcyNTI.NjUwMzM1MA*MTU2NjEzMw(NDY1OTg4Mw~!UA*MA.MTgwMDAwMDA)NA" title="The True Size Of..."></iframe>
+```
+
+::: footer
+[The True Size Of...](https://thetruesize.com/)
+:::
+
+## World projections
+
+```{r}
+#| label: projections
+#| echo: false
+
+world_shapes <- read_sf("data/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp") |> 
+  filter(ISO_A3 != "ATA")
+
+base_map <- ggplot() + 
+  geom_sf(data = world_shapes, fill = purple, size = 0.1, color = blue) +
+  theme_void(base_family = "Fira Sans Condensed") + 
+  theme(plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines"),
+        plot.title = element_text(margin = margin(b = 3), face = "bold"),
+        plot.caption = element_text(family = "Consolas", color = "grey50"))
+
+# Longitude/latitude
+map_lat_lon <- base_map +
+  coord_sf(crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_def") +
+  labs(title = "Longitude-latitude",
+       caption = 'crs = "+proj=longlat +ellps=WGS84"')
+
+# Robinson
+map_robinson <- base_map +
+  coord_sf(crs = "+proj=robin") +
+  # coord_sf(crs = 54030, datum = NA) +  # Robinson
+  labs(title = "Robinson",
+       caption = 'crs = "+proj=robin"')
+
+# Mercator (ew)
+map_mercator <- base_map +
+  coord_sf(crs = "+proj=merc") +
+  # coord_sf(crs = 54004, datum = NA) +  # Mercator
+  labs(title = "Mercator",
+       caption = 'crs = "+proj=merc"')
+
+# Gall Peters
+map_gall_peters <- base_map +
+  coord_sf(crs = st_crs("ESRI:54002"), datum = NA) +  # Gall Peters / Equidistant cylindrical
+  labs(title = "Gall-Peters",
+       caption = 'crs = "ESRI:54002"')
+
+(map_lat_lon / map_mercator) | (map_gall_peters / map_robinson) 
+
+# Equal earth
+# base_map +
+#   coord_sf(crs = "+proj=eqearth +wktext") +  # Equal earth 
+#   labs(title = "Equal Earth",
+#        caption = 'crs = "+proj=eqearth +wktext"')
+```
+
+## UA projections
+
+```{r}
+#| label: ua-projections
+#| echo: false
+
+ua <- read_sf("data/ua_shp/ua.shp")
+
+map_nad83 <- ggplot() +
+  geom_sf(data = ua, fill = purple, size = 0.25, color = blue) +
+  labs(title = "Foucaut",
+       caption = 'crs = "+proj=fouc"') +
+  coord_sf(crs = "+proj=fouc") +
+  theme_void(base_family = "Fira Sans Condensed") + 
+  theme(plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines"),
+        plot.title = element_text(margin = margin(b = 3), face = "bold"),
+        plot.caption = element_text(family = "Consolas", color = "grey50"))
+
+map_albers <- ggplot() +
+  geom_sf(data = ua, fill = purple, size = 0.25, color = blue) +
+  labs(title = "Central Conic",
+       caption = 'crs = "+proj=ccon +lat_1=52 +lon_0=19"') +
+  coord_sf(crs = "+proj=ccon +lat_1=52 +lon_0=19") +
+  theme_void(base_family = "Fira Sans Condensed") + 
+  theme(plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines"),
+        plot.title = element_text(margin = margin(b = 3), face = "bold"),
+        plot.caption = element_text(family = "Consolas", color = "grey50"))
+
+map_nad83 | map_albers
+```
+
+::: footer
+[List of all projection images](https://proj.org/en/stable/operations/projections/all_images.html)
+:::
+
+## Which projection is best? {.incremental}
+
+- None of them
+- There are no good or bad projections
+- There are appropriate and inappropriate projections
+- It depends on the purpose of the map
+
+# Putting data on maps {background-iframe=".07_files/libs/colored-particles/index.html"}
+
+## Maps with lines
+
+![](img/CA_Migration_v2_101-01.png){fig-align="center" width="600px"}
+
+---
+
+```{=html}
+<iframe width="1600" height="1000" src="http://hint.fm/wind/index.html" title="Wind Map"></iframe>
+```
+
+::: footer
+[Wind Map](http://hint.fm/wind/)
+:::
+
+---
+
+![](img/streams-lakes-bw-100-w-01.jpg){fig-align="center" width="600px"}
+
+## Maps with points
+
+![](img/Surfer_travel.png){fig-align="center" width="600px"}
+
+::: footer
+[Map Connection](https://www.data-to-viz.com/story/MapConnection.html)
+:::
+
+---
+
+```{r}
+#| label: uk-map
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-align: center
+
+# Libraries
+library(ggplot2)
+library(dplyr)
+
+# Get the world polygon and extract UK
+library(giscoR)
+UK <- gisco_get_countries(country = "UK", resolution = 1)
+
+# Get a data frame with longitude, latitude, and size of bubbles (a bubble = a city)
+library(maps)
+data <- world.cities |> filter(country.etc == "UK")
+
+# Create breaks for the color scale
+mybreaks <- c(0.02, 0.04, 0.08, 1, 7)
+
+# Reorder data to show biggest cities on top
+data <- data |>
+  arrange(pop) |>
+  mutate(name = factor(name, unique(name))) |>
+  mutate(pop = pop / 1000000)
+
+# Build the map
+data |>
+  ggplot() +
+  geom_sf(data = UK, fill = "grey", alpha = 0.3) +
+  geom_point(aes(x = long, y = lat, size = pop, color = pop, alpha = pop),
+    shape = 20, stroke = FALSE
+  ) +
+  scale_size_continuous(
+    name = "Population (in M)", trans = "log",
+    range = c(1, 12), breaks = mybreaks
+  ) +
+  scale_alpha_continuous(
+    name = "Population (in M)", trans = "log",
+    range = c(0.1, .9), breaks = mybreaks
+  ) +
+  scale_color_viridis_c(
+    option = "magma", trans = "log",
+    breaks = mybreaks, name = "Population (in M)"
+  ) +
+  theme_void() +
+  guides(colour = guide_legend()) +
+  ggtitle("The 1000 biggest cities in the UK") +
+  theme(
+    legend.position = c(1, 0.6),
+    text = element_text(color = "#22211d"),
+    plot.margin = margin(r = 2, l = 2, unit = "cm"),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA),
+    panel.background = element_rect(fill = "#f5f5f2", color = NA),
+    plot.title = element_text(size = 14, hjust = 0.5, color = "#4e4d47"),
+    legend.title = element_text(size = 8),
+    legend.text = element_text(size = 8)
+  )
+```
+
+::: footer
+[The R Graph Gallery](https://r-graph-gallery.com/330-bubble-map-with-ggplot2.html)
+:::
+
+---
+
+![](img/Points_Squirrels.png){fig-align="center" width="600px"}
+
+::: footer
+[Cedric Scherer](https://github.com/z3tt/30DayMapChallenge2019/tree/main/contributions/Day01_Points)
+:::
+
+## Voronoi maps
+
+```{=html}
+<iframe width="1600" height="1000" src="https://www.jasondavies.com/maps/voronoi/airports/" title="World Airports Voronoi"></iframe>
+```
+
+::: footer
+[National Park Service Voronoi Map](https://engaging-data.com/national-park-voronoi/)
+:::
+
+## Small multiples that look like maps
+
+![](img/geofacet.png){fig-align="center" width="600px"}
+
+::: footer
+[`facet_geo()` in the geofacet package](https://hafen.github.io/geofacet/)
+:::
+
+# GIS in R with `sf` {background-iframe=".07_files/libs/colored-particles/index.html"}
+
+## Shapefiles 
+
+::: {.columns}
+::: {.column}
+- Geographic information is shared as **shapefiles**
+- These are not like regular single CSV files!
+- Shapefiles come as zipped files with a bunch of different files inside
+:::
+::: {.column}
+```{r}
+#| label: file-tree
+#| echo: false
+
+library(fs)
+
+dir_tree("data/ne_110m_admin_0_countries")
+```
+:::
+:::
+
+## Structure of a shapefile {.smaller}
+
+```{r}
+library(sf)
+
+world_shapes <- read_sf("data/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp")
+
+world_shapes |> 
+  select(TYPE, GEOUNIT, ISO_A3, geometry) |> 
+  head(7)
+```
+
+## Where to find shapefiles
+
+- [Natural Earth](https://www.naturalearthdata.com/downloads/) for international maps
+- [US Census Bureau](https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.html) for US maps (need VPN 🙃)
+- [GADM](https://gadm.org/download_country_v3.html) for country-level maps
+- [Eurostat GISCO](https://ec.europa.eu/eurostat/web/gisco/geodata) for European maps
+- Google "shapefile [country/region name]"
+
+## Scales
+
+::: {.columns}
+::: {.column width="33%"}
+
+![](img/download_thumbs_10m.jpg)
+
+
+1:10m = 1:10,000,000<br>
+1 cm = 100 km
+:::
+::: {.column width="33%"}
+![](img/download_thumbs_50m.jpg)
+
+1:50m = 1:50,000,000<br>
+1 cm = 500 km
+:::
+::: {.column width="34%"}
+![](img/download_thumbs_110m.jpg)
+
+1:110m = 1:110,000,000<br>
+1 cm = 1,100 km
+:::
+:::
+
+. . .
+
+Using too high of a resolution makes your maps slow and huge
+
+## Latitude and longitude
+
+```{r}
+#| label: lat-long-example
+#| echo: false
+#| fig-align: center
+
+point_example <- tibble(x = 2, y = 1) %>%
+  mutate(label = glue("{x} x, {y} y\n{y} lat, {x} lon"))
+lat_labs <- tibble(x = -3, y = seq(-2, 3, 1), label = "Latitude")
+lon_labs <- tibble(x = seq(-2, 3, 1), y = -2, label = "Longitude")
+
+ggplot() +
+  geom_point(data = point_example, aes(x = x, y = y), size = 5) +
+  geom_label(data = point_example, aes(x = x, y = y, label = label),
+             nudge_y = 0.8, size = 8,
+             family = "Fira Sans Condensed",) +
+  geom_text(data = lat_labs, aes(x = x, y = y, label = label),
+            hjust = 0.5, vjust = -0.3, size = 6,
+            family = "Fira Sans Condensed",) +
+  geom_text(data = lon_labs, aes(x = x, y = y, label = label),
+            hjust = 1.1, vjust = -0.5, angle = 90, size = 6,
+            family = "Fira Sans Condensed", ) +
+  geom_hline(yintercept = 0) +
+  geom_vline(xintercept = 0) +
+  scale_x_continuous(breaks = seq(-2, 3, 1)) +
+  scale_y_continuous(breaks = seq(-2, 3, 1)) +
+  coord_equal(xlim = c(-3.5, 3), ylim = c(-3, 3)) +
+  labs(x = NULL, y = NULL, caption = "") +
+  # labs(x = NULL, y = NULL) +
+  theme_minimal(base_family = "Fira Sans Condensed") +
+  theme(panel.grid.minor = element_blank(),
+        axis.text = element_blank(),
+        plot.caption = element_text(size = rel(1), margin = margin(t = 15), color = "grey50"))
+```
+
+## The magic `geometry` column
+
+As long as you have a magic geometry column, all you need to do to plot maps is `geom_sf()`
+
+```{r}
+#| label: simple-map
+#| output-location: column
+#| echo: false
+#| fig-align: center
+
+ggplot() +
+  geom_sf(data = world_shapes)
+```
+
+## The magic `geometry` column {.smaller}
+
+- Use `coord_sf()` to change projections
+
+```{r}
+#| label: simple-map-proj
+#| output-location: column
+
+ggplot() +
+  geom_sf(data = world_shapes) +
+  coord_sf(crs = "+proj=robin")
+```
+
+## The magic `geometry` column {.smaller}
+
+- Use `coord_sf()` to change projections
+
+```{r}
+#| label: simple-map-2
+#| output-location: column
+
+ggplot() +
+  geom_sf(data = world_shapes) +
+  coord_sf(crs = "+proj=laea +lat_0=52 +lon_0=10")
+```
+
+## Use aesthetics like normal
+
+All regular ggplot layers and aesthetics work
+
+```{r}
+#| label: aesthetic-map
+#| output-location: column
+
+ggplot() +
+  geom_sf(data = world_shapes, 
+          aes(fill = POP_EST),
+          color = "white", size = 0.15) +
+  coord_sf(crs = "+proj=robin") +
+  scale_fill_gradient(labels = scales::comma) +
+  labs(fill = NULL) +
+  theme_void() +
+  theme(legend.position = "bottom")
+```
+
+## No geometry column? {.smaller}
+
+Make your own with `st_as_sf()`
+
+::: {.columns}
+::: {.column}
+
+```{r}
+other_data <- tibble(
+  country = c("Kyiv", "Lviv", "Odesa"),
+  lon = c(30.5234, 24.0316, 30.7326),
+  lat = c(50.4501, 49.8397, 46.4825)
+)
+other_data
+```
+:::
+::: {.column}
+```{r}
+other_data |> 
+  st_as_sf(coords = c("lon", "lat"), crs = 4326)
+```
+:::
+:::
+
+## `sf` is for all GIS stuff
+
+- Draw maps
+- Calculate distances between points
+- Count observations in a given area
+- Anything else related to geography!
+
+## `geom_sf()` is today's standard
+
+- You'll sometimes find older tutorials and StackOverflow/LLM's answers about using `geom_map()` or `ggmap()` or other things
+- Those **still work**, but they don't use the same magical `sf` system with easy-to-convert projections and other GIS stuff
+
+<br><br>
+<center>Stick with `sf` and `geom_sf()` and your life will be easy</center>
+
+# Questions? {.unnumbered .unlisted background-iframe=".07_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=3374)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
