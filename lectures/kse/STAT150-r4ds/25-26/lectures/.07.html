@@ -218,6 +218,7 @@ Ihor Miroshnychenko
 <li><a href="#/maps" id="/toc-maps">Maps</a></li>
 <li><a href="#/putting-data-on-maps" id="/toc-putting-data-on-maps">Putting data on maps</a></li>
 <li><a href="#/gis-in-r-with-sf" id="/toc-gis-in-r-with-sf">GIS in R with <code>sf</code></a></li>
+<li><a href="#/crimea-comming-home" id="/toc-crimea-comming-home">Crimea comming home</a></li>
 </ul>
 </nav>
 </section>
@@ -397,9 +398,9 @@ Ihor Miroshnychenko
 <img data-src="img/CA_Migration_v2_101-01.png" class="quarto-figure quarto-figure-center r-stretch" width="600"></section>
 <section class="slide level2">
 
-<iframe width="1600" height="1000" src="http://hint.fm/wind/index.html" title="Wind Map"></iframe>
+<iframe width="1600" height="1000" src="https://earth.nullschool.net/#current/wind/surface/level/orthographic=-326.37,48.42,3821" title="Wind Map"></iframe>
 <div class="footer">
-<p><a href="http://hint.fm/wind/">Wind Map</a></p>
+<p><a href="https://earth.nullschool.net/#current/wind/surface/level/orthographic=-326.37,48.42,3821">Wind Map</a></p>
 </div>
 </section>
 <section class="slide level2">
@@ -659,6 +660,357 @@ Geodetic CRS:  WGS 84
 <center>
 Stick with <code>sf</code> and <code>geom_sf()</code> and your life will be easy
 </center>
+</section></section>
+<section>
+<section id="crimea-comming-home" class="title-slide slide level1 center" data-background-iframe=".07_files/libs/colored-particles/index.html">
+<h1>Crimea comming home</h1>
+<div class="footer">
+<p><a href="https://www.andrewheiss.com/blog/2025/02/13/natural-earth-crimea/">Heiss, Andrew. 2025. “How to Move Crimea from Russia to Ukraine in Maps with R.”</a></p>
+</div>
+</section>
+<section id="the-natural-earth-project" class="slide level2 tiny">
+<h2>The Natural Earth Project</h2>
+<ul>
+<li>The Natural Earth Project is a public domain map dataset available at three scales: 1:10m, 1:50m, and 1:110m.</li>
+<li><code>rnaturalearth</code> is an R package that makes it easy to download and use these maps in R.</li>
+</ul>
+<div class="cell columns column-output-location" data-layout-align="center">
+<div class="column">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb11-2"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sf)</span>
+<span id="cb11-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(rnaturalearth)</span>
+<span id="cb11-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Set some colors</span></span>
+<span id="cb11-6"><a href="" aria-hidden="true" tabindex="-1"></a>ukr_blue <span class="ot">&lt;-</span> <span class="st">"#0057b7"</span>  <span class="co"># Blue from the Ukrainian flag</span></span>
+<span id="cb11-7"><a href="" aria-hidden="true" tabindex="-1"></a>ukr_yellow <span class="ot">&lt;-</span> <span class="st">"#ffdd00"</span>  <span class="co"># Yellow from the Ukrainian flag</span></span>
+<span id="cb11-8"><a href="" aria-hidden="true" tabindex="-1"></a>rus_red <span class="ot">&lt;-</span> <span class="st">"#d62718"</span>  <span class="co"># Red from the Russian flag</span></span>
+<span id="cb11-9"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-10"><a href="" aria-hidden="true" tabindex="-1"></a>clr_ocean <span class="ot">&lt;-</span> <span class="st">"#d9f0ff"</span></span>
+<span id="cb11-11"><a href="" aria-hidden="true" tabindex="-1"></a>clr_land <span class="ot">&lt;-</span> <span class="st">"#facba6"</span></span>
+<span id="cb11-12"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-13"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># CARTOColors Prism (https://carto.com/carto-colors/)</span></span>
+<span id="cb11-14"><a href="" aria-hidden="true" tabindex="-1"></a>carto_prism <span class="ot">=</span> <span class="fu">c</span>(</span>
+<span id="cb11-15"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="st">"#5F4690"</span>, <span class="st">"#1D6996"</span>, <span class="st">"#38A6A5"</span>, <span class="st">"#0F8554"</span>, <span class="st">"#73AF48"</span>, <span class="st">"#EDAD08"</span>, </span>
+<span id="cb11-16"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="st">"#E17C05"</span>, <span class="st">"#CC503E"</span>, <span class="st">"#94346E"</span>, <span class="st">"#6F4070"</span>, <span class="st">"#994E95"</span>, <span class="st">"#666666"</span></span>
+<span id="cb11-17"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb11-18"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-19"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ne_countries</span>(<span class="at">scale =</span> <span class="dv">110</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb11-20"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(admin <span class="sc">!=</span> <span class="st">"Antarctica"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb11-21"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span> </span>
+<span id="cb11-22"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> continent), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.1</span>) <span class="sc">+</span></span>
+<span id="cb11-23"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> carto_prism, <span class="at">guide =</span> <span class="st">"none"</span>) <span class="sc">+</span></span>
+<span id="cb11-24"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_sf</span>(<span class="at">crs =</span> <span class="st">"+proj=robin"</span>) <span class="sc">+</span></span>
+<span id="cb11-25"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div><div class="column">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".07_files/figure-revealjs/ne-package-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></div>
+</section>
+<section id="natural-earths-de-facto-policy" class="slide level2">
+<h2>Natural Earth’s <a href="https://www.naturalearthdata.com/about/disputed-boundaries-policy/">de facto policy</a> 😡</h2>
+<blockquote>
+<p>Natural Earth draws boundaries of sovereign states according to de facto (“in fact”) status rather than de jure (“by law”).</p>
+</blockquote>
+<ul>
+<li>Nearly three dozen <a href="https://github.com/search?q=repo:nvkelso/natural-earth-vector+crimea&amp;type=issues">issues on GitHub</a> about Crimea</li>
+<li><a href="https://github.com/nvkelso/natural-earth-vector/issues/391">There</a> <a href="https://github.com/nvkelso/natural-earth-vector/issues/489">are</a> <a href="https://github.com/nvkelso/natural-earth-vector/issues/926">huge</a> <a href="https://github.com/nvkelso/natural-earth-vector/issues/810">debates</a> <a href="https://github.com/nvkelso/natural-earth-vector/issues/812">over</a> the ethics of the de facto policy</li>
+</ul>
+</section>
+<section id="natural-earth-de-jure-points-of-view" class="slide level2">
+<h2>Natural Earth de jure points of view</h2>
+<ul>
+<li>Natural Earth <a href="https://github.com/nvkelso/natural-earth-vector/issues/391#issuecomment-890772203">provides</a> 31 <a href="https://www.naturalearthdata.com/blog/admin-0-countries-point-of-views/">country-specific</a> de jure POV shapefiles (high-resolution only) for disputed areas.</li>
+<li>Other datasets include <a href="https://github.com/nvkelso/natural-earth-vector/blob/master/packages/Natural_Earth_quick_start/LOCALIZATION.md#setting-boundary-pov">columns like <code>fclass_us</code> and <code>fclass_ua</code></a>, mostly for localization; how to use them is unclear.</li>
+<li>Documentation is limited, and medium/low-resolution POV maps <a href="https://github.com/nvkelso/natural-earth-vector/issues/875#issuecomment-1726400482">aren’t available yet</a>.</li>
+</ul>
+</section>
+<section id="example-ua-pov" class="slide level2 smaller">
+<h2>Example UA POV</h2>
+<ul>
+<li>UA-POV <a href="https://www.naturalearthdata.com/blog/admin-0-countries-point-of-views/">10m shapefile</a> shows Crimea in Ukraine.</li>
+<li>Download manually; <code>rnaturalearth::ne_countries()</code> doesn’t support POV.</li>
+</ul>
+<div class="cell" data-layout-align="center">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="" aria-hidden="true" tabindex="-1"></a>world_10_us <span class="ot">&lt;-</span> <span class="fu">read_sf</span>(<span class="st">"data/ne_10m_admin_0_countries_ukr/ne_10m_admin_0_countries_ukr.shp"</span>)</span>
+<span id="cb12-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="" aria-hidden="true" tabindex="-1"></a>world_10_us <span class="sc">|&gt;</span> </span>
+<span id="cb12-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(ADMIN <span class="sc">==</span> <span class="st">"Ukraine"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb12-5"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb12-6"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">fill =</span> ukr_blue) <span class="sc">+</span></span>
+<span id="cb12-7"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+
+</section>
+<section id="example-ua-pov-output" class="slide level2 smaller output-location-slide"><h2>Example UA POV</h2><div class="cell output-location-slide" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".07_files/figure-revealjs/ua-pov-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></section><section id="low-and-medium-resolution-pov" class="slide level2 smaller">
+<h2>Low and medium resolution POV 😡</h2>
+<ul>
+<li>Low and medium resolution POV shapefiles are not available yet.</li>
+</ul>
+<div class="cell" data-layout-align="center">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="" aria-hidden="true" tabindex="-1"></a>world <span class="ot">&lt;-</span> <span class="fu">ne_countries</span>(<span class="at">scale =</span> <span class="dv">110</span>, <span class="at">type =</span> <span class="st">"map_units"</span>)</span>
+<span id="cb13-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="" aria-hidden="true" tabindex="-1"></a>ukraine <span class="ot">&lt;-</span> world <span class="sc">|&gt;</span> <span class="fu">filter</span>(admin <span class="sc">==</span> <span class="st">"Ukraine"</span>)</span>
+<span id="cb13-4"><a href="" aria-hidden="true" tabindex="-1"></a>russia <span class="ot">&lt;-</span> world <span class="sc">|&gt;</span> <span class="fu">filter</span>(admin <span class="sc">==</span> <span class="st">"Russia"</span>)</span>
+<span id="cb13-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="" aria-hidden="true" tabindex="-1"></a>ukraine_bbox <span class="ot">&lt;-</span> ukraine <span class="sc">|&gt;</span> </span>
+<span id="cb13-7"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_buffer</span>(<span class="at">dist =</span> <span class="dv">100000</span>) <span class="sc">|&gt;</span>  <span class="co"># Add 100,000 meter buffer around the country </span></span>
+<span id="cb13-8"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_bbox</span>()</span>
+<span id="cb13-9"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-10"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb13-11"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> world, <span class="at">fill =</span> clr_land) <span class="sc">+</span></span>
+<span id="cb13-12"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> russia, <span class="at">fill =</span> rus_red) <span class="sc">+</span> </span>
+<span id="cb13-13"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> ukraine, <span class="at">fill =</span> ukr_blue, <span class="at">color =</span> ukr_yellow, <span class="at">linewidth =</span> <span class="dv">2</span>) <span class="sc">+</span> </span>
+<span id="cb13-14"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_sf</span>(</span>
+<span id="cb13-15"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">xlim =</span> <span class="fu">c</span>(ukraine_bbox[<span class="st">"xmin"</span>], ukraine_bbox[<span class="st">"xmax"</span>]), </span>
+<span id="cb13-16"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">ylim =</span> <span class="fu">c</span>(ukraine_bbox[<span class="st">"ymin"</span>], ukraine_bbox[<span class="st">"ymax"</span>])</span>
+<span id="cb13-17"><a href="" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb13-18"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb13-19"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">panel.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> clr_ocean))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+
+</section>
+<section id="low-and-medium-resolution-pov-output" class="slide level2 smaller output-location-slide"><h2>Low and medium resolution POV 😡</h2><div class="cell output-location-slide" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".07_files/figure-revealjs/low-med-pov-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></section><section id="return-crimea-to-ukraine-w-r-and-sf" class="slide level2">
+<h2>Return Crimea to Ukraine w/ R and <code>sf</code></h2>
+<ul>
+<li>The actual geometric shapes for all the countries in <code>world</code> are <strong>MULTIPOLYGONs</strong>, or collections of POLYGON geometric objects:</li>
+</ul>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="" aria-hidden="true" tabindex="-1"></a>russia <span class="sc">|&gt;</span> <span class="fu">st_geometry</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Geometry set for 1 feature 
+Geometry type: MULTIPOLYGON
+Dimension:     XY
+Bounding box:  xmin: -180 ymin: 41.15142 xmax: 180 ymax: 81.2504
+Geodetic CRS:  WGS 84</code></pre>
+</div>
+</div>
+</section>
+<section id="return-crimea-to-ukraine-w-r-and-sf-1" class="slide level2">
+<h2>Return Crimea to Ukraine w/ R and <code>sf</code></h2>
+<ul>
+<li>We can split MULTIPOLYGONs into their component POLYGONs with <code>st_cast()</code>. Russia consists of 14 different shapes:</li>
+</ul>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="" aria-hidden="true" tabindex="-1"></a>(russia_polygons <span class="ot">&lt;-</span> russia <span class="sc">|&gt;</span> <span class="fu">st_geometry</span>() <span class="sc">|&gt;</span> <span class="fu">st_cast</span>(<span class="st">"POLYGON"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Geometry set for 14 features 
+Geometry type: POLYGON
+Dimension:     XY
+Bounding box:  xmin: -180 ymin: 41.15142 xmax: 180 ymax: 81.2504
+Geodetic CRS:  WGS 84
+First 5 geometries:</code></pre>
+</div>
+</div>
+</section>
+<section class="slide level2">
+
+<div class="cell" data-layout-align="center">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(russia_polygons[<span class="dv">2</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+
+</div>
+<img data-src=".07_files/figure-revealjs/plot-russia-polygons-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section class="slide level2">
+
+<div class="cell" data-layout-align="center">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(russia_polygons[<span class="dv">14</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+
+</div>
+<img data-src=".07_files/figure-revealjs/plot-crimea-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="identifying-the-crimea" class="slide level2">
+<h2>Identifying the Crimea</h2>
+<ul>
+<li>Plotting each POLYGON is brittle (counts/order change by map scale). Instead, place a POINT in Crimea (e.g., 45°N, 34°E) and select the Russian POLYGON that contains it:</li>
+</ul>
+<div class="cell" data-layout-align="center">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="" aria-hidden="true" tabindex="-1"></a>crimea_point <span class="ot">&lt;-</span> <span class="fu">st_sfc</span>(<span class="fu">st_point</span>(<span class="fu">c</span>(<span class="dv">34</span>, <span class="dv">45</span>)), <span class="at">crs =</span> <span class="fu">st_crs</span>(world))</span>
+<span id="cb20-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb20-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> world, <span class="at">fill =</span> clr_land) <span class="sc">+</span></span>
+<span id="cb20-5"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> russia, <span class="at">fill =</span> rus_red) <span class="sc">+</span> </span>
+<span id="cb20-6"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> ukraine, <span class="at">fill =</span> ukr_blue, <span class="at">color =</span> ukr_yellow, <span class="at">linewidth =</span> <span class="dv">2</span>) <span class="sc">+</span> </span>
+<span id="cb20-7"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> crimea_point) <span class="sc">+</span></span>
+<span id="cb20-8"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_sf</span>(</span>
+<span id="cb20-9"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">xlim =</span> <span class="fu">c</span>(ukraine_bbox[<span class="st">"xmin"</span>], ukraine_bbox[<span class="st">"xmax"</span>]), </span>
+<span id="cb20-10"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">ylim =</span> <span class="fu">c</span>(ukraine_bbox[<span class="st">"ymin"</span>], ukraine_bbox[<span class="st">"ymax"</span>])</span>
+<span id="cb20-11"><a href="" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb20-12"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb20-13"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">panel.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> clr_ocean))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+
+</section>
+<section id="identifying-the-crimea-output" class="slide level2 output-location-slide"><h2>Identifying the Crimea</h2><div class="cell output-location-slide" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".07_files/figure-revealjs/crimea-point-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></section><section id="extracting-crimea-polygon" class="slide level2 smaller">
+<h2>Extracting Crimea polygon</h2>
+<ul>
+<li><code>st_intersects()</code> tells us which POLYGON contains the POINT:</li>
+</ul>
+<div class="cell columns column-output-location">
+<div class="column">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract the Russia MULTIPOLYGON and convert it to polygons</span></span>
+<span id="cb21-2"><a href="" aria-hidden="true" tabindex="-1"></a>russia_polygons <span class="ot">&lt;-</span> world <span class="sc">|&gt;</span> </span>
+<span id="cb21-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(admin <span class="sc">==</span> <span class="st">"Russia"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb21-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_geometry</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb21-5"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_cast</span>(<span class="st">"POLYGON"</span>)</span>
+<span id="cb21-6"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract the Russia polygon that has Crimea in it</span></span>
+<span id="cb21-8"><a href="" aria-hidden="true" tabindex="-1"></a>crimea_polygon <span class="ot">&lt;-</span> russia_polygons <span class="sc">|&gt;</span></span>
+<span id="cb21-9"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">keep</span>(\(x) <span class="fu">st_intersects</span>(x, crimea_point, <span class="at">sparse =</span> <span class="cn">FALSE</span>))</span>
+<span id="cb21-10"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-11"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># This is the same as russia_polygons[14]</span></span>
+<span id="cb21-12"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(crimea_polygon)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div><div class="column">
+<div class="cell-output-display">
+<div>
+<figure>
+<p><img data-src=".07_files/figure-revealjs/unnamed-chunk-22-1.svg"></p>
+</figure>
+</div>
+</div>
+</div></div>
+</section>
+<section id="extracting-crimea-polygon-from-russia" class="slide level2 smaller">
+<h2>Extracting Crimea polygon from Russia</h2>
+<ul>
+<li>Now we can remove Crimea from Russia</li>
+</ul>
+<div class="cell" data-layout-align="center">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Remove Crimea from Russia</span></span>
+<span id="cb22-2"><a href="" aria-hidden="true" tabindex="-1"></a>new_russia <span class="ot">&lt;-</span> russia_polygons <span class="sc">|&gt;</span></span>
+<span id="cb22-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">discard</span>(\(x) <span class="fu">any</span>(<span class="fu">st_equals</span>(x, crimea_polygon, <span class="at">sparse =</span> <span class="cn">FALSE</span>))) <span class="sc">|&gt;</span> </span>
+<span id="cb22-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_combine</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb22-5"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_cast</span>(<span class="st">"MULTIPOLYGON"</span>)</span>
+<span id="cb22-6"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb22-8"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> world, <span class="at">fill =</span> clr_land) <span class="sc">+</span></span>
+<span id="cb22-9"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> new_russia, <span class="at">fill =</span> rus_red) <span class="sc">+</span> </span>
+<span id="cb22-10"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> ukraine, <span class="at">fill =</span> ukr_blue, <span class="at">color =</span> ukr_yellow, <span class="at">linewidth =</span> <span class="dv">2</span>) <span class="sc">+</span> </span>
+<span id="cb22-11"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_sf</span>(</span>
+<span id="cb22-12"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">xlim =</span> <span class="fu">c</span>(ukraine_bbox[<span class="st">"xmin"</span>], ukraine_bbox[<span class="st">"xmax"</span>]), </span>
+<span id="cb22-13"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">ylim =</span> <span class="fu">c</span>(ukraine_bbox[<span class="st">"ymin"</span>], ukraine_bbox[<span class="st">"ymax"</span>])</span>
+<span id="cb22-14"><a href="" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb22-15"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb22-16"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">panel.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> clr_ocean))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+
+</section>
+<section id="extracting-crimea-polygon-from-russia-output" class="slide level2 smaller output-location-slide"><h2>Extracting Crimea polygon from Russia</h2><div class="cell output-location-slide" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".07_files/figure-revealjs/add-crimea-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></section><section id="adding-crimea-to-ukraine" class="slide level2 smaller">
+<h2>Adding Crimea to Ukraine</h2>
+<div class="cell" data-layout-align="center">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract the Ukraine MULTIPOLYGON and convert it to polygons</span></span>
+<span id="cb23-2"><a href="" aria-hidden="true" tabindex="-1"></a>ukraine_polygons <span class="ot">&lt;-</span> world <span class="sc">|&gt;</span> </span>
+<span id="cb23-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(admin <span class="sc">==</span> <span class="st">"Ukraine"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb23-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_geometry</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb23-5"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_cast</span>(<span class="st">"POLYGON"</span>)</span>
+<span id="cb23-6"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Add Crimea to Ukraine</span></span>
+<span id="cb23-8"><a href="" aria-hidden="true" tabindex="-1"></a>true_ukraine <span class="ot">&lt;-</span> <span class="fu">st_union</span>(<span class="fu">c</span>(ukraine_polygons, crimea_polygon)) <span class="sc">|&gt;</span></span>
+<span id="cb23-9"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_cast</span>(<span class="st">"MULTIPOLYGON"</span>)</span>
+<span id="cb23-10"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-11"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb23-12"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> world, <span class="at">fill =</span> clr_land) <span class="sc">+</span></span>
+<span id="cb23-13"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> new_russia, <span class="at">fill =</span> rus_red) <span class="sc">+</span> </span>
+<span id="cb23-14"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> true_ukraine, <span class="at">fill =</span> ukr_blue, <span class="at">color =</span> ukr_yellow, <span class="at">linewidth =</span> <span class="dv">2</span>) <span class="sc">+</span> </span>
+<span id="cb23-15"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_sf</span>(</span>
+<span id="cb23-16"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">xlim =</span> <span class="fu">c</span>(ukraine_bbox[<span class="st">"xmin"</span>], ukraine_bbox[<span class="st">"xmax"</span>]), </span>
+<span id="cb23-17"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">ylim =</span> <span class="fu">c</span>(ukraine_bbox[<span class="st">"ymin"</span>], ukraine_bbox[<span class="st">"ymax"</span>])</span>
+<span id="cb23-18"><a href="" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb23-19"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb23-20"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">panel.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> clr_ocean))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+
+</section>
+<section id="adding-crimea-to-ukraine-output" class="slide level2 smaller output-location-slide"><h2>Adding Crimea to Ukraine</h2><div class="cell output-location-slide" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".07_files/figure-revealjs/final-crimea-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></section><section id="update-full-data" class="slide level2">
+<h2>Update full data</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="" aria-hidden="true" tabindex="-1"></a>world_un <span class="ot">&lt;-</span> world <span class="sc">|&gt;</span></span>
+<span id="cb24-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">geometry =</span> <span class="fu">case_when</span>(</span>
+<span id="cb24-3"><a href="" aria-hidden="true" tabindex="-1"></a>    admin <span class="sc">==</span> <span class="st">"Ukraine"</span> <span class="sc">~</span> true_ukraine,</span>
+<span id="cb24-4"><a href="" aria-hidden="true" tabindex="-1"></a>    admin <span class="sc">==</span> <span class="st">"Russia"</span> <span class="sc">~</span> new_russia,</span>
+<span id="cb24-5"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">.default =</span> geometry</span>
+<span id="cb24-6"><a href="" aria-hidden="true" tabindex="-1"></a>  ))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="welcome-back-crimea" class="slide level2 smaller">
+<h2>Welcome back, Crimea!</h2>
+<div class="cell" data-layout-align="center">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="" aria-hidden="true" tabindex="-1"></a>eastern_eu_bbox <span class="ot">&lt;-</span> ukraine <span class="sc">|&gt;</span> </span>
+<span id="cb25-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_buffer</span>(<span class="at">dist =</span> <span class="dv">700000</span>) <span class="sc">|&gt;</span>  <span class="co"># Add 700,000 meter buffer around the country </span></span>
+<span id="cb25-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_bbox</span>()</span>
+<span id="cb25-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb25-6"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> world_un, <span class="fu">aes</span>(<span class="at">fill =</span> <span class="fu">factor</span>(mapcolor9)), <span class="at">linewidth =</span> <span class="fl">0.25</span>, <span class="at">color =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
+<span id="cb25-7"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> carto_prism, <span class="at">guide =</span> <span class="st">"none"</span>) <span class="sc">+</span></span>
+<span id="cb25-8"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_sf</span>(</span>
+<span id="cb25-9"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">xlim =</span> <span class="fu">c</span>(eastern_eu_bbox[<span class="st">"xmin"</span>], eastern_eu_bbox[<span class="st">"xmax"</span>]), </span>
+<span id="cb25-10"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">ylim =</span> <span class="fu">c</span>(eastern_eu_bbox[<span class="st">"ymin"</span>], eastern_eu_bbox[<span class="st">"ymax"</span>])</span>
+<span id="cb25-11"><a href="" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb25-12"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb25-13"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">panel.background =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> clr_ocean))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+
+</section>
+<section id="welcome-back-crimea-output" class="slide level2 smaller output-location-slide"><h2>Welcome back, Crimea!</h2><div class="cell output-location-slide" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".07_files/figure-revealjs/final-map-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></section><section id="alt-data-sources" class="slide level2">
+<h2>Alt data sources</h2>
+<ul>
+<li><a href="https://ec.europa.eu/eurostat/web/gisco">Geographic Information System of the Commission (GISCO)</a></li>
+<li>The <a href="https://ropengov.github.io/giscoR/"><code>giscoR</code> R package</a></li>
+<li>The original raw <a href="https://gisco-services.ec.europa.eu/distribution/v2/countries/geojson/">GeoJSON from Eurostat</a></li>
+<li>The <a href="https://www.geoboundaries.org/">geoBoundaries</a> project</li>
+<li><a href="https://data.apps.fao.org/catalog/iso/6aecaf08-c7d0-4e16-8778-b8dddae9da14">UN Country Boundaries of the World</a></li>
+<li><a href="https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/map/?dataChart=eyJxdWVyaWVzIjpbeyJjb25maWciOnsiZGF0YXNldCI6IndvcmxkLWFkbWluaXN0cmF0aXZlLWJvdW5kYXJpZXMiLCJvcHRpb25zIjp7ImJhc2VtYXAiOiJqYXdnLmxpZ2h0IiwibG9jYXRpb24iOiI1LDQ1LjkwNTMsMzcuNzI3MDUifX0sImNoYXJ0cyI6W3siYWxpZ25Nb250aCI6dHJ1ZSwidHlwZSI6ImNvbHVtbiIsImZ1bmMiOiJDT1VOVCIsInNjaWVudGlmaWNEaXNwbGF5Ijp0cnVlLCJjb2xvciI6IiNGRjUxNUEifV0sInhBeGlzIjoic3RhdHVzIiwibWF4cG9pbnRzIjo1MCwic29ydCI6IiJ9XSwidGltZXNjYWxlIjoiIiwiZGlzcGxheUxlZ2VuZCI6dHJ1ZSwiYWxpZ25Nb250aCI6dHJ1ZX0%3D&amp;location=5,50.23315,30.25635&amp;basemap=jawg.light">World Administrative Boundaries</a> by World Food Programme (UN agency)</li>
+</ul>
 </section></section>
 <section id="questions" class="title-slide slide level1 unnumbered unlisted center" data-background-iframe=".07_files/libs/colored-particles/index.html">
 <h1>Questions?</h1>

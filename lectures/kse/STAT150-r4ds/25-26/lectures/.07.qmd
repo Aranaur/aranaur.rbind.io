@@ -281,11 +281,11 @@ map_nad83 | map_albers
 ---
 
 ```{=html}
-<iframe width="1600" height="1000" src="http://hint.fm/wind/index.html" title="Wind Map"></iframe>
+<iframe width="1600" height="1000" src="https://earth.nullschool.net/#current/wind/surface/level/orthographic=-326.37,48.42,3821" title="Wind Map"></iframe>
 ```
 
 ::: footer
-[Wind Map](http://hint.fm/wind/)
+[Wind Map](https://earth.nullschool.net/#current/wind/surface/level/orthographic=-326.37,48.42,3821)
 :::
 
 ---
@@ -598,6 +598,302 @@ other_data |>
 
 <br><br>
 <center>Stick with `sf` and `geom_sf()` and your life will be easy</center>
+
+# Crimea comming home {background-iframe=".07_files/libs/colored-particles/index.html"}
+
+::: footer
+[Heiss, Andrew. 2025. "How to Move Crimea from Russia to Ukraine in Maps with R."](https://www.andrewheiss.com/blog/2025/02/13/natural-earth-crimea/)
+:::
+
+## The Natural Earth Project {.tiny}
+
+- The Natural Earth Project is a public domain map dataset available at three scales: 1:10m, 1:50m, and 1:110m.
+- `rnaturalearth` is an R package that makes it easy to download and use these maps in R.
+
+```{r}
+#| label: ne-package
+#| fig-align: center
+#| output-location: column
+#| fig-height: 8
+#| fig-width: 10
+
+library(tidyverse)
+library(sf)
+library(rnaturalearth)
+
+# Set some colors
+ukr_blue <- "#0057b7"  # Blue from the Ukrainian flag
+ukr_yellow <- "#ffdd00"  # Yellow from the Ukrainian flag
+rus_red <- "#d62718"  # Red from the Russian flag
+
+clr_ocean <- "#d9f0ff"
+clr_land <- "#facba6"
+
+# CARTOColors Prism (https://carto.com/carto-colors/)
+carto_prism = c(
+  "#5F4690", "#1D6996", "#38A6A5", "#0F8554", "#73AF48", "#EDAD08", 
+  "#E17C05", "#CC503E", "#94346E", "#6F4070", "#994E95", "#666666"
+)
+
+ne_countries(scale = 110) |> 
+  filter(admin != "Antarctica") |> 
+  ggplot() + 
+  geom_sf(aes(fill = continent), color = "white", linewidth = 0.1) +
+  scale_fill_manual(values = carto_prism, guide = "none") +
+  coord_sf(crs = "+proj=robin") +
+  theme_void()
+```
+
+## Natural Earth’s [de facto policy](https://www.naturalearthdata.com/about/disputed-boundaries-policy/) 😡
+
+> Natural Earth draws boundaries of sovereign states according to de facto ("in fact") status rather than de jure ("by law").
+
+- Nearly three dozen [issues on GitHub](https://github.com/search?q=repo:nvkelso/natural-earth-vector+crimea&type=issues) about Crimea
+- [There](https://github.com/nvkelso/natural-earth-vector/issues/391) [are](https://github.com/nvkelso/natural-earth-vector/issues/489) [huge](https://github.com/nvkelso/natural-earth-vector/issues/926) [debates](https://github.com/nvkelso/natural-earth-vector/issues/810) [over](https://github.com/nvkelso/natural-earth-vector/issues/812) the ethics of the de facto policy
+
+## Natural Earth de jure points of view
+
+- Natural Earth [provides](https://github.com/nvkelso/natural-earth-vector/issues/391#issuecomment-890772203) 31 [country-specific](https://www.naturalearthdata.com/blog/admin-0-countries-point-of-views/) de jure POV shapefiles (high-resolution only) for disputed areas.
+- Other datasets include [columns like `fclass_us` and `fclass_ua`](https://github.com/nvkelso/natural-earth-vector/blob/master/packages/Natural_Earth_quick_start/LOCALIZATION.md#setting-boundary-pov), mostly for localization; how to use them is unclear.
+- Documentation is limited, and medium/low-resolution POV maps [aren't available yet](https://github.com/nvkelso/natural-earth-vector/issues/875#issuecomment-1726400482).
+
+## Example UA POV {.smaller}
+
+- UA-POV [10m shapefile](https://www.naturalearthdata.com/blog/admin-0-countries-point-of-views/) shows Crimea in Ukraine.
+- Download manually; `rnaturalearth::ne_countries()` doesn't support POV.
+
+```{r}
+#| label: ua-pov
+#| fig-align: center
+#| output-location: slide
+#| fig-height: 8
+
+world_10_us <- read_sf("data/ne_10m_admin_0_countries_ukr/ne_10m_admin_0_countries_ukr.shp")
+
+world_10_us |> 
+  filter(ADMIN == "Ukraine") |> 
+  ggplot() +
+  geom_sf(fill = ukr_blue) +
+  theme_void()
+```
+
+## Low and medium resolution POV 😡 {.smaller}
+
+- Low and medium resolution POV shapefiles are not available yet.
+
+```{r}
+#| label: low-med-pov
+#| fig-align: center
+#| output-location: slide
+#| fig-height: 8
+
+world <- ne_countries(scale = 110, type = "map_units")
+
+ukraine <- world |> filter(admin == "Ukraine")
+russia <- world |> filter(admin == "Russia")
+
+ukraine_bbox <- ukraine |> 
+  st_buffer(dist = 100000) |>  # Add 100,000 meter buffer around the country 
+  st_bbox()
+
+ggplot() +
+  geom_sf(data = world, fill = clr_land) +
+  geom_sf(data = russia, fill = rus_red) + 
+  geom_sf(data = ukraine, fill = ukr_blue, color = ukr_yellow, linewidth = 2) + 
+  coord_sf(
+    xlim = c(ukraine_bbox["xmin"], ukraine_bbox["xmax"]), 
+    ylim = c(ukraine_bbox["ymin"], ukraine_bbox["ymax"])
+  ) +
+  theme_void() +
+  theme(panel.background = element_rect(fill = clr_ocean))
+```
+
+## Return Crimea to Ukraine w/ R and `sf`
+
+- The actual geometric shapes for all the countries in `world` are **MULTIPOLYGONs**, or collections of POLYGON geometric objects:
+
+```{r}
+#| label: multipolygon-example
+
+russia |> st_geometry()
+```
+
+## Return Crimea to Ukraine w/ R and `sf`
+
+- We can split MULTIPOLYGONs into their component POLYGONs with `st_cast()`. Russia consists of 14 different shapes:
+
+```{r}
+#| label: multipolygon-to-polygon
+
+(russia_polygons <- russia |> st_geometry() |> st_cast("POLYGON"))
+```
+
+---
+
+```{r}
+#| label: plot-russia-polygons
+#| fig-align: center
+
+plot(russia_polygons[2])
+```
+
+---
+
+```{r}
+#| label: plot-crimea
+#| fig-align: center
+
+plot(russia_polygons[14])
+```
+
+## Identifying the Crimea
+
+- Plotting each POLYGON is brittle (counts/order change by map scale). Instead, place a POINT in Crimea (e.g., 45°N, 34°E) and select the Russian POLYGON that contains it:
+
+```{r}
+#| label: crimea-point
+#| fig-align: center
+#| output-location: slide
+#| fig-height: 8
+
+crimea_point <- st_sfc(st_point(c(34, 45)), crs = st_crs(world))
+
+ggplot() +
+  geom_sf(data = world, fill = clr_land) +
+  geom_sf(data = russia, fill = rus_red) + 
+  geom_sf(data = ukraine, fill = ukr_blue, color = ukr_yellow, linewidth = 2) + 
+  geom_sf(data = crimea_point) +
+  coord_sf(
+    xlim = c(ukraine_bbox["xmin"], ukraine_bbox["xmax"]), 
+    ylim = c(ukraine_bbox["ymin"], ukraine_bbox["ymax"])
+  ) +
+  theme_void() +
+  theme(panel.background = element_rect(fill = clr_ocean))
+```
+
+## Extracting Crimea polygon {.smaller}
+
+- `st_intersects()` tells us which POLYGON contains the POINT:
+
+```{r}
+#| output-location: column
+
+# Extract the Russia MULTIPOLYGON and convert it to polygons
+russia_polygons <- world |> 
+  filter(admin == "Russia") |> 
+  st_geometry() |> 
+  st_cast("POLYGON")
+
+# Extract the Russia polygon that has Crimea in it
+crimea_polygon <- russia_polygons |>
+  keep(\(x) st_intersects(x, crimea_point, sparse = FALSE))
+
+# This is the same as russia_polygons[14]
+plot(crimea_polygon)
+```
+
+## Extracting Crimea polygon from Russia {.smaller}
+
+- Now we can remove Crimea from Russia
+
+```{r}
+#| label: add-crimea
+#| fig-align: center
+#| output-location: slide
+#| fig-height: 8
+
+# Remove Crimea from Russia
+new_russia <- russia_polygons |>
+  discard(\(x) any(st_equals(x, crimea_polygon, sparse = FALSE))) |> 
+  st_combine() |> 
+  st_cast("MULTIPOLYGON")
+
+ggplot() +
+  geom_sf(data = world, fill = clr_land) +
+  geom_sf(data = new_russia, fill = rus_red) + 
+  geom_sf(data = ukraine, fill = ukr_blue, color = ukr_yellow, linewidth = 2) + 
+  coord_sf(
+    xlim = c(ukraine_bbox["xmin"], ukraine_bbox["xmax"]), 
+    ylim = c(ukraine_bbox["ymin"], ukraine_bbox["ymax"])
+  ) +
+  theme_void() +
+  theme(panel.background = element_rect(fill = clr_ocean))
+```
+
+## Adding Crimea to Ukraine {.smaller}
+
+```{r}
+#| label: final-crimea
+#| fig-align: center
+#| output-location: slide
+#| fig-height: 8
+
+# Extract the Ukraine MULTIPOLYGON and convert it to polygons
+ukraine_polygons <- world |> 
+  filter(admin == "Ukraine") |> 
+  st_geometry() |> 
+  st_cast("POLYGON")
+
+# Add Crimea to Ukraine
+true_ukraine <- st_union(c(ukraine_polygons, crimea_polygon)) |>
+  st_cast("MULTIPOLYGON")
+
+ggplot() +
+  geom_sf(data = world, fill = clr_land) +
+  geom_sf(data = new_russia, fill = rus_red) + 
+  geom_sf(data = true_ukraine, fill = ukr_blue, color = ukr_yellow, linewidth = 2) + 
+  coord_sf(
+    xlim = c(ukraine_bbox["xmin"], ukraine_bbox["xmax"]), 
+    ylim = c(ukraine_bbox["ymin"], ukraine_bbox["ymax"])
+  ) +
+  theme_void() +
+  theme(panel.background = element_rect(fill = clr_ocean))
+```
+
+## Update full data
+
+```{r}
+world_un <- world |>
+  mutate(geometry = case_when(
+    admin == "Ukraine" ~ true_ukraine,
+    admin == "Russia" ~ new_russia,
+    .default = geometry
+  ))
+```
+
+## Welcome back, Crimea! {.smaller}
+
+```{r}
+#| label: final-map
+#| fig-align: center
+#| output-location: slide
+#| fig-height: 8
+#| fig-width: 10
+
+eastern_eu_bbox <- ukraine |> 
+  st_buffer(dist = 700000) |>  # Add 700,000 meter buffer around the country 
+  st_bbox()
+
+ggplot() +
+  geom_sf(data = world_un, aes(fill = factor(mapcolor9)), linewidth = 0.25, color = "white") +
+  scale_fill_manual(values = carto_prism, guide = "none") +
+  coord_sf(
+    xlim = c(eastern_eu_bbox["xmin"], eastern_eu_bbox["xmax"]), 
+    ylim = c(eastern_eu_bbox["ymin"], eastern_eu_bbox["ymax"])
+  ) +
+  theme_void() +
+  theme(panel.background = element_rect(fill = clr_ocean))
+```
+
+## Alt data sources
+
+- [Geographic Information System of the Commission (GISCO)](https://ec.europa.eu/eurostat/web/gisco)
+- The [`giscoR` R package](https://ropengov.github.io/giscoR/)
+- The original raw [GeoJSON from Eurostat](https://gisco-services.ec.europa.eu/distribution/v2/countries/geojson/)
+- The [geoBoundaries](https://www.geoboundaries.org/) project
+- [UN Country Boundaries of the World](https://data.apps.fao.org/catalog/iso/6aecaf08-c7d0-4e16-8778-b8dddae9da14)
+- [World Administrative Boundaries](https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/map/?dataChart=eyJxdWVyaWVzIjpbeyJjb25maWciOnsiZGF0YXNldCI6IndvcmxkLWFkbWluaXN0cmF0aXZlLWJvdW5kYXJpZXMiLCJvcHRpb25zIjp7ImJhc2VtYXAiOiJqYXdnLmxpZ2h0IiwibG9jYXRpb24iOiI1LDQ1LjkwNTMsMzcuNzI3MDUifX0sImNoYXJ0cyI6W3siYWxpZ25Nb250aCI6dHJ1ZSwidHlwZSI6ImNvbHVtbiIsImZ1bmMiOiJDT1VOVCIsInNjaWVudGlmaWNEaXNwbGF5Ijp0cnVlLCJjb2xvciI6IiNGRjUxNUEifV0sInhBeGlzIjoic3RhdHVzIiwibWF4cG9pbnRzIjo1MCwic29ydCI6IiJ9XSwidGltZXNjYWxlIjoiIiwiZGlzcGxheUxlZ2VuZCI6dHJ1ZSwiYWxpZ25Nb250aCI6dHJ1ZX0%3D&location=5,50.23315,30.25635&basemap=jawg.light) by World Food Programme (UN agency)
+
 
 # Questions? {.unnumbered .unlisted background-iframe=".07_files/libs/colored-particles/index.html"}
 
