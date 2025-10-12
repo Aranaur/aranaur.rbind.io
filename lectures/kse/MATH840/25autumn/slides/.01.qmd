@@ -1,0 +1,767 @@
+---
+title: "Introduction to Forecasting"
+subtitle: "MATH840 | Time Series"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .01_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=3416">🔗MATH840 | Time Series</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Getting started
+
+## Babylonian predicting (~ 1000 BC)
+
+::: {.columns}
+::: {.column}
+![](img/TU11.png)
+:::
+::: {.column}
+TU 11: rule for prediction of times of lunar eclipses
+:::
+:::
+
+::: footer
+[Methods for understanding and reconstructing Babylonian predicting rules](https://epub.uni-regensburg.de/58017/1/36.%20Methods%20underst.%20reconst%20.pdf)
+:::
+
+## Greeks (~ 300 BC)
+
+::: {.columns}
+::: {.column}
+![](img/Delphic.jpg){width=300px}<br>
+![](img/Pythia.jpg){width=300px}
+:::
+::: {.column}
+Delphic Oracle: predicting the future through cryptic messages
+
+> If Croesus goes to war, he will destroy a great empire.
+:::
+:::
+
+
+
+::: footer
+[Pythia](https://en.wikipedia.org/wiki/Pythia)
+:::
+
+## John Graunt (17th century)
+
+John Graunt: "Natural and Political Observations Made upon the Bills of Mortality"
+
+::: {.columns}
+::: {.column}
+![](img/JohnGraunt.png){height=400px}<br>
+:::
+::: {.column}
+![](img/Bills%20of%20Mortality.jpg){width=400px}
+:::
+:::
+
+::: footer
+[John Graunt](https://en.wikipedia.org/wiki/John_Graunt)
+:::
+
+## Medical instruments {.smaller}
+
+::: {.columns}
+::: {.column}
+![](img/Waller.jpg)
+:::
+::: {.column}
+- **1901:** The first practical electrocardiogram (ECG) was invented to record the heart's electrical signals.
+- **1924:** The first human electroencephalogram (EEG) was recorded, measuring brain impulses.
+:::
+:::
+
+These medical instruments provided some of the first complex time series for analyzing individual patient health.
+
+::: footer
+[Augustus Desire Waller](https://en.wikipedia.org/wiki/Augustus_Desire_Waller)
+:::
+
+## Weather Forecasting {.smaller}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+- **Antiquity:** Aristotle's *Meteorology* was the dominant text until the Renaissance.
+- **Renaissance:** The invention of the barometer and other instruments allowed for data collection.
+- **1850s:** Robert FitzRoy, captain of the HMS *Beagle* (of Darwin fame), headed a new government department in Britain and coined the term **"weather forecast."**
+- **1870s:** The telegraph allowed for fast compilation of data from many locations, revolutionizing forecasting.
+:::
+
+::: {.column width="50%"}
+![](img/Robert FitzRoy.jpg){width=700px}
+:::
+
+::::
+
+::: footer
+[Robert FitzRoy](https://en.wikipedia.org/wiki/Robert_FitzRoy)
+:::
+
+## Economics {.smaller}
+
+::: {.columns}
+::: {.column}
+- **Late 19th-Early 20th Century:** Banking crises in the US and Europe fueled the idea that the economy was a **cyclical system**, much like the weather.
+- This created a demand for tracking **economic indicators** to avert crashes.
+- Governments began systematically collecting and publishing data like **GDP, unemployment, and tax revenues**.
+- This laid the foundation for modern **economics** and **financial** time series analysis.
+:::
+::: {.column}
+![](img/NBER.png){width=700px}
+:::
+:::
+
+## Famous "Accurate" Forecasts {.smaller}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![](img/Watson.jpg){width=400px}<br>
+
+> "I think there is a world market for **maybe five computers**."
+>
+> — *Thomas Watson, chairman of IBM, 1943*
+:::
+::: {.column width="50%"}
+![](img/KenOlson.jpg){width=400px}
+
+> "There is **no reason** anyone would want a **computer in their home**."
+>
+> — *Ken Olsen, president of Digital Equipment Corp., 1977*
+:::
+
+::::
+
+Forecasting is hard, but companies that do it well have a massive advantage.
+
+# What is a Time Series?
+
+## Definition
+
+> **A time series** is a set of data points ordered in time.
+
+- The data is often **equally spaced in time**, meaning a consistent interval separates each data point (e.g., hourly, daily, monthly).
+- **Examples:**
+    - The daily closing price of a stock.
+    - A household's monthly electricity consumption.
+    - A country's quarterly Gross Domestic Product (GDP).
+    - Minute-by-minute temperature readings from a weather station.
+
+## Time Series Are Everywhere
+
+Time series data and its analysis are increasingly important due to the massive production of such data.
+
+- **Internet of Things (IoT):** Sensors in manufacturing, smart homes, and logistics.
+- **Digital Healthcare:** ECGs, EEGs, and data from wearable devices.
+- **Smart Cities:** Traffic patterns, energy consumption, and air quality data.
+- **Economics & Finance:** Stock markets, currency exchange rates, and economic indicators.
+- **Science:** Astronomical observations (like sunspots), weather data, and climate records.
+
+## What can be forecast?
+
+
+- Daily electricity consumption in 3 days ⚡
+- Time of sunrise this day next year 🌅
+- Google stock price tomorrow 📈
+- Google stock price in 6 months 📉
+- Maximum temperature tomorrow 🌡️
+- Exchange rate UAH/USD next week 💱
+- Total sales of product X in 3 months 📊
+- Timing of next Halley's comet ☄️
+
+## Which is easier to forecast? {.smaller}
+
+::: {.columns}
+::: {.column}
+1. Time of sunrise this day next year 🌅
+2. Timing of next Halley's comet ☄️
+3. Maximum temperature tomorrow 🌡️
+4. Daily electricity consumption in 3 days ⚡
+5. Total sales of product X in 3 months 📊
+6. Google stock price tomorrow 📈
+7. Exchange rate UAH/USD next week 💱
+8. Google stock price in 6 months 📉
+:::
+::: {.column}
+- What means **"easier"**?
+- What makes something easier/harder to forecast?
+:::
+:::
+
+## Forecastability factors
+
+1. Good **understanding** of the domain and factors affecting the variable. 🤔
+2. A **lot** of data. 📊
+3. The future is somewhat **similar to the past**. 🔄
+4. The forecasts *cannot change the future*. 🛑
+
+## Case study: Stolen or lost mobile phones
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-height: 6
+#| fig-width: 10
+#| fig-align: center
+
+import duckdb
+import pandas as pd
+import plotly.express as px
+
+# Custom colors
+red    = "#fb6107"
+orange = "#FFA500"
+blue   = "#181485"
+
+# Connect to DuckDB
+con = duckdb.connect(':memory:')
+
+query = """
+SELECT 
+    CAST(DK AS DATE) AS date,
+    NZ,
+    COUNT(*) AS n
+FROM 'data/mobile.parquet'
+WHERE 
+    DK IS NOT NULL
+    AND NZ IN ('SAMSUNG', 'XIAOMI', 'APPLE IPHONE')
+    AND CAST(DK AS DATE) >= DATE '2020-01-01'
+GROUP BY date, NZ
+ORDER BY date, NZ
+"""
+
+filtered = con.sql(query).df()
+con.close()
+
+# Clean data
+filtered['date'] = pd.to_datetime(filtered['date'], errors='coerce')
+filtered['n'] = pd.to_numeric(filtered['n'], errors='coerce')
+filtered = filtered.dropna(subset=['date', 'n'])
+
+# Color mapping
+color_map = {
+    "SAMSUNG": red,
+    "XIAOMI": orange,
+    "APPLE IPHONE": blue
+}
+
+# Create interactive Plotly figure
+fig = px.line(
+    filtered,
+    x='date',
+    y='n',
+    color='NZ',
+    facet_row='NZ',          # vertical facets
+    color_discrete_map=color_map,
+    markers=True,
+    title="Count of stolen or lost mobile phones over time<br><sup>Data from 2020 onwards for Samsung, Xiaomi, and Apple iPhone</sup>"
+)
+
+# Free y-axis per facet
+fig.update_yaxes(matches=None)
+
+# Layout sizing (~10x6 inches, assuming 100 px per inch)
+fig.update_layout(
+    template='plotly_white',
+    width=1000,
+    height=600,
+    title_x=0.5,
+    xaxis_title="Date",
+    yaxis_title="Number of reports",
+    showlegend=False,
+    font=dict(size=14)
+)
+
+# Clean facet labels
+fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+
+# Caption
+fig.add_annotation(
+    text="MATH840 | Source: data.gov.ua",
+    xref="paper", yref="paper",
+    x=1, y=-0.10, showarrow=False,
+    font=dict(size=12, color="gray"),
+    align="right"
+)
+
+# Show interactive plot
+fig.show()
+
+con.close()
+```
+
+
+
+
+
+## The Anatomy of a Time Series
+
+Any time series can be broken down, or **decomposed**, into three fundamental components:
+
+1.  **Trend:** The slow-moving, long-term change in a time series. It shows the general direction (increasing, decreasing, or flat).
+2.  **Seasonality:** A cyclical pattern that repeats over a fixed period of time (e.g., annually, weekly, daily).
+3.  **Residuals (or Noise):** What remains after removing the trend and seasonal components. These are the random, unpredictable fluctuations.
+
+## Case Study: Johnson & Johnson Quarterly EPS (1960-1980)
+
+::: {.columns}
+::: {.column}
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+import pandas as pd
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+
+# Load the Johnson & Johnson dataset
+data = sm.datasets.get_rdataset("JohnsonJohnson").data
+
+# Create a proper date-time index for our data
+# The original data has a time column like 1960.00, 1960.25...
+# A quarterly frequency ('Q') date range is more useful.
+date_index = pd.date_range(start='1960-01-01', periods=len(data), freq='Q')
+data.index = date_index
+
+# Plotting the series
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(data.index, data['value'], color=turquoise, linewidth=2)
+ax.set_title("Johnson & Johnson Quarterly Earnings Per Share (EPS)", fontsize=16)
+ax.set_xlabel("Year")
+ax.set_ylabel("EPS (USD)")
+ax.grid(True, linestyle='--', alpha=0.6)
+plt.show()
+```
+:::
+::: {.column .incremental}
+**What do you see?**
+
+- Trend: A clear, upward movement over time.
+- Seasonality: A repeating up-and-down pattern within each year.
+:::
+:::
+
+## Understanding the Components {.smaller}
+
+::: {.columns}
+::: {.column}
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-height: 8
+
+from statsmodels.tsa.seasonal import seasonal_decompose
+
+# We use a multiplicative model because the seasonal fluctuations
+# appear to grow larger as the trend goes up.
+decomposition = seasonal_decompose(data['value'], model='multiplicative')
+
+# The result is an object with observed, trend, seasonal, and resid attributes.
+fig = decomposition.plot()
+fig.set_size_inches(10, 8)
+fig.suptitle("Decomposition of Johnson & Johnson EPS", y=0.95, fontsize=16)
+plt.show()
+```
+:::
+::: {.column}
+- **Observed**: Our original time series data.
+- **Trend**: A smooth line capturing the long-term growth in earnings.
+- **Seasonal**: The repeating pattern within each year. We can see earnings are typically highest in Q2/Q3 and lowest in Q4.
+- **Resid** (Residuals): The random, irregular fluctuations. In a good model, this component should have no obvious pattern.
+:::
+:::
+
+**Why is this important?** Understanding these components is the key to choosing the right forecasting model. If your data has a trend, your model must account for it. If it has seasonality, your model must handle that too.
+
+# The Forecasting Process
+
+## The Forecasting Project {.smaller}
+
+- Forecasting **isn't** just about running an **algorithm**. 🔮
+- A successful project requires a **structured approach** from start to finish. 🏗️
+- This **workflow** ensures that your model provides real business value and avoids common pitfalls. 🚫
+- Let's imagine our goal is to forecast monthly sales for an e-commerce store. 📈
+
+## The Forecasting Roadmap
+
+```{dot}
+//| echo: false
+digraph SimpleForecastingRoadmap {
+    // Graph settings
+    rankdir="LR";
+    node [shape=box, style="rounded,filled", fillcolor="#deeff5"];
+    edge [fontsize=10];
+
+    // Define nodes
+    Step1 [label="1. Set Goal"];
+    Step2 [label="2. Define What to Forecast"];
+    Step3 [label="3. Set Time Horizon"];
+    Step4 [label="4. Gather Data"];
+    Step5 [label="5. Develop Model"];
+    Step6 [label="6. Deploy Model"];
+    Step7 [label="7. Monitor & Retrain"];
+
+    // Define the process flow
+    Step1 -> Step2 -> Step3 -> Step4 -> Step5 -> Step6 -> Step7;
+
+    // Define the feedback loop
+    Step7 -> Step5 [style=dashed, label="Feedback Loop"];
+}
+```
+
+## Step 1 & 2: Set a Goal & What to Forecast {.smaller}
+
+**1. Setting a Goal (The "Why")** 🎯
+
+- **Vague:** "We want to **forecast sales**."
+- **Specific:** "We need to forecast monthly sales for each product category to **optimize inventory levels**, aiming to reduce storage costs by 15% without increasing stockouts."
+
+**2. Determining What Must Be Forecast (The "What")** 📊
+
+- To achieve our goal, we need to predict the **number of units sold per category for the next 3 months.**
+- This is the specific *target variable* our model will predict.
+
+## Step 3 & 4: Set the Horizon & Gather Data {.smaller}
+
+**3. Setting the Horizon (The "When")** 🕒
+
+- The **forecast horizon** is the length of time into the future we need to predict.
+- For our goal (inventory planning), a **3-month horizon** is appropriate. We need to know what to stock for the upcoming quarter.
+
+**4. Gathering the Data (The "With What")** 📚
+
+- We need historical sales data. How much is enough?
+    - Ideally, at least **2-3 full seasonal cycles**. For monthly sales, this means 2-3 years of data to identify yearly patterns.
+- We might also gather data on potential drivers (*exogenous variables*):
+    - Marketing spend, promotions, holidays, website traffic, competitor prices.
+
+## Step 5-7: Model, Deploy, & Monitor {.smaller}
+
+**5. Developing a Forecasting Model** 🛠️
+
+- This is the core of our course! It involves:
+    - Visualizing the data (next lecture!).
+    - Preprocessing and feature engineering.
+    - Selecting and training models (from simple baselines to complex algorithms).
+    - Evaluating model performance on a held-out test set.
+
+**6. Deploying to Production** 🚀
+
+- The model is integrated into a system (e.g., an API, a dashboard) that automatically generates forecasts for the inventory team.
+
+**7. Monitoring & Collecting New Data** 📊
+
+- We continuously compare our forecasts to actual sales. Is the model's accuracy degrading?
+- New sales data is collected to **retrain the model regularly**, keeping it relevant and accurate. This creates a feedback loop.
+
+## Forecasting vs. "Normal" Regression {.smaller}
+
+Time series forecasting looks like a regression problem (predict a number), but there are critical differences.
+
+:::: {.columns}
+::: {.column width="50%"}
+**Regression** 📈
+
+- Data points are often assumed to be independent.
+- You can shuffle the data before training without losing information.
+- Goal: Find a relationship $y = f(X)$.
+- Features $X$ are usually from the same time period as $y$.
+:::
+::: {.column width="50%"}
+**Time Series Forecasting** 🔮
+
+- Data points are ordered and dependent. Time matters!
+- Never shuffle the data! This would destroy the temporal structure.
+- Goal: Find a relationship $y_{future} = f(y_{past}, X_{past})$.
+- You are predicting the future using only information from the past.
+:::
+::::
+
+## Random futures {.smaller}
+
+> A forecast is an estimate of the probabilities of possible future events.
+
+. . .
+
+```{python}
+#| echo: false
+#| fig-align: center
+from statsforecast import StatsForecast
+from statsforecast.models import AutoETS
+
+df = sm.datasets.get_rdataset("JohnsonJohnson").data
+
+#plot of the original series
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(df['time'], df['value'], color=turquoise, linewidth=2)
+ax.set_title("Johnson & Johnson Quarterly Earnings Per Share (EPS)", fontsize=16)
+ax.set_xlabel("Year")
+ax.set_ylabel("EPS (USD)")
+ax.grid(True, linestyle='--', alpha=0.6)
+ax.set_ylim([0, 20])
+ax.set_xlim([1960, 1984])
+plt.show()
+```
+
+## Random futures {.smaller}
+
+```{python}
+#| echo: false
+#| fig-align: center
+from statsforecast import StatsForecast
+from statsforecast.models import AutoETS, AutoARIMA, SeasonalNaive, AutoCES, HoltWinters, AutoTheta, AutoRegressive, AutoTBATS, SeasonalExponentialSmoothing, DynamicOptimizedTheta
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+import pandas as pd
+
+df = sm.datasets.get_rdataset("JohnsonJohnson").data
+df = pd.DataFrame({
+    'unique_id': 'J&J',
+    'ds': pd.to_datetime(df['time'].apply(lambda x: f'{int(x)}-Q{int((x - int(x)) * 4) + 1}')),
+    'y': df['value']
+})
+
+season_length = 4  # Quarterly data
+horizon = 8        # Forecasting 8 quarters (2 years)
+
+
+# Define model configurations
+model_configs = [
+    AutoETS(season_length=season_length, alias='Model 1'),
+    AutoARIMA(season_length=season_length, alias='Model 2'),
+    SeasonalNaive(season_length=season_length, alias='Model 3'),
+    AutoCES(season_length=season_length, alias='Model 4'),
+    HoltWinters(season_length=season_length, alias='Model 5'),
+    AutoTheta(season_length=season_length, alias='Model 6'),
+    AutoRegressive(lags=season_length, alias='Model 7'),
+    AutoTBATS(season_length=season_length, alias='Model 8'),
+    SeasonalExponentialSmoothing(season_length=season_length, alpha=0.9, alias='Model 9'),
+    DynamicOptimizedTheta(season_length=season_length, alias='Model 10')
+]
+
+sf = StatsForecast(models=model_configs, freq='Q')
+forecast_df = sf.forecast(df=df, h=horizon)
+
+# pivot longer format for easier plotting
+forecast_df = forecast_df.melt(id_vars=['ds'], value_vars=[model.alias for model in model_configs],
+                               var_name='model', value_name='yhat')
+forecast_df['model'] = forecast_df['model'].str.replace('yhat_', '')
+
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(df['ds'], df['y'], label='Observed', color=turquoise)
+# plot only the first model
+for model in model_configs[:1]:
+    model_forecast = forecast_df[forecast_df['model'] == model.alias]
+    ax.plot(model_forecast['ds'], model_forecast['yhat'], label=model.alias)
+ax.set_title('Johnson & Johnson Quarterly Earnings Per Share (EPS)')
+ax.set_xlabel('Year')
+ax.set_ylabel('EPS (USD)')
+ax.grid(True, linestyle='--', alpha=0.6)
+ax.legend()
+ax.set_xlim([pd.Timestamp('1960-01-01'), pd.Timestamp('1984-01-01')])
+ax.set_ylim([0, 20])
+plt.show()
+```
+
+## Random futures {.smaller}
+
+```{python}
+#| echo: false
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(df['ds'], df['y'], label='Observed', color=turquoise)
+for model in model_configs[:2]:
+    model_forecast = forecast_df[forecast_df['model'] == model.alias]
+    ax.plot(model_forecast['ds'], model_forecast['yhat'], label=model.alias)
+ax.set_title('Johnson & Johnson Quarterly Earnings Per Share (EPS)')
+ax.set_xlabel('Year')
+ax.set_ylabel('EPS (USD)')
+ax.grid(True, linestyle='--', alpha=0.6)
+ax.legend()
+ax.set_xlim([pd.Timestamp('1960-01-01'), pd.Timestamp('1984-01-01')])
+ax.set_ylim([0, 20])
+plt.show()
+```
+
+## Random futures {.smaller}
+
+```{python}
+#| echo: false
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(df['ds'], df['y'], label='Observed', color=turquoise)
+for model in model_configs[:3]:
+    model_forecast = forecast_df[forecast_df['model'] == model.alias]
+    ax.plot(model_forecast['ds'], model_forecast['yhat'], label=model.alias)
+ax.set_title('Johnson & Johnson Quarterly Earnings Per Share (EPS)')
+ax.set_xlabel('Year')
+ax.set_ylabel('EPS (USD)')
+ax.grid(True, linestyle='--', alpha=0.6)
+ax.legend()
+ax.set_xlim([pd.Timestamp('1960-01-01'), pd.Timestamp('1984-01-01')])
+ax.set_ylim([0, 20])
+plt.show()
+```
+
+## Random futures {.smaller}
+
+```{python}
+#| echo: false
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(df['ds'], df['y'], label='Observed', color=turquoise)
+for model in model_configs[:4]:
+    model_forecast = forecast_df[forecast_df['model'] == model.alias]
+    ax.plot(model_forecast['ds'], model_forecast['yhat'], label=model.alias)
+ax.set_title('Johnson & Johnson Quarterly Earnings Per Share (EPS)')
+ax.set_xlabel('Year')
+ax.set_ylabel('EPS (USD)')
+ax.grid(True, linestyle='--', alpha=0.6)
+ax.legend()
+ax.set_xlim([pd.Timestamp('1960-01-01'), pd.Timestamp('1984-01-01')])
+ax.set_ylim([0, 20])
+plt.show()
+```
+
+## Random futures {.smaller}
+
+```{python}
+#| echo: false
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(df['ds'], df['y'], label='Observed', color=turquoise)
+for model in model_configs:
+    model_forecast = forecast_df[forecast_df['model'] == model.alias]
+    ax.plot(model_forecast['ds'], model_forecast['yhat'], label=model.alias)
+ax.set_title('Johnson & Johnson Quarterly Earnings Per Share (EPS)')
+ax.set_xlabel('Year')
+ax.set_ylabel('EPS (USD)')
+ax.grid(True, linestyle='--', alpha=0.6)
+ax.legend()
+ax.set_xlim([pd.Timestamp('1960-01-01'), pd.Timestamp('1984-01-01')])
+ax.set_ylim([0, 20])
+plt.show()
+```
+
+## Random futures {.smaller}
+
+```{python}
+#| echo: false
+#| fig-align: center
+
+min_max_df = forecast_df.groupby(['ds']).agg({'yhat': ['min', 'max', 'mean']}).reset_index()
+
+# Plot with the corrected column access on the now-numeric data.
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(df['ds'], df['y'], label='Observed', color='c')
+
+# Access MultiIndex columns using tuples, which now contain clean numeric data.
+ax.fill_between(min_max_df['ds'], min_max_df[('yhat', 'min')].values, min_max_df[('yhat', 'max')].values, color=purple, alpha=0.3)
+ax.set_title('Johnson & Johnson Quarterly Earnings Per Share (EPS)')
+ax.set_xlabel('Year')
+ax.set_ylabel('EPS (USD)')
+ax.grid(True, linestyle='--', alpha=0.6)
+ax.legend().remove()
+ax.set_xlim([pd.Timestamp('1960-01-01'), pd.Timestamp('1984-01-01')])
+ax.set_ylim([0, 20])
+plt.show()
+```
+
+## Random futures {.smaller}
+
+```{python}
+#| echo: false
+#| fig-align: center
+
+min_max_df = forecast_df.groupby(['ds']).agg({'yhat': ['min', 'max', 'mean']}).reset_index()
+
+# Plot with the corrected column access on the now-numeric data.
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(df['ds'], df['y'], label='Observed', color='c')
+ax.fill_between(min_max_df['ds'], min_max_df[('yhat', 'min')].values, min_max_df[('yhat', 'max')].values, color=purple, alpha=0.3)
+ax.plot(min_max_df['ds'], min_max_df[('yhat', 'mean')].values, label='Mean Forecast', color=purple)
+ax.set_title('Johnson & Johnson Quarterly Earnings Per Share (EPS)')
+ax.set_xlabel('Year')
+ax.set_ylabel('EPS (USD)')
+ax.grid(True, linestyle='--', alpha=0.6)
+ax.legend().remove()
+ax.set_xlim([pd.Timestamp('1960-01-01'), pd.Timestamp('1984-01-01')])
+ax.set_ylim([0, 20])
+plt.show()
+```
+
+# Questions? {.unnumbered .unlisted background-iframe=".01_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=3416)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

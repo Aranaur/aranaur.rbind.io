@@ -1,0 +1,129 @@
+---
+title: "Testing StatsForecast"
+---
+
+```{python}
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+
+```{python}
+from statsforecast import StatsForecast
+from statsforecast.models import AutoETS, AutoARIMA, SeasonalNaive, AutoCES, HoltWinters, AutoTheta, AutoRegressive, AutoTBATS, SeasonalExponentialSmoothing, DynamicOptimizedTheta
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+import pandas as pd
+
+df = sm.datasets.get_rdataset("JohnsonJohnson").data
+df = pd.DataFrame({
+    'unique_id': 'J&J',
+    'ds': pd.to_datetime(df['time'].apply(lambda x: f'{int(x)}-Q{int((x - int(x)) * 4) + 1}')),
+    'y': df['value']
+})
+
+season_length = 4  # Quarterly data
+horizon = 8        # Forecasting 8 quarters (2 years)
+
+
+# Define model configurations
+model_configs = [
+    AutoETS(season_length=season_length, alias='Model 1'),
+    AutoARIMA(season_length=season_length, alias='Model 2'),
+    SeasonalNaive(season_length=season_length, alias='Model 3'),
+    AutoCES(season_length=season_length, alias='Model 4'),
+    HoltWinters(season_length=season_length, alias='Model 5'),
+    AutoTheta(season_length=season_length, alias='Model 6'),
+    AutoRegressive(lags=season_length, alias='Model 7'),
+    AutoTBATS(season_length=season_length, alias='Model 8'),
+    SeasonalExponentialSmoothing(season_length=season_length, alpha=0.9, alias='Model 9'),
+    DynamicOptimizedTheta(season_length=season_length, alias='Model 10')
+]
+
+sf = StatsForecast(models=model_configs, freq='Q')
+forecast_df = sf.forecast(df=df, h=horizon)
+
+# pivot longer format for easier plotting
+forecast_df = forecast_df.melt(id_vars=['ds'], value_vars=[model.alias for model in model_configs],
+                               var_name='model', value_name='yhat')
+forecast_df['model'] = forecast_df['model'].str.replace('yhat_', '')
+
+# Plotting y and first model forecasts
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(df['ds'], df['y'], label='Observed', color=turquoise)
+for model in model_configs:
+    model_forecast = forecast_df[forecast_df['model'] == model.alias]
+    ax.plot(model_forecast['ds'], model_forecast['yhat'], label=model.alias)
+ax.set_title('Johnson & Johnson Quarterly Earnings Per Share (EPS)')
+ax.set_xlabel('Year')
+ax.set_ylabel('EPS (USD)')
+ax.grid(True, linestyle='--', alpha=0.6)
+ax.legend()
+ax.set_xlim([pd.Timestamp('1960-01-01'), pd.Timestamp('1984-01-01')])
+ax.set_ylim([0, 20])
+plt.show()
+```
+
+
+```{python}
+min_max_df = forecast_df.groupby(['ds']).agg({'yhat': ['min', 'max', 'mean']}).reset_index()
+
+# Plot with the corrected column access on the now-numeric data.
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(df['ds'], df['y'], label='Observed', color='c')
+
+# Access MultiIndex columns using tuples, which now contain clean numeric data.
+ax.fill_between(min_max_df['ds'], min_max_df[('yhat', 'min')].values, min_max_df[('yhat', 'max')].values, color=purple, alpha=0.3)
+ax.set_title('Johnson & Johnson Quarterly Earnings Per Share (EPS)')
+ax.set_xlabel('Year')
+ax.set_ylabel('EPS (USD)')
+ax.grid(True, linestyle='--', alpha=0.6)
+# disable legend for CI
+ax.legend().remove()
+ax.set_xlim([pd.Timestamp('1960-01-01'), pd.Timestamp('1984-01-01')])
+ax.set_ylim([0, 20])
+plt.show();
+```
+
+
+```{python}
+import matplotlib.pyplot as plt
+
+items = [
+    "Electricity (3 days)",
+    "Temp (tomorrow)",
+    "Sunrise (next year)",
+    "UAH/USD (next week)",
+    "Sales (3 months)",
+    "GOOG (tomorrow)",
+    "GOOG (6 months)",
+    "Halley's comet"
+]
+
+time_horizon = [2, 2, 4, 3, 4, 2, 4, 6]  # increasing with horizon
+forecastability = [8, 8, 10, 5, 4, 3, 2, 10]
+
+plt.figure(figsize=(6,4))
+plt.scatter(time_horizon, forecastability, s=100, c='steelblue')
+
+for i, label in enumerate(items):
+    plt.text(time_horizon[i]+0.05, forecastability[i], label, fontsize=9, va='center')
+
+plt.title("What Can Be Forecast?")
+plt.xlabel("Time Horizon →")
+plt.ylabel("Forecastability ↑")
+plt.xticks([2,3,4,5,6], ["Days", "Weeks", "Months", "Years", "Centuries"])
+plt.ylim(0, 11)
+plt.grid(True, linestyle='--', alpha=0.4)
+plt.tight_layout()
+plt.show()
+
+```
