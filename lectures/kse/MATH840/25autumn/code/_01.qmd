@@ -1,0 +1,163 @@
+---
+title: "Untitled"
+format: html
+---
+
+## `utilsforecast`
+
+Generating time series data with `utilsforecast`
+```{python}
+from utilsforecast.data import generate_series
+
+series = generate_series(3, with_trend=True, static_as_categorical=False)
+series
+```
+
+Plotting time series data with `utilsforecast`
+
+```{python}
+from utilsforecast.plotting import plot_series
+plot_series(series)
+```
+
+Gaps in time series data
+
+```{python}
+from utilsforecast.preprocessing import fill_gaps
+import numpy as np
+import pandas as pd
+
+df = pd.DataFrame(
+    {
+        'unique_id': [0, 0, 0, 1, 1],
+        'ds': pd.to_datetime(['2020', '2021', '2023', '2021', '2022']),
+        'y': np.arange(5),
+    }
+)
+df
+```
+
+Default
+
+```{python}
+fill_gaps(
+    df,
+    freq='YS',
+)
+```
+
+We can also specify an end date in the future.
+
+```{python}
+fill_gaps(
+    df,
+    freq='YS',
+    end='2025',
+)
+```
+
+We can set all series to start at the same time.
+
+```{python}
+fill_gaps(
+    df,
+    freq='YS',
+    start='global',
+)
+```
+
+## Fill na values
+
+Forward fill and backward fill
+
+```{python}
+fill_gaps(
+    df,
+    freq='YS',
+    start='global',
+).groupby('unique_id').apply(lambda x: x.ffill().bfill())
+```
+
+Fill with mean
+
+```{python}
+fill_gaps(
+    df,
+    freq='YS',
+    start='global',
+).groupby('unique_id').apply(lambda x: x.fillna(x['y'].mean()))
+```
+
+Duplicate rows
+
+```{python}
+df = pd.DataFrame(
+    {
+        'unique_id': [0, 0, 0, 1, 1, 1],
+        'ds': pd.to_datetime(['2020', '2021', '2021', '2021', '2022', '2022']),
+        'y': np.arange(6),
+    }
+)
+df
+```
+
+Check duplicates
+
+```{python}
+df.duplicated(subset=['unique_id', 'ds']).groupby(df['unique_id']).sum()
+```
+
+Remove duplicates keeping the last
+
+```{python}
+df.drop_duplicates(subset=['unique_id', 'ds'], keep='last')
+```
+
+## Real world data
+
+```{python}
+import pandas as pd
+```
+
+```{python}
+base_url = "https://docs.google.com/spreadsheets/d/1jB4OuOmxwIKjcvT93kGFXt45VunJppcN9mMFtX5IBYQ/edit?usp=sharing"
+gsheetkey = base_url.split("/")[5]
+url=f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+df = pd.read_csv(url)
+df
+```
+
+```{python}
+df['ds'] = pd.to_datetime(df['Date_Time'])
+df = df.drop(columns=['Date_Time'])
+df
+```
+
+```{python}
+plot_series(df)
+```
+
+Gaps in time series data and count of missing values
+
+```{python}
+from utilsforecast.plotting import plot_series
+from utilsforecast.preprocessing import fill_gaps
+
+
+fill_gaps(
+    df,
+    freq='h'
+).groupby('unique_id').apply(lambda x: x.isna().sum())
+```
+
+Fill data with forward fill and backward fill
+
+```{python}
+df_ffill = fill_gaps(
+    df,
+    freq='h'
+).groupby('unique_id').apply(lambda x: x.ffill().bfill())
+
+df_ffill
+```
