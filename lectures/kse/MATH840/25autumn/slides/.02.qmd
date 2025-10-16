@@ -1,0 +1,867 @@
+---
+title: "Time series graphics"
+subtitle: "MATH840 | Time Series"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .02_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=3416">🔗MATH840 | Time Series</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: false
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+
+```{python}
+#| label: setup-2
+#| include: false
+
+from scipy.stats import pearsonr
+import statsmodels.api as sm
+from statsmodels.graphics.tsaplots import plot_acf
+from utilsforecast.plotting import plot_series as plot_series_utils
+
+import numpy as np
+import pandas as pd
+import random
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+from cycler import cycler
+
+from fpppy.utils import plot_series
+
+import os
+
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    category=UserWarning,
+    message=".*FigureCanvasAgg is non-interactive.*"
+)
+
+plt.style.use("ggplot")
+sns.set_style("whitegrid")
+plt.rcParams.update({
+    "figure.figsize": (8, 5),
+    "figure.dpi": 100,
+    "savefig.dpi": 300,
+    "figure.constrained_layout.use": True,
+    "axes.titlesize": 12,
+    "axes.labelsize": 10,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+    "legend.fontsize": 9,
+    "legend.title_fontsize": 10,
+})
+mpl.rcParams['axes.prop_cycle'] = cycler(color=["#000000", "#000000"])
+```
+
+## Basic operations with time {.smaller}
+
+- To convert a column to a datetime object, use `pd.to_datetime()`
+- To set a datetime column as an index, use `df.set_index()`
+
+| Frequency  | Function                                   |
+|------------|--------------------------------------------|
+| Annual     | `.dt.to_period('Y')` or `.dt.strftime("%Y")` |
+| Quarterly  | `.dt.to_period('Q')`                         |
+| Monthly    | `.dt.to_period('M')`                         |
+| Weekly     | `.dt.to_period('W')` or `.dt.strftime("%Y-%W")`|
+| Daily      | `.dt.strftime("%Y-%m-%d")`                   |
+| Sub-daily  | `.dt.strftime("%Y-%m-%d %H:%M:%S")`         |
+
+::: {.callout-note}
+`.dt.to_period('W')` assumes weeks start on Monday. For Sunday, use `.dt.to_period('W-SUN')`.
+:::
+
+## The seasonal period
+
+| Data | Minute | Hour | Day | Week | Year |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Quarters** | | | | | 4 |
+| **Months** | | | | | 12 |
+| **Weeks** | | | | | 52 |
+| **Days** | | | | 7 | 365.25 |
+| **Hours** | | | 24 | 168 | 8766 |
+| **Minutes** | | 60 | 1440 | 10080 | 525960 |
+| **Seconds** | 60 | 3600 | 86400 | 604800 | 31557600 |
+
+## Graohics
+
+Plots allow us ti identify:
+
+- Patterns
+- Unusual observations
+- Changes over time
+- Relationships between variables
+
+## Time plots
+
+```{python}
+gsheetkey = '1dYDpO6_dkxewLWrIL9LkJO6_RKBV6lwuCULY5bm9eGw'
+url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+ansett = pd.read_csv(url)
+ansett["ds"] = pd.to_datetime(ansett["ds"])
+melsyd_economy = ansett.query(
+        'Airports == "MEL-SYD" & Class == "Economy"'
+    ).copy()
+melsyd_economy["y"] = melsyd_economy["y"] / 1000
+
+plot_series(df=melsyd_economy,
+            id_col="Airports",
+            time_col="ds",
+            target_col="y",
+            ylabel="Passengers ('000)",
+            xlabel="Week [1W]",
+            title="Ansett airlines economy class: Melbourne-Sydney"
+           )
+```
+
+## Time plots
+
+```{python}
+plot_series_utils(ansett.query(
+        'Airports == "MEL-SYD"'
+    ), id_col='Class')
+```
+
+## Time plots
+
+```{python}
+
+gsheetkey = '126HUP_-mR_a2cQ94deSAWmSwML3Kf0nwd3ZtWhhb7dw'
+url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+total_cost_df = pd.read_csv(url)
+total_cost_df["unique_id"] = "total_cost"
+total_cost_df["Month"] = pd.to_datetime(total_cost_df["Month"])
+plot_series(total_cost_df,
+            id_col="unique_id",
+            time_col="Month",
+            target_col="Cost",
+            xlabel="Month [1M]",
+            ylabel="$ (millions)",
+            title="Australian antidiabetic drug sales")
+```
+
+## Time series patterns
+
+- **Trend**: Long-term increase or decrease in data (not necessarily linear)
+- **Seasonal**: Regular patterns at fixed, known intervals (yearly, monthly, weekly, daily)
+- **Cyclic**: Rises and falls without fixed frequency, typically lasting 2+ years (often tied to economic conditions)
+
+## Time series patterns
+
+![](img/fourexamples-output-1.png){fig-align="center"}
+
+## Seasonal plots
+
+```{python}
+#| fig-align: center
+#| fig-width: 10
+total_cost_df["Month_name"] = total_cost_df["Month"].dt.strftime("%b")
+total_cost_df["Year"] = total_cost_df["Month"].dt.year
+total_cost_df["Month_num"] = total_cost_df["Month"].dt.month
+
+unique_years = total_cost_df["Year"].unique()
+year_palette = sns.color_palette("husl", n_colors=len(unique_years))
+
+fig, ax = plt.subplots()
+sns.lineplot(
+    data=total_cost_df,
+    x="Month_num",
+    y="Cost",
+    hue="Year",
+    palette=year_palette,
+    legend=False,
+    ax=ax,
+)
+ax.set_title("Seasonal Plot: Antidiabetic Drug Sales")
+ax.set_xlabel("Month")
+ax.set_ylabel("$ (millions)")
+ax.set_xticks(
+    ticks=range(1, 13),
+    labels=[
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ],
+)
+
+min_year = unique_years.min()
+for year, subset in total_cost_df.groupby("Year"):
+    ax.text(
+        subset["Month_num"].iloc[-1],
+        subset["Cost"].iloc[-1],
+        str(year),
+        fontsize=9,
+        weight="bold",
+        color=year_palette[year - min_year],
+    )
+
+fig.show()
+```
+
+## Seasonal plots
+
+- Data plotted against time within each seasonal period
+- Useful for identifying seasonal patterns and anomalies
+- Can be used for multiple seasonal periods
+
+## Multiple seasonal periods
+
+```{python}
+#| fig-align: center
+#| fig-width: 10
+
+gsheetkey = '162yp2yvcpUt33vU3I2oIpTVJYXKuihRScyUS96Q7Rbk'
+url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+vic_elec_df = pd.read_csv(url)
+vic_elec_df["ds"] = pd.to_datetime(vic_elec_df["ds"])
+vic_elec_demand = vic_elec_df[vic_elec_df["unique_id"] == "Demand"].copy()
+vic_elec_demand["hour-minute"] = \
+  vic_elec_demand["ds"].dt.strftime("%H:%M:%S")
+vic_elec_demand["day"] = vic_elec_demand["ds"].dt.date
+
+fig, ax = plt.subplots()
+sns.lineplot(
+    data=vic_elec_demand,
+    x="hour-minute",
+    y="y",
+    hue="day",
+    palette="husl",
+    legend=False,
+    ax=ax,
+)
+unique_ticks = vic_elec_demand["hour-minute"].unique()
+ticks_to_plot = unique_ticks[::2]
+ax.set_xticks(ticks=range(0, len(unique_ticks), 2), labels=ticks_to_plot,
+    rotation=45)
+ax.set_title("Electricity Demand: Victoria")
+ax.set_xlabel("Time")
+ax.set_ylabel("MWh")
+fig.show()
+```
+
+## Multiple seasonal periods
+
+```{python}
+#| fig-align: center
+#| fig-width: 10
+
+vic_elec_demand["day_of_week"] = vic_elec_demand["ds"].dt.day_name()
+vic_elec_demand = vic_elec_demand[
+    (vic_elec_demand["ds"] >= "2012-01-02") &
+    (vic_elec_demand["ds"] < "2014-12-29")
+].copy()
+
+# Використовуйте groups для створення унікальних ключів
+groups = vic_elec_demand["ds"].dt.to_period("W-SUN").dt.start_time
+unique_weeks = groups.unique() # Унікальні ключі
+
+# Переконайтеся, що ключі є списком об'єктів pandas.Timestamp, щоб уникнути проблем із numpy.datetime64
+unique_weeks_list = [pd.to_datetime(w) for w in unique_weeks]
+
+palette = sns.color_palette("husl", n_colors=len(unique_weeks_list))
+color_map = dict(zip(unique_weeks_list, palette))
+
+fig, ax = plt.subplots()
+# Оскільки groups - це Series з типом Timestamp, ключі (week) в groupby також будуть Timestamp
+for week, df_w in vic_elec_demand.groupby(groups):
+    # week тут - це об'єкт Timestamp, як і ключі у color_map
+    # Ми перетворюємо week на той же тип, що і ключі словника, просто для додаткової безпеки, 
+    # хоча в ідеалі це не повинно бути необхідно.
+    week_key = pd.to_datetime(week) 
+    
+    df_w.plot(
+        y="y",
+        x="day_of_week",
+        ax=ax,
+        color=color_map[week_key], # Використовуємо явний ключ
+        label=str(week_key.date())
+    )
+ax.get_legend().remove()
+ax.set_title("Electricity Demand: Victoria")
+ax.set_ylabel("MWh")
+ax.set_xlabel("Time")
+fig.show()
+```
+
+## Multiple seasonal periods
+
+```{python}
+#| fig-align: center
+#| fig-width: 10
+
+vic_elec_demand["day_of_year"] = vic_elec_demand["ds"].dt.strftime("%m-%d")
+
+unique_years = vic_elec_demand["ds"].dt.year.unique()
+palette = sns.color_palette("husl", n_colors=len(unique_years))
+color_map = dict(zip(unique_years, palette))
+
+fig, ax = plt.subplots()
+for df_year in vic_elec_demand.groupby(vic_elec_demand["ds"].dt.year):
+    year, df_y = df_year
+    df_y.plot(
+        y="y",
+        x="day_of_year",
+        ax=ax,
+        label=str(year),
+        color=color_map[year]
+    )
+ax.set_title("Electricity Demand: Victoria")
+ax.set_ylabel("MWh")
+ax.set_xlabel("Time")
+fig.show()
+```
+
+## Seasonal subseries plots
+
+```{python}
+#| fig-align: center
+#| fig-width: 10
+
+total_cost_df["Month"] = pd.to_datetime(total_cost_df["Month"])
+total_cost_df["year"] = total_cost_df["Month"].dt.year
+total_cost_df["month"] = total_cost_df["Month"].dt.strftime("%B")
+total_cost_df["month"] = pd.Categorical(
+  total_cost_df["month"],
+  categories=[
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ],
+  ordered=True,
+)
+
+fig, axes = plt.subplots(nrows=1, ncols=12, sharey=True)
+for i, month in enumerate(total_cost_df["month"].cat.categories):
+    month_data = total_cost_df.query("month == @month")
+    mean_cost = month_data["Cost"].mean()
+    axes[i].plot(month_data["year"], month_data["Cost"], color="black")
+    axes[i].axhline(
+        mean_cost, color="blue", linestyle="-", linewidth=1, label="Average"
+    )
+    axes[i].set_title(month[:3])
+    axes[i].set_xlabel("")
+    axes[i].tick_params(axis='x', rotation=90)
+    if i == 0:
+        axes[i].set_ylabel("$(millions)")
+    else:
+        axes[i].set_yticklabels([])
+
+fig.suptitle("Australian Antidiabetic Drug Sales")
+fig.text(0.5, -0.05, "Month", ha="center")
+fig.subplots_adjust(wspace=0.2)
+fig.show()
+```
+
+## Seasonal subseries plots
+
+- Data for each season collected together in time plot as separate time series
+- Enables the underlying seasonal pattern to be seen clearly, and changes in seasonality over time to be visualized
+
+## Example: Australian holiday tourism
+
+```{python}
+#| fig-align: center
+#| fig-width: 10
+
+gsheetkey = '1rNavG5fAbFCKzXr5hKMsppGhJB3yy3SmIDAOQguxKhA'
+url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+tourism = pd.read_csv(url)
+tourism["ds"] = pd.to_datetime(tourism["ds"])
+tourism["Quarter"] = tourism["ds"].dt.to_period("Q").astype(str)
+tourism_sub = tourism.query('Purpose == "Holiday"')
+trips = tourism_sub.groupby(["State", "ds"], as_index=False)["y"].sum().round(2)
+
+states = trips["State"].unique()
+colors = sns.color_palette("husl", len(states))
+fig, ax = plt.subplots()
+for state, color in zip(states, colors):
+    state_df = trips.query("State == @state")
+    state_df.plot(y="y", x="ds", ax=ax, label=state, color=color)
+ax.set_title("Australian domestic holidays")
+handles, labels = ax.get_legend_handles_labels()
+ax.get_legend().remove()
+fig.legend(
+    handles, labels, loc="center left", bbox_to_anchor=(1.02, .5),
+    frameon=False, borderaxespad=0,
+)
+
+ax.set_ylabel("Overnight trips ('000)")
+ax.set_xlabel("Quarter [1Q]")
+fig.show()
+```
+
+## Example: Australian holiday tourism
+
+```{python}
+#| fig-align: center
+#| fig-width: 10
+
+trips["Quarter"] = "Q" + trips["ds"].dt.quarter.astype(str)
+trips["Year"] = trips["ds"].dt.year
+years = sorted(trips["Year"].unique())
+palette = sns.color_palette("husl", len(years))
+year_to_color = dict(zip(years, palette))
+
+n_states = trips["State"].nunique()
+
+fig, axs = plt.subplots(n_states, 1, sharex=True, figsize=(8, 10))
+for ax, (state, df_state) in zip(axs, trips.groupby("State")):
+    pivot_data = df_state.pivot(index="Quarter", columns="Year", values="y")
+    pivot_data.plot(ax=ax, color=[year_to_color[year] for year in pivot_data.columns])
+    ax.get_legend().remove()
+    ax.text(1.02, 0.5, state, va="center", ha="right", rotation=270,
+        fontsize=10, transform=ax.transAxes)
+
+handles = [plt.Line2D([0], [0], color=year_to_color[year], lw=4) for year in years]
+labels = [str(year) for year in years]
+fig.legend(handles, labels, title="Year", loc="center left", bbox_to_anchor=(1.05, 0.5), frameon=False, borderaxespad=0)
+
+fig.supylabel("Overnight trips ('000)")
+fig.suptitle("Australian domestic holidays")
+fig.show()
+```
+
+## Example: Australian holiday tourism
+
+```{python}
+#| fig-align: center
+#| fig-width: 10
+
+fig, axs = plt.subplots(n_states, 4, sharex=True, figsize=(8, 10))
+axs = axs.flatten()
+quarters = sorted(trips["Quarter"].unique())
+states = sorted(trips["State"].unique())
+for idx, (state_i, df_state) in enumerate(trips.groupby("State")):
+    y_state_min, y_state_max = df_state["y"].min(), df_state["y"].max()
+    for jdx, (quart_i, df_state_quart) in \
+            enumerate(df_state.groupby("Quarter")):
+        axi = axs[idx * 4 + jdx]
+        df_state_quart.plot(y="y", x="ds", label=None, ax=axi,
+            color="black")
+        axi.axhline(df_state_quart["y"].mean(), color="blue")
+        axi.set_ylim(y_state_min, y_state_max)
+        axi.set_xlabel("")
+        axi.tick_params(axis="x", rotation=90)
+        axi.get_legend().remove()
+for j, quarter in enumerate(quarters):
+    axs[j].set_title(quarter)
+for i, state in enumerate(states):
+    axs[i * 4 + 3].text(
+        1.02, 0.5, state, va="center", ha="left", rotation=270,
+        transform=axs[i * 4 + 3].transAxes
+    )
+fig.supylabel("Overnight trips ('000)", va="center", rotation=90)
+fig.supxlabel("Quarter", ha="center")
+fig.suptitle("Australian domestic holidays")
+fig.show()
+```
+
+## Scatterplots {.tiny}
+
+::: {.columns}
+::: {.column}
+```{python}
+plot_series(vic_elec_df, ids=["Demand"],
+            max_insample_length=2 * 24 * 365,
+            xlabel="Time [30m]",
+            ylabel="GW",
+            title="Half-hourly electricity demand: Victoria")
+```
+:::
+::: {.column}
+```{python}
+plot_series(vic_elec_df, ids=["Temperature"],
+            max_insample_length=2 * 24 * 365,
+            xlabel="Time [30m]",
+            ylabel="Degrees Celsius",
+            title="Half-hourly temperature: Melbourne, Australia")
+```
+:::
+:::
+
+## Scatterplots
+
+```{python}
+#| fig-align: center
+#| fig-width: 10
+elec_2014 = vic_elec_df.query('ds >= "2014"')
+elec_2014_pivot = elec_2014.pivot(
+    index=["ds", "Holiday"], columns="unique_id", values="y"
+).reset_index()
+fig, ax = plt.subplots()
+sns.scatterplot(data=elec_2014_pivot, x="Temperature", y="Demand", ax=ax)
+ax.set_title("Scatter Plot of Demand vs. Temperature")
+ax.set_xlabel("Temperature (degrees Celsius)")
+ax.set_ylabel("Electricity demand (GW)")
+fig.show()
+```
+
+## Correlation
+
+Measures the extent of linear relationship between two variables.
+
+$$
+r=\frac{\sum\left(x_t-\bar{x}\right)\left(y_t-\bar{y}\right)}{\sqrt{\sum\left(x_t-\bar{x}\right)^2} \sqrt{\sum\left(y_t-\bar{y}\right)^2}}
+$$
+
+![](img/corr-output-1.png){fig-align="center"}
+
+---
+
+![](img/anscombe-output-1.png){fig-align="center"}
+
+## Scatterplot matrices
+
+```{python}
+#| fig-align: center
+#| fig-width: 10
+
+visitors = tourism.groupby(["State", "ds"], as_index=False)["y"].sum()
+n_states = visitors["State"].nunique()
+fig, axs = plt.subplots(n_states, 1, sharex=True, figsize=(8, 10))
+for ax, (state, df_state) in zip(axs, visitors.groupby("State")):
+    ax.plot(df_state["ds"], df_state["y"])
+    ax.grid(True, linestyle="--", alpha=0.6)
+    ax.text(1.02, 0.5, state, va="center", ha="right",
+        rotation=270, transform=ax.transAxes)
+fig.suptitle("Australian domestic tourism")
+fig.supylabel("Overnight trips ('000)", va="center", rotation=90)
+fig.supxlabel("Quarter", ha="center")
+fig.show()
+```
+
+## Scatterplot matrices
+
+```{python}
+#| fig-align: center
+#| fig-width: 10
+
+visitors_pivot = \
+    visitors.pivot(index="ds", columns="State", values="y").reset_index()
+df_for_plot = visitors_pivot.drop(columns=["ds"])
+
+def corrfunc(x, y, **kws):
+    r, pvalue = pearsonr(x, y)
+    ax = plt.gca()
+    ax.annotate(
+        f"Corr: \n{r:.3f}{'***' if pvalue < 0.05 else ''}",
+        xy=(0.5, 0.5),
+        xycoords="axes fraction",
+        ha="center",
+        va="center",
+        fontsize=12,
+    )
+
+
+g = sns.PairGrid(df_for_plot, height=1.6)
+g.map_lower(sns.scatterplot)
+g.map_upper(corrfunc)
+g.map_diag(sns.kdeplot, lw=2)
+
+# Remove default axis labels
+g.set(xlabel="")
+
+# Move y-axis labels to the top
+for i, col in enumerate(df_for_plot.columns):
+    g.axes[0, i].set_title(col, fontsize=12)
+
+fig.show()
+```
+
+## Lag plots {.smaller}
+
+::: {.columns}
+::: {.column}
+```{python}
+#| fig-align: center
+#| fig-width: 10
+
+gsheetkey = '1IfqpCIO9uSxaSvSJUjTQ0WgpSs8NFyCk1GOHw7ghWUo'
+url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+aus_production = pd.read_csv(url)
+aus_production["ds"] = pd.to_datetime(aus_production["ds"])
+
+recent_production = aus_production[["ds", "Beer"]].query("ds >= 2000")
+recent_production.rename(columns={"Beer": "y"}, inplace=True)
+recent_production["ds"] = pd.to_datetime(recent_production["ds"])
+recent_production["Quarter"] = recent_production["ds"].dt.quarter
+
+for lag in range(1, 10):
+    recent_production[f"lag_{lag}"] = recent_production["y"].shift(lag)
+lags = [f"lag_{i}" for i in range(1, 10)]
+lims = [
+    np.min([recent_production[lag].min() for lag in lags] +
+        [recent_production["y"].min()]),
+    np.max([recent_production[lag].max() for lag in lags] +
+        [recent_production["y"].max()]),
+]
+fig, axes = plt.subplots(3, 3)
+for ax, lag in zip(axes.flatten(), lags):
+    ax.scatter(
+        recent_production[lag],
+        recent_production["y"],
+        c=recent_production["Quarter"],
+        cmap="viridis"
+    )
+    ax.plot(lims, lims, "grey", linestyle="--", linewidth=1)
+    ax.set_title(lag)
+unique_quarters = sorted(recent_production["Quarter"].unique())
+colors = plt.cm.viridis(np.linspace(0, 1, len(unique_quarters)))
+handles = [plt.Line2D([0], [0], color=color, lw=4) for color in colors]
+labels = [f"Q{q}" for q in unique_quarters]
+fig.legend(handles, labels, title="Season", loc="center left", bbox_to_anchor=(1.02, .5),
+    frameon=False, borderaxespad=0,)
+fig.supxlabel("lag(Beer, k)")
+fig.supylabel("Beer")
+fig.show()
+```
+:::
+::: {.column}
+- Each graph shows $y_t$ against $y_{t-k}$ for lag \(k\).
+- The autocorrelations are the correlations associated with these lag plots.
+- $r_1$ = correlation between $y_t$ and $y_{t-1}$.
+- $r_2$ = correlation between $y_t$ and $y_{t-2}$.
+- And so on...
+:::
+:::
+
+## Autocorrelation
+
+::: {.columns}
+::: {.column}
+$$
+r_k=\frac{\sum_{t=k+1}^T\left(y_t-\bar{y}\right)\left(y_{t-k}-\bar{y}\right)}{\sum_{t=1}^T\left(y_t-\bar{y}\right)^2},
+$$
+:::
+::: {.column}
+```{python}
+acf_df = pd.DataFrame(
+    {"Lag": range(10), "ACF": sm.tsa.acf(recent_production["y"], nlags=9,
+        fft=False, bartlett_confint=False)}
+).set_index("Lag")
+acf_df[1:]
+```
+:::
+:::
+
+## Autocorrelation plots
+
+```{python}
+#| fig-align: center
+#| fig-width: 10
+recent_production["ds"] = pd.to_datetime(recent_production["ds"])
+fig, ax = plt.subplots()
+plot_acf(recent_production["y"], lags=16,
+         ax=ax,
+         zero=False, bartlett_confint=False, auto_ylims=True)
+
+ax.set_title("Autocorrelation Function for Beer")
+ax.set_xlabel("Lags")
+ax.set_ylabel("ACF")
+
+fig.show()
+```
+
+---
+
+![](img/acf.jpg){fig-align="center"}
+
+::: footer
+Art by [Allison Horst](https://allisonhorst.com/time-series-acf)
+:::
+
+---
+
+![](img/acf2.jpg){fig-align="center"}
+
+::: footer
+Art by [Allison Horst](https://allisonhorst.com/time-series-acf)
+:::
+
+---
+
+![](img/acf3.jpg){fig-align="center"}
+
+::: footer
+Art by [Allison Horst](https://allisonhorst.com/time-series-acf)
+:::
+
+---
+
+![](img/acf4.jpg){fig-align="center"}
+
+::: footer
+Art by [Allison Horst](https://allisonhorst.com/time-series-acf)
+:::
+
+---
+
+![](img/acf5.jpg){fig-align="center"}
+
+::: footer
+Art by [Allison Horst](https://allisonhorst.com/time-series-acf)
+:::
+
+---
+
+![](img/acf6.jpg){fig-align="center"}
+
+::: footer
+Art by [Allison Horst](https://allisonhorst.com/time-series-acf)
+:::
+
+---
+
+![](img/acf7.jpg){fig-align="center"}
+
+::: footer
+Art by [Allison Horst](https://allisonhorst.com/time-series-acf)
+:::
+
+---
+
+![](img/acf8.jpg){fig-align="center"}
+
+::: footer
+Art by [Allison Horst](https://allisonhorst.com/time-series-acf)
+:::
+
+---
+
+![](img/acf9.jpg){fig-align="center"}
+
+::: footer
+Art by [Allison Horst](https://allisonhorst.com/time-series-acf)
+:::
+
+
+## Trend and seasonality in ACF plots
+
+```{python}
+#| fig-align: center
+#| fig-width: 10
+total_cost_df["Month"] = pd.to_datetime(total_cost_df["Month"])
+fig, ax = plt.subplots()
+plot_acf(total_cost_df["Cost"], lags=48, ax=ax,
+         zero=False, bartlett_confint=False, auto_ylims=True)
+
+ax.set_title("Australian antidiabetic drug sales")
+ax.set_xlabel("Lags")
+ax.set_ylabel("ACF")
+ax.set_ylim(bottom=-0.3)
+
+fig.show()
+```
+
+## Trend and seasonality in ACF plots
+
+- When the data have trend, ACF for small lags tend to be large and positive.
+- When data are seasonal, ACF tends to be large and positive at seasonal lags (e.g., 12, 24 for monthly data with yearly seasonality).
+- When data are trended and seasonal, ACF tends to be large and positive at small lags and seasonal lags.
+
+## White noise
+
+```{python}
+np.random.seed(73)
+y = pd.DataFrame(
+    {"wn": np.random.normal(0, 1, 50), "ds": np.arange(1, 51),
+        "unique_id": "wn"}
+)
+plot_series(y, target_col="wn",
+            xlabel="sample [1]",
+            title = "White noise")
+```
+
+## White noise ACF
+
+```{python}
+fig, ax = plt.subplots()
+plot_acf(y["wn"], lags=16, ax=ax,
+         zero=False, bartlett_confint=False,
+         auto_ylims=True)
+ax.set_title("White Noise")
+ax.set_xlabel("Lag[1]")
+ax.set_ylabel("ACF")
+#ax.set_ylim(bottom=-0.3)
+fig.show()
+```
+
+## CI for ACF
+
+- Sampling distribution of $r_k$ for white noise data is asymptotically $N(0, 1/T)$.
+- Approximate 95% confidence interval for $r_k$ is
+
+$$
+\pm \frac{1.96}{\sqrt{T}}
+$$
+
+where \(T\) is the length of the series.
+
+# Questions? {.unnumbered .unlisted background-iframe=".02_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=3416)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
