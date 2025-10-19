@@ -1,0 +1,344 @@
+---
+title: "Time series visualization: Ukraine electricity generation"
+format: html
+---
+
+## Imports
+
+```{python}
+import pandas as pd
+import numpy as np
+from statsforecast import StatsForecast
+from utilsforecast.preprocessing import fill_gaps
+from utilsforecast.plotting import plot_series
+import matplotlib.pyplot as plt
+import seaborn as sns
+import altair as alt
+
+sns.set_style("whitegrid")
+plt.style.use("ggplot")
+```
+
+## Load Ukraine electricity generation data
+
+Weather data
+
+```{python}
+weather_df = pd.read_csv(
+    'https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/energy_ua/energy_weather_ua_2016_2019.csv'
+).drop(columns=['Heneratsia'])
+
+# change columns names
+weather_df.columns = [
+    'ds',
+    'w_cloudiness_percent',
+    'w_temperature_celsius',
+    'w_wind_speed_m_s',
+    'w_pressure_hpa',
+    'w_humidity_percent',
+    'w_sundial_hours',
+    'w_air_density_kg_m3',
+    ]
+
+weather_df
+```
+
+Electricity generation data
+```{python}
+electricity_df = pd.read_csv(
+    'https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/energy_ua/energy_ua_2014_2021.csv'
+)
+
+electricity_df.columns = [
+    'ds',
+    'nuclear_generation_mwh',
+    'total_consumption_mwh',
+    'pump_storage_generation_mwh',
+    'pump_storage_consumption_mwh',
+    'hydro_generation_mwh',
+    'cogeneration_generation_mwh',
+    'thermal_generation_mwh',
+    'export_blr_rus_mwh',
+    'export_eu_mwh',
+    'export_mld_mwh',
+    'renewable_generation_mwh'
+]
+
+electricity_df
+```
+
+Merge datasets
+
+```{python}
+df = pd.merge(
+    electricity_df,
+    weather_df,
+    on='ds',
+    how='left'
+)
+df['ds'] = pd.to_datetime(df['ds'])
+df
+```
+
+```{python}
+df.info()
+```
+
+Pivot data to long format
+
+```{python}
+df_h = df.melt(
+    id_vars=['ds'],
+    var_name='unique_id',
+    value_name='y'
+)
+df_h
+```
+
+New datasets with different time resolutions with aggregation (sum), but if variable starts with "w_" then mean aggregation
+
+```{python}
+df_d = df_h.groupby(['unique_id', pd.Grouper(key='ds', freq='D')])['y'].agg(['sum', 'mean']).reset_index()
+df_d['y'] = np.where(
+    df_d['unique_id'].str.startswith('w_'),
+    df_d['mean'],
+    df_d['sum']
+)
+df_d = df_d.drop(columns=['sum', 'mean'])
+# df_d['ds'] = df_d['ds'].dt.strftime("%Y-%m-%d")
+
+df_w = df_h.groupby(['unique_id', pd.Grouper(key='ds', freq='W')])['y'].agg(['sum', 'mean']).reset_index()
+# df_w['ds'] = df_w['ds'].dt.to_period('W')
+df_w['y'] = np.where(
+    df_w['unique_id'].str.startswith('w_'),
+    df_w['mean'],
+    df_w['sum']
+)
+df_w = df_w.drop(columns=['sum', 'mean'])
+
+df_m = df_h.groupby(['unique_id', pd.Grouper(key='ds', freq='M')])['y'].agg(['sum', 'mean']).reset_index()
+# df_m['ds'] = df_m['ds'].dt.to_period('M')
+df_m['y'] = np.where(
+    df_m['unique_id'].str.startswith('w_'),
+    df_m['mean'],
+    df_m['sum']
+)
+df_m = df_m.drop(columns=['sum', 'mean'])
+
+df_q = df_h.groupby(['unique_id', pd.Grouper(key='ds', freq='Q')])['y'].agg(['sum', 'mean']).reset_index()
+# df_q['ds'] = df_q['ds'].dt.to_period('Q')
+df_q['y'] = np.where(
+    df_q['unique_id'].str.startswith('w_'),
+    df_q['mean'],
+    df_q['sum']
+)
+df_q = df_q.drop(columns=['sum', 'mean'])
+```
+
+## Time plots
+
+Hourly data
+
+```{python}
+StatsForecast.plot(
+    df_h,
+    unique_ids=['nuclear_generation_mwh', 'w_temperature_celsius']
+)
+```
+
+```{python}
+plot_series(
+    df_h,
+    max_ids=18
+)
+```
+
+Daily data
+```{python}
+StatsForecast.plot(
+    df_d,
+    unique_ids=['nuclear_generation_mwh', 'w_temperature_celsius']
+)
+```
+
+Weekly data
+
+```{python}
+StatsForecast.plot(
+    df_w,
+    unique_ids=['nuclear_generation_mwh', 'w_temperature_celsius']
+)
+```
+
+Monthly data
+
+```{python}
+StatsForecast.plot(
+    df_m,
+    unique_ids=['nuclear_generation_mwh', 'w_temperature_celsius']
+)
+```
+
+Quarterly data
+
+```{python}
+StatsForecast.plot(
+    df_q,
+    unique_ids=['nuclear_generation_mwh', 'w_temperature_celsius']
+)
+```
+
+## Seasonal plots
+
+Monthly seasonal plot for nuclear generation
+
+```{python}
+# remove october 2021 partial data
+df_m = df_m[~((df_m['ds'] >= '2021-10-01') & (df_m['ds'] < '2021-11-01'))]
+
+df_m['month_name'] = df_m['ds'].dt.month_name()
+df_m['year'] = df_m['ds'].dt.year
+df_m['month_num'] = df_m['ds'].dt.month
+
+unique_years = df_m['year'].unique()
+year_palette = sns.color_palette("husl", len(unique_years))
+
+fig, ax = plt.subplots()
+sns.lineplot(
+    data=df_m[df_m['unique_id'] == 'nuclear_generation_mwh'],
+    x='month_num',
+    y='y',
+    hue='year',
+    palette=year_palette,
+    legend=False,
+    ax=ax
+)
+ax.set_title('Seasonal Plot - Nuclear Generation (Monthly)')
+ax.set_xlabel('Month')
+ax.set_ylabel('Generation (MWh)')
+ax.set_xticks(
+    range(1, 13),
+    ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+)
+
+min_year = unique_years.min()
+
+for year, subset in df_m[df_m['unique_id'] == 'nuclear_generation_mwh'].groupby('year'):
+    ax.text(
+        subset['month_num'].iloc[-1],
+        subset['y'].iloc[-1],
+        str(year),
+        fontsize=9,
+        weight='bold',
+        color=year_palette[list(unique_years).index(year)]
+    )
+fig.show()
+```
+
+Same interactive plot with Altair
+
+```{python}
+alt.Chart(
+    df_m[df_m['unique_id'] == 'nuclear_generation_mwh']
+).mark_line().encode(
+    x=alt.X('month(ds):N', title='Month'),
+    y=alt.Y('y:Q', title='Generation (MWh)'),
+    color=alt.Color('year(ds):N', title='Year'),
+    tooltip=['year(ds):N', 'month(ds):N', 'y:Q']
+).properties(
+    title='Seasonal Plot - Nuclear Generation (Monthly)'
+).interactive()
+```
+
+Hourly seasonal plot for nuclear generation
+
+```{python}
+df_h['hour-minute'] = df_h['ds'].dt.strftime('%H:%M:%S')
+df_h['day'] = df_h['ds'].dt.date
+
+fig, ax = plt.subplots(figsize=(12, 6))
+sns.lineplot(
+    data=df_h[df_h['unique_id'] == 'hydro_generation_mwh'],
+    x='hour-minute',
+    y='y',
+    hue='day',
+    legend=False,
+    ax=ax,
+    palette="husl"
+)
+
+unique_ticks = df_h['hour-minute'].unique()
+ticks_to_plot = unique_ticks[::2]
+
+ax.set_xticks(ticks=range(0, len(unique_ticks), 2), labels=ticks_to_plot,
+    rotation=45)
+ax.set_title('Seasonal Plot - Hydro Generation (Hourly)')
+ax.set_xlabel('Hour of Day')
+ax.set_ylabel('Generation (MWh)')
+fig.show()
+```
+
+Seasonal plot showing weekly seasonal patterns for nuclear generation
+
+```{python}
+df_d['week_day'] = df_d['ds'].dt.day_name()
+df_d['week_num'] = df_d['ds'].dt.isocalendar().week
+df_d['year'] = df_d['ds'].dt.year
+unique_years = df_d['year'].unique()
+year_palette = sns.color_palette("husl", len(unique_years))
+fig, ax = plt.subplots(figsize=(12, 6))
+sns.lineplot(
+    data=df_d[df_d['unique_id'] == 'nuclear_generation_mwh'],
+    x='week_num',
+    y='y',
+    hue='year',
+    palette=year_palette,
+    legend=False,
+    ax=ax
+)
+ax.set_title('Seasonal Plot - Nuclear Generation (Weekly)')
+ax.set_xlabel('Week of Year')
+ax.set_ylabel('Generation (MWh)')
+for year, subset in df_d[df_d['unique_id'] == 'nuclear_generation_mwh'].groupby('year'):
+    ax.text(
+        subset['week_num'].iloc[-1],
+        subset['y'].iloc[-1],
+        str(year),
+        fontsize=9,
+        weight='bold',
+        color=year_palette[list(unique_years).index(year)]
+    )
+fig.show()
+```
+
+Seasonal plot showing yearly seasonal patterns for nuclear generation
+
+```{python}
+df_d['day_of_year'] = df_d['ds'].dt.dayofyear
+
+unique_years = df_d['year'].unique()
+pallette = sns.color_palette("husl", len(unique_years))
+color_map = dict(zip(unique_years, pallette))
+
+fig, ax = plt.subplots(figsize=(12, 6))
+for year, subset in df_d[df_d['unique_id'] == 'nuclear_generation_mwh'].groupby('year'):
+    ax.plot(
+        subset['day_of_year'],
+        subset['y'],
+        label=year,
+        color=color_map[year]
+    )
+ax.set_title('Seasonal Plot - Nuclear Generation (Daily)')
+ax.set_xlabel('Day of Year')
+ax.set_ylabel('Generation (MWh)')
+for year, subset in df_d[df_d['unique_id'] == 'nuclear_generation_mwh'].groupby('year'):
+    ax.text(
+        subset['day_of_year'].iloc[-1],
+        subset['y'].iloc[-1],
+        str(year),
+        fontsize=9,
+        weight='bold',
+        color=color_map[year]
+    )
+fig.show()
+```
