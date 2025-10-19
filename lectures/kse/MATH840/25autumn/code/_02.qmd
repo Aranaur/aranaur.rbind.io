@@ -1,6 +1,9 @@
 ---
 title: "Time series visualization: Ukraine electricity generation"
 format: html
+execute: 
+  warning: false
+  message: false
 ---
 
 ## Imports
@@ -17,6 +20,13 @@ import altair as alt
 
 sns.set_style("whitegrid")
 plt.style.use("ggplot")
+import matplotlib as mpl
+from cycler import cycler
+mpl.rcParams['axes.prop_cycle'] = cycler(color=["#000000", "#000000"])
+
+# disable warnings
+import warnings
+warnings.filterwarnings("ignore")
 ```
 
 ## Load Ukraine electricity generation data
@@ -116,7 +126,7 @@ df_w['y'] = np.where(
 )
 df_w = df_w.drop(columns=['sum', 'mean'])
 
-df_m = df_h.groupby(['unique_id', pd.Grouper(key='ds', freq='M')])['y'].agg(['sum', 'mean']).reset_index()
+df_m = df_h.groupby(['unique_id', pd.Grouper(key='ds', freq='ME')])['y'].agg(['sum', 'mean']).reset_index()
 # df_m['ds'] = df_m['ds'].dt.to_period('M')
 df_m['y'] = np.where(
     df_m['unique_id'].str.startswith('w_'),
@@ -125,7 +135,7 @@ df_m['y'] = np.where(
 )
 df_m = df_m.drop(columns=['sum', 'mean'])
 
-df_q = df_h.groupby(['unique_id', pd.Grouper(key='ds', freq='Q')])['y'].agg(['sum', 'mean']).reset_index()
+df_q = df_h.groupby(['unique_id', pd.Grouper(key='ds', freq='QE')])['y'].agg(['sum', 'mean']).reset_index()
 # df_q['ds'] = df_q['ds'].dt.to_period('Q')
 df_q['y'] = np.where(
     df_q['unique_id'].str.startswith('w_'),
@@ -232,7 +242,6 @@ for year, subset in df_m[df_m['unique_id'] == 'nuclear_generation_mwh'].groupby(
         weight='bold',
         color=year_palette[list(unique_years).index(year)]
     )
-fig.show()
 ```
 
 Same interactive plot with Altair
@@ -256,7 +265,7 @@ Hourly seasonal plot for nuclear generation
 df_h['hour-minute'] = df_h['ds'].dt.strftime('%H:%M:%S')
 df_h['day'] = df_h['ds'].dt.date
 
-fig, ax = plt.subplots(figsize=(12, 6))
+fig, ax = plt.subplots()
 sns.lineplot(
     data=df_h[df_h['unique_id'] == 'hydro_generation_mwh'],
     x='hour-minute',
@@ -275,7 +284,6 @@ ax.set_xticks(ticks=range(0, len(unique_ticks), 2), labels=ticks_to_plot,
 ax.set_title('Seasonal Plot - Hydro Generation (Hourly)')
 ax.set_xlabel('Hour of Day')
 ax.set_ylabel('Generation (MWh)')
-fig.show()
 ```
 
 Seasonal plot showing weekly seasonal patterns for nuclear generation
@@ -286,7 +294,7 @@ df_d['week_num'] = df_d['ds'].dt.isocalendar().week
 df_d['year'] = df_d['ds'].dt.year
 unique_years = df_d['year'].unique()
 year_palette = sns.color_palette("husl", len(unique_years))
-fig, ax = plt.subplots(figsize=(12, 6))
+fig, ax = plt.subplots()
 sns.lineplot(
     data=df_d[df_d['unique_id'] == 'nuclear_generation_mwh'],
     x='week_num',
@@ -315,12 +323,13 @@ Seasonal plot showing yearly seasonal patterns for nuclear generation
 
 ```{python}
 df_d['day_of_year'] = df_d['ds'].dt.dayofyear
+df_d['year'] = df_d['ds'].dt.year
 
 unique_years = df_d['year'].unique()
 pallette = sns.color_palette("husl", len(unique_years))
 color_map = dict(zip(unique_years, pallette))
 
-fig, ax = plt.subplots(figsize=(12, 6))
+fig, ax = plt.subplots()
 for year, subset in df_d[df_d['unique_id'] == 'nuclear_generation_mwh'].groupby('year'):
     ax.plot(
         subset['day_of_year'],
@@ -342,3 +351,302 @@ for year, subset in df_d[df_d['unique_id'] == 'nuclear_generation_mwh'].groupby(
     )
 fig.show()
 ```
+
+## Subseries plots
+
+Monthly subseries plot for nuclear generation
+
+```{python}
+fig, axes = plt.subplots(nrows=1, ncols=12, sharey=True)
+for i, month in enumerate(df_m['ds'].dt.month_name().unique()):
+    month_data = df_m.query(
+        "unique_id == 'nuclear_generation_mwh' and month_name == @month"
+    )
+    mean_value = month_data['y'].mean()
+    axes[i].plot(
+        month_data['year'],
+        month_data['y'],
+        color='black'
+    )
+    axes[i].axhline(
+        mean_value,
+        color='blue',
+        linestyle='-',
+        linewidth=1,
+        label='Mean'
+    )
+    axes[i].set_title(month)
+    axes[i].set_xlabel('')
+    axes[i].tick_params(axis='x', rotation=90)
+    if i == 0:
+        axes[i].set_ylabel('Generation (MWh)')
+    else:
+        axes[i].set_ylabel('')
+
+fig.suptitle('Subseries Plot - Nuclear Generation (Monthly)', fontsize=16)
+fig.text(0.5, -0.05, 'Month', ha='center')
+fig.subplots_adjust(wspace=0.2)
+```
+
+Or using boxplots
+
+```{python}
+fig, ax = plt.subplots()
+sns.boxplot(
+    data=df_m[df_m['unique_id'] == 'nuclear_generation_mwh'],
+    x=df_m['ds'].dt.month_name(),
+    y='y',
+    order=['January', 'February', 'March', 'April', 'May', 'June',
+           'July', 'August', 'September', 'October', 'November', 'December'],
+    ax=ax
+)
+ax.set_title('Subseries Plot - Nuclear Generation (Monthly)')
+ax.set_xlabel('Month')
+ax.set_ylabel('Generation (MWh)')
+```
+
+Or using [`statsmodels.graphics.tsaplots.month_plot`](https://www.statsmodels.org/dev/generated/statsmodels.graphics.tsaplots.month_plot.html)
+
+## All variables time plot
+
+```{python}
+# unique ids that not start with 'w_'
+unique_ids = df_q['unique_id'].unique().tolist()
+unique_ids = [uid for uid in unique_ids if not uid.startswith('w_')]
+colors = sns.color_palette("husl", len(unique_ids))
+fig, ax = plt.subplots()
+for i, color in zip(unique_ids, colors):
+    subset = df_q.query("unique_id == @i")
+    subset.plot(
+        x='ds',
+        y='y',
+        ax=ax,
+        label=i,
+        color=color
+    )
+ax.set_title('All Variables Time Plot (Quarterly)')
+ax.set_xlabel('Date')
+ax.set_ylabel('Generation (MWh)')
+fig.show()
+```
+
+Seasonal plot for all variables
+
+```{python}
+df_q['Quarter'] = 'Q' + df_q['ds'].dt.quarter.astype(str)
+df_q['Year'] = df_q['ds'].dt.year
+years = sorted(df_q['Year'].unique())
+palette = sns.color_palette("husl", len(years))
+year_to_color = dict(zip(years, palette))
+
+n_gen = df_q['unique_id'].nunique()
+
+fig, axes = plt.subplots(nrows=n_gen, ncols=1, figsize=(12, n_gen * 3), sharex=True)
+for ax, (uid, group) in zip(axes, df_q.groupby('unique_id')):
+    for year, subset in group.groupby('Year'):
+        ax.plot(
+            subset['Quarter'],
+            subset['y'],
+            label=str(year),
+            color=year_to_color[year]
+        )
+    ax.set_title(f'Subseries Plot - {uid} (Quarterly)')
+    ax.set_ylabel('Generation (MWh)')
+    ax.legend(title='Year', bbox_to_anchor=(1.05, 1), loc='upper left')
+fig.tight_layout()
+```
+
+Subseries plot for all variables using lineplot and facets
+
+```{python}
+uids = sorted(df_q['unique_id'].unique())
+n_uids = len(uids)
+quarters = sorted(df_q['Quarter'].unique())
+
+fig, axs = plt.subplots(n_uids, 4, sharex=True, figsize=(12, n_uids * 2.5))
+axs = axs.flatten()
+
+for r_idx, (uid, df_uid) in enumerate(df_q.groupby('unique_id', sort=True)):
+    y_min, y_max = df_uid['y'].min(), df_uid['y'].max()
+    for q_name, df_uid_q in df_uid.groupby('Quarter'):
+        c_idx = quarters.index(q_name)
+        ax = axs[r_idx * 4 + c_idx]
+        df_uid_q.plot(y='y', x='Year', ax=ax, label=None, color='black', marker='o', linestyle='-')
+        ax.axhline(df_uid_q['y'].mean(), color='blue')
+        ax.set_ylim(y_min, y_max)
+        ax.set_xlabel('')
+        ax.tick_params(axis='x', rotation=90)
+        if ax.get_legend() is not None:
+            ax.get_legend().remove()
+        ax.set_xticks(df_uid_q['Year'].unique())
+
+for j, q in enumerate(quarters):
+    axs[j].set_title(q)
+
+for i, uid in enumerate(uids):
+    axs[i * 4 + 3].text(1.02, 0.5, uid, va='center', ha='left', rotation=270, transform=axs[i * 4 + 3].transAxes)
+
+fig.supylabel('Generation (MWh)', va='center', rotation=90)
+fig.supxlabel('Year', ha='center')
+fig.suptitle('Subseries Plot for All Variables (Quarterly)')
+fig.tight_layout()
+fig.show()
+```
+
+## Scatterplots
+
+Basic scatterplot daily data
+
+```{python}
+df_d_pivot = df_d.pivot(
+    index='ds',
+    columns='unique_id',
+    values='y'
+).reset_index()
+
+fig, ax = plt.subplots()
+sns.scatterplot(
+    data=df_d_pivot,
+    x='w_temperature_celsius',
+    y='total_consumption_mwh',
+    ax=ax
+)
+ax.set_title('Scatterplot: Total Consumption vs Temperature (Daily)')
+ax.set_xlabel('Temperature (Celsius)')
+ax.set_ylabel('Total Consumption (MWh)')
+```
+
+Analog `ggpair` plot with Python using `seaborn` pairplot
+
+```{python}
+from scipy.stats import pearsonr
+
+df_for_plot = df.drop(columns=['ds']).dropna()
+
+def corrfunc(x, y, **kws):
+    r, pvalue = pearsonr(x, y)
+    ax = plt.gca()
+    ax.annotate(f"r= \n{r:.2f}{'***' if pvalue < 0.05 else ''}",
+                xy=(0.5, 0.5),
+                xycoords='axes fraction',
+                ha='center', va='center', fontsize=12
+    )
+
+g = sns.PairGrid(df_for_plot)
+g.map_lower(sns.scatterplot, color='black')
+g.map_upper(corrfunc)
+g.map_diag(sns.kdeplot, fill=True, color='black')
+
+g.set(xlabel='')
+
+for i, col in enumerate(df_for_plot.columns):
+    g.axes[i,0].set_ylabel(col)
+    g.axes[-1,i].set_xlabel(col)
+```
+
+## Lag plots
+
+```{python}
+#| warning: false
+#| message: false
+df_q_filtered = df_q[df_q['unique_id'] == 'cogeneration_generation_mwh']
+
+for lag in range(1, 10):
+    df_q_filtered[f'lag_{lag}'] = df_q_filtered['y'].shift(lag)
+lags = [f'lag_{lag}' for lag in range(1, 10)]
+lims = [
+    np.min([df_q_filtered[lag].min() for lag in lags]),
+    np.max([df_q_filtered[lag].max() for lag in lags])
+]
+fig, axes = plt.subplots(3, 3)
+for ax, lag in zip(axes.flatten(), lags):
+    ax.scatter(
+        df_q_filtered[lag],
+        df_q_filtered['y'],
+        cmap='viridis',
+        c=df_q_filtered['Quarter'].astype('category').cat.codes,
+    )
+    ax.plot(lims, lims, color='gray', linestyle='--')
+    ax.set_title(f'lag {lag.split("_")[1]}')
+
+unique_quarters = sorted(df_q_filtered['Quarter'].unique())
+colors = plt.cm.viridis(np.linspace(0, 1, len(unique_quarters)))
+handles = [plt.Line2D([0], [0], marker='o', color=color, lw=4) for color in colors]
+labels = [f"Q{q}" for q in unique_quarters]
+fig.legend(handles, labels, title='Quarter', loc='upper right')
+fig.suptitle('Lag Plots - Nuclear Generation (Quarterly)', fontsize=16)
+fig.tight_layout()
+```
+
+## Autocorrelation plots
+
+ACF tabele
+
+```{python}
+import statsmodels.api as sm
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+
+
+acf_df = pd.DataFrame(
+    {"Lag": range(10),
+     "ACF": sm.tsa.acf(
+         df_q[df_q['unique_id'] == 'cogeneration_generation_mwh']['y'],
+         nlags=9
+     )}
+).set_index('Lag')
+acf_df[1:]
+```
+
+ACF plot quarterly data
+
+```{python}
+fig, ax = plt.subplots()
+plot_acf(
+    df_q[df_q['unique_id'] == 'cogeneration_generation_mwh']['y'],
+    lags=16,
+    ax=ax,
+    zero=False,
+    bartlett_confint=False, # disable Bartlett confidence intervals
+    auto_ylims=True
+)
+ax.set_title('Autocorrelation Function - Cogeneration Generation (Quarterly)')
+ax.set_xlabel('Lags')
+ax.set_ylabel('ACF')
+```
+
+ACF plot monthly data
+
+```{python}
+fig, ax = plt.subplots()
+plot_acf(
+    df_m[df_m['unique_id'] == 'cogeneration_generation_mwh']['y'],
+    lags=60,
+    ax=ax,
+    zero=False,
+    bartlett_confint=False, # disable Bartlett confidence intervals
+    auto_ylims=True
+)
+ax.set_title('Autocorrelation Function - Cogeneration Generation (Monthly)')
+ax.set_xticks(range(0, 61, 5))
+ax.set_xlabel('Lags')
+ax.set_ylabel('ACF')
+```
+
+ACF plot daily data
+
+```{python}
+fig, ax = plt.subplots()
+plot_acf(
+    df_d[df_d['unique_id'] == 'cogeneration_generation_mwh']['y'],
+    lags=400,
+    ax=ax,
+    zero=False,
+    bartlett_confint=False, # disable Bartlett confidence intervals
+    auto_ylims=True
+)
+ax.set_title('Autocorrelation Function - Cogeneration Generation (Daily)')
+ax.set_xticks(range(0, 121, 10))
+ax.set_xlabel('Lags')
+ax.set_ylabel('ACF')
+```
+

@@ -1,0 +1,2130 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.33">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Time series visualization: Ukraine electricity generation</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script><script src="_02_files/libs/clipboard/clipboard.min.js"></script>
+<script src="_02_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="_02_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="_02_files/libs/quarto-html/popper.min.js"></script>
+<script src="_02_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="_02_files/libs/quarto-html/anchor.min.js"></script>
+<link href="_02_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="_02_files/libs/quarto-html/quarto-syntax-highlighting-ea385d0e468b0dd5ea5bf0780b1290d9.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="_02_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="_02_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="_02_files/libs/bootstrap/bootstrap-bb462d781dde1847d9e3ccf7736099dd.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Time series visualization: Ukraine electricity generation</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="imports" class="level2">
+<h2 class="anchored" data-anchor-id="imports">Imports</h2>
+<div id="8438f2fa" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> statsforecast <span class="im">import</span> StatsForecast</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> utilsforecast.preprocessing <span class="im">import</span> fill_gaps</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> utilsforecast.plotting <span class="im">import</span> plot_series</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> seaborn <span class="im">as</span> sns</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> altair <span class="im">as</span> alt</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>sns.set_style(<span class="st">"whitegrid"</span>)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>plt.style.use(<span class="st">"ggplot"</span>)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib <span class="im">as</span> mpl</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cycler <span class="im">import</span> cycler</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>mpl.rcParams[<span class="st">'axes.prop_cycle'</span>] <span class="op">=</span> cycler(color<span class="op">=</span>[<span class="st">"#000000"</span>, <span class="st">"#000000"</span>])</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="co"># disable warnings</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> warnings</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>warnings.filterwarnings(<span class="st">"ignore"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="load-ukraine-electricity-generation-data" class="level2">
+<h2 class="anchored" data-anchor-id="load-ukraine-electricity-generation-data">Load Ukraine electricity generation data</h2>
+<p>Weather data</p>
+<div id="051009be" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>weather_df <span class="op">=</span> pd.read_csv(</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">'https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/energy_ua/energy_weather_ua_2016_2019.csv'</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>).drop(columns<span class="op">=</span>[<span class="st">'Heneratsia'</span>])</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co"># change columns names</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>weather_df.columns <span class="op">=</span> [</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">'ds'</span>,</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">'w_cloudiness_percent'</span>,</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">'w_temperature_celsius'</span>,</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">'w_wind_speed_m_s'</span>,</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">'w_pressure_hpa'</span>,</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="st">'w_humidity_percent'</span>,</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">'w_sundial_hours'</span>,</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    <span class="st">'w_air_density_kg_m3'</span>,</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>weather_df</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="2">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">w_cloudiness_percent</th>
+<th data-quarto-table-cell-role="th">w_temperature_celsius</th>
+<th data-quarto-table-cell-role="th">w_wind_speed_m_s</th>
+<th data-quarto-table-cell-role="th">w_pressure_hpa</th>
+<th data-quarto-table-cell-role="th">w_humidity_percent</th>
+<th data-quarto-table-cell-role="th">w_sundial_hours</th>
+<th data-quarto-table-cell-role="th">w_air_density_kg_m3</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>2016-01-01 01:00:00</td>
+<td>0.00</td>
+<td>-7</td>
+<td>1</td>
+<td>765</td>
+<td>96</td>
+<td>0</td>
+<td>1.338069</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>2016-01-01 02:00:00</td>
+<td>0.00</td>
+<td>-7</td>
+<td>1</td>
+<td>765</td>
+<td>96</td>
+<td>0</td>
+<td>1.338069</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>2016-01-01 03:00:00</td>
+<td>0.00</td>
+<td>-7</td>
+<td>1</td>
+<td>765</td>
+<td>96</td>
+<td>0</td>
+<td>1.338069</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>2016-01-01 04:00:00</td>
+<td>0.00</td>
+<td>-7</td>
+<td>1</td>
+<td>765</td>
+<td>96</td>
+<td>0</td>
+<td>1.338069</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>2016-01-01 05:00:00</td>
+<td>0.00</td>
+<td>-8</td>
+<td>1</td>
+<td>765</td>
+<td>95</td>
+<td>0</td>
+<td>1.343119</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">33523</td>
+<td>2019-10-28 20:00:00</td>
+<td>0.25</td>
+<td>11</td>
+<td>1</td>
+<td>757</td>
+<td>100</td>
+<td>0</td>
+<td>1.240156</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">33524</td>
+<td>2019-10-28 21:00:00</td>
+<td>0.25</td>
+<td>11</td>
+<td>0</td>
+<td>757</td>
+<td>100</td>
+<td>0</td>
+<td>1.240156</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">33525</td>
+<td>2019-10-28 22:00:00</td>
+<td>0.25</td>
+<td>11</td>
+<td>1</td>
+<td>757</td>
+<td>100</td>
+<td>0</td>
+<td>1.240156</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">33526</td>
+<td>2019-10-28 23:00:00</td>
+<td>0.00</td>
+<td>9</td>
+<td>1</td>
+<td>757</td>
+<td>100</td>
+<td>0</td>
+<td>1.248951</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">33527</td>
+<td>2019-10-29 00:00:00</td>
+<td>0.00</td>
+<td>9</td>
+<td>1</td>
+<td>757</td>
+<td>100</td>
+<td>0</td>
+<td>1.248951</td>
+</tr>
+</tbody>
+</table>
+
+<p>33528 rows × 8 columns</p>
+</div>
+</div>
+</div>
+<p>Electricity generation data</p>
+<div id="b8ba898c" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>electricity_df <span class="op">=</span> pd.read_csv(</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">'https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/energy_ua/energy_ua_2014_2021.csv'</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>electricity_df.columns <span class="op">=</span> [</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">'ds'</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">'nuclear_generation_mwh'</span>,</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">'total_consumption_mwh'</span>,</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">'pump_storage_generation_mwh'</span>,</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">'pump_storage_consumption_mwh'</span>,</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">'hydro_generation_mwh'</span>,</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="st">'cogeneration_generation_mwh'</span>,</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">'thermal_generation_mwh'</span>,</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    <span class="st">'export_blr_rus_mwh'</span>,</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    <span class="st">'export_eu_mwh'</span>,</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    <span class="st">'export_mld_mwh'</span>,</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="st">'renewable_generation_mwh'</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>electricity_df</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="3">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">nuclear_generation_mwh</th>
+<th data-quarto-table-cell-role="th">total_consumption_mwh</th>
+<th data-quarto-table-cell-role="th">pump_storage_generation_mwh</th>
+<th data-quarto-table-cell-role="th">pump_storage_consumption_mwh</th>
+<th data-quarto-table-cell-role="th">hydro_generation_mwh</th>
+<th data-quarto-table-cell-role="th">cogeneration_generation_mwh</th>
+<th data-quarto-table-cell-role="th">thermal_generation_mwh</th>
+<th data-quarto-table-cell-role="th">export_blr_rus_mwh</th>
+<th data-quarto-table-cell-role="th">export_eu_mwh</th>
+<th data-quarto-table-cell-role="th">export_mld_mwh</th>
+<th data-quarto-table-cell-role="th">renewable_generation_mwh</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>2014-01-01 00:00:00</td>
+<td>10728</td>
+<td>20586</td>
+<td>0</td>
+<td>0</td>
+<td>1809</td>
+<td>2825</td>
+<td>6044</td>
+<td>-365</td>
+<td>-355</td>
+<td>-150</td>
+<td>50</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>2014-01-01 01:00:00</td>
+<td>10606</td>
+<td>19665</td>
+<td>0</td>
+<td>0</td>
+<td>863</td>
+<td>2822</td>
+<td>6038</td>
+<td>-200</td>
+<td>-409</td>
+<td>-104</td>
+<td>49</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>2014-01-01 02:00:00</td>
+<td>10515</td>
+<td>19107</td>
+<td>0</td>
+<td>0</td>
+<td>355</td>
+<td>2837</td>
+<td>5865</td>
+<td>-59</td>
+<td>-400</td>
+<td>-60</td>
+<td>54</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>2014-01-01 03:00:00</td>
+<td>10475</td>
+<td>18453</td>
+<td>0</td>
+<td>0</td>
+<td>185</td>
+<td>2827</td>
+<td>5524</td>
+<td>-175</td>
+<td>-399</td>
+<td>-26</td>
+<td>42</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>2014-01-01 04:00:00</td>
+<td>10427</td>
+<td>18072</td>
+<td>0</td>
+<td>-488</td>
+<td>274</td>
+<td>2826</td>
+<td>5506</td>
+<td>-90</td>
+<td>-421</td>
+<td>-11</td>
+<td>49</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">68226</td>
+<td>2021-10-13 18:00:00</td>
+<td>9954</td>
+<td>19029</td>
+<td>561</td>
+<td>0</td>
+<td>1988</td>
+<td>646</td>
+<td>5232</td>
+<td>126</td>
+<td>-12</td>
+<td>13</td>
+<td>521</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">68227</td>
+<td>2021-10-13 19:00:00</td>
+<td>9960</td>
+<td>19528</td>
+<td>1175</td>
+<td>0</td>
+<td>2150</td>
+<td>640</td>
+<td>5303</td>
+<td>-73</td>
+<td>12</td>
+<td>-64</td>
+<td>425</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">68228</td>
+<td>2021-10-13 20:00:00</td>
+<td>9964</td>
+<td>19627</td>
+<td>1205</td>
+<td>0</td>
+<td>2089</td>
+<td>644</td>
+<td>5342</td>
+<td>13</td>
+<td>-3</td>
+<td>-70</td>
+<td>443</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">68229</td>
+<td>2021-10-13 21:00:00</td>
+<td>9943</td>
+<td>19167</td>
+<td>798</td>
+<td>0</td>
+<td>1771</td>
+<td>640</td>
+<td>5373</td>
+<td>-114</td>
+<td>1</td>
+<td>-32</td>
+<td>787</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">68230</td>
+<td>2021-10-13 22:00:00</td>
+<td>9951</td>
+<td>18320</td>
+<td>0</td>
+<td>0</td>
+<td>1704</td>
+<td>640</td>
+<td>5295</td>
+<td>-45</td>
+<td>-21</td>
+<td>46</td>
+<td>750</td>
+</tr>
+</tbody>
+</table>
+
+<p>68231 rows × 12 columns</p>
+</div>
+</div>
+</div>
+<p>Merge datasets</p>
+<div id="235e31a6" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.merge(</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    electricity_df,</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    weather_df,</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    on<span class="op">=</span><span class="st">'ds'</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    how<span class="op">=</span><span class="st">'left'</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>df[<span class="st">'ds'</span>] <span class="op">=</span> pd.to_datetime(df[<span class="st">'ds'</span>])</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>df</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="4">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">nuclear_generation_mwh</th>
+<th data-quarto-table-cell-role="th">total_consumption_mwh</th>
+<th data-quarto-table-cell-role="th">pump_storage_generation_mwh</th>
+<th data-quarto-table-cell-role="th">pump_storage_consumption_mwh</th>
+<th data-quarto-table-cell-role="th">hydro_generation_mwh</th>
+<th data-quarto-table-cell-role="th">cogeneration_generation_mwh</th>
+<th data-quarto-table-cell-role="th">thermal_generation_mwh</th>
+<th data-quarto-table-cell-role="th">export_blr_rus_mwh</th>
+<th data-quarto-table-cell-role="th">export_eu_mwh</th>
+<th data-quarto-table-cell-role="th">export_mld_mwh</th>
+<th data-quarto-table-cell-role="th">renewable_generation_mwh</th>
+<th data-quarto-table-cell-role="th">w_cloudiness_percent</th>
+<th data-quarto-table-cell-role="th">w_temperature_celsius</th>
+<th data-quarto-table-cell-role="th">w_wind_speed_m_s</th>
+<th data-quarto-table-cell-role="th">w_pressure_hpa</th>
+<th data-quarto-table-cell-role="th">w_humidity_percent</th>
+<th data-quarto-table-cell-role="th">w_sundial_hours</th>
+<th data-quarto-table-cell-role="th">w_air_density_kg_m3</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>2014-01-01 00:00:00</td>
+<td>10728</td>
+<td>20586</td>
+<td>0</td>
+<td>0</td>
+<td>1809</td>
+<td>2825</td>
+<td>6044</td>
+<td>-365</td>
+<td>-355</td>
+<td>-150</td>
+<td>50</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>2014-01-01 01:00:00</td>
+<td>10606</td>
+<td>19665</td>
+<td>0</td>
+<td>0</td>
+<td>863</td>
+<td>2822</td>
+<td>6038</td>
+<td>-200</td>
+<td>-409</td>
+<td>-104</td>
+<td>49</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>2014-01-01 02:00:00</td>
+<td>10515</td>
+<td>19107</td>
+<td>0</td>
+<td>0</td>
+<td>355</td>
+<td>2837</td>
+<td>5865</td>
+<td>-59</td>
+<td>-400</td>
+<td>-60</td>
+<td>54</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>2014-01-01 03:00:00</td>
+<td>10475</td>
+<td>18453</td>
+<td>0</td>
+<td>0</td>
+<td>185</td>
+<td>2827</td>
+<td>5524</td>
+<td>-175</td>
+<td>-399</td>
+<td>-26</td>
+<td>42</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>2014-01-01 04:00:00</td>
+<td>10427</td>
+<td>18072</td>
+<td>0</td>
+<td>-488</td>
+<td>274</td>
+<td>2826</td>
+<td>5506</td>
+<td>-90</td>
+<td>-421</td>
+<td>-11</td>
+<td>49</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">68226</td>
+<td>2021-10-13 18:00:00</td>
+<td>9954</td>
+<td>19029</td>
+<td>561</td>
+<td>0</td>
+<td>1988</td>
+<td>646</td>
+<td>5232</td>
+<td>126</td>
+<td>-12</td>
+<td>13</td>
+<td>521</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">68227</td>
+<td>2021-10-13 19:00:00</td>
+<td>9960</td>
+<td>19528</td>
+<td>1175</td>
+<td>0</td>
+<td>2150</td>
+<td>640</td>
+<td>5303</td>
+<td>-73</td>
+<td>12</td>
+<td>-64</td>
+<td>425</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">68228</td>
+<td>2021-10-13 20:00:00</td>
+<td>9964</td>
+<td>19627</td>
+<td>1205</td>
+<td>0</td>
+<td>2089</td>
+<td>644</td>
+<td>5342</td>
+<td>13</td>
+<td>-3</td>
+<td>-70</td>
+<td>443</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">68229</td>
+<td>2021-10-13 21:00:00</td>
+<td>9943</td>
+<td>19167</td>
+<td>798</td>
+<td>0</td>
+<td>1771</td>
+<td>640</td>
+<td>5373</td>
+<td>-114</td>
+<td>1</td>
+<td>-32</td>
+<td>787</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">68230</td>
+<td>2021-10-13 22:00:00</td>
+<td>9951</td>
+<td>18320</td>
+<td>0</td>
+<td>0</td>
+<td>1704</td>
+<td>640</td>
+<td>5295</td>
+<td>-45</td>
+<td>-21</td>
+<td>46</td>
+<td>750</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+</tbody>
+</table>
+
+<p>68231 rows × 19 columns</p>
+</div>
+</div>
+</div>
+<div id="c54d7f17" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>df.info()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>&lt;class 'pandas.core.frame.DataFrame'&gt;
+RangeIndex: 68231 entries, 0 to 68230
+Data columns (total 19 columns):
+ #   Column                        Non-Null Count  Dtype         
+---  ------                        --------------  -----         
+ 0   ds                            68231 non-null  datetime64[ns]
+ 1   nuclear_generation_mwh        68231 non-null  int64         
+ 2   total_consumption_mwh         68231 non-null  int64         
+ 3   pump_storage_generation_mwh   68231 non-null  int64         
+ 4   pump_storage_consumption_mwh  68231 non-null  int64         
+ 5   hydro_generation_mwh          68231 non-null  int64         
+ 6   cogeneration_generation_mwh   68231 non-null  int64         
+ 7   thermal_generation_mwh        68231 non-null  int64         
+ 8   export_blr_rus_mwh            68231 non-null  int64         
+ 9   export_eu_mwh                 68231 non-null  int64         
+ 10  export_mld_mwh                68231 non-null  int64         
+ 11  renewable_generation_mwh      68231 non-null  int64         
+ 12  w_cloudiness_percent          33528 non-null  float64       
+ 13  w_temperature_celsius         33528 non-null  float64       
+ 14  w_wind_speed_m_s              33528 non-null  float64       
+ 15  w_pressure_hpa                33528 non-null  float64       
+ 16  w_humidity_percent            33528 non-null  float64       
+ 17  w_sundial_hours               33528 non-null  float64       
+ 18  w_air_density_kg_m3           33528 non-null  float64       
+dtypes: datetime64[ns](1), float64(7), int64(11)
+memory usage: 9.9 MB</code></pre>
+</div>
+</div>
+<p>Pivot data to long format</p>
+<div id="ddaebf29" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>df_h <span class="op">=</span> df.melt(</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    id_vars<span class="op">=</span>[<span class="st">'ds'</span>],</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    var_name<span class="op">=</span><span class="st">'unique_id'</span>,</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    value_name<span class="op">=</span><span class="st">'y'</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>df_h</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">y</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>2014-01-01 00:00:00</td>
+<td>nuclear_generation_mwh</td>
+<td>10728.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>2014-01-01 01:00:00</td>
+<td>nuclear_generation_mwh</td>
+<td>10606.0</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>2014-01-01 02:00:00</td>
+<td>nuclear_generation_mwh</td>
+<td>10515.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>2014-01-01 03:00:00</td>
+<td>nuclear_generation_mwh</td>
+<td>10475.0</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>2014-01-01 04:00:00</td>
+<td>nuclear_generation_mwh</td>
+<td>10427.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">1228153</td>
+<td>2021-10-13 18:00:00</td>
+<td>w_air_density_kg_m3</td>
+<td>NaN</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1228154</td>
+<td>2021-10-13 19:00:00</td>
+<td>w_air_density_kg_m3</td>
+<td>NaN</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">1228155</td>
+<td>2021-10-13 20:00:00</td>
+<td>w_air_density_kg_m3</td>
+<td>NaN</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1228156</td>
+<td>2021-10-13 21:00:00</td>
+<td>w_air_density_kg_m3</td>
+<td>NaN</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">1228157</td>
+<td>2021-10-13 22:00:00</td>
+<td>w_air_density_kg_m3</td>
+<td>NaN</td>
+</tr>
+</tbody>
+</table>
+
+<p>1228158 rows × 3 columns</p>
+</div>
+</div>
+</div>
+<p>New datasets with different time resolutions with aggregation (sum), but if variable starts with “w_” then mean aggregation</p>
+<div id="b27d3e30" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>df_d <span class="op">=</span> df_h.groupby([<span class="st">'unique_id'</span>, pd.Grouper(key<span class="op">=</span><span class="st">'ds'</span>, freq<span class="op">=</span><span class="st">'D'</span>)])[<span class="st">'y'</span>].agg([<span class="st">'sum'</span>, <span class="st">'mean'</span>]).reset_index()</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>df_d[<span class="st">'y'</span>] <span class="op">=</span> np.where(</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    df_d[<span class="st">'unique_id'</span>].<span class="bu">str</span>.startswith(<span class="st">'w_'</span>),</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    df_d[<span class="st">'mean'</span>],</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    df_d[<span class="st">'sum'</span>]</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>df_d <span class="op">=</span> df_d.drop(columns<span class="op">=</span>[<span class="st">'sum'</span>, <span class="st">'mean'</span>])</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="co"># df_d['ds'] = df_d['ds'].dt.strftime("%Y-%m-%d")</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>df_w <span class="op">=</span> df_h.groupby([<span class="st">'unique_id'</span>, pd.Grouper(key<span class="op">=</span><span class="st">'ds'</span>, freq<span class="op">=</span><span class="st">'W'</span>)])[<span class="st">'y'</span>].agg([<span class="st">'sum'</span>, <span class="st">'mean'</span>]).reset_index()</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="co"># df_w['ds'] = df_w['ds'].dt.to_period('W')</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>df_w[<span class="st">'y'</span>] <span class="op">=</span> np.where(</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>    df_w[<span class="st">'unique_id'</span>].<span class="bu">str</span>.startswith(<span class="st">'w_'</span>),</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    df_w[<span class="st">'mean'</span>],</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>    df_w[<span class="st">'sum'</span>]</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>df_w <span class="op">=</span> df_w.drop(columns<span class="op">=</span>[<span class="st">'sum'</span>, <span class="st">'mean'</span>])</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>df_m <span class="op">=</span> df_h.groupby([<span class="st">'unique_id'</span>, pd.Grouper(key<span class="op">=</span><span class="st">'ds'</span>, freq<span class="op">=</span><span class="st">'ME'</span>)])[<span class="st">'y'</span>].agg([<span class="st">'sum'</span>, <span class="st">'mean'</span>]).reset_index()</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="co"># df_m['ds'] = df_m['ds'].dt.to_period('M')</span></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>df_m[<span class="st">'y'</span>] <span class="op">=</span> np.where(</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>    df_m[<span class="st">'unique_id'</span>].<span class="bu">str</span>.startswith(<span class="st">'w_'</span>),</span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>    df_m[<span class="st">'mean'</span>],</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>    df_m[<span class="st">'sum'</span>]</span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>df_m <span class="op">=</span> df_m.drop(columns<span class="op">=</span>[<span class="st">'sum'</span>, <span class="st">'mean'</span>])</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>df_q <span class="op">=</span> df_h.groupby([<span class="st">'unique_id'</span>, pd.Grouper(key<span class="op">=</span><span class="st">'ds'</span>, freq<span class="op">=</span><span class="st">'QE'</span>)])[<span class="st">'y'</span>].agg([<span class="st">'sum'</span>, <span class="st">'mean'</span>]).reset_index()</span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a><span class="co"># df_q['ds'] = df_q['ds'].dt.to_period('Q')</span></span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>df_q[<span class="st">'y'</span>] <span class="op">=</span> np.where(</span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>    df_q[<span class="st">'unique_id'</span>].<span class="bu">str</span>.startswith(<span class="st">'w_'</span>),</span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>    df_q[<span class="st">'mean'</span>],</span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a>    df_q[<span class="st">'sum'</span>]</span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a>df_q <span class="op">=</span> df_q.drop(columns<span class="op">=</span>[<span class="st">'sum'</span>, <span class="st">'mean'</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="time-plots" class="level2">
+<h2 class="anchored" data-anchor-id="time-plots">Time plots</h2>
+<p>Hourly data</p>
+<div id="239a53f2" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>StatsForecast.plot(</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    df_h,</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    unique_ids<span class="op">=</span>[<span class="st">'nuclear_generation_mwh'</span>, <span class="st">'w_temperature_celsius'</span>]</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-9-output-1.png" width="1628" height="347" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="5b76a433" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>plot_series(</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    df_h,</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    max_ids<span class="op">=</span><span class="dv">18</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-10-output-1.png" width="1628" height="3035" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Daily data</p>
+<div id="cb0f1c8a" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>StatsForecast.plot(</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    df_d,</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    unique_ids<span class="op">=</span>[<span class="st">'nuclear_generation_mwh'</span>, <span class="st">'w_temperature_celsius'</span>]</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-11-output-1.png" width="1628" height="347" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Weekly data</p>
+<div id="97773574" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>StatsForecast.plot(</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    df_w,</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    unique_ids<span class="op">=</span>[<span class="st">'nuclear_generation_mwh'</span>, <span class="st">'w_temperature_celsius'</span>]</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-12-output-1.png" width="1628" height="347" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Monthly data</p>
+<div id="e8ecfb4e" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>StatsForecast.plot(</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    df_m,</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    unique_ids<span class="op">=</span>[<span class="st">'nuclear_generation_mwh'</span>, <span class="st">'w_temperature_celsius'</span>]</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-13-output-1.png" width="1628" height="347" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Quarterly data</p>
+<div id="b7722827" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>StatsForecast.plot(</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    df_q,</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    unique_ids<span class="op">=</span>[<span class="st">'nuclear_generation_mwh'</span>, <span class="st">'w_temperature_celsius'</span>]</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="13">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-14-output-1.png" width="1628" height="347" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="seasonal-plots" class="level2">
+<h2 class="anchored" data-anchor-id="seasonal-plots">Seasonal plots</h2>
+<p>Monthly seasonal plot for nuclear generation</p>
+<div id="e23577d1" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># remove october 2021 partial data</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>df_m <span class="op">=</span> df_m[<span class="op">~</span>((df_m[<span class="st">'ds'</span>] <span class="op">&gt;=</span> <span class="st">'2021-10-01'</span>) <span class="op">&amp;</span> (df_m[<span class="st">'ds'</span>] <span class="op">&lt;</span> <span class="st">'2021-11-01'</span>))]</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>df_m[<span class="st">'month_name'</span>] <span class="op">=</span> df_m[<span class="st">'ds'</span>].dt.month_name()</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>df_m[<span class="st">'year'</span>] <span class="op">=</span> df_m[<span class="st">'ds'</span>].dt.year</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>df_m[<span class="st">'month_num'</span>] <span class="op">=</span> df_m[<span class="st">'ds'</span>].dt.month</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>unique_years <span class="op">=</span> df_m[<span class="st">'year'</span>].unique()</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>year_palette <span class="op">=</span> sns.color_palette(<span class="st">"husl"</span>, <span class="bu">len</span>(unique_years))</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>sns.lineplot(</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>    data<span class="op">=</span>df_m[df_m[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'nuclear_generation_mwh'</span>],</span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>    x<span class="op">=</span><span class="st">'month_num'</span>,</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>    y<span class="op">=</span><span class="st">'y'</span>,</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>    hue<span class="op">=</span><span class="st">'year'</span>,</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>    palette<span class="op">=</span>year_palette,</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>    legend<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>ax</span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">'Seasonal Plot - Nuclear Generation (Monthly)'</span>)</span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">'Month'</span>)</span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">'Generation (MWh)'</span>)</span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>ax.set_xticks(</span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>    <span class="bu">range</span>(<span class="dv">1</span>, <span class="dv">13</span>),</span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>    [<span class="st">'Jan'</span>, <span class="st">'Feb'</span>, <span class="st">'Mar'</span>, <span class="st">'Apr'</span>, <span class="st">'May'</span>, <span class="st">'Jun'</span>, <span class="st">'Jul'</span>, <span class="st">'Aug'</span>, <span class="st">'Sep'</span>, <span class="st">'Oct'</span>, <span class="st">'Nov'</span>, <span class="st">'Dec'</span>]</span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>min_year <span class="op">=</span> unique_years.<span class="bu">min</span>()</span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> year, subset <span class="kw">in</span> df_m[df_m[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'nuclear_generation_mwh'</span>].groupby(<span class="st">'year'</span>):</span>
+<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a>    ax.text(</span>
+<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a>        subset[<span class="st">'month_num'</span>].iloc[<span class="op">-</span><span class="dv">1</span>],</span>
+<span id="cb15-34"><a href="#cb15-34" aria-hidden="true" tabindex="-1"></a>        subset[<span class="st">'y'</span>].iloc[<span class="op">-</span><span class="dv">1</span>],</span>
+<span id="cb15-35"><a href="#cb15-35" aria-hidden="true" tabindex="-1"></a>        <span class="bu">str</span>(year),</span>
+<span id="cb15-36"><a href="#cb15-36" aria-hidden="true" tabindex="-1"></a>        fontsize<span class="op">=</span><span class="dv">9</span>,</span>
+<span id="cb15-37"><a href="#cb15-37" aria-hidden="true" tabindex="-1"></a>        weight<span class="op">=</span><span class="st">'bold'</span>,</span>
+<span id="cb15-38"><a href="#cb15-38" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span>year_palette[<span class="bu">list</span>(unique_years).index(year)]</span>
+<span id="cb15-39"><a href="#cb15-39" aria-hidden="true" tabindex="-1"></a>    )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-15-output-1.png" width="591" height="451" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Same interactive plot with Altair</p>
+<div id="c5a6a596" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>alt.Chart(</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    df_m[df_m[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'nuclear_generation_mwh'</span>]</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>).mark_line().encode(</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    x<span class="op">=</span>alt.X(<span class="st">'month(ds):N'</span>, title<span class="op">=</span><span class="st">'Month'</span>),</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    y<span class="op">=</span>alt.Y(<span class="st">'y:Q'</span>, title<span class="op">=</span><span class="st">'Generation (MWh)'</span>),</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span>alt.Color(<span class="st">'year(ds):N'</span>, title<span class="op">=</span><span class="st">'Year'</span>),</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>    tooltip<span class="op">=</span>[<span class="st">'year(ds):N'</span>, <span class="st">'month(ds):N'</span>, <span class="st">'y:Q'</span>]</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>).properties(</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>    title<span class="op">=</span><span class="st">'Seasonal Plot - Nuclear Generation (Monthly)'</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>).interactive()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="15">
+
+<style>
+  #altair-viz-60c2488483de46688e07cce62229ea94.vega-embed {
+    width: 100%;
+    display: flex;
+  }
+
+  #altair-viz-60c2488483de46688e07cce62229ea94.vega-embed details,
+  #altair-viz-60c2488483de46688e07cce62229ea94.vega-embed details summary {
+    position: relative;
+  }
+</style>
+<div id="altair-viz-60c2488483de46688e07cce62229ea94"></div>
+<script type="text/javascript">
+  var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
+  (function(spec, embedOpt){
+    let outputDiv = document.currentScript.previousElementSibling;
+    if (outputDiv.id !== "altair-viz-60c2488483de46688e07cce62229ea94") {
+      outputDiv = document.getElementById("altair-viz-60c2488483de46688e07cce62229ea94");
+    }
+    const paths = {
+      "vega": "https://cdn.jsdelivr.net/npm/vega@5?noext",
+      "vega-lib": "https://cdn.jsdelivr.net/npm/vega-lib?noext",
+      "vega-lite": "https://cdn.jsdelivr.net/npm/vega-lite@5.15.1?noext",
+      "vega-embed": "https://cdn.jsdelivr.net/npm/vega-embed@6?noext",
+    };
+
+    function maybeLoadScript(lib, version) {
+      var key = `${lib.replace("-", "")}_version`;
+      return (VEGA_DEBUG[key] == version) ?
+        Promise.resolve(paths[lib]) :
+        new Promise(function(resolve, reject) {
+          var s = document.createElement('script');
+          document.getElementsByTagName("head")[0].appendChild(s);
+          s.async = true;
+          s.onload = () => {
+            VEGA_DEBUG[key] = version;
+            return resolve(paths[lib]);
+          };
+          s.onerror = () => reject(`Error loading script: ${paths[lib]}`);
+          s.src = paths[lib];
+        });
+    }
+
+    function showError(err) {
+      outputDiv.innerHTML = `<div class="error" style="color:red;">${err}</div>`;
+      throw err;
+    }
+
+    function displayChart(vegaEmbed) {
+      vegaEmbed(outputDiv, spec, embedOpt)
+        .catch(err => showError(`Javascript Error: ${err.message}<br>This usually means there's a typo in your chart specification. See the javascript console for the full traceback.`));
+    }
+
+    if(typeof define === "function" && define.amd) {
+      requirejs.config({paths});
+      require(["vega-embed"], displayChart, err => showError(`Error loading script: ${err.message}`));
+    } else {
+      maybeLoadScript("vega", "5")
+        .then(() => maybeLoadScript("vega-lite", "5.15.1"))
+        .then(() => maybeLoadScript("vega-embed", "6"))
+        .catch(showError)
+        .then(() => displayChart(vegaEmbed));
+    }
+  })({"config": {"view": {"continuousWidth": 300, "continuousHeight": 300}}, "data": {"name": "data-d750ba14777bbea7e7f25dfd14d5e4d6"}, "mark": {"type": "line"}, "encoding": {"color": {"field": "ds", "timeUnit": "year", "title": "Year", "type": "nominal"}, "tooltip": [{"field": "ds", "timeUnit": "year", "type": "nominal"}, {"field": "ds", "timeUnit": "month", "type": "nominal"}, {"field": "y", "type": "quantitative"}], "x": {"field": "ds", "timeUnit": "month", "title": "Month", "type": "nominal"}, "y": {"field": "y", "title": "Generation (MWh)", "type": "quantitative"}}, "params": [{"name": "param_1", "select": {"type": "interval", "encodings": ["x", "y"]}, "bind": "scales"}], "title": "Seasonal Plot - Nuclear Generation (Monthly)", "$schema": "https://vega.github.io/schema/vega-lite/v5.15.1.json", "datasets": {"data-d750ba14777bbea7e7f25dfd14d5e4d6": [{"unique_id": "nuclear_generation_mwh", "ds": "2014-01-31T00:00:00", "y": 8261641.0, "month_name": "January", "year": 2014, "month_num": 1}, {"unique_id": "nuclear_generation_mwh", "ds": "2014-02-28T00:00:00", "y": 7739150.0, "month_name": "February", "year": 2014, "month_num": 2}, {"unique_id": "nuclear_generation_mwh", "ds": "2014-03-31T00:00:00", "y": 7723948.0, "month_name": "March", "year": 2014, "month_num": 3}, {"unique_id": "nuclear_generation_mwh", "ds": "2014-04-30T00:00:00", "y": 6695527.0, "month_name": "April", "year": 2014, "month_num": 4}, {"unique_id": "nuclear_generation_mwh", "ds": "2014-05-31T00:00:00", "y": 6079458.0, "month_name": "May", "year": 2014, "month_num": 5}, {"unique_id": "nuclear_generation_mwh", "ds": "2014-06-30T00:00:00", "y": 6080585.0, "month_name": "June", "year": 2014, "month_num": 6}, {"unique_id": "nuclear_generation_mwh", "ds": "2014-07-31T00:00:00", "y": 6566824.0, "month_name": "July", "year": 2014, "month_num": 7}, {"unique_id": "nuclear_generation_mwh", "ds": "2014-08-31T00:00:00", "y": 7222809.0, "month_name": "August", "year": 2014, "month_num": 8}, {"unique_id": "nuclear_generation_mwh", "ds": "2014-09-30T00:00:00", "y": 7335970.0, "month_name": "September", "year": 2014, "month_num": 9}, {"unique_id": "nuclear_generation_mwh", "ds": "2014-10-31T00:00:00", "y": 7955493.0, "month_name": "October", "year": 2014, "month_num": 10}, {"unique_id": "nuclear_generation_mwh", "ds": "2014-11-30T00:00:00", "y": 8281469.0, "month_name": "November", "year": 2014, "month_num": 11}, {"unique_id": "nuclear_generation_mwh", "ds": "2014-12-31T00:00:00", "y": 8261544.0, "month_name": "December", "year": 2014, "month_num": 12}, {"unique_id": "nuclear_generation_mwh", "ds": "2015-01-31T00:00:00", "y": 8692510.0, "month_name": "January", "year": 2015, "month_num": 1}, {"unique_id": "nuclear_generation_mwh", "ds": "2015-02-28T00:00:00", "y": 7454304.0, "month_name": "February", "year": 2015, "month_num": 2}, {"unique_id": "nuclear_generation_mwh", "ds": "2015-03-31T00:00:00", "y": 7533657.0, "month_name": "March", "year": 2015, "month_num": 3}, {"unique_id": "nuclear_generation_mwh", "ds": "2015-04-30T00:00:00", "y": 7251025.0, "month_name": "April", "year": 2015, "month_num": 4}, {"unique_id": "nuclear_generation_mwh", "ds": "2015-05-31T00:00:00", "y": 6542133.0, "month_name": "May", "year": 2015, "month_num": 5}, {"unique_id": "nuclear_generation_mwh", "ds": "2015-06-30T00:00:00", "y": 6854501.0, "month_name": "June", "year": 2015, "month_num": 6}, {"unique_id": "nuclear_generation_mwh", "ds": "2015-07-31T00:00:00", "y": 6591609.0, "month_name": "July", "year": 2015, "month_num": 7}, {"unique_id": "nuclear_generation_mwh", "ds": "2015-08-31T00:00:00", "y": 6373866.0, "month_name": "August", "year": 2015, "month_num": 8}, {"unique_id": "nuclear_generation_mwh", "ds": "2015-09-30T00:00:00", "y": 6777267.0, "month_name": "September", "year": 2015, "month_num": 9}, {"unique_id": "nuclear_generation_mwh", "ds": "2015-10-31T00:00:00", "y": 7674814.0, "month_name": "October", "year": 2015, "month_num": 10}, {"unique_id": "nuclear_generation_mwh", "ds": "2015-11-30T00:00:00", "y": 7421910.0, "month_name": "November", "year": 2015, "month_num": 11}, {"unique_id": "nuclear_generation_mwh", "ds": "2015-12-31T00:00:00", "y": 8246167.0, "month_name": "December", "year": 2015, "month_num": 12}, {"unique_id": "nuclear_generation_mwh", "ds": "2016-01-31T00:00:00", "y": 8262075.0, "month_name": "January", "year": 2016, "month_num": 1}, {"unique_id": "nuclear_generation_mwh", "ds": "2016-02-29T00:00:00", "y": 7304373.0, "month_name": "February", "year": 2016, "month_num": 2}, {"unique_id": "nuclear_generation_mwh", "ds": "2016-03-31T00:00:00", "y": 7265969.0, "month_name": "March", "year": 2016, "month_num": 3}, {"unique_id": "nuclear_generation_mwh", "ds": "2016-04-30T00:00:00", "y": 6240869.0, "month_name": "April", "year": 2016, "month_num": 4}, {"unique_id": "nuclear_generation_mwh", "ds": "2016-05-31T00:00:00", "y": 5647612.0, "month_name": "May", "year": 2016, "month_num": 5}, {"unique_id": "nuclear_generation_mwh", "ds": "2016-06-30T00:00:00", "y": 5443099.0, "month_name": "June", "year": 2016, "month_num": 6}, {"unique_id": "nuclear_generation_mwh", "ds": "2016-07-31T00:00:00", "y": 5526116.0, "month_name": "July", "year": 2016, "month_num": 7}, {"unique_id": "nuclear_generation_mwh", "ds": "2016-08-31T00:00:00", "y": 5649246.0, "month_name": "August", "year": 2016, "month_num": 8}, {"unique_id": "nuclear_generation_mwh", "ds": "2016-09-30T00:00:00", "y": 6094143.0, "month_name": "September", "year": 2016, "month_num": 9}, {"unique_id": "nuclear_generation_mwh", "ds": "2016-10-31T00:00:00", "y": 7522205.0, "month_name": "October", "year": 2016, "month_num": 10}, {"unique_id": "nuclear_generation_mwh", "ds": "2016-11-30T00:00:00", "y": 7620641.0, "month_name": "November", "year": 2016, "month_num": 11}, {"unique_id": "nuclear_generation_mwh", "ds": "2016-12-31T00:00:00", "y": 8185746.0, "month_name": "December", "year": 2016, "month_num": 12}, {"unique_id": "nuclear_generation_mwh", "ds": "2017-01-31T00:00:00", "y": 7967535.0, "month_name": "January", "year": 2017, "month_num": 1}, {"unique_id": "nuclear_generation_mwh", "ds": "2017-02-28T00:00:00", "y": 7751704.0, "month_name": "February", "year": 2017, "month_num": 2}, {"unique_id": "nuclear_generation_mwh", "ds": "2017-03-31T00:00:00", "y": 8011400.0, "month_name": "March", "year": 2017, "month_num": 3}, {"unique_id": "nuclear_generation_mwh", "ds": "2017-04-30T00:00:00", "y": 7642370.0, "month_name": "April", "year": 2017, "month_num": 4}, {"unique_id": "nuclear_generation_mwh", "ds": "2017-05-31T00:00:00", "y": 7399797.0, "month_name": "May", "year": 2017, "month_num": 5}, {"unique_id": "nuclear_generation_mwh", "ds": "2017-06-30T00:00:00", "y": 6704673.0, "month_name": "June", "year": 2017, "month_num": 6}, {"unique_id": "nuclear_generation_mwh", "ds": "2017-07-31T00:00:00", "y": 6555314.0, "month_name": "July", "year": 2017, "month_num": 7}, {"unique_id": "nuclear_generation_mwh", "ds": "2017-08-31T00:00:00", "y": 6108883.0, "month_name": "August", "year": 2017, "month_num": 8}, {"unique_id": "nuclear_generation_mwh", "ds": "2017-09-30T00:00:00", "y": 5826334.0, "month_name": "September", "year": 2017, "month_num": 9}, {"unique_id": "nuclear_generation_mwh", "ds": "2017-10-31T00:00:00", "y": 6585978.0, "month_name": "October", "year": 2017, "month_num": 10}, {"unique_id": "nuclear_generation_mwh", "ds": "2017-11-30T00:00:00", "y": 7076511.0, "month_name": "November", "year": 2017, "month_num": 11}, {"unique_id": "nuclear_generation_mwh", "ds": "2017-12-31T00:00:00", "y": 7683759.0, "month_name": "December", "year": 2017, "month_num": 12}, {"unique_id": "nuclear_generation_mwh", "ds": "2018-01-31T00:00:00", "y": 7222482.0, "month_name": "January", "year": 2018, "month_num": 1}, {"unique_id": "nuclear_generation_mwh", "ds": "2018-02-28T00:00:00", "y": 7246372.0, "month_name": "February", "year": 2018, "month_num": 2}, {"unique_id": "nuclear_generation_mwh", "ds": "2018-03-31T00:00:00", "y": 7488269.0, "month_name": "March", "year": 2018, "month_num": 3}, {"unique_id": "nuclear_generation_mwh", "ds": "2018-04-30T00:00:00", "y": 5554825.0, "month_name": "April", "year": 2018, "month_num": 4}, {"unique_id": "nuclear_generation_mwh", "ds": "2018-05-31T00:00:00", "y": 5891693.0, "month_name": "May", "year": 2018, "month_num": 5}, {"unique_id": "nuclear_generation_mwh", "ds": "2018-06-30T00:00:00", "y": 6587731.0, "month_name": "June", "year": 2018, "month_num": 6}, {"unique_id": "nuclear_generation_mwh", "ds": "2018-07-31T00:00:00", "y": 6578489.0, "month_name": "July", "year": 2018, "month_num": 7}, {"unique_id": "nuclear_generation_mwh", "ds": "2018-08-31T00:00:00", "y": 7472484.0, "month_name": "August", "year": 2018, "month_num": 8}, {"unique_id": "nuclear_generation_mwh", "ds": "2018-09-30T00:00:00", "y": 6752434.0, "month_name": "September", "year": 2018, "month_num": 9}, {"unique_id": "nuclear_generation_mwh", "ds": "2018-10-31T00:00:00", "y": 7504302.0, "month_name": "October", "year": 2018, "month_num": 10}, {"unique_id": "nuclear_generation_mwh", "ds": "2018-11-30T00:00:00", "y": 7972383.0, "month_name": "November", "year": 2018, "month_num": 11}, {"unique_id": "nuclear_generation_mwh", "ds": "2018-12-31T00:00:00", "y": 8079864.0, "month_name": "December", "year": 2018, "month_num": 12}, {"unique_id": "nuclear_generation_mwh", "ds": "2019-01-31T00:00:00", "y": 8109381.0, "month_name": "January", "year": 2019, "month_num": 1}, {"unique_id": "nuclear_generation_mwh", "ds": "2019-02-28T00:00:00", "y": 7863113.0, "month_name": "February", "year": 2019, "month_num": 2}, {"unique_id": "nuclear_generation_mwh", "ds": "2019-03-31T00:00:00", "y": 7631266.0, "month_name": "March", "year": 2019, "month_num": 3}, {"unique_id": "nuclear_generation_mwh", "ds": "2019-04-30T00:00:00", "y": 6728556.0, "month_name": "April", "year": 2019, "month_num": 4}, {"unique_id": "nuclear_generation_mwh", "ds": "2019-05-31T00:00:00", "y": 6638842.0, "month_name": "May", "year": 2019, "month_num": 5}, {"unique_id": "nuclear_generation_mwh", "ds": "2019-06-30T00:00:00", "y": 5743683.0, "month_name": "June", "year": 2019, "month_num": 6}, {"unique_id": "nuclear_generation_mwh", "ds": "2019-07-31T00:00:00", "y": 6071605.0, "month_name": "July", "year": 2019, "month_num": 7}, {"unique_id": "nuclear_generation_mwh", "ds": "2019-08-31T00:00:00", "y": 5825532.0, "month_name": "August", "year": 2019, "month_num": 8}, {"unique_id": "nuclear_generation_mwh", "ds": "2019-09-30T00:00:00", "y": 6027726.0, "month_name": "September", "year": 2019, "month_num": 9}, {"unique_id": "nuclear_generation_mwh", "ds": "2019-10-31T00:00:00", "y": 6526362.0, "month_name": "October", "year": 2019, "month_num": 10}, {"unique_id": "nuclear_generation_mwh", "ds": "2019-11-30T00:00:00", "y": 7606735.0, "month_name": "November", "year": 2019, "month_num": 11}, {"unique_id": "nuclear_generation_mwh", "ds": "2019-12-31T00:00:00", "y": 8325464.0, "month_name": "December", "year": 2019, "month_num": 12}, {"unique_id": "nuclear_generation_mwh", "ds": "2020-01-31T00:00:00", "y": 7807324.0, "month_name": "January", "year": 2020, "month_num": 1}, {"unique_id": "nuclear_generation_mwh", "ds": "2020-02-29T00:00:00", "y": 7199012.0, "month_name": "February", "year": 2020, "month_num": 2}, {"unique_id": "nuclear_generation_mwh", "ds": "2020-03-31T00:00:00", "y": 7562492.0, "month_name": "March", "year": 2020, "month_num": 3}, {"unique_id": "nuclear_generation_mwh", "ds": "2020-04-30T00:00:00", "y": 6319580.0, "month_name": "April", "year": 2020, "month_num": 4}, {"unique_id": "nuclear_generation_mwh", "ds": "2020-05-31T00:00:00", "y": 5465918.0, "month_name": "May", "year": 2020, "month_num": 5}, {"unique_id": "nuclear_generation_mwh", "ds": "2020-06-30T00:00:00", "y": 5034275.0, "month_name": "June", "year": 2020, "month_num": 6}, {"unique_id": "nuclear_generation_mwh", "ds": "2020-07-31T00:00:00", "y": 5803473.0, "month_name": "July", "year": 2020, "month_num": 7}, {"unique_id": "nuclear_generation_mwh", "ds": "2020-08-31T00:00:00", "y": 5942475.0, "month_name": "August", "year": 2020, "month_num": 8}, {"unique_id": "nuclear_generation_mwh", "ds": "2020-09-30T00:00:00", "y": 5638168.0, "month_name": "September", "year": 2020, "month_num": 9}, {"unique_id": "nuclear_generation_mwh", "ds": "2020-10-31T00:00:00", "y": 6250966.0, "month_name": "October", "year": 2020, "month_num": 10}, {"unique_id": "nuclear_generation_mwh", "ds": "2020-11-30T00:00:00", "y": 6225665.0, "month_name": "November", "year": 2020, "month_num": 11}, {"unique_id": "nuclear_generation_mwh", "ds": "2020-12-31T00:00:00", "y": 6961535.0, "month_name": "December", "year": 2020, "month_num": 12}, {"unique_id": "nuclear_generation_mwh", "ds": "2021-01-31T00:00:00", "y": 7163266.0, "month_name": "January", "year": 2021, "month_num": 1}, {"unique_id": "nuclear_generation_mwh", "ds": "2021-02-28T00:00:00", "y": 6761990.0, "month_name": "February", "year": 2021, "month_num": 2}, {"unique_id": "nuclear_generation_mwh", "ds": "2021-03-31T00:00:00", "y": 7924895.0, "month_name": "March", "year": 2021, "month_num": 3}, {"unique_id": "nuclear_generation_mwh", "ds": "2021-04-30T00:00:00", "y": 7208076.0, "month_name": "April", "year": 2021, "month_num": 4}, {"unique_id": "nuclear_generation_mwh", "ds": "2021-05-31T00:00:00", "y": 6794528.0, "month_name": "May", "year": 2021, "month_num": 5}, {"unique_id": "nuclear_generation_mwh", "ds": "2021-06-30T00:00:00", "y": 6205654.0, "month_name": "June", "year": 2021, "month_num": 6}, {"unique_id": "nuclear_generation_mwh", "ds": "2021-07-31T00:00:00", "y": 6431348.0, "month_name": "July", "year": 2021, "month_num": 7}, {"unique_id": "nuclear_generation_mwh", "ds": "2021-08-31T00:00:00", "y": 6845061.0, "month_name": "August", "year": 2021, "month_num": 8}, {"unique_id": "nuclear_generation_mwh", "ds": "2021-09-30T00:00:00", "y": 6687032.0, "month_name": "September", "year": 2021, "month_num": 9}]}}, {"mode": "vega-lite"});
+</script>
+</div>
+</div>
+<p>Hourly seasonal plot for nuclear generation</p>
+<div id="d2067876" class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>df_h[<span class="st">'hour-minute'</span>] <span class="op">=</span> df_h[<span class="st">'ds'</span>].dt.strftime(<span class="st">'%H:%M:%S'</span>)</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>df_h[<span class="st">'day'</span>] <span class="op">=</span> df_h[<span class="st">'ds'</span>].dt.date</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>sns.lineplot(</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>    data<span class="op">=</span>df_h[df_h[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'hydro_generation_mwh'</span>],</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    x<span class="op">=</span><span class="st">'hour-minute'</span>,</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    y<span class="op">=</span><span class="st">'y'</span>,</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    hue<span class="op">=</span><span class="st">'day'</span>,</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>    legend<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>ax,</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>    palette<span class="op">=</span><span class="st">"husl"</span></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>unique_ticks <span class="op">=</span> df_h[<span class="st">'hour-minute'</span>].unique()</span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>ticks_to_plot <span class="op">=</span> unique_ticks[::<span class="dv">2</span>]</span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>ax.set_xticks(ticks<span class="op">=</span><span class="bu">range</span>(<span class="dv">0</span>, <span class="bu">len</span>(unique_ticks), <span class="dv">2</span>), labels<span class="op">=</span>ticks_to_plot,</span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>    rotation<span class="op">=</span><span class="dv">45</span>)</span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">'Seasonal Plot - Hydro Generation (Hourly)'</span>)</span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">'Hour of Day'</span>)</span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">'Generation (MWh)'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="16">
+<pre><code>Text(0, 0.5, 'Generation (MWh)')</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-17-output-2.png" width="599" height="485" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Seasonal plot showing weekly seasonal patterns for nuclear generation</p>
+<div id="af5cac32" class="cell" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>df_d[<span class="st">'week_day'</span>] <span class="op">=</span> df_d[<span class="st">'ds'</span>].dt.day_name()</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>df_d[<span class="st">'week_num'</span>] <span class="op">=</span> df_d[<span class="st">'ds'</span>].dt.isocalendar().week</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>df_d[<span class="st">'year'</span>] <span class="op">=</span> df_d[<span class="st">'ds'</span>].dt.year</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>unique_years <span class="op">=</span> df_d[<span class="st">'year'</span>].unique()</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>year_palette <span class="op">=</span> sns.color_palette(<span class="st">"husl"</span>, <span class="bu">len</span>(unique_years))</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>sns.lineplot(</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>    data<span class="op">=</span>df_d[df_d[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'nuclear_generation_mwh'</span>],</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>    x<span class="op">=</span><span class="st">'week_num'</span>,</span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>    y<span class="op">=</span><span class="st">'y'</span>,</span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>    hue<span class="op">=</span><span class="st">'year'</span>,</span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>    palette<span class="op">=</span>year_palette,</span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>    legend<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>ax</span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">'Seasonal Plot - Nuclear Generation (Weekly)'</span>)</span>
+<span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">'Week of Year'</span>)</span>
+<span id="cb19-18"><a href="#cb19-18" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">'Generation (MWh)'</span>)</span>
+<span id="cb19-19"><a href="#cb19-19" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> year, subset <span class="kw">in</span> df_d[df_d[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'nuclear_generation_mwh'</span>].groupby(<span class="st">'year'</span>):</span>
+<span id="cb19-20"><a href="#cb19-20" aria-hidden="true" tabindex="-1"></a>    ax.text(</span>
+<span id="cb19-21"><a href="#cb19-21" aria-hidden="true" tabindex="-1"></a>        subset[<span class="st">'week_num'</span>].iloc[<span class="op">-</span><span class="dv">1</span>],</span>
+<span id="cb19-22"><a href="#cb19-22" aria-hidden="true" tabindex="-1"></a>        subset[<span class="st">'y'</span>].iloc[<span class="op">-</span><span class="dv">1</span>],</span>
+<span id="cb19-23"><a href="#cb19-23" aria-hidden="true" tabindex="-1"></a>        <span class="bu">str</span>(year),</span>
+<span id="cb19-24"><a href="#cb19-24" aria-hidden="true" tabindex="-1"></a>        fontsize<span class="op">=</span><span class="dv">9</span>,</span>
+<span id="cb19-25"><a href="#cb19-25" aria-hidden="true" tabindex="-1"></a>        weight<span class="op">=</span><span class="st">'bold'</span>,</span>
+<span id="cb19-26"><a href="#cb19-26" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span>year_palette[<span class="bu">list</span>(unique_years).index(year)]</span>
+<span id="cb19-27"><a href="#cb19-27" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb19-28"><a href="#cb19-28" aria-hidden="true" tabindex="-1"></a>fig.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-18-output-1.png" width="616" height="451" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Seasonal plot showing yearly seasonal patterns for nuclear generation</p>
+<div id="60bc7bcb" class="cell" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>df_d[<span class="st">'day_of_year'</span>] <span class="op">=</span> df_d[<span class="st">'ds'</span>].dt.dayofyear</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>df_d[<span class="st">'year'</span>] <span class="op">=</span> df_d[<span class="st">'ds'</span>].dt.year</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>unique_years <span class="op">=</span> df_d[<span class="st">'year'</span>].unique()</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>pallette <span class="op">=</span> sns.color_palette(<span class="st">"husl"</span>, <span class="bu">len</span>(unique_years))</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>color_map <span class="op">=</span> <span class="bu">dict</span>(<span class="bu">zip</span>(unique_years, pallette))</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> year, subset <span class="kw">in</span> df_d[df_d[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'nuclear_generation_mwh'</span>].groupby(<span class="st">'year'</span>):</span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>    ax.plot(</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>        subset[<span class="st">'day_of_year'</span>],</span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>        subset[<span class="st">'y'</span>],</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span>year,</span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span>color_map[year]</span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">'Seasonal Plot - Nuclear Generation (Daily)'</span>)</span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">'Day of Year'</span>)</span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">'Generation (MWh)'</span>)</span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> year, subset <span class="kw">in</span> df_d[df_d[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'nuclear_generation_mwh'</span>].groupby(<span class="st">'year'</span>):</span>
+<span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a>    ax.text(</span>
+<span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a>        subset[<span class="st">'day_of_year'</span>].iloc[<span class="op">-</span><span class="dv">1</span>],</span>
+<span id="cb20-22"><a href="#cb20-22" aria-hidden="true" tabindex="-1"></a>        subset[<span class="st">'y'</span>].iloc[<span class="op">-</span><span class="dv">1</span>],</span>
+<span id="cb20-23"><a href="#cb20-23" aria-hidden="true" tabindex="-1"></a>        <span class="bu">str</span>(year),</span>
+<span id="cb20-24"><a href="#cb20-24" aria-hidden="true" tabindex="-1"></a>        fontsize<span class="op">=</span><span class="dv">9</span>,</span>
+<span id="cb20-25"><a href="#cb20-25" aria-hidden="true" tabindex="-1"></a>        weight<span class="op">=</span><span class="st">'bold'</span>,</span>
+<span id="cb20-26"><a href="#cb20-26" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span>color_map[year]</span>
+<span id="cb20-27"><a href="#cb20-27" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb20-28"><a href="#cb20-28" aria-hidden="true" tabindex="-1"></a>fig.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-19-output-1.png" width="616" height="451" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="subseries-plots" class="level2">
+<h2 class="anchored" data-anchor-id="subseries-plots">Subseries plots</h2>
+<p>Monthly subseries plot for nuclear generation</p>
+<div id="0180c50a" class="cell" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(nrows<span class="op">=</span><span class="dv">1</span>, ncols<span class="op">=</span><span class="dv">12</span>, sharey<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, month <span class="kw">in</span> <span class="bu">enumerate</span>(df_m[<span class="st">'ds'</span>].dt.month_name().unique()):</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    month_data <span class="op">=</span> df_m.query(</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">"unique_id == 'nuclear_generation_mwh' and month_name == @month"</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> month_data[<span class="st">'y'</span>].mean()</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>    axes[i].plot(</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>        month_data[<span class="st">'year'</span>],</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>        month_data[<span class="st">'y'</span>],</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span><span class="st">'black'</span></span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>    axes[i].axhline(</span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>        mean_value,</span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span><span class="st">'blue'</span>,</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>        linestyle<span class="op">=</span><span class="st">'-'</span>,</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>        linewidth<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="st">'Mean'</span></span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a>    axes[i].set_title(month)</span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>    axes[i].set_xlabel(<span class="st">''</span>)</span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a>    axes[i].tick_params(axis<span class="op">=</span><span class="st">'x'</span>, rotation<span class="op">=</span><span class="dv">90</span>)</span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> i <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a>        axes[i].set_ylabel(<span class="st">'Generation (MWh)'</span>)</span>
+<span id="cb21-24"><a href="#cb21-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb21-25"><a href="#cb21-25" aria-hidden="true" tabindex="-1"></a>        axes[i].set_ylabel(<span class="st">''</span>)</span>
+<span id="cb21-26"><a href="#cb21-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-27"><a href="#cb21-27" aria-hidden="true" tabindex="-1"></a>fig.suptitle(<span class="st">'Subseries Plot - Nuclear Generation (Monthly)'</span>, fontsize<span class="op">=</span><span class="dv">16</span>)</span>
+<span id="cb21-28"><a href="#cb21-28" aria-hidden="true" tabindex="-1"></a>fig.text(<span class="fl">0.5</span>, <span class="op">-</span><span class="fl">0.05</span>, <span class="st">'Month'</span>, ha<span class="op">=</span><span class="st">'center'</span>)</span>
+<span id="cb21-29"><a href="#cb21-29" aria-hidden="true" tabindex="-1"></a>fig.subplots_adjust(wspace<span class="op">=</span><span class="fl">0.2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-20-output-1.png" width="614" height="516" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Or using boxplots</p>
+<div id="60ab6ac3" class="cell" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>sns.boxplot(</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    data<span class="op">=</span>df_m[df_m[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'nuclear_generation_mwh'</span>],</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    x<span class="op">=</span>df_m[<span class="st">'ds'</span>].dt.month_name(),</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    y<span class="op">=</span><span class="st">'y'</span>,</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>    order<span class="op">=</span>[<span class="st">'January'</span>, <span class="st">'February'</span>, <span class="st">'March'</span>, <span class="st">'April'</span>, <span class="st">'May'</span>, <span class="st">'June'</span>,</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>           <span class="st">'July'</span>, <span class="st">'August'</span>, <span class="st">'September'</span>, <span class="st">'October'</span>, <span class="st">'November'</span>, <span class="st">'December'</span>],</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>ax</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">'Subseries Plot - Nuclear Generation (Monthly)'</span>)</span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">'Month'</span>)</span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">'Generation (MWh)'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="20">
+<pre><code>Text(0, 0.5, 'Generation (MWh)')</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-21-output-2.png" width="597" height="451" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Or using <a href="https://www.statsmodels.org/dev/generated/statsmodels.graphics.tsaplots.month_plot.html"><code>statsmodels.graphics.tsaplots.month_plot</code></a></p>
+</section>
+<section id="all-variables-time-plot" class="level2">
+<h2 class="anchored" data-anchor-id="all-variables-time-plot">All variables time plot</h2>
+<div id="8fa7b2be" class="cell" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># unique ids that not start with 'w_'</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>unique_ids <span class="op">=</span> df_q[<span class="st">'unique_id'</span>].unique().tolist()</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>unique_ids <span class="op">=</span> [uid <span class="cf">for</span> uid <span class="kw">in</span> unique_ids <span class="cf">if</span> <span class="kw">not</span> uid.startswith(<span class="st">'w_'</span>)]</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>colors <span class="op">=</span> sns.color_palette(<span class="st">"husl"</span>, <span class="bu">len</span>(unique_ids))</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, color <span class="kw">in</span> <span class="bu">zip</span>(unique_ids, colors):</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>    subset <span class="op">=</span> df_q.query(<span class="st">"unique_id == @i"</span>)</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>    subset.plot(</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>        x<span class="op">=</span><span class="st">'ds'</span>,</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>        y<span class="op">=</span><span class="st">'y'</span>,</span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>        ax<span class="op">=</span>ax,</span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span>i,</span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span>color</span>
+<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">'All Variables Time Plot (Quarterly)'</span>)</span>
+<span id="cb24-16"><a href="#cb24-16" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">'Date'</span>)</span>
+<span id="cb24-17"><a href="#cb24-17" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">'Generation (MWh)'</span>)</span>
+<span id="cb24-18"><a href="#cb24-18" aria-hidden="true" tabindex="-1"></a>fig.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-22-output-1.png" width="577" height="451" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Seasonal plot for all variables</p>
+<div id="352fbb9b" class="cell" data-execution_count="22">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>df_q[<span class="st">'Quarter'</span>] <span class="op">=</span> <span class="st">'Q'</span> <span class="op">+</span> df_q[<span class="st">'ds'</span>].dt.quarter.astype(<span class="bu">str</span>)</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>df_q[<span class="st">'Year'</span>] <span class="op">=</span> df_q[<span class="st">'ds'</span>].dt.year</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>years <span class="op">=</span> <span class="bu">sorted</span>(df_q[<span class="st">'Year'</span>].unique())</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>palette <span class="op">=</span> sns.color_palette(<span class="st">"husl"</span>, <span class="bu">len</span>(years))</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>year_to_color <span class="op">=</span> <span class="bu">dict</span>(<span class="bu">zip</span>(years, palette))</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>n_gen <span class="op">=</span> df_q[<span class="st">'unique_id'</span>].nunique()</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(nrows<span class="op">=</span>n_gen, ncols<span class="op">=</span><span class="dv">1</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, n_gen <span class="op">*</span> <span class="dv">3</span>), sharex<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ax, (uid, group) <span class="kw">in</span> <span class="bu">zip</span>(axes, df_q.groupby(<span class="st">'unique_id'</span>)):</span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> year, subset <span class="kw">in</span> group.groupby(<span class="st">'Year'</span>):</span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>        ax.plot(</span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>            subset[<span class="st">'Quarter'</span>],</span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>            subset[<span class="st">'y'</span>],</span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>            label<span class="op">=</span><span class="bu">str</span>(year),</span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>            color<span class="op">=</span>year_to_color[year]</span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>    ax.set_title(<span class="ss">f'Subseries Plot - </span><span class="sc">{</span>uid<span class="sc">}</span><span class="ss"> (Quarterly)'</span>)</span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>    ax.set_ylabel(<span class="st">'Generation (MWh)'</span>)</span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a>    ax.legend(title<span class="op">=</span><span class="st">'Year'</span>, bbox_to_anchor<span class="op">=</span>(<span class="fl">1.05</span>, <span class="dv">1</span>), loc<span class="op">=</span><span class="st">'upper left'</span>)</span>
+<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a>fig.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-23-output-1.png" width="1143" height="5174" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Subseries plot for all variables using lineplot and facets</p>
+<div id="5a396086" class="cell" data-execution_count="23">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>uids <span class="op">=</span> <span class="bu">sorted</span>(df_q[<span class="st">'unique_id'</span>].unique())</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>n_uids <span class="op">=</span> <span class="bu">len</span>(uids)</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>quarters <span class="op">=</span> <span class="bu">sorted</span>(df_q[<span class="st">'Quarter'</span>].unique())</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>fig, axs <span class="op">=</span> plt.subplots(n_uids, <span class="dv">4</span>, sharex<span class="op">=</span><span class="va">True</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, n_uids <span class="op">*</span> <span class="fl">2.5</span>))</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>axs <span class="op">=</span> axs.flatten()</span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> r_idx, (uid, df_uid) <span class="kw">in</span> <span class="bu">enumerate</span>(df_q.groupby(<span class="st">'unique_id'</span>, sort<span class="op">=</span><span class="va">True</span>)):</span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>    y_min, y_max <span class="op">=</span> df_uid[<span class="st">'y'</span>].<span class="bu">min</span>(), df_uid[<span class="st">'y'</span>].<span class="bu">max</span>()</span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> q_name, df_uid_q <span class="kw">in</span> df_uid.groupby(<span class="st">'Quarter'</span>):</span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>        c_idx <span class="op">=</span> quarters.index(q_name)</span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>        ax <span class="op">=</span> axs[r_idx <span class="op">*</span> <span class="dv">4</span> <span class="op">+</span> c_idx]</span>
+<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a>        df_uid_q.plot(y<span class="op">=</span><span class="st">'y'</span>, x<span class="op">=</span><span class="st">'Year'</span>, ax<span class="op">=</span>ax, label<span class="op">=</span><span class="va">None</span>, color<span class="op">=</span><span class="st">'black'</span>, marker<span class="op">=</span><span class="st">'o'</span>, linestyle<span class="op">=</span><span class="st">'-'</span>)</span>
+<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>        ax.axhline(df_uid_q[<span class="st">'y'</span>].mean(), color<span class="op">=</span><span class="st">'blue'</span>)</span>
+<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a>        ax.set_ylim(y_min, y_max)</span>
+<span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a>        ax.set_xlabel(<span class="st">''</span>)</span>
+<span id="cb26-17"><a href="#cb26-17" aria-hidden="true" tabindex="-1"></a>        ax.tick_params(axis<span class="op">=</span><span class="st">'x'</span>, rotation<span class="op">=</span><span class="dv">90</span>)</span>
+<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> ax.get_legend() <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a>            ax.get_legend().remove()</span>
+<span id="cb26-20"><a href="#cb26-20" aria-hidden="true" tabindex="-1"></a>        ax.set_xticks(df_uid_q[<span class="st">'Year'</span>].unique())</span>
+<span id="cb26-21"><a href="#cb26-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-22"><a href="#cb26-22" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> j, q <span class="kw">in</span> <span class="bu">enumerate</span>(quarters):</span>
+<span id="cb26-23"><a href="#cb26-23" aria-hidden="true" tabindex="-1"></a>    axs[j].set_title(q)</span>
+<span id="cb26-24"><a href="#cb26-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-25"><a href="#cb26-25" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, uid <span class="kw">in</span> <span class="bu">enumerate</span>(uids):</span>
+<span id="cb26-26"><a href="#cb26-26" aria-hidden="true" tabindex="-1"></a>    axs[i <span class="op">*</span> <span class="dv">4</span> <span class="op">+</span> <span class="dv">3</span>].text(<span class="fl">1.02</span>, <span class="fl">0.5</span>, uid, va<span class="op">=</span><span class="st">'center'</span>, ha<span class="op">=</span><span class="st">'left'</span>, rotation<span class="op">=</span><span class="dv">270</span>, transform<span class="op">=</span>axs[i <span class="op">*</span> <span class="dv">4</span> <span class="op">+</span> <span class="dv">3</span>].transAxes)</span>
+<span id="cb26-27"><a href="#cb26-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-28"><a href="#cb26-28" aria-hidden="true" tabindex="-1"></a>fig.supylabel(<span class="st">'Generation (MWh)'</span>, va<span class="op">=</span><span class="st">'center'</span>, rotation<span class="op">=</span><span class="dv">90</span>)</span>
+<span id="cb26-29"><a href="#cb26-29" aria-hidden="true" tabindex="-1"></a>fig.supxlabel(<span class="st">'Year'</span>, ha<span class="op">=</span><span class="st">'center'</span>)</span>
+<span id="cb26-30"><a href="#cb26-30" aria-hidden="true" tabindex="-1"></a>fig.suptitle(<span class="st">'Subseries Plot for All Variables (Quarterly)'</span>)</span>
+<span id="cb26-31"><a href="#cb26-31" aria-hidden="true" tabindex="-1"></a>fig.tight_layout()</span>
+<span id="cb26-32"><a href="#cb26-32" aria-hidden="true" tabindex="-1"></a>fig.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-24-output-1.png" width="1133" height="4252" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="scatterplots" class="level2">
+<h2 class="anchored" data-anchor-id="scatterplots">Scatterplots</h2>
+<p>Basic scatterplot daily data</p>
+<div id="74edc347" class="cell" data-execution_count="24">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>df_d_pivot <span class="op">=</span> df_d.pivot(</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>    index<span class="op">=</span><span class="st">'ds'</span>,</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    columns<span class="op">=</span><span class="st">'unique_id'</span>,</span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>    values<span class="op">=</span><span class="st">'y'</span></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>).reset_index()</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>sns.scatterplot(</span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>    data<span class="op">=</span>df_d_pivot,</span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>    x<span class="op">=</span><span class="st">'w_temperature_celsius'</span>,</span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>    y<span class="op">=</span><span class="st">'total_consumption_mwh'</span>,</span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>ax</span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">'Scatterplot: Total Consumption vs Temperature (Daily)'</span>)</span>
+<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">'Temperature (Celsius)'</span>)</span>
+<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">'Total Consumption (MWh)'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="24">
+<pre><code>Text(0, 0.5, 'Total Consumption (MWh)')</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-25-output-2.png" width="614" height="451" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Analog <code>ggpair</code> plot with Python using <code>seaborn</code> pairplot</p>
+<div id="ba0111bc" class="cell" data-execution_count="25">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.stats <span class="im">import</span> pearsonr</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>df_for_plot <span class="op">=</span> df.drop(columns<span class="op">=</span>[<span class="st">'ds'</span>]).dropna()</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> corrfunc(x, y, <span class="op">**</span>kws):</span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>    r, pvalue <span class="op">=</span> pearsonr(x, y)</span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>    ax <span class="op">=</span> plt.gca()</span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>    ax.annotate(<span class="ss">f"r= </span><span class="ch">\n</span><span class="sc">{</span>r<span class="sc">:.2f}{</span><span class="st">'***'</span> <span class="cf">if</span> pvalue <span class="op">&lt;</span> <span class="fl">0.05</span> <span class="cf">else</span> <span class="st">''</span><span class="sc">}</span><span class="ss">"</span>,</span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>                xy<span class="op">=</span>(<span class="fl">0.5</span>, <span class="fl">0.5</span>),</span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>                xycoords<span class="op">=</span><span class="st">'axes fraction'</span>,</span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>                ha<span class="op">=</span><span class="st">'center'</span>, va<span class="op">=</span><span class="st">'center'</span>, fontsize<span class="op">=</span><span class="dv">12</span></span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>g <span class="op">=</span> sns.PairGrid(df_for_plot)</span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a>g.map_lower(sns.scatterplot, color<span class="op">=</span><span class="st">'black'</span>)</span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a>g.map_upper(corrfunc)</span>
+<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a>g.map_diag(sns.kdeplot, fill<span class="op">=</span><span class="va">True</span>, color<span class="op">=</span><span class="st">'black'</span>)</span>
+<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a>g.<span class="bu">set</span>(xlabel<span class="op">=</span><span class="st">''</span>)</span>
+<span id="cb29-20"><a href="#cb29-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-21"><a href="#cb29-21" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, col <span class="kw">in</span> <span class="bu">enumerate</span>(df_for_plot.columns):</span>
+<span id="cb29-22"><a href="#cb29-22" aria-hidden="true" tabindex="-1"></a>    g.axes[i,<span class="dv">0</span>].set_ylabel(col)</span>
+<span id="cb29-23"><a href="#cb29-23" aria-hidden="true" tabindex="-1"></a>    g.axes[<span class="op">-</span><span class="dv">1</span>,i].set_xlabel(col)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-26-output-1.png" width="4248" height="4239" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="lag-plots" class="level2">
+<h2 class="anchored" data-anchor-id="lag-plots">Lag plots</h2>
+<div id="d5251378" class="cell" data-message="false" data-execution_count="26">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>df_q_filtered <span class="op">=</span> df_q[df_q[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'cogeneration_generation_mwh'</span>]</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> lag <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, <span class="dv">10</span>):</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>    df_q_filtered[<span class="ss">f'lag_</span><span class="sc">{</span>lag<span class="sc">}</span><span class="ss">'</span>] <span class="op">=</span> df_q_filtered[<span class="st">'y'</span>].shift(lag)</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>lags <span class="op">=</span> [<span class="ss">f'lag_</span><span class="sc">{</span>lag<span class="sc">}</span><span class="ss">'</span> <span class="cf">for</span> lag <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, <span class="dv">10</span>)]</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>lims <span class="op">=</span> [</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>    np.<span class="bu">min</span>([df_q_filtered[lag].<span class="bu">min</span>() <span class="cf">for</span> lag <span class="kw">in</span> lags]),</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>    np.<span class="bu">max</span>([df_q_filtered[lag].<span class="bu">max</span>() <span class="cf">for</span> lag <span class="kw">in</span> lags])</span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">3</span>, <span class="dv">3</span>)</span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ax, lag <span class="kw">in</span> <span class="bu">zip</span>(axes.flatten(), lags):</span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>    ax.scatter(</span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>        df_q_filtered[lag],</span>
+<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>        df_q_filtered[<span class="st">'y'</span>],</span>
+<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a>        cmap<span class="op">=</span><span class="st">'viridis'</span>,</span>
+<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a>        c<span class="op">=</span>df_q_filtered[<span class="st">'Quarter'</span>].astype(<span class="st">'category'</span>).cat.codes,</span>
+<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb30-18"><a href="#cb30-18" aria-hidden="true" tabindex="-1"></a>    ax.plot(lims, lims, color<span class="op">=</span><span class="st">'gray'</span>, linestyle<span class="op">=</span><span class="st">'--'</span>)</span>
+<span id="cb30-19"><a href="#cb30-19" aria-hidden="true" tabindex="-1"></a>    ax.set_title(<span class="ss">f'lag </span><span class="sc">{</span>lag<span class="sc">.</span>split(<span class="st">"_"</span>)[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb30-20"><a href="#cb30-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-21"><a href="#cb30-21" aria-hidden="true" tabindex="-1"></a>unique_quarters <span class="op">=</span> <span class="bu">sorted</span>(df_q_filtered[<span class="st">'Quarter'</span>].unique())</span>
+<span id="cb30-22"><a href="#cb30-22" aria-hidden="true" tabindex="-1"></a>colors <span class="op">=</span> plt.cm.viridis(np.linspace(<span class="dv">0</span>, <span class="dv">1</span>, <span class="bu">len</span>(unique_quarters)))</span>
+<span id="cb30-23"><a href="#cb30-23" aria-hidden="true" tabindex="-1"></a>handles <span class="op">=</span> [plt.Line2D([<span class="dv">0</span>], [<span class="dv">0</span>], marker<span class="op">=</span><span class="st">'o'</span>, color<span class="op">=</span>color, lw<span class="op">=</span><span class="dv">4</span>) <span class="cf">for</span> color <span class="kw">in</span> colors]</span>
+<span id="cb30-24"><a href="#cb30-24" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> [<span class="ss">f"Q</span><span class="sc">{</span>q<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> q <span class="kw">in</span> unique_quarters]</span>
+<span id="cb30-25"><a href="#cb30-25" aria-hidden="true" tabindex="-1"></a>fig.legend(handles, labels, title<span class="op">=</span><span class="st">'Quarter'</span>, loc<span class="op">=</span><span class="st">'upper right'</span>)</span>
+<span id="cb30-26"><a href="#cb30-26" aria-hidden="true" tabindex="-1"></a>fig.suptitle(<span class="st">'Lag Plots - Nuclear Generation (Quarterly)'</span>, fontsize<span class="op">=</span><span class="dv">16</span>)</span>
+<span id="cb30-27"><a href="#cb30-27" aria-hidden="true" tabindex="-1"></a>fig.tight_layout()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-27-output-1.png" width="670" height="478" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="autocorrelation-plots" class="level2">
+<h2 class="anchored" data-anchor-id="autocorrelation-plots">Autocorrelation plots</h2>
+<p>ACF tabele</p>
+<div id="80152b7c" class="cell" data-execution_count="27">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.api <span class="im">as</span> sm</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> statsmodels.graphics.tsaplots <span class="im">import</span> plot_acf, plot_pacf</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>acf_df <span class="op">=</span> pd.DataFrame(</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"Lag"</span>: <span class="bu">range</span>(<span class="dv">10</span>),</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>     <span class="st">"ACF"</span>: sm.tsa.acf(</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>         df_q[df_q[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'cogeneration_generation_mwh'</span>][<span class="st">'y'</span>],</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>         nlags<span class="op">=</span><span class="dv">9</span></span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>     )}</span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>).set_index(<span class="st">'Lag'</span>)</span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a>acf_df[<span class="dv">1</span>:]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="27">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">ACF</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Lag</th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">1</td>
+<td>0.082226</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">2</td>
+<td>-0.646482</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">3</td>
+<td>-0.035342</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">4</td>
+<td>0.596282</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">5</td>
+<td>-0.057960</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">6</td>
+<td>-0.604237</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">7</td>
+<td>-0.041509</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">8</td>
+<td>0.560552</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">9</td>
+<td>0.020121</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>ACF plot quarterly data</p>
+<div id="e1c0cd8c" class="cell" data-execution_count="28">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>plot_acf(</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>    df_q[df_q[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'cogeneration_generation_mwh'</span>][<span class="st">'y'</span>],</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>    lags<span class="op">=</span><span class="dv">16</span>,</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>ax,</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>    zero<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>    bartlett_confint<span class="op">=</span><span class="va">False</span>, <span class="co"># disable Bartlett confidence intervals</span></span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>    auto_ylims<span class="op">=</span><span class="va">True</span></span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">'Autocorrelation Function - Cogeneration Generation (Quarterly)'</span>)</span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">'Lags'</span>)</span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">'ACF'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="28">
+<pre><code>Text(0, 0.5, 'ACF')</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-29-output-2.png" width="603" height="451" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>ACF plot monthly data</p>
+<div id="f5d15870" class="cell" data-execution_count="29">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>plot_acf(</span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>    df_m[df_m[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'cogeneration_generation_mwh'</span>][<span class="st">'y'</span>],</span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>    lags<span class="op">=</span><span class="dv">60</span>,</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>ax,</span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>    zero<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>    bartlett_confint<span class="op">=</span><span class="va">False</span>, <span class="co"># disable Bartlett confidence intervals</span></span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>    auto_ylims<span class="op">=</span><span class="va">True</span></span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">'Autocorrelation Function - Cogeneration Generation (Monthly)'</span>)</span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a>ax.set_xticks(<span class="bu">range</span>(<span class="dv">0</span>, <span class="dv">61</span>, <span class="dv">5</span>))</span>
+<span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">'Lags'</span>)</span>
+<span id="cb34-13"><a href="#cb34-13" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">'ACF'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="29">
+<pre><code>Text(0, 0.5, 'ACF')</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-30-output-2.png" width="605" height="451" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>ACF plot daily data</p>
+<div id="e4dbb106" class="cell" data-execution_count="30">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>plot_acf(</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>    df_d[df_d[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'cogeneration_generation_mwh'</span>][<span class="st">'y'</span>],</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    lags<span class="op">=</span><span class="dv">400</span>,</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>ax,</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>    zero<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>    bartlett_confint<span class="op">=</span><span class="va">False</span>, <span class="co"># disable Bartlett confidence intervals</span></span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>    auto_ylims<span class="op">=</span><span class="va">True</span></span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">'Autocorrelation Function - Cogeneration Generation (Daily)'</span>)</span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a>ax.set_xticks(<span class="bu">range</span>(<span class="dv">0</span>, <span class="dv">121</span>, <span class="dv">10</span>))</span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">'Lags'</span>)</span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">'ACF'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="30">
+<pre><code>Text(0, 0.5, 'ACF')</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_02_files/figure-html/cell-31-output-2.png" width="603" height="451" class="figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
