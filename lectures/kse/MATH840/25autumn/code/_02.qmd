@@ -9,24 +9,43 @@ execute:
 ## Imports
 
 ```{python}
-import pandas as pd
-import numpy as np
-from statsforecast import StatsForecast
-from utilsforecast.preprocessing import fill_gaps
-from utilsforecast.plotting import plot_series
+import warnings
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
 import altair as alt
 
-sns.set_style("whitegrid")
-plt.style.use("ggplot")
-import matplotlib as mpl
 from cycler import cycler
-mpl.rcParams['axes.prop_cycle'] = cycler(color=["#000000", "#000000"])
+from statsforecast import StatsForecast
+from utilsforecast.preprocessing import fill_gaps
+from utilsforecast.plotting import plot_series
 
-# disable warnings
-import warnings
-warnings.filterwarnings("ignore")
+def setup_plotting_styles():
+    """
+    Встановлює єдиний стиль для всіх графіків у проєкті.
+    """
+    sns.set_style("whitegrid")
+    
+    plt.style.use("ggplot")
+
+    mpl.rcParams.update({
+        'axes.grid': True,
+        'axes.grid.which': 'both',
+        'grid.color': '#cccccc',
+        'grid.linestyle': '--',
+        'grid.linewidth': 0.5,
+        'figure.figsize': (12, 6),
+        'font.size': 12,
+        'axes.titlesize': 'large',
+        'axes.labelsize': 'medium'
+    })
+    
+    custom_cycler = cycler(color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
+    mpl.rcParams['axes.prop_cycle'] = custom_cycler
+
+setup_plotting_styles()
 ```
 
 ## Load Ukraine electricity generation data
@@ -36,7 +55,8 @@ Weather data
 ```{python}
 weather_df = pd.read_csv(
     'https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/energy_ua/energy_weather_ua_2016_2019.csv'
-).drop(columns=['Heneratsia'])
+    )
+    .drop(columns=['Heneratsia'])
 
 # change columns names
 weather_df.columns = [
@@ -108,44 +128,40 @@ df_h
 New datasets with different time resolutions with aggregation (sum), but if variable starts with "w_" then mean aggregation
 
 ```{python}
-df_d = df_h.groupby(['unique_id', pd.Grouper(key='ds', freq='D')])['y'].agg(['sum', 'mean']).reset_index()
-df_d['y'] = np.where(
-    df_d['unique_id'].str.startswith('w_'),
-    df_d['mean'],
-    df_d['sum']
-)
-df_d = df_d.drop(columns=['sum', 'mean'])
-# df_d['ds'] = df_d['ds'].dt.strftime("%Y-%m-%d")
+def resample_data(df, freq_code):
+    """
+    Агрегує дані до заданої частоти.
+    Використовує суму для енергетичних метрик і середнє для погодних.
+    """
+    # Групуємо та агрегуємо
+    resampled_df = df.groupby(['unique_id', pd.Grouper(key='ds', freq=freq_code)])['y'].agg(['sum', 'mean']).reset_index()
+    
+    # Визначаємо правильне значення на основі типу метрики
+    is_weather_metric = resampled_df['unique_id'].str.startswith('w_')
+    resampled_df['y'] = np.where(
+        is_weather_metric,
+        resampled_df['mean'],  # Середнє для погоди
+        resampled_df['sum']     # Сума для енергетики
+    )
+    
+    # Видаляємо проміжні стовпці
+    return resampled_df.drop(columns=['sum', 'mean'])
 
-df_w = df_h.groupby(['unique_id', pd.Grouper(key='ds', freq='W')])['y'].agg(['sum', 'mean']).reset_index()
-# df_w['ds'] = df_w['ds'].dt.to_period('W')
-df_w['y'] = np.where(
-    df_w['unique_id'].str.startswith('w_'),
-    df_w['mean'],
-    df_w['sum']
-)
-df_w = df_w.drop(columns=['sum', 'mean'])
-
-df_m = df_h.groupby(['unique_id', pd.Grouper(key='ds', freq='ME')])['y'].agg(['sum', 'mean']).reset_index()
-# df_m['ds'] = df_m['ds'].dt.to_period('M')
-df_m['y'] = np.where(
-    df_m['unique_id'].str.startswith('w_'),
-    df_m['mean'],
-    df_m['sum']
-)
-df_m = df_m.drop(columns=['sum', 'mean'])
-
-df_q = df_h.groupby(['unique_id', pd.Grouper(key='ds', freq='QE')])['y'].agg(['sum', 'mean']).reset_index()
-# df_q['ds'] = df_q['ds'].dt.to_period('Q')
-df_q['y'] = np.where(
-    df_q['unique_id'].str.startswith('w_'),
-    df_q['mean'],
-    df_q['sum']
-)
-df_q = df_q.drop(columns=['sum', 'mean'])
+# Тепер викликаємо функцію для кожної частоти
+df_d = resample_data(df_h, 'D')   # День
+df_w = resample_data(df_h, 'W')   # Тиждень
+df_m = resample_data(df_h, 'ME')  # Кінець місяця
+df_q = resample_data(df_h, 'QE')  # Кінець кварталу
 ```
 
 ## Time plots
+
+```{python}
+plot_series(
+    df_h,
+    max_ids=df_h['unique_id'].nunique()
+)
+```
 
 Hourly data
 
@@ -156,12 +172,7 @@ StatsForecast.plot(
 )
 ```
 
-```{python}
-plot_series(
-    df_h,
-    max_ids=18
-)
-```
+
 
 Daily data
 ```{python}
@@ -244,7 +255,189 @@ for year, subset in df_m[df_m['unique_id'] == 'nuclear_generation_mwh'].groupby(
     )
 ```
 
+```{python}
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# --- Крок 1: Підготовка даних (виконується один раз) ---
+# Робимо копію, щоб уникнути SettingWithCopyWarning
+df_monthly_clean = df_m[df_m['ds'].dt.year != 2021].copy()
+
+# --- Крок 2: Створюємо функцію для побудови сезонних графіків ---
+
+def plot_seasonal(
+    data: pd.DataFrame, 
+    metric_id: str, 
+    title: str,
+    y_label: str,
+    ax: plt.Axes = None
+) -> plt.Axes:
+    """
+    Будує сезонний графік для обраної метрики по місяцях.
+    
+    Args:
+        data: DataFrame з даними.
+        metric_id: Назва метрики (unique_id), яку потрібно візуалізувати.
+        title: Заголовок графіка.
+        y_label: Підпис осі Y.
+        ax: Існуючі осі Matplotlib для малювання (необов'язково).
+
+    Returns:
+        Осі Matplotlib з графіком.
+    """
+    # 1. Фільтруємо дані для конкретної метрики
+    plot_data = data[data['unique_id'] == metric_id].assign(
+        year=lambda d: d['ds'].dt.year,
+        month_num=lambda d: d['ds'].dt.month
+    )
+    
+    # 2. Створюємо палітру та ефективну мапу "рік -> колір"
+    unique_years = sorted(plot_data['year'].unique())
+    palette = sns.color_palette("viridis", len(unique_years))
+    color_map = dict(zip(unique_years, palette))
+
+    # 3. Створюємо фігуру, якщо вона не була передана
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(14, 7))
+
+    # 4. Будуємо основний графік
+    sns.lineplot(
+        data=plot_data,
+        x='month_num',
+        y='y',
+        hue='year',
+        palette=color_map,
+        legend=False,
+        ax=ax
+    )
+
+    # 5. Налаштовуємо вигляд графіка
+    ax.set_title(title, fontsize=16)
+    ax.set_xlabel('Місяць', fontsize=12)
+    ax.set_ylabel(y_label, fontsize=12)
+    ax.set_xticks(ticks=range(1, 13))
+    ax.set_xticklabels(['Січ', 'Лют', 'Бер', 'Кві', 'Тра', 'Чер', 'Лип', 'Сер', 'Вер', 'Жов', 'Лис', 'Гру'])
+    ax.grid(True, linestyle='--', alpha=0.6)
+
+    # 6. Додаємо текстові мітки для кожного року (більш ефективно)
+    for year, group in plot_data.groupby('year'):
+        last_point = group.iloc[-1]
+        ax.text(
+            last_point['month_num'] + 0.1,  # Невеликий відступ для читабельності
+            last_point['y'],
+            year,
+            color=color_map[year],
+            fontsize=10,
+            weight='bold',
+            ha='left',
+            va='center'
+        )
+        
+    return ax
+
+# --- Крок 3: Використовуємо нашу нову функцію! ---
+plot_seasonal(
+    data=df_monthly_clean,
+    metric_id='nuclear_generation_mwh',
+    title='Сезонність генерації АЕС (помісячно)',
+    y_label='Генерація (МВт·год)'
+)
+plt.show()
+
+# Тепер легко побудувати графік для іншої метрики!
+plot_seasonal(
+    data=df_monthly_clean,
+    metric_id='total_consumption_mwh',
+    title='Сезонність загального споживання (помісячно)',
+    y_label='Споживання (МВт·год)'
+)
+plt.show()
+```
+
 Same interactive plot with Altair
+
+```{python}
+import altair as alt
+import pandas as pd
+
+# (Припускаємо, що df_m вже існує і підготовлений)
+# Наприклад, очищений від даних за 2021 рік
+# df_m = df_m[df_m['ds'].dt.year != 2021].copy()
+
+
+def create_altair_seasonal_plot(
+    data: pd.DataFrame, 
+    metric_id: str, 
+    title: str,
+    y_axis_title: str
+) -> alt.Chart:
+    """
+    Створює інтерактивний сезонний графік за допомогою Altair.
+    
+    Args:
+        data: DataFrame з даними у довгому форматі.
+        metric_id: Назва метрики (unique_id) для візуалізації.
+        title: Заголовок графіка.
+        y_axis_title: Підпис осі Y.
+
+    Returns:
+        Об'єкт Altair Chart.
+    """
+    # 1. Фільтруємо дані для потрібної метрики
+    plot_data = data[data['unique_id'] == metric_id]
+    
+    # 2. Створюємо графік
+    chart = alt.Chart(plot_data).mark_line(
+        point=True, # Додаємо точки для кращої візуалізації даних
+        opacity=0.8
+    ).encode(
+        # 3. Використовуємо :O (Ordinal) для місяців, щоб зберегти їх порядок
+        x=alt.X('month(ds):O', title='Місяць'),
+        
+        # 4. Використовуємо динамічний заголовок для осі Y
+        y=alt.Y('y:Q', title=y_axis_title, axis=alt.Axis(format='~s')), # Формат 's' для скорочень (K, M)
+        
+        # 5. Кодуємо колір за роком
+        color=alt.Color('year(ds):N', title='Рік'),
+        
+        # 6. Створюємо більш інформативні підказки (tooltips)
+        tooltip=[
+            alt.Tooltip('year(ds):O', title='Рік'),
+            alt.Tooltip('month(ds):T', title='Місяць', format='%B'), # Показуємо повну назву місяця
+            alt.Tooltip('y:Q', title=y_axis_title, format=',.0f') # Форматуємо число
+        ]
+    ).properties(
+        title=title,
+        width=700,
+        height=400
+    ).interactive() # Дозволяє масштабування та панорамування
+    
+    return chart
+
+# --- Використання функції ---
+
+# 1. Графік для генерації АЕС
+nuclear_plot = create_altair_seasonal_plot(
+    data=df_m,
+    metric_id='nuclear_generation_mwh',
+    title='Сезонність генерації АЕС (помісячно)',
+    y_axis_title='Генерація (МВт·год)'
+)
+# nuclear_plot.display() # Розкоментуйте, щоб показати в блокноті
+
+# 2. Тепер дуже легко створити такий самий графік для іншої метрики
+consumption_plot = create_altair_seasonal_plot(
+    data=df_m,
+    metric_id='total_consumption_mwh',
+    title='Сезонність загального споживання (помісячно)',
+    y_axis_title='Споживання (МВт·год)'
+)
+# consumption_plot.display()
+
+# Ви можете легко об'єднати їх для порівняння
+# (nuclear_plot | consumption_plot)
+nuclear_plot
+```
 
 ```{python}
 alt.Chart(
@@ -260,6 +453,82 @@ alt.Chart(
 ```
 
 Hourly seasonal plot for nuclear generation
+
+```{python}
+def plot_daily_profile(
+    data: pd.DataFrame, 
+    metric_id: str, 
+    title: str,
+    y_label: str,
+    ax: plt.Axes = None
+) -> plt.Axes:
+    """
+    Будує агрегований добовий профіль (середнє + 95% довірчий інтервал)
+    для обраної метрики.
+    
+    Args:
+        data: DataFrame з погодинними даними.
+        metric_id: Назва метрики (unique_id) для візуалізації.
+        title: Заголовок графіка.
+        y_label: Підпис осі Y.
+        ax: Існуючі осі Matplotlib для малювання (необов'язково).
+        
+    Returns:
+        Осі Matplotlib з графіком.
+    """
+    # 1. Фільтруємо дані та створюємо числовий стовпець 'hour'
+    plot_data = data[data['unique_id'] == metric_id].copy()
+    plot_data['hour'] = plot_data['ds'].dt.hour
+    
+    # 2. Створюємо фігуру, якщо потрібно
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+    # 3. Будуємо графік. Seaborn автоматично розрахує середнє 
+    #    і 95% довірчий інтервал для 'y' для кожної години.
+    sns.lineplot(
+        data=plot_data,
+        x='hour',
+        y='y',
+        ax=ax,
+        linewidth=2.5,
+        color='#005A9C' # Приклад кольору
+    )
+    
+    # 4. Налаштовуємо вигляд графіка
+    ax.set_title(title, fontsize=16, pad=20)
+    ax.set_xlabel('Година доби', fontsize=12)
+    ax.set_ylabel(y_label, fontsize=12)
+    ax.grid(True, linestyle='--', alpha=0.6)
+    
+    # 5. Спрощуємо налаштування осі X, оскільки вона тепер числова
+    ax.set_xticks(range(0, 25, 2)) # Мітки кожні 2 години
+    ax.set_xlim(0, 23) # Обмежуємо вісь 24 годинами
+    
+    return ax
+
+# --- Використання функції ---
+
+# 1. Будуємо профіль для гідрогенерації
+plot_daily_profile(
+    data=df_h,
+    metric_id='hydro_generation_mwh',
+    title='Типовий добовий профіль генерації ГЕС',
+    y_label='Генерація (МВт·год)'
+)
+plt.show()
+
+# 2. Легко будуємо такий самий графік для температури
+plot_daily_profile(
+    data=df_h,
+    metric_id='w_temperature_celsius',
+    title='Типовий добовий профіль температури',
+    y_label='Температура (°C)'
+)
+plt.show()
+```
+
+Аlternative hourly seasonal plot for hydro generation
 
 ```{python}
 df_h['hour-minute'] = df_h['ds'].dt.strftime('%H:%M:%S')
@@ -289,34 +558,99 @@ ax.set_ylabel('Generation (MWh)')
 Seasonal plot showing weekly seasonal patterns for nuclear generation
 
 ```{python}
-df_d['week_day'] = df_d['ds'].dt.day_name()
-df_d['week_num'] = df_d['ds'].dt.isocalendar().week
-df_d['year'] = df_d['ds'].dt.year
-unique_years = df_d['year'].unique()
-year_palette = sns.color_palette("husl", len(unique_years))
-fig, ax = plt.subplots()
-sns.lineplot(
-    data=df_d[df_d['unique_id'] == 'nuclear_generation_mwh'],
-    x='week_num',
-    y='y',
-    hue='year',
-    palette=year_palette,
-    legend=False,
-    ax=ax
-)
-ax.set_title('Seasonal Plot - Nuclear Generation (Weekly)')
-ax.set_xlabel('Week of Year')
-ax.set_ylabel('Generation (MWh)')
-for year, subset in df_d[df_d['unique_id'] == 'nuclear_generation_mwh'].groupby('year'):
-    ax.text(
-        subset['week_num'].iloc[-1],
-        subset['y'].iloc[-1],
-        str(year),
-        fontsize=9,
-        weight='bold',
-        color=year_palette[list(unique_years).index(year)]
+import seaborn as sns
+import matplotlib.pyplot as plt
+import pandas as pd
+
+def plot_weekly_seasonal(
+    data: pd.DataFrame, 
+    metric_id: str, 
+    title: str,
+    y_label: str,
+    ax: plt.Axes = None
+) -> plt.Axes:
+    """
+    Будує сезонний графік для обраної метрики по тижнях року.
+    
+    Args:
+        data: DataFrame з даними.
+        metric_id: Назва метрики (unique_id) для візуалізації.
+        title: Заголовок графіка.
+        y_label: Підпис осі Y.
+        ax: Існуючі осі Matplotlib для малювання (необов'язково).
+
+    Returns:
+        Осі Matplotlib з графіком.
+    """
+    # 1. Фільтруємо дані та створюємо необхідні стовпці за допомогою .assign()
+    plot_data = data[data['unique_id'] == metric_id].assign(
+        year=lambda d: d['ds'].dt.year,
+        week_num=lambda d: d['ds'].dt.isocalendar().week
     )
-fig.show()
+    
+    # 2. Створюємо палітру та ефективну мапу "рік -> колір"
+    unique_years = sorted(plot_data['year'].unique())
+    palette = sns.color_palette("viridis", len(unique_years))
+    color_map = dict(zip(unique_years, palette))
+
+    # 3. Створюємо фігуру, якщо вона не була передана
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(14, 7))
+
+    # 4. Будуємо основний графік
+    sns.lineplot(
+        data=plot_data,
+        x='week_num',
+        y='y',
+        hue='year',
+        palette=color_map,
+        legend=False,
+        ax=ax
+    )
+
+    # 5. Налаштовуємо вигляд графіка
+    ax.set_title(title, fontsize=16)
+    ax.set_xlabel('Тиждень року', fontsize=12)
+    ax.set_ylabel(y_label, fontsize=12)
+    ax.grid(True, linestyle='--', alpha=0.6)
+    ax.set_xlim(1, 53) # Встановлюємо чіткі межі для осі X
+    ax.set_xticks(range(1, 53, 4)) # Мітки кожні 4 тижні
+
+    # 6. Додаємо текстові мітки для кожного року (ефективно та чисто)
+    for year, group in plot_data.groupby('year'):
+        last_point = group.iloc[-1]
+        ax.text(
+            last_point['week_num'] + 0.5, # Невеликий відступ для читабельності
+            last_point['y'],
+            year,
+            color=color_map[year],
+            fontsize=10,
+            weight='bold',
+            ha='left',
+      
+        )
+        
+    return ax
+
+# --- Використання нової функції ---
+
+# 1. Будуємо графік для генерації АЕС
+plot_weekly_seasonal(
+    data=df_d,
+    metric_id='nuclear_generation_mwh',
+    title='Сезонність генерації АЕС (потижнево)',
+    y_label='Генерація (МВт·год)'
+)
+plt.show()
+
+# 2. Тепер легко побудувати такий самий графік для загального споживання
+plot_weekly_seasonal(
+    data=df_d,
+    metric_id='total_consumption_mwh',
+    title='Сезонність загального споживання (потижнево)',
+    y_label='Споживання (МВт·год)'
+)
+plt.show()
 ```
 
 Seasonal plot showing yearly seasonal patterns for nuclear generation

@@ -1,0 +1,76 @@
+---
+title: "Final Team Schedule"
+subtitle: "STAT150 R for Data Science"
+format: html
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+#| include: false
+library(tidyverse)
+```
+
+```{r}
+#| code-fold: true
+#| code-annotation: "# Load and clean dataset"
+#| message: false
+dataset <- read_csv("https://docs.google.com/spreadsheets/d/1yV6Vg1H0buf93PmlTJApvZ2-aaR6mfFedQmIKrpgANU/export?format=csv") |> 
+  janitor::clean_names() |> 
+  mutate(
+    groups = case_when(
+      groups %in% c("Group 1, Group 2", "Group 1,2") ~ "Group 1",
+      TRUE ~ groups
+    )
+  ) |> 
+  filter(groups != "No groups") |> 
+  drop_na()
+
+team_composition <- dataset |> 
+  group_by(team_name) |> 
+  summarise(
+    num_groups = n_distinct(groups),
+    team_type = case_when(
+      num_groups > 1 ~ "Mixed",
+      all(groups == "Group 1") ~ "Group 1",
+      all(groups == "Group 2") ~ "Group 2",
+      TRUE ~ "Other"
+    )
+  ) |>
+  ungroup()
+
+g1_only_teams <- team_composition |> filter(team_type == "Group 1")
+g2_only_teams <- team_composition |> filter(team_type == "Group 2")
+mixed_teams <- team_composition |> filter(team_type == "Mixed")
+
+set.seed(73)
+
+# --- Day 1 ---
+
+day1_mixed_count <- round(nrow(mixed_teams) / 2)
+day1_mixed_teams <- mixed_teams |> slice_sample(n = day1_mixed_count)
+
+day1_g1_needed <- 8 - nrow(day1_mixed_teams)
+day1_g2_needed <- 7 - nrow(day1_mixed_teams)
+
+day1_g1_only_teams <- g1_only_teams |> slice_sample(n = day1_g1_needed)
+day1_g2_only_teams <- g2_only_teams |> slice_sample(n = day1_g2_needed)
+
+day1_schedule <- bind_rows(day1_mixed_teams, day1_g1_only_teams, day1_g2_only_teams) |> 
+  mutate(day = "22.10.2025")
+
+# --- Day 2 ---
+
+day2_schedule <- anti_join(team_composition, day1_schedule, by = "team_name") |> 
+  mutate(day = "23.10.2025")
+
+final_schedule <- bind_rows(day1_schedule, day2_schedule) |>
+  select(team_name, team_type, day) |>
+  arrange(day, team_type)
+
+final_schedule |> gt::gt(
+  rowname_col = "team_name",
+  groupname_col = "day"
+)
+```
+
