@@ -1,0 +1,1150 @@
+---
+title: "Time Series Decomposition"
+subtitle: "MATH840 | Time Series"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .03_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=3416">🔗MATH840 | Time Series</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: false
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    category=UserWarning,
+    message=".*FigureCanvasAgg is non-interactive.*"
+)
+import os
+os.environ["NIXTLA_ID_AS_COL"] = "true"
+import numpy as np
+np.set_printoptions(suppress=True)
+np.random.seed(1)
+import random
+random.seed(1)
+import pandas as pd
+pd.set_option("max_colwidth", 100)
+pd.set_option("display.precision", 3)
+from utilsforecast.plotting import plot_series as plot_series_utils
+import seaborn as sns
+sns.set_style("whitegrid")
+import matplotlib.pyplot as plt
+plt.style.use("ggplot")
+plt.rcParams.update({
+    "figure.figsize": (8, 5),
+    "figure.dpi": 100,
+    "savefig.dpi": 300,
+    "figure.constrained_layout.use": True,
+    "axes.titlesize": 12,
+    "axes.labelsize": 10,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+    "legend.fontsize": 9,
+    "legend.title_fontsize": 10,
+})
+import matplotlib as mpl
+from cycler import cycler
+mpl.rcParams['axes.prop_cycle'] = cycler(color=["#000000", "#000000"])
+from fpppy.utils import plot_series
+
+import calendar
+from tsfeatures import *
+from statsmodels.tsa.seasonal import STL
+from statsforecast import StatsForecast
+from coreforecast.scalers import boxcox, boxcox_lambda
+from statsmodels.tsa.seasonal import seasonal_decompose
+
+from great_tables import GT
+```
+
+```{python}
+#| label: load-data
+#| include: false
+
+gsheetkey = '1wrSjwahn_OCY6JcS6Bumxu9ucuzGX1eN2yeQTIVhF3c'
+url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+global_economy = pd.read_csv(url)
+df = global_economy.query('unique_id == "Australia"')[
+    ["unique_id", "ds", "GDP", "Population"]
+].assign(y=lambda x: x["GDP"] / x["Population"])
+```
+
+# Transformations and adjustments
+
+## Per capita adjustments
+
+::: {.columns}
+::: {.column}
+```{python}
+#| label: gdp
+
+plot_series(df, target_col = "GDP", xlabel="Year [1Y]", ylabel="$US", title="GDP")
+```
+:::
+::: {.column}
+```{python}
+#| label: gdp-per-capita
+
+plot_series(df, target_col = "y", xlabel="Year [1Y]", ylabel="$US/person", title="GDP per capita")
+```
+:::
+:::
+
+## Inflation adjustment
+
+```{python}
+#| label: inflation-adjustment
+#| fig-align: center
+
+gsheetkey = '1nXrDE4Sevc6z8pW7SH255eAI3OO6HAby2Y6RPTnS4Yw'
+url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+aus_retail = pd.read_csv(url, parse_dates=["Month"])
+print_retail = (
+    aus_retail.query('Industry == "Newspaper and book retailing"')
+    .groupby(["Month"], as_index=False)["Turnover"]
+    .sum()
+)
+print_retail["ds"] = print_retail["Month"].dt.year
+print_retail = print_retail.groupby("ds")["Turnover"].sum().reset_index()
+
+aus_economy = global_economy.query('unique_id == "Australia"')
+
+df = pd.merge(aus_economy, print_retail, on="ds", how="left")
+df["Adjusted_turnover"] = (df["Turnover"] / df["CPI"]) * 100
+df.dropna(inplace=True)
+
+fig, axes = plt.subplots(nrows=2, ncols=1)
+sns.lineplot(data=df, x='ds', y='Turnover', ax=axes[0], color='black',
+    label="Turnover")
+sns.lineplot(data=df, x='ds', y='Adjusted_turnover', ax=axes[1],
+    color='black', label="Adjusted_turnover")
+axes[0].set_xlabel('')
+axes[1].set_xlabel("Year")
+axes[0].set_ylabel("")
+axes[1].set_ylabel("")
+fig.suptitle("Turnover: Australian print media industry")
+fig.supylabel("$AU")
+plt.show()
+```
+
+## Mathematical transformations {.smaller}
+
+If the data show different variation at different levels of the series, then a transformation may be useful to [stabilize the variance]{.hi}.
+
+Denote **original** observations as $y_1, y_2, \ldots, y_T$ and **transformed** observations as $w_1, w_2, \ldots, w_T$.
+
+::: {.callout-note icon="false"}
+## Mathematical transformations for variance stabilization
+
+| Transformation | Formula                          |                                       |
+|:---------------|:---------------------------------|:---------------------------------------------:|
+| Square root    | $w_t = \sqrt{y_t}$               | $\downarrow$       |
+| Cube root      | $w_t = \sqrt[3]{y_t}$             | Increasing        |
+| Logarithm      | $w_t = \log(y_t)$                | strange          |
+:::
+
+Logarithms, in particular, are useful because they are more interpretable: changes in the log scale correspond to **relative (percentage) changes in the original scale**.
+
+---
+
+```{python}
+#| label: food
+
+food = aus_retail.query('Industry == "Food retailing"').groupby(["Month"], as_index=False)["Turnover"].sum()
+food['unique_id'] = 'Food retailing'
+plot_series(food, target_col = "Turnover", time_col = "Month", xlabel="Month [1M]", ylabel="$AU", title="Food retailing turnover")
+```
+
+---
+
+```{python}
+#| label: sqrt-food
+
+food['Turnover_sqrt'] = food['Turnover'].apply(np.sqrt)
+plot_series(food, target_col = "Turnover_sqrt", time_col = "Month", xlabel="Month [1M]", ylabel="$AU", title="Food retailing turnover (sqrt)")
+```
+
+---
+
+```{python}
+#| label: cube-food
+
+food['Turnover_cbrt'] = food['Turnover'].apply(lambda x: x**(1/3))
+plot_series(food, target_col = "Turnover_cbrt", time_col = "Month", xlabel="Month [1M]", ylabel="$AU", title="Food retailing turnover (cbrt)")
+```
+
+---
+
+```{python}
+#| label: log-food
+
+food['Turnover_log'] = food['Turnover'].apply(np.log)
+plot_series(food, target_col = "Turnover_log", time_col = "Month", xlabel="Month [1M]", ylabel="$AU", title="Food retailing turnover (log)")
+```
+
+---
+
+$\frac{-1}{y_t}$ transformation is useful when the series shows a rapid increase.
+
+```{python}
+#| label: inverse-food
+
+food['Turnover_inv'] = food['Turnover'].apply(lambda x: -1/x)
+plot_series(food, target_col = "Turnover_inv", time_col = "Month", xlabel="Month [1M]", ylabel="$AU", title="Food retailing turnover (inverse)")
+```
+
+## Box-Cox transformation {.smaller}
+
+Each of the above transformations is a special case of the Box-Cox transformation:
+
+$$
+w_t = \begin{cases}\frac{\text{sign}(y_t)|y_t|^{\lambda} - 1}{\lambda}, & \text{if } \lambda \neq 0 \\\\ \log(y_t), & \text{if } \lambda = 0\end{cases}
+$$
+
+. . .
+
+- Actually the [Bickel-Doksum transformation (1979)](https://www.tandfonline.com/doi/abs/10.1080/01621459.1981.10477649) allows for negative values as well.
+- $\lambda=1$ gives no transformation.
+- $\lambda=0.5$ gives the square root transformation.
+- $\lambda=0$ gives the logarithmic transformation.
+- $\lambda=-1$ gives the inverse transformation.
+
+::: footer
+[An Analysis of Transformations, 1964](https://academic.oup.com/jrsssb/article/26/2/211/7028064?login=false)
+:::
+
+---
+
+```{python}
+#| label: boxcox-food-lambda-animated
+#| eval: false
+from matplotlib.animation import FuncAnimation, PillowWriter
+
+fig, ax = plt.subplots()
+line, = ax.plot([], [], color='black')
+time_text = ax.text(0.05, 0.9, '', transform=ax.transAxes)
+
+def init():
+    ax.set_xlabel("Month [1M]")
+    ax.set_ylabel("Turnover")
+    ax.set_title("Box-Cox Transformation of Food Retailing Turnover")
+    line.set_data([], [])
+    return line, time_text
+
+def update(frame):
+    lmbda = 1 - frame * 0.02
+    transformed_turnover = boxcox(food['Turnover'].values, lmbda)
+    
+    line.set_data(food['Month'], transformed_turnover)
+    ax.relim()
+    ax.autoscale_view()
+    
+    time_text.set_text(f'λ = {lmbda:.2f}')
+    fig.canvas.draw()
+    return line, time_text
+
+ani = FuncAnimation(fig, update, frames=101, init_func=init, blit=True, interval=100)
+
+# Save the animation
+writer = PillowWriter(fps=10)
+ani.save("img/boxcox_animation.gif", writer=writer)
+plt.close(fig)
+```
+
+![](img/boxcox_animation.gif)
+
+## How to choose $\lambda$?
+
+**Guerrero transformation:** ratio of the standard deviation to the mean raised to a certain power is constant.
+
+$$
+\text{VAR}(X)^\frac{1}{2} / \text{E}(X)^{1-\lambda} = a
+$$
+
+The series is divided into subgroups (e.g., by year). For each subgroup, the mean $\bar{Z}_h$ and standard deviation $S_h$ are calculated.
+
+::: footer
+[Time-series analysis supported by power transformations, 1993](https://doi.org/10.1002/for.3980120104)
+:::
+
+## How to choose $\lambda$: CV minimization {.smaller}
+
+::: {.columns}
+::: {.column}
+**Algorithm**:
+
+1.  **Partition** the series into subgroups (e.g., by year).
+2.  **Calculate** the mean ($\bar{Z}_h$) and standard deviation ($S_h$) for each subgroup.
+3.  **For each candidate $\lambda$**:
+    -   Calculate the ratio $R_h(\lambda) = S_h / \bar{Z}_h^{(1-\lambda)}$ for all subgroups.
+    -   Compute the Coefficient of Variation (CV) of these ratios.
+4.  **Select** the $\lambda$ that yields the minimum CV.
+:::
+::: {.column}
+The coefficient of variation (CV) is defined as the ratio of the standard deviation to the mean:
+$$
+\text{CV} = \frac{S}{\bar{Z}} \text{, where } S = \text{std}(X), \bar{Z} = \text{mean}(X)
+$$
+:::
+:::
+
+## How to choose $\lambda$: Linear regression approach {.smaller}
+
+::: {.columns}
+::: {.column}
+**Concept:**
+
+*   The non-linear relationship $S_h ≈ a \times \bar{Z}_h^{(1-λ)}$ can be linearized by taking the natural logarithm:
+$$
+\log(S_h) ≈ \log(a) + (1-λ) \times \log(\bar{Z}_h)
+$$
+
+*   This is a simple linear regression $Y = \beta_0 + \beta_1 \times X$, where:
+    *   $Y = \log(S_h)$
+    *   $X = \log(\bar{Z}_h)$
+    *   The slope $\beta_1 = (1-λ)$
+:::
+::: {.column}
+**Algorithm:**
+
+1.  **Partition** the series into subgroups.
+2.  **Calculate** $log(S_h)$ and $log(\bar{Z}_h)$ for each subgroup.
+3.  **Fit** a linear regression of $log(S_h)$ on $log(\bar{Z}_h)$.
+4.  **Estimate** the slope $\hat{\beta}_1$.
+5.  **Calculate** $\hat{λ}$ from the slope: $\hat{λ} = 1 - \hat{\beta}_1$.
+:::
+:::
+
+## How to choose $\lambda$: Food retailing turnover
+
+```{python}
+optim_lambda = boxcox_lambda(
+    food['Turnover'].to_numpy(),
+    method='loglik',
+    season_length=12
+)
+food['Turnover_boxcox'] = boxcox(food['Turnover'].to_numpy(), 0.0524)
+rounded_lambda = round(optim_lambda, 2)
+plot_series(
+    food,
+    target_col='Turnover_boxcox',
+    time_col='Month',
+    xlabel="Month [1M]",
+    ylabel="Turnover",
+    title=f"Food retailing turnover (Box-Cox, λ={0.0524})"
+)
+```
+
+## Transformations summary
+
+- Often **no transformation** is needed.
+- Simple transformations (log, sqrt, cbrt, inverse) are **easy to interpret**.
+- Transformations can have very **large effects on PI**.
+- If some data are zero or negative, then use $\lambda > 0$.
+- `np.log1p()` can be used for zero values (equivalent to Box-Cox with $\lambda=0$ and shifting data by 1).
+- Transformations must be **inverted** to obtain forecasts on the original scale.
+
+# Time series components
+
+## Time series patterns
+
+**Recall**
+
+- **Trend**: Long-term movement in the data.
+- **Seasonality**: Regular pattern of fluctuations.
+- **Cyclic patterns**: Irregular fluctuations due to economic or other cycles.
+- **Irregular components**: Random noise or shocks.
+
+## Time series decomposition
+
+::: {.columns}
+::: {.column width="60%"}
+$$y_t = f(T_t, S_t, R_t)$$
+
+Where:
+
+- $y_t$ = observed value at time $t$
+- $T_t$ = trend-cycle component at time $t$
+- $S_t$ = seasonal component at time $t$
+- $R_t$ = remainder component at time $t$
+:::
+::: {.column width="40%"}
+**Additive model:** $f(T_t, S_t, R_t) = T_t + S_t + R_t$
+
+**Multiplicative model:** $f(T_t, S_t, R_t) = T_t \times S_t \times R_t$
+:::
+:::
+
+## Time series decomposition {.smaller}
+
+- [Additive]{.hi} decomposition is appropriate when the magnitude of **seasonal** fluctuations and residuals are roughly **constant** over time.
+- [Multiplicative]{.hi} decomposition is suitable when the magnitude of **seasonal** fluctuations and residuals **increases** with the level of the series.
+- Multiplicative decomposition more prevalent with *economic and financial data*.
+- Alternative: use Box-Cox transformation to stabilize variance, then apply additive decomposition.
+- Logs turn multiplicative relationships into additive ones:
+
+$$y_t = T_t \times S_t \times R_t \implies \log(y_t) = \log(T_t) + \log(S_t) + \log(R_t)$$
+
+## Example: Employment in the US retail sector
+
+```{python}
+gsheetkey = "1ZWRHFzMVH14Nn-nzLyOqREcS9S_aesZdkA3uKD5I3p0"
+url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+us_employment = pd.read_csv(url, parse_dates=["ds"])
+us_retail_employment = us_employment.query(
+    '(unique_id == "Retail Trade") & (ds >= "1990-01-01")'
+)
+
+plot_series(us_retail_employment,
+            xlabel="Month [1M]",
+            ylabel="Persons (thousands)",
+            title="Total employment in US retail")
+```
+
+## Example: Employment in the US retail sector
+
+```{python}
+stl = STL(us_retail_employment["y"], period=12)
+res = stl.fit()
+
+dcmp = pd.DataFrame({
+    "ds": us_retail_employment["ds"],
+    "data": us_retail_employment["y"],
+    "trend": res.trend,
+    "seasonal": res.seasonal,
+    "remainder": res.resid
+}).reset_index(drop=True)
+
+(
+    GT(dcmp.head())
+    .fmt_number(columns=["data", "trend", "seasonal", "remainder"], decimals=3)
+)
+```
+
+---
+
+```{python}
+#| fig-align: center
+fig, ax = plt.subplots()
+sns.lineplot(data=dcmp, x="ds", y="data", label="Data", color="gray")
+sns.lineplot(data=dcmp, x="ds", y="trend", label="Trend", color="#D55E00")
+ax.set_title("Total employment in US retail")
+ax.set_xlabel("Month [1M]")
+ax.set_ylabel("Persons (thousands)")
+plt.show()
+```
+
+---
+
+```{python}
+#| fig-align: center
+fig, axes = plt.subplots(nrows=4, ncols=1, sharex=True, figsize=(8, 6))
+sns.lineplot(data=dcmp, x=dcmp.index, y="data", ax=axes[0])
+sns.lineplot(data=dcmp, x=dcmp.index, y="trend", ax=axes[1])
+sns.lineplot(data=dcmp, x=dcmp.index, y="seasonal", ax=axes[2])
+sns.lineplot(data=dcmp, x=dcmp.index, y="remainder", ax=axes[3])
+axes[0].set_ylabel("Employed")
+axes[1].set_ylabel("trend")
+axes[2].set_ylabel("seasonal")
+axes[3].set_ylabel("remainder")
+fig.suptitle("STL decomposition")
+fig.subplots_adjust(top=0.90)
+fig.text(0.5, 0.95, "Employed = trend + seasonal + remainder", ha='center')
+plt.xlabel("")
+plt.show()
+plt.show()
+```
+
+---
+
+```{python}
+#| label: subseries-plot-by-month
+#| fig-align: center
+dcmp["Month"] = pd.to_datetime(dcmp["ds"])
+dcmp["year"] = dcmp["ds"].dt.year
+dcmp["month"] = dcmp["Month"].dt.month_name()
+dcmp["month"] = pd.Categorical(
+  dcmp["month"],
+  categories=[
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ],
+  ordered=True,
+)
+
+fig, axes = plt.subplots(nrows=1, ncols=12, sharey=True)
+for i, month in enumerate(dcmp["month"].cat.categories):
+    month_data = dcmp.query("month == @month")
+    mean_cost = month_data["seasonal"].mean()
+    axes[i].plot(month_data["year"], month_data["seasonal"], color="black")
+    axes[i].axhline(
+        mean_cost, color="blue", linestyle="-", linewidth=1, label="Average"
+    )
+    axes[i].set_title(month[:3])
+    axes[i].set_xlabel("")
+    axes[i].tick_params(axis='x', rotation=90)
+    if i == 0:
+        axes[i].set_ylabel("Employed")
+    else:
+        axes[i].set_yticklabels([])
+
+fig.suptitle("US Employment in Retail Trade")
+fig.text(0.5, -0.05, "Month", ha="center")
+fig.subplots_adjust(wspace=0.2)
+fig.show()
+```
+
+## Seasonal adjustment
+
+- Useful by-products of decomposition: an easy way to calculate seasonally adjusted data.
+- Additive model: $$y_t - S_t = T_t + R_t$$
+- Multiplicative model: $$y_t / S_t = T_t \times R_t$$
+
+---
+
+```{python}
+#| fig-align: center
+#| label: seasonal-adjustment
+
+dcmp["seasonally_adjusted"] = dcmp["data"] - dcmp["seasonal"]
+fig, ax = plt.subplots()
+sns.lineplot(data=dcmp, x="ds", y="seasonally_adjusted", color=red_pink)
+sns.lineplot(data=dcmp, x="ds", y="data", color="gray", alpha=0.5)
+ax.set_title("Seasonally adjusted employment in US retail")
+ax.set_xlabel("Month [1M]")
+ax.set_ylabel("Persons (thousands)")
+plt.show()
+```
+
+# Moving average
+
+## Moving averages {.smaller}
+
+The simplest estimate of the trend-cycle component is a **moving average**.
+
+::: {.callout-note icon="false"}
+## $m$-MA
+$$
+\hat{T}_t = \frac{1}{m} \sum_{i=-k}^{k} y_{t+i}
+$$
+:::
+
+Where $k=\frac{m-1}{2}$ for odd $m$ and $k=\frac{m}{2}$ for even $m$.
+
+
+. . .
+
+If $m=7$ (odd), then $k=\frac{7-1}{2}=3$. It's a centered 7-MA:
+
+$$
+\hat{T}_t = \frac{1}{7} (y_{t-3} + y_{t-2} + y_{t-1} + y_t + y_{t+1} + y_{t+2} + y_{t+3})
+$$
+
+## Moving averages
+
+::: {.columns}
+::: {.column}
+```{python}
+jp_exports = global_economy.query('unique_id == "Japan"')[
+    ["unique_id", "ds", "Exports"]
+]
+
+plot_series(jp_exports, target_col="Exports",
+            xlabel="Year [1Y]", ylabel="% of GDP",
+            title="Total Japanese exports")
+```
+:::
+::: {.column}
+```{python}
+#| label: moving-average-table
+
+jp_exports = jp_exports.sort_values("ds").reset_index(drop=True)
+for window in [3, 5, 7, 11, 13, 15]:
+    col_name = f"{window}_MA"
+    jp_exports[col_name] = jp_exports["Exports"].rolling(window=window, center=True).mean()
+
+(
+    GT(jp_exports.head(10))
+    .fmt_number(columns=["Exports", "3_MA", "5_MA", "7_MA", "11_MA", "13_MA", "15_MA"], decimals=2)
+)
+```
+:::
+:::
+
+---
+
+```{python}
+#| label: moving-average-plot-3ma
+#| fig-align: center
+
+fig, ax = plt.subplots()
+sns.lineplot(data=jp_exports, x="ds", y="Exports", label="Exports", color="gray")
+sns.lineplot(data=jp_exports, x="ds", y="3_MA", label="3-MA", color=red_pink)
+ax.set_title("Total Japanese exports with 3-MA")
+ax.set_xlabel("Year [1Y]")
+ax.set_ylabel("% of GDP")
+plt.show()
+```
+
+---
+
+```{python}
+#| label: moving-average-plot-5ma
+#| fig-align: center
+
+fig, ax = plt.subplots()
+sns.lineplot(data=jp_exports, x="ds", y="Exports", label="Exports", color="gray")
+sns.lineplot(data=jp_exports, x="ds", y="5_MA", label="5-MA", color=red_pink)
+ax.set_title("Total Japanese exports with 5-MA")
+ax.set_xlabel("Year [1Y]")
+ax.set_ylabel("% of GDP")
+plt.show()
+```
+
+---
+
+```{python}
+#| label: moving-average-plot-7ma
+#| fig-align: center
+
+fig, ax = plt.subplots()
+sns.lineplot(data=jp_exports, x="ds", y="Exports", label="Exports", color="gray")
+sns.lineplot(data=jp_exports, x="ds", y="7_MA", label="7-MA", color=red_pink)
+ax.set_title("Total Japanese exports with 7-MA")
+ax.set_xlabel("Year [1Y]")
+ax.set_ylabel("% of GDP")
+plt.show()
+```
+
+---
+
+```{python}
+#| label: moving-average-plot-13ma
+#| fig-align: center
+
+fig, ax = plt.subplots()
+sns.lineplot(data=jp_exports, x="ds", y="Exports", label="Exports", color="gray")
+sns.lineplot(data=jp_exports, x="ds", y="13_MA", label="13-MA", color=red_pink)
+ax.set_title("Total Japanese exports with 13-MA")
+ax.set_xlabel("Year [1Y]")
+ax.set_ylabel("% of GDP")
+plt.show()
+```
+
+---
+
+```{python}
+#| label: moving-average-plot-15ma
+#| fig-align: center
+
+fig, ax = plt.subplots()
+sns.lineplot(data=jp_exports, x="ds", y="Exports", label="Exports", color="gray")
+sns.lineplot(data=jp_exports, x="ds", y="15_MA", label="15-MA", color=red_pink)
+ax.set_title("Total Japanese exports with 15-MA")
+ax.set_xlabel("Year [1Y]")
+ax.set_ylabel("% of GDP")
+plt.show()
+```
+
+## Moving averages smoothing {.smaller}
+
+So a MA is an avareage of nearby values.
+
+- 3-MA: $$\hat{T}_t = \frac{1}{3} (y_{t-1} + y_t + y_{t+1})$$
+- 5-MA: $$\hat{T}_t = \frac{1}{5} (y_{t-2} + y_{t-1} + y_t + y_{t+1} + y_{t+2})$$
+- Each average computed by dropping the oldest observation and adding the newest one.
+- Averaging moves through the series, smoothing out short-term fluctuations.
+
+## Endpoints problem {.smaller}
+
+**Why is there no estimate at endpoints?**
+
+- For a 3-MA, there cannot be estimates at the **first and last** time points, because there is no prior or subsequent observation to include in the average.
+- Generally: there cannot be estimates at times near endpoints.
+
+**The order of MA**
+
+- Larger order means more smoothing, but also more missing values at the ends.
+- **order = length of seasonal cycle** is often a good choice (e.g., 12 for monthly data with yearly seasonality).
+- But so far odd orders?
+
+## Centered moving averages {.smaller}
+
+**4-MA:**
+
+$$\frac{1}{4} (y_{t-2} + y_{t-1} + y_t + y_{t+1})$$
+
+or $$\frac{1}{4} (y_{t-1} + y_t + y_{t+1} + y_{t+2})$$
+
+**Solution:** take a further 2-MA to center it.
+
+$$
+\hat{T}_t = \frac{1}{2} \left \{ \frac{1}{4} (y_{t-2} + y_{t-1} + y_t + y_{t+1}) + \frac{1}{4} (y_{t-1} + y_t + y_{t+1} + y_{t+2}) \right \} \\
+= \frac{1}{8}y_{t-2} + \frac{1}{4}y_{t-1} + \frac{1}{4}y_t + \frac{1}{4}y_{t+1} + \frac{1}{8}y_{t+2}
+$$
+
+## Centered moving averages {.smaller}
+
+| Year | Data | 4-MA | 2 x 4-MA |
+| :--- | :--- | :--- | :--- |
+| 1992 Q1 | 443.00 | | |
+| 1992 Q2 | 410.00 | | |
+| 1992 Q3 | 420.00 | 451.25 | |
+| 1992 Q4 | 532.00 | 448.75 | 450.00 |
+| 1993 Q1 | 433.00 | 451.50 | 450.12 |
+| 1993 Q2 | 421.00 | 449.00 | 450.25 |
+| 1993 Q3 | 410.00 | 444.00 | 446.50 |
+| 1993 Q4 | 512.00 | 448.00 | 446.00 |
+| ... | ... | 438.00 | 443.00 |
+| ... | ... | ... | ... |
+
+## MA trend-cycle estimation
+
+A moving average of the same length as the season removes the seasonal pattern.
+
+- For quarterly data: use a 2 x 4-MA.
+- For monthly data: use a 2 x 12-MA.
+
+$$
+\hat{T}_t = \frac{1}{24}y_{t-6} + \frac{1}{12}y_{t-5} + \dots + \frac{1}{12}y_{t+5} + \frac{1}{24}y_{t+6}
+$$
+
+---
+
+```{python}
+#| label: us-retail-2x12ma
+#| fig-align: center
+
+us_retail_employment_ma = us_retail_employment.copy()
+us_retail_employment_ma["12-MA"] = (
+    us_retail_employment_ma["y"].rolling(window=12, center=True).mean()
+)
+us_retail_employment_ma["2x12-MA"] = (
+    us_retail_employment_ma["12-MA"].rolling(window=2, center=True).mean()
+)
+
+fig, ax = plt.subplots()
+sns.lineplot(data=us_retail_employment_ma, x="ds", y="y", label="Data",
+    color="grey")
+sns.lineplot(
+    data=us_retail_employment_ma, x="ds", y="2x12-MA", label="2x12-MA",
+    color="#D55E00"
+)
+ax.set_title("Total employment in US retail")
+ax.set_xlabel("Month [1M]")
+ax.set_ylabel("Persons (thousands)")
+plt.show()
+```
+
+# Classical Decomposition
+
+## Trend-cycle {.smaller}
+
+Additive decomposition: $y_t = T_t + S_t + R_t = \hat{T}_t + \hat{S}_t + \hat{R}_t$
+
+Multiplicative decomposition: $y_t = T_t \times S_t \times R_t = \hat{T}_t \times \hat{S}_t \times \hat{R}_t$
+
+- Estimate trend-cycle component $\hat{T}_t$ using moving averages.
+
+**Compute seasonal component $\hat{S}_t$:**
+
+- For additive model: $\hat{S}_t = y_t - \hat{T}_t$
+- For multiplicative model: $\hat{S}_t = y_t / \hat{T}_t$
+
+**De-trend the series:**
+
+- For additive model: $D_t = y_t - \hat{T}_t = \hat{S}_t + \hat{R}_t$
+- For multiplicative model: $D_t = y_t / \hat{T}_t = \hat{S}_t \times \hat{R}_t$
+
+## Estimating seasonal component
+
+*   Seasonal index for each season is estimated as an average of the detrended series for that season of successive years.
+*   E.g., take **averages across all Januaries** to get $S^{(1)}$ if your data is monthly.
+*   If necessary, adjust the seasonal indices so that:
+    *   for additive: $S^{(1)} + S^{(1)} \dots S^{(12)} = 0$ 
+    *   for multiplicative: $S^{(1)} + S^{(2)} + \dots + S^{(12)} = m$
+*   The seasonal component $\hat{S}_t$ simply consists of replications of the seasonal indices.
+
+## Remainder component
+
+Additive model: $\hat{R}_t = y_t - \hat{T}_t - \hat{S}_t$
+
+Multiplicative model: $\hat{R}_t = y_t / (\hat{T}_t \times \hat{S}_t)$
+
+::: {.callout-note icon="false"}
+## Classical decomposition
+
+- Choose additive or multiplicative model.
+- For multiplicative model, this method of estimation is known as the **ratio-to-moving-average method**.
+:::
+
+---
+
+```{python}
+#| fig-align: center
+dcmp_classical = seasonal_decompose(
+    us_retail_employment["y"], model="additive", period=12
+)
+dcmp = pd.DataFrame({
+    "ds": us_retail_employment["ds"],
+    "data": us_retail_employment["y"],
+    "trend": dcmp_classical.trend,
+    "seasonal": dcmp_classical.seasonal,
+    "remainder": dcmp_classical.resid
+}).reset_index(drop=True)
+
+fig, axes = plt.subplots(nrows=4, ncols=1, sharex=True, figsize=(8, 6))
+sns.lineplot(data=dcmp, x=dcmp.index, y="data", ax=axes[0])
+sns.lineplot(data=dcmp, x=dcmp.index, y="trend", ax=axes[1])
+sns.lineplot(data=dcmp, x=dcmp.index, y="seasonal", ax=axes[2])
+sns.lineplot(data=dcmp, x=dcmp.index, y="remainder", ax=axes[3])
+axes[0].set_ylabel("Employed")
+axes[1].set_ylabel("trend")
+axes[2].set_ylabel("seasonal")
+axes[3].set_ylabel("remainder")
+fig.suptitle("Classical additive decomposition: US Retail Employment")
+fig.subplots_adjust(top=0.90)
+fig.text(0.5, 0.95, "Employed = trend + seasonal + remainder", ha='center')
+plt.xlabel("")
+plt.show()
+```
+
+---
+
+```{python}
+#| fig-align: center
+dcmp_classical = seasonal_decompose(
+    us_retail_employment["y"], model="multiplicative", period=12
+)
+dcmp = pd.DataFrame({
+    "ds": us_retail_employment["ds"],
+    "data": us_retail_employment["y"],
+    "trend": dcmp_classical.trend,
+    "seasonal": dcmp_classical.seasonal,
+    "remainder": dcmp_classical.resid
+}).reset_index(drop=True)
+
+fig, axes = plt.subplots(nrows=4, ncols=1, sharex=True, figsize=(8, 6))
+sns.lineplot(data=dcmp, x=dcmp.index, y="data", ax=axes[0])
+sns.lineplot(data=dcmp, x=dcmp.index, y="trend", ax=axes[1])
+sns.lineplot(data=dcmp, x=dcmp.index, y="seasonal", ax=axes[2])
+sns.lineplot(data=dcmp, x=dcmp.index, y="remainder", ax=axes[3])
+axes[0].set_ylabel("Employed")
+axes[1].set_ylabel("trend")
+axes[2].set_ylabel("seasonal")
+axes[3].set_ylabel("remainder")
+fig.suptitle("Classical multiplicative decomposition: US Retail Employment")
+fig.subplots_adjust(top=0.90)
+fig.text(0.5, 0.95, "Employed = trend × seasonal × remainder", ha='center')
+plt.xlabel("")
+plt.show()
+```
+
+## Comments on classical decomposition
+
+- Estimate of trend is unavailable at the ends of the series.
+- Seasonal component repeats exactly each year. May be unrealistic.
+- **Not very robust to outliers.**
+
+## History of time series decomposition
+
+- Classical method originated in the 1920's.
+- Census II method developed in the 1957. Basis for X-11 and variants (X-12-ARIMA, X-13-ARIMA-SEATS).
+- STL (Seasonal and Trend decomposition using Loess) developed in 1983.
+- TRAMO/SEATS developed in the 1990s.
+
+# STL decomposition
+
+## STL decomposition {.smaller}
+
+*   STL: **S**easonal-**T**rend decomposition using **L**oess
+*   Very versatile and robust.
+*   Unlike X-12-ARIMA, STL will handle any type of seasonality.
+*   Seasonal component allowed to change over time, and rate of change controlled by user.
+*   Smoothness of trend-cycle also controlled by user.
+*   Robust to outliers
+*   Not trading day or calendar adjustments.
+*   Only additive.
+*   Take logs to get multiplicative decomposition.
+*   Use Box-Cox transformations to get other decompositions.
+
+## The Core Engine: Loess {.smaller}
+
+**Loess** (Locally Weighted Regression) is the smoothing method that powers the entire STL procedure.
+
+-   **The Idea**: Instead of just averaging points, Loess fits a simple local regression model (linear or quadratic) for each data point.
+-   **The Process**:
+    1.  For each point `x`, a neighborhood of `q` nearest points is selected.
+    2.  Each neighbor is given a weight using the **tricube weight function**:
+        $$ W(u) = (1 - u^3)^3 \quad \text{for } 0 \le u < 1 $$
+        where `u` is the normalized distance to the neighbor. Closer points get much more weight.
+    3.  A weighted least squares regression is fit to these neighbors.
+    4.  The value of this regression at point `x` is the smoothed value.
+
+## The Overall Design: Two Nested Loops {.smaller}
+
+STL uses an elegant two-loop structure to iteratively refine the components.
+
+::: {.columns}
+::: {.column width="50%"}
+### The Inner Loop
+-   **Goal**: To iteratively update the seasonal and trend components.
+-   Consists of 6 steps that sequentially smooth the data to extract the seasonal part, then the trend part.
+-   It is run `n(i)` times (typically 1 or 2 passes).
+:::
+
+::: {.column width="50%"}
+### The Outer Loop
+-   **Goal**: To achieve robustness to outliers.
+-   After each full inner loop, the remainder component is calculated.
+-   Points with large remainders (outliers) are assigned low weights.
+-   The inner loop is then re-run, using these weights in the Loess smoothing.
+-   It is run `n(o)` times.
+:::
+:::
+
+## The Inner Loop: Step-by-Step {.smaller}
+
+A single pass of the inner loop consists of two main stages.
+Let $T_v^{(k)}$ and $S_v^{(k)}$ be the estimates at iteration $k$.
+
+::: {.columns}
+::: {.column width="50%"}
+#### Stage 1: Seasonal Smoothing
+1.  **Detrending**: Calculate the detrended series:
+    $Y_v - T_v^{(k)}$
+2.  **Cycle-subseries Smoothing**: Break the detrended series into subseries (e.g., all Januarys, all Februarys, etc.). Smooth each with **Loess**. This yields a temporary seasonal series, $C_v^{(k+1)}$.
+3.  **Low-Pass Filtering**: Pass $C_v^{(k+1)}$ through a series of moving averages and another **Loess** smoother to remove any remaining trend. This yields $L_v^{(k+1)}$.
+4.  **Detrending of Seasonal**:
+    $S_v^{(k+1)} = C_v^{(k+1)} - L_v^{(k+1)}$
+:::
+
+::: {.column width="50%"}
+#### Stage 2: Trend Smoothing
+5.  **Deseasonalizing**:
+    $Y_v - S_v^{(k+1)}$
+6.  **Trend Smoothing**: Smooth the deseasonalized series with **Loess** to get the updated trend component, $T_v^{(k+1)}$.
+:::
+:::
+
+## The Outer Loop: Achieving Robustness {.smaller}
+
+The outer loop is designed to reduce the influence of outliers.
+
+1.  **Calculate Remainders** after an inner loop pass:
+    $$ R_v = Y_v - T_v - S_v $$
+
+2.  **Calculate Robustness Weights** $\rho_v$ for each observation:
+    -   First, calculate a scale measure of the residuals: $h = 6 \cdot \text{median}(|R_v|)$.
+    -   The weight $\rho_v$ is then calculated using the **bisquare weight function** `B`:
+        $$ \rho_v = B(|R_v|/h) $$
+    -   where the function `B` is defined as:
+        $$ B(u) = (1 - u^2)^2 \quad \text{for } 0 \le u < 1, \text{ and } 0 \text{ for } u \ge 1 $$
+
+3.  **Re-run Inner Loop**: The next inner loop uses these weights $\rho_v$ during the Loess smoothing steps, effectively down-weighting or ignoring outliers.
+
+## Tuning STL Parameters {.smaller}
+
+The user has control over 6 main parameters:
+
+-   `n(p)`: The period of the seasonality (e.g., 12 for monthly, 365 for daily).
+-   `n(i)`: Number of inner loop passes (usually 1 or 2).
+-   `n(o)`: Number of outer (robustness) loop passes (0 if no robustness is needed).
+
+**Smoothing Parameters (Loess window sizes):**
+
+-   **`n(s)`**: The smoothing parameter for the seasonal component. **This is the most important parameter.**
+    -   It controls how quickly the seasonal pattern is allowed to change over time.
+-   `n(t)`: The smoothing parameter for the trend component.
+-   `n(l)`: The smoothing parameter for the low-pass filter.
+
+## STL: Varying seasonal window
+
+```{python}
+#| label: stl-seasonal-animation
+#| eval: false
+
+from matplotlib.animation import FuncAnimation, PillowWriter
+
+# Setup figure and axes
+fig, axes = plt.subplots(nrows=4, ncols=1, sharex=True, figsize=(8, 6))
+seasonal_values = range(5, 57, 2)  # from 5 to 55 with step 2
+
+def update(seasonal_window):
+    # Clear previous plots
+    for ax in axes:
+        ax.cla()
+
+    # Perform STL decomposition
+    stl = STL(us_retail_employment["y"], period=12, seasonal=seasonal_window, robust=True)
+    res_stl = stl.fit()
+
+    # Create a dataframe with the results
+    dcmp = pd.DataFrame({
+        "ds": us_retail_employment["ds"],
+        "data": us_retail_employment["y"],
+        "trend": res_stl.trend,
+        "seasonal": res_stl.seasonal,
+        "remainder": res_stl.resid
+    }).reset_index(drop=True)
+
+    # Plot components
+    sns.lineplot(data=dcmp, x=dcmp.index, y="data", ax=axes[0], color='gray')
+    sns.lineplot(data=dcmp, x=dcmp.index, y="trend", ax=axes[1])
+    sns.lineplot(data=dcmp, x=dcmp.index, y="seasonal", ax=axes[2])
+    sns.lineplot(data=dcmp, x=dcmp.index, y="remainder", ax=axes[3])
+
+    # Set titles and labels
+    axes[0].set_ylabel("Employed")
+    axes[1].set_ylabel("Trend")
+    axes[2].set_ylabel("Seasonal")
+    axes[3].set_ylabel("Remainder")
+    plt.xlabel("")
+    
+    # Add text for the current seasonal window
+    axes[2].text(0.05, 0.8, f'seasonal = {seasonal_window}', transform=axes[2].transAxes, fontsize=12, bbox=dict(facecolor='white', alpha=0.8))
+
+    fig.suptitle("STL Decomposition: Varying Seasonal Window")
+    fig.subplots_adjust(top=0.90)
+
+    return fig,
+
+# Create animation
+ani = FuncAnimation(fig, update, frames=seasonal_values, blit=False, interval=200)
+
+# Save the animation
+writer = PillowWriter(fps=5)
+ani.save("img/stl_seasonal_animation.gif", writer=writer)
+```
+
+![](img/stl_seasonal_animation.gif){fig-align="center"}
+
+## STLe: Varying trend window
+
+```{python}
+#| label: stl-trend-animation
+#| eval: false
+
+# Setup figure and axes
+fig, axes = plt.subplots(nrows=4, ncols=1, sharex=True, figsize=(8, 6))
+trend_values = range(13, len(us_retail_employment)//2, 4)
+
+def update(trend_values):
+    # Clear previous plots
+    for ax in axes:
+        ax.cla()
+
+    # Perform STL decomposition
+    stl = STL(us_retail_employment["y"], period=12, seasonal=13, trend=trend_values, robust=True)
+    res_stl = stl.fit()
+
+    # Create a dataframe with the results
+    dcmp = pd.DataFrame({
+        "ds": us_retail_employment["ds"],
+        "data": us_retail_employment["y"],
+        "trend": res_stl.trend,
+        "seasonal": res_stl.seasonal,
+        "remainder": res_stl.resid
+    }).reset_index(drop=True)
+
+    # Plot components
+    sns.lineplot(data=dcmp, x=dcmp.index, y="data", ax=axes[0], color='gray')
+    sns.lineplot(data=dcmp, x=dcmp.index, y="trend", ax=axes[1])
+    sns.lineplot(data=dcmp, x=dcmp.index, y="seasonal", ax=axes[2])
+    sns.lineplot(data=dcmp, x=dcmp.index, y="remainder", ax=axes[3])
+
+    # Set titles and labels
+    axes[0].set_ylabel("Employed")
+    axes[1].set_ylabel("Trend")
+    axes[2].set_ylabel("Seasonal")
+    axes[3].set_ylabel("Remainder")
+    plt.xlabel("")
+
+    # Add text for the current trend window
+    axes[1].text(0.05, 0.8, f'trend = {trend_values}', transform=axes[1].transAxes, fontsize=12, bbox=dict(facecolor='white', alpha=0.8))
+
+    fig.suptitle("STL Decomposition: Varying Trend Window")
+    fig.subplots_adjust(top=0.90)
+
+    return fig,
+
+# Create animation
+ani = FuncAnimation(fig, update, frames=trend_values, blit=False, interval=200)
+
+# Save the animation
+writer = PillowWriter(fps=5)
+ani.save("img/stl_trend_animation.gif", writer=writer)
+```
+
+![](img/stl_trend_animation.gif){fig-align="center"}
+
+## STL decomposition
+
+- Trend controls wiggliness of trend component.
+- Seasonal controls variability of seasonal component.
+
+# Questions? {.unnumbered .unlisted background-iframe=".03_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=3416)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
