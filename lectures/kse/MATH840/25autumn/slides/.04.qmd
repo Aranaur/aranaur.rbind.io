@@ -1,0 +1,1233 @@
+---
+title: "Forecasting workflow"
+subtitle: "MATH840 | Time Series"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .04_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=3416">🔗MATH840 | Time Series</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: false
+  warning: false
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    category=UserWarning,
+    message=".*FigureCanvasAgg is non-interactive.*"
+)
+import os
+os.environ["NIXTLA_ID_AS_COL"] = "true"
+import numpy as np
+np.set_printoptions(suppress=True)
+np.random.seed(1)
+import random
+random.seed(1)
+import pandas as pd
+pd.set_option("max_colwidth", 100)
+pd.set_option("display.precision", 3)
+from utilsforecast.plotting import plot_series as plot_series_utils
+import seaborn as sns
+sns.set_style("whitegrid")
+import matplotlib.pyplot as plt
+plt.style.use("ggplot")
+plt.rcParams.update({
+    "figure.figsize": (8, 5),
+    "figure.dpi": 100,
+    "savefig.dpi": 300,
+    "figure.constrained_layout.use": True,
+    "axes.titlesize": 12,
+    "axes.labelsize": 10,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+    "legend.fontsize": 9,
+    "legend.title_fontsize": 10,
+})
+import matplotlib as mpl
+from cycler import cycler
+mpl.rcParams['axes.prop_cycle'] = cycler(color=["#000000", blue, turquoise, orange, red, green, purple, yellow, red_pink, slate])
+from fpppy.utils import plot_series
+
+from IPython.display import Image
+from functools import partial
+from statsmodels.tsa.seasonal import STL
+from statsmodels.graphics.tsaplots import plot_acf
+from statsmodels.stats.diagnostic import acorr_ljungbox
+from utilsforecast.evaluation import evaluate
+from utilsforecast.feature_engineering import pipeline, trend
+from utilsforecast.losses import rmse, mae, mape as _mape, mase, quantile_loss, mqloss
+
+def mape(df, models, id_col = "unique_id", target_col = "y"):
+    df_mape = _mape(df, models, id_col=id_col, target_col=target_col)
+    df_mape.loc[:, df_mape.select_dtypes(include='number').columns] *= 100
+    return df_mape
+
+from statsforecast import StatsForecast
+from statsforecast.models import SklearnModel
+from statsforecast.utils import ConformalIntervals
+from statsforecast.models import (
+    WindowAverage,
+    Naive,
+    SeasonalNaive,
+    RandomWalkWithDrift,
+    HistoricAverage,
+)
+from fpppy.models import LinearRegression
+
+from great_tables import GT
+```
+
+# A tidy forecasting workflow
+
+## A tidy forecasting workflow
+
+The process of producing forecasts can be broken down into a series of steps:
+
+1. Preparing data
+2. Data visualization
+3. Specifying a forecasting model
+4. Model estimation
+5. Accuracy and performance evaluation
+6. Producing forecasts
+
+## A tidy forecasting workflow
+
+```{python}
+# %%
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+
+# --- Setup the Plot ---
+# Create a figure and axes
+fig, ax = plt.subplots(figsize=(10, 6))
+
+# Set the axis limits to provide space for the diagram
+ax.set_xlim(-4, 4)
+ax.set_ylim(-2, 2)
+
+# Hide the axes and ticks for a clean look
+ax.axis('off')
+
+# --- Define Node Positions and Styles ---
+# Coordinates for each text label (node)
+positions = {
+    'Tidy': (-3.5, 0),
+    'Visualise': (-1.5, 0),
+    'Specify': (0, 1.2),
+    'Estimate': (1.5, 0),
+    'Evaluate': (0, -1.2),
+    'Forecast': (3.5, 0),
+}
+
+# Style for the text labels
+node_style = {
+    'ha': 'center',
+    'va': 'center',
+    'fontsize': 14,
+    'fontname': 'sans-serif'
+}
+
+# Style for the arrows
+arrow_style = dict(
+    arrowstyle='->, head_width=0.3, head_length=0.6',
+    color='black',
+    linewidth=1.5
+)
+
+
+# --- Draw Nodes (Text Labels) ---
+for label, pos in positions.items():
+    ax.text(pos[0], pos[1], label, **node_style)
+
+
+# --- Draw Edges (Arrows) ---
+# Straight arrows
+# Tidy -> Visualise
+tidy_to_visualise = mpatches.FancyArrowPatch(
+    (positions['Tidy'][0] + 0.5, positions['Tidy'][1]),
+    (positions['Visualise'][0] - 0.7, positions['Visualise'][1]),
+    **arrow_style
+)
+ax.add_patch(tidy_to_visualise)
+
+# Estimate -> Forecast
+estimate_to_forecast = mpatches.FancyArrowPatch(
+    (positions['Estimate'][0] + 0.6, positions['Estimate'][1]),
+    (positions['Forecast'][0] - 0.7, positions['Forecast'][1]),
+    **arrow_style
+)
+ax.add_patch(estimate_to_forecast)
+
+
+# Curved arrows for the loop
+# We use connectionstyle with a radius value (rad) to create the curve
+# Visualise -> Specify
+vis_to_spec = mpatches.FancyArrowPatch(
+    (-1.2, 0.2), # Start point offset from Visualise
+    (-0.4, 1.1), # End point offset from Specify
+    connectionstyle="arc3,rad=-0.5",
+    **arrow_style
+)
+ax.add_patch(vis_to_spec)
+
+# Specify -> Estimate
+spec_to_est = mpatches.FancyArrowPatch(
+    (0.4, 1.1),  # Start point
+    (1.2, 0.2),  # End point
+    connectionstyle="arc3,rad=-0.5",
+    **arrow_style
+)
+ax.add_patch(spec_to_est)
+
+# Estimate -> Evaluate
+est_to_eval = mpatches.FancyArrowPatch(
+    (1.2, -0.2), # Start point
+    (0.4, -1.1), # End point
+    connectionstyle="arc3,rad=-0.5", # Negative radius to curve downwards
+    **arrow_style
+)
+ax.add_patch(est_to_eval)
+
+# Evaluate -> Visualise
+eval_to_vis = mpatches.FancyArrowPatch(
+    (-0.4, -1.1),# Start point
+    (-1.2, -0.2),# End point
+    connectionstyle="arc3,rad=-0.5", # Negative radius
+    **arrow_style
+)
+ax.add_patch(eval_to_vis)
+
+
+# --- Display the Plot ---
+# Ensure the aspect ratio is equal to avoid distortion
+ax.set_aspect('equal', adjustable='box')
+plt.title("Data Analysis Workflow", fontsize=16)
+plt.show()
+```
+
+## Data preparation
+
+```{python}
+#| label: load-data
+#| echo: true
+
+gsheetkey = '1wrSjwahn_OCY6JcS6Bumxu9ucuzGX1eN2yeQTIVhF3c'
+url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+gdp_df = pd.read_csv(url, parse_dates=["ds"])
+gdp_df[["GDP", "Population"]] = gdp_df[["GDP", "Population"]].interpolate()
+gdp_df["y"] = gdp_df["GDP"] / gdp_df["Population"]
+gdp_df = gdp_df.drop(["Code", "Growth", "CPI", "Imports", "Exports"],
+  axis=1)
+gdp_df.head()
+```
+
+## Data visualization
+
+```{python}
+#| echo: true
+plot_series(gdp_df, ids=["Sweden"],
+            xlabel="Year [1Y]", ylabel="$US",
+            title="GDP per capita for Sweden")
+```
+
+## Model estimation
+
+```{python}
+SklearnModel(LinearRegression())
+```
+
+## Train the model
+
+```{python}
+train_df = gdp_df.copy()
+train_df.drop(["GDP", "Population"], axis=1, inplace=True)
+sweden_df = train_df.query("unique_id == 'Sweden'")
+
+train_features, valid_features = pipeline(
+    sweden_df,
+    features=[trend],
+    freq="YE",
+    h=3,
+)
+sf = StatsForecast(
+    models=[SklearnModel(LinearRegression())],
+    freq="YE",
+)
+```
+
+## Produce forecasts
+
+```{python}
+sf.fit(df=train_features)
+fcasts = sf.predict(
+    h=3,
+    X_df=valid_features,
+)
+fcasts = sf.fitted_[0][0].model_["model"].add_prediction_intervals(fcasts,
+  valid_features.rename(columns={"trend": "x1"}))
+```
+
+---
+
+```{python}
+plot_series(train_df, fcasts,
+            level=[80, 95],
+            ids=["Sweden"],
+            xlabel="Year",
+            ylabel="$US",
+            title="GDP per capita for Sweden",
+            rm_legend=False
+            )
+```
+
+# Some simple forecasting methods
+
+## Data
+
+```{python}
+gsheetkey = '10Y3HqO91-87jSvxmmxuTlAlbKyD67pZ9hWP8RIp7JSE'
+url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+production_df = pd.read_csv(url,
+  parse_dates=["ds"])
+production_df.head()
+```
+
+## Mean method
+
+- Forecast of all future values is the mean of the historical data
+- Forecast: $\hat{y}_{t+h|t} = \bar{y}_t = \frac{1}{T} \sum_{i=1}^{T} y_i$
+
+```{python}
+df = production_df[production_df['unique_id'] == 'Bricks'].dropna()
+sf = StatsForecast(models=[HistoricAverage()], freq='QE')
+fcasts_avg = sf.forecast(h=20, df=df)
+plot_series(df, fcasts_avg,
+            xlabel="Quarter",
+            ylabel="Production",
+            title="Mean method forecasts for Bricks production")
+```
+
+## Naïve method
+
+- Forecast of all future values is the last observed value
+- Forecast: $\hat{y}_{t+h|t} = y_t$
+
+```{python}
+sf = StatsForecast(models=[Naive()], freq='QE')
+fcasts_naive = sf.forecast(h=20, df=df)
+plot_series(df, fcasts_naive,
+            xlabel="Quarter",
+            ylabel="Production",
+            title="Naïve method forecasts for Bricks production")
+```
+
+## Seasonal naïve method
+
+- Forecast of all future values is the last observed value from the same season
+- Forecast: $\hat{y}_{t+h|t} = y_{t+h-m(k+1)}$, where $m$ is the seasonal period and $k = (h-1)/m$
+
+```{python}
+sf = StatsForecast(models=[SeasonalNaive(season_length=4)], freq='QE')
+fcasts_snaive = sf.forecast(h=20, df=df)
+plot_series(df, fcasts_snaive,
+            xlabel="Quarter",
+            ylabel="Production",
+            title="Seasonal naïve method forecasts for Bricks production")
+```
+
+## Drift method
+
+- Forecast equals last observed value plus average change observed in historical data
+- Forecast: $\hat{y}_{T+h \mid T}=y_T+\frac{h}{T-1} \sum_{t=2}^T\left(y_t-y_{t-1}\right)=y_T+h\left(\frac{y_T-y_1}{T-1}\right)$.
+- Equivalent to fitting a line between the first and last observation and extrapolating it into the future
+
+```{python}
+sf = StatsForecast(models=[RandomWalkWithDrift()], freq='QE')
+fcasts_drift = sf.forecast(h=20, df=df)
+plot_series(df, fcasts_drift,
+            xlabel="Quarter",
+            ylabel="Production",
+            title="Drift method forecasts for Bricks production")
+```
+
+## Example: Australian beer production
+
+```{python}
+beers_df = production_df.query("unique_id == 'Beer' and ds >= '1992-01-01'")
+train = beers_df[:-14]
+test = beers_df[-14:]
+
+avg_method = HistoricAverage()
+naive_method = Naive()
+seasonal_naive_method = SeasonalNaive(4)
+
+sf = StatsForecast(
+    models=[avg_method, naive_method, seasonal_naive_method],
+    freq=pd.offsets.QuarterBegin(1)
+)
+sf.fit(train)
+
+fcasts = sf.predict(h=14)
+fcasts["y"] = test["y"].values
+
+plot_series(train, fcasts,
+            xlabel="Quarter",
+            ylabel="Megalitres",
+            title="Forecasts for quarterly beer production",
+            rm_legend=False)
+```
+
+## Example: Google’s daily closing stock price
+
+```{python}
+gsheetkey = '1t5ZT0wHdunWVflzwp_vL-qRjRBlAleH4WJ23mL44cWA'
+url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+gafa_df = pd.read_csv(url, parse_dates=["ds"])
+goog_df = gafa_df.query(
+    "unique_id == 'GOOG_Close' and '2015-01-01' <= ds <= '2016-01-31'"
+)
+
+train = goog_df.query("ds.dt.year == 2015")
+test = goog_df.query("ds.dt.year == 2016")
+
+train["ds"] = np.arange(len(train))
+test["ds"] = np.arange(len(test))
+
+avg_method = HistoricAverage()
+naive_method = Naive()
+drift_method = RandomWalkWithDrift()
+sf = StatsForecast(models=[drift_method, avg_method, naive_method], freq=1)
+sf.fit(train)
+
+fcasts = sf.predict(h=len(test))
+fcasts["y"] = test["y"].values
+
+plot_series(train, fcasts,
+            xlabel="day",
+            ylabel="$US",
+            title="Google daily closing stock prices (Jan 2015-Jan 2016)",
+            rm_legend=False)
+```
+
+# Fitted values and residuals
+
+## Fitted values
+
+- $\hat{y}_{t|t-1}$ is the forecast of $y_t$ based on all available information up to time $t-1$.
+- We call this the **fitted value**
+- Sometimes drop the subscript and simply refer to it as $\hat{y}_t$.
+- Often not true forecast since parameters are estimated on all data.
+
+::: {.callout-tip icon="false"}
+## For example
+
+- $\hat{y}_{t}=\bar{y}$ for average method
+- $\hat{y}_{t|t-1}=y_{t-1}+(y_T-y_1)/(T-1)$ for drift method
+:::
+
+## Forecasting residuals
+
+- The residuals are the differences between the observed values and the fitted values: $e_t = y_t - \hat{y}_{t|t-1}$.
+
+Assumptions:
+
+1. $\{e_t\}$ uncorrelated. If they aren't, then information left in residuals can be used to improve forecasts.
+2. $\{e_t\}$ have mean zero. If they don't, then the model is systematically over- or under-predicting.
+
+Useful properties (for distribution and prediction intervals):
+
+3. $\{e_t\}$ are normally distributed. If they aren't, then prediction intervals may be invalid.
+4. $\{e_t\}$ are homoscedastic. If they aren't, then prediction intervals may be invalid.
+
+# Residual diagnostics
+
+## Google daily closing stock prices
+
+```{python}
+train = goog_df.query("ds.dt.year == 2015")
+plot_series(train,
+            xlabel="day [1]",
+            ylabel="$US",
+            title="Google daily closing stock prices in 2015")
+```
+
+## Google stock prices and Naive method
+
+```{python}
+naive_method = Naive()
+sf = StatsForecast(models=[naive_method], freq='1d')
+sf.forecast(h=14, df=train, fitted=True)
+fitted_values = sf.forecast_fitted_values()
+train["fitted"] = fitted_values["Naive"].values
+train["resid"] = train["y"] - train["fitted"]
+train["innov"] = train["y"] - train["fitted"]
+train.head()
+```
+
+## True vs Fitted values
+
+```{python}
+fig, ax = plt.subplots()
+ax.plot(train["ds"], train["y"], label="Observed", color=blue)
+ax.plot(train["ds"], train["fitted"], label="Fitted", color=orange)
+ax.legend()
+```
+
+## Last observations
+
+```{python}
+fig, ax = plt.subplots()
+ax.plot(train["ds"][-40:], train["y"][-40:], label="Observed", color=blue)
+ax.plot(train["ds"][-40:], train["fitted"][-40:], label="Fitted", color=orange)
+ax.legend()
+```
+
+
+## Residual diagnostics
+
+```{python}
+train["resid"] = train["y"].diff().values
+plot_series(train, target_col="resid",
+            xlabel="day [1]",
+            ylabel="$US",
+            title="Residuals from the naive method")
+```
+
+## Histogram of residuals
+
+```{python}
+ax = train["resid"].hist()
+ax.set_title("Histogram of residuals")
+plt.show()
+```
+
+## ACF of residuals
+
+```{python}
+fig = plot_acf(train["resid"][1:], zero=False, auto_ylims=True,
+         bartlett_confint=False, title="Residuals from the naïve method")
+```
+
+## All together
+
+```{python}
+def plot_diagnostics(data):
+  fig = plt.figure(figsize=(8, 5))
+  ax1 = fig.add_subplot(2, 2, (1, 2))
+  ax1.plot(data['ds'], data["resid"])
+  ax1.set_title("Innovation Residuals")
+  ax2 = fig.add_subplot(2, 2, 3)
+  plot_acf(data["resid"].dropna(), ax=ax2, zero=False,
+    bartlett_confint=False, auto_ylims=True)
+  ax2.set_title("ACF Plot")
+  ax2.set_xlabel('lag[1]')
+  ax3 = fig.add_subplot(2, 2, 4)
+  ax3.hist(data["resid"], bins=20)
+  ax3.set_title("Histogram")
+  ax3.set_xlabel(".resid")
+  ax3.set_ylabel("Count")
+  plt.tight_layout()
+  plt.show()
+plot_diagnostics(train)
+```
+
+## ACF of residuals
+
+- We assume that the residuals are white noise. If they are not, then there is information left in the residuals that can be used to improve the forecasts.
+- So a standard residual diagnostic is to plot the ACF of the residuals and check for significant autocorrelations.
+- We *expect* all autocorrelations to be close to zero and within the 95% confidence bounds.
+
+## Portmanteau test
+
+$r_k$ --- autocorrelation of residual at lag $k$.
+
+Consider a whole set of $r_k$ values, and develop a test to see whether they are significantly different from zero.
+
+- $H_0$: All $r_k = 0$ for $k = 1, 2, \ldots, l$
+- $H_a$: At least one $r_k \neq 0$ for $k = 1, 2, \ldots, l$
+
+::: {.callout-note}
+## Box-Pierce test
+
+$$Q = T \sum_{k=1}^{l} r_k^2$$
+
+where $T$ is the number of residuals and $l$ is the number of lags being tested.
+:::
+
+- If each $r_k$ close to zero, then $Q$ will be small.
+- If some $r_k$ significantly different from zero, then $Q$ will be large.
+
+## Portmanteau test
+
+$r_k$ --- autocorrelation of residual at lag $k$.
+
+Consider a whole set of $r_k$ values, and develop a test to see whether they are significantly different from zero.
+
+::: {.callout-note}
+## Ljung-Box test
+
+$$Q^* = T(T+2) \sum_{k=1}^{l} \frac{r_k^2}{T-k}$$
+
+where $T$ is the number of residuals and $l$ is the number of lags being tested.
+:::
+
+- Preferences: $l = 10$ for non-seasonal data, $l = 2 \times m$ for seasonal data with period $m$.
+- Better performance for small samples compared to Box-Pierce test.
+
+## Portmanteau test for naive method residuals
+
+- If data are white noise, then $Q^*$ has a $\chi^2$ distribution with $l$ degrees of freedom.
+- lag = $l$
+
+```{python}
+resid_test = acorr_ljungbox(train["resid"].dropna(),
+  boxpierce=True)
+resid_test.round(4).head()
+```
+
+## Portmanteau test for RW
+
+```{python}
+train = goog_df.query("ds.dt.year == 2015")
+drift_method = RandomWalkWithDrift()
+sf = StatsForecast(models=[drift_method], freq="B")
+sf.fit(train)
+fcasts = sf.forecast(df=train, h=10, fitted=True)
+insample_preds = sf.forecast_fitted_values()
+insample_preds["resid"] = insample_preds["y"] - insample_preds["RWD"]
+resid_test = acorr_ljungbox(insample_preds["resid"].dropna(),
+  boxpierce=True)
+resid_test.round(4).head()
+```
+
+# Forecasting using transformations
+
+## Backtransformation
+
+We must reverse the transformation to obtain forecasts on the original scale.
+
+For Box-Cox transformation with parameter $\lambda$:
+
+::: {.columns}
+::: {.column}
+Box-Cox transformation:
+
+$$
+w_t^{(\lambda)} =
+\begin{cases}
+\frac{\text{sign}(y_t)|y_t|^{(\lambda)} - 1}{\lambda} & \text{if } \lambda \neq 0 \\
+\log(y_t) & \text{if } \lambda = 0
+\end{cases}
+$$
+:::
+::: {.column}
+Box-Cox backtransformation:
+
+$$
+y_t =
+\begin{cases}
+\text{sign}(\lambda w_t^{(\lambda)} + 1) |\lambda w_t^{(\lambda)} + 1|^{1/\lambda} & \text{if } \lambda \neq 0 \\
+\exp(w_t^{(\lambda)}) & \text{if } \lambda = 0
+\end{cases}
+$$
+
+:::
+:::
+
+---
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+import scipy.stats as stats
+from matplotlib.patches import ConnectionPatch
+
+# Використовуємо стиль XKCD для імітації малюнка від руки
+with plt.xkcd():
+    # 1. Створення фігури та двох підграфіків
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+
+    # --- ЗМІНА: Встановлюємо білий фон для фігури та осей ---
+    fig.patch.set_facecolor('white')
+    ax1.set_facecolor('white')
+    ax2.set_facecolor('white')
+    # ---------------------------------------------------------
+
+    fig.suptitle(
+        "Transformations to reduce skewness",
+        fontsize=18, y=0.98
+    )
+
+    # --- Графік 1: Асиметричний (вихідний) розподіл ---
+
+    # Генеруємо дані для правостороннього асиметричного розподілу
+    a = 4  # Параметр асиметрії
+    x_skewed = np.linspace(stats.skewnorm.ppf(0.001, a), stats.skewnorm.ppf(0.999, a), 200)
+    pdf_skewed = stats.skewnorm.pdf(x_skewed, a)
+
+    # Розраховуємо моду, медіану та середнє
+    mean_val = stats.skewnorm.mean(a)
+    median_val = stats.skewnorm.median(a)
+    mode_val = x_skewed[np.argmax(pdf_skewed)] # Мода - це пік розподілу
+
+    # Малюємо криву розподілу
+    ax1.plot(x_skewed, pdf_skewed, 'k')
+
+    # Малюємо вертикальні лінії для моди, медіани та середнього
+    ax1.vlines([mode_val, median_val, mean_val], 0,
+               [stats.skewnorm.pdf(mode_val, a),
+                stats.skewnorm.pdf(median_val, a),
+                stats.skewnorm.pdf(mean_val, a)],
+               colors='k', lw=2)
+
+    # Додаємо текстові підписи
+    ax1.text(mode_val, stats.skewnorm.pdf(mode_val, a) + 0.05, 'mode', ha='center', fontsize=14)
+    ax1.text(median_val, stats.skewnorm.pdf(median_val, a) + 0.08, 'median', ha='center', fontsize=14)
+    ax1.text(mean_val + 0.1, stats.skewnorm.pdf(mean_val, a) + 0.04, 'mean', ha='left', fontsize=14)
+
+    # --- Графік 2: Симетричний (трансформований) розподіл ---
+
+    # Генеруємо дані для нормального розподілу
+    x_norm = np.linspace(-3, 3, 200)
+    pdf_norm = stats.norm.pdf(x_norm)
+
+    # Малюємо криву
+    ax2.plot(x_norm, pdf_norm, 'k')
+
+    # Малюємо центральну лінію (середнє = медіана = мода)
+    ax2.vlines(0, 0, stats.norm.pdf(0), 'k', lw=2)
+    ax2.text(0, stats.norm.pdf(0) + 0.05, 'symmetric', ha='center', fontsize=16)
+
+    # --- Стрілки та анотації ---
+
+    # 1. Головна чорна стрілка: з'єднує середнє симетричного розподілу з медіаною асиметричного
+    con = ConnectionPatch(
+        xyA=(0, 0), xyB=(median_val, 0),
+        coordsA='data', coordsB='data',
+        axesA=ax2, axesB=ax1,
+        arrowstyle="->", shrinkB=5,
+        connectionstyle="arc3,rad=-0.4", # Вигин стрілки вниз
+        color='k', lw=2
+    )
+    ax2.add_artist(con)
+
+    # 2. Зелена анотація з поясненням
+    ax1.annotate(
+        'adjust to get to\nthe mean',
+        xy=(mean_val, 0.2), xycoords='data',
+        xytext=(mean_val + 0.3, 0.1), textcoords='data',
+        ha='left', va='top', fontsize=14, color='green',
+        arrowprops=dict(
+            arrowstyle='->',
+            connectionstyle="arc3,rad=0.3",
+            color='green',
+            lw=2
+        )
+    )
+
+    # --- Фінальне налаштування вигляду графіків ---
+    for ax in [ax1, ax2]:
+        ax.set_yticks([])
+        ax.set_xticks([])
+        # Малюємо осі X та Y
+        ax.axhline(0, color='k', lw=2)
+        ax.axvline(ax.get_xlim()[0], color='k', lw=2)
+        # Прибираємо зайві рамки
+        for spine in ['right', 'top', 'left', 'bottom']:
+            ax.spines[spine].set_visible(False)
+        ax.set_ylim(bottom=-0.3) # Додаємо місце знизу для анотацій
+
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.show()
+```
+
+## Modeling with transformations
+
+```{python}
+gsheetkey = '1V2HAc5bwBXq1KJg9Dv7dX0R0C3s1mcGxfWmEVwoI1bs'
+url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+egg_df = pd.read_csv(url, parse_dates=["ds"])
+egg_df_log = egg_df.copy()
+egg_df_log['y'] = np.log(egg_df_log['y'])
+
+# plot original and log-transformed data
+fig, ax = plt.subplots(2, 1, figsize=(10, 8))
+ax[0].plot(egg_df['ds'], egg_df['y'], color=blue)
+ax[0].set_title('Original Egg Production Data')
+ax[0].set_xlabel('Date')
+ax[0].set_ylabel('Egg Production')
+ax[1].plot(egg_df_log['ds'], egg_df_log['y'], color=orange)
+ax[1].set_title('Log-Transformed Egg Production Data')
+ax[1].set_xlabel('Date')
+ax[1].set_ylabel('Log(Egg Production)')
+plt.tight_layout()
+plt.show()
+```
+
+---
+
+```{python}
+rwd_method = RandomWalkWithDrift()
+sf = StatsForecast(models=[rwd_method], freq="YE")
+sf.fit(egg_df_log)
+fcasts = sf.forecast(df=egg_df_log, h=50, level=[80, 95])
+sigma_h = (fcasts['RWD-hi-80'] - fcasts['RWD-lo-80']) / (2 * 1.28)
+sigma_h_squared = sigma_h**2
+bias_adjusted = np.exp(fcasts['RWD']) * (1 + sigma_h_squared/2)
+fcasts_original = fcasts.copy()
+columns_to_transform = \
+  ['RWD', 'RWD-lo-80', 'RWD-lo-95', 'RWD-hi-80', 'RWD-hi-95']
+for col in columns_to_transform:
+    fcasts_original[col] = np.exp(fcasts[col])
+fcasts_original['RWD-adjusted'] = bias_adjusted
+
+fig, ax = plt.subplots()
+ax.plot(egg_df['ds'], egg_df['y'], color='black', label='Historical',
+  linewidth=1)
+ax.fill_between(fcasts_original['ds'],
+                fcasts_original['RWD-lo-80'],
+                fcasts_original['RWD-hi-80'],
+                alpha=0.3, color='#B8BFFF', label='80% CI')
+ax.plot(fcasts_original['ds'], fcasts_original['RWD'],
+        color='blue', linestyle='--', label='Median forecast', linewidth=1)
+ax.plot(fcasts_original['ds'], fcasts_original['RWD-adjusted'],
+        color='blue', linestyle='-', label='Bias-adjusted mean', linewidth=1)
+ax.set_title('Annual egg prices')
+ax.set_xlabel('year')
+ax.set_ylabel('$US (in cents adjusted for inflation)')
+handles, labels = fig.axes[0].get_legend_handles_labels()
+fig.legend(
+  handles,
+  labels,
+  loc="center left",
+  bbox_to_anchor=(1.02, 0.5),
+  borderaxespad=0.0,
+  frameon=False,
+)
+plt.show()
+```
+
+## Bias adjustment
+
+- Back transformed point forecassts are median.
+- Back transformed PI have the correct coverage.
+
+Back-transformed means:
+
+1. Let $X$ have mean $\mu$ and variance $\sigma^2$.
+2. Let $f(x)$ be back-transformation function, and $Y = f(X)$.
+3. Taylor series expansion about $\mu$:
+$$
+Y = f(x) \approx f(\mu) + (X - \mu) f'(\mu) + \frac{f''(\mu)(X - \mu)^2}{2} 
+$$
+
+4. Taking expectations:
+$$
+E[Y] \approx f(\mu) + \frac{f''(\mu) \sigma^2}{2}
+$$
+
+## Bias adjustment
+
+Box-Cox back-transformation:
+
+$\begin{aligned} y_t & = \begin{cases}\exp \left(w_t\right) & \lambda=0 ; \\ \left(\lambda w_t+1\right)^{1 / \lambda} & \lambda \neq 0 .\end{cases} \\ f(x) & = \begin{cases}e^x & \lambda=0 ; \\ (\lambda x+1)^{1 / \lambda} & \lambda \neq 0 .\end{cases} \\ f^{\prime \prime}(x) & = \begin{cases}e^x & \lambda=0 ; \\ (1-\lambda)(\lambda x+1)^{1 / \lambda-2} & \lambda \neq 0 .\end{cases} \end{aligned}$
+
+$E[Y] \approx \begin{cases}e^\mu\left[1+\frac{\sigma^2}{2}\right] & \lambda=0 ; \\ (\lambda \mu+1)^{1 / \lambda}\left[1+\frac{\sigma^2(1-\lambda)}{2(\lambda \mu+1)^2}\right] & \lambda \neq 0 .\end{cases}$
+
+# Forecasting with decomposition
+
+## Forecasting and decomposition
+
+$$
+y_t = \hat{S_t} + \hat{A_t}
+$$
+
+- $\hat{S_t}$ is the seasonal component
+- $\hat{A_t}$ is seasonally adjusted data (trend + remainder)
+
+. . .
+
+- Forecast $\hat{S_t}$ using seasonal naïve method
+- Forecast $\hat{A_t}$ using appropriate method (e.g., drift method)
+- Combine forecasts to obtain final forecasts
+
+## US Retail Employment
+
+```{python}
+gsheetkey = '1VoHDwazrwCVOyooH7AyBqMAJZmq5sD7jRgzzPl7AyZA'
+url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+
+us_employment_df = pd.read_csv(url,
+  parse_dates=["ds"])
+us_retail_employment_df = us_employment_df.query(
+    "Title == 'Retail Trade' and ds.dt.year >= 1992"
+)
+
+train_df = us_retail_employment_df.drop(["Title"], axis=1)
+
+stl = STL(train_df["y"].values, period=12, robust=True, trend_deg=7)
+res = stl.fit()
+
+train_df["seasonal"] = res.seasonal
+train_df["y_adjusted"] = train_df["y"] - train_df["seasonal"]
+
+# Plot original and seasonally adjusted data
+fig, ax = plt.subplots(2, 1, figsize=(10, 8))
+ax[0].plot(train_df['ds'], train_df['y'], color='blue')
+ax[0].set_title('Original US Retail Employment Data')
+ax[1].plot(train_df['ds'], train_df['y_adjusted'], color='orange')
+ax[1].set_title('Seasonally Adjusted US Retail Employment Data')
+plt.tight_layout()
+plt.show()
+```
+
+## Seasonally Adjusted with naive method
+
+```{python}
+naive_method = Naive()
+sf = StatsForecast(models=[naive_method], freq="M")
+adjusted_fcasts = sf.forecast(h=24, level=[80, 95], df=train_df,
+                              target_col="y_adjusted", fitted=True)
+
+adjusted_fcasts_fitted = sf.forecast_fitted_values()
+plot_series(train_df, adjusted_fcasts, target_col="y_adjusted",
+            level=[80, 95],
+            xlabel="Month",
+            ylabel="Number of people",
+            title="US retail employment",
+            rm_legend=False)
+```
+
+## Seasonal component with seasonal naive
+
+```{python}
+seasonal_naive_method = SeasonalNaive(season_length=12)
+sf = StatsForecast(models=[seasonal_naive_method], freq="M")
+seasonal_fcasts = sf.forecast(h=24, level=[80, 95], df=train_df,
+                               target_col="seasonal", fitted=True)
+
+seasonal_fcasts_fitted = sf.forecast_fitted_values()
+plot_series(train_df, seasonal_fcasts, target_col="seasonal",
+            level=[80, 95],
+            xlabel="Month",
+            ylabel="Number of people",
+            title="US retail employment",
+            rm_legend=False)
+```
+
+## Final forecasts
+
+```{python}
+seasonal_naive = SeasonalNaive(12)
+sf = StatsForecast(models=[seasonal_naive], freq="M")
+seasonal_fcasts = sf.forecast(h=24, level=[80, 95], df=train_df,
+  target_col="seasonal", fitted=True)
+merged_df = adjusted_fcasts.merge(seasonal_fcasts, on=['unique_id', 'ds'],
+  how='inner')
+merged_df_fitted = adjusted_fcasts_fitted.merge(sf.forecast_fitted_values(),
+  on=['unique_id', 'ds'], how='inner')
+merged_df_fitted["combined"] = merged_df_fitted['Naive'] + \
+  merged_df_fitted['SeasonalNaive']
+merged_df_fitted = merged_df_fitted.merge(train_df, on=["unique_id", "ds"],
+  how="right")
+final_df = merged_df[['unique_id', 'ds']].copy() # Start with identifiers
+final_df['combined'] = merged_df['Naive'] + merged_df['SeasonalNaive']
+train_df["resid"] = merged_df_fitted["y"].values - \
+  merged_df_fitted["Naive"].values - \
+  merged_df_fitted["SeasonalNaive"].values
+final_df['combined-lo-80'] = merged_df['Naive-lo-80'] + \
+  merged_df['SeasonalNaive-lo-80']
+final_df['combined-lo-95'] = merged_df['Naive-lo-95'] + \
+  merged_df['SeasonalNaive-lo-95']
+final_df['combined-hi-80'] = merged_df['Naive-hi-80'] + \
+  merged_df['SeasonalNaive-hi-80']
+final_df['combined-hi-95'] = merged_df['Naive-hi-95'] + \
+  merged_df['SeasonalNaive-hi-95']
+
+plot_series(train_df, final_df, target_col="y", level=[80, 95],
+            xlabel="Month",
+            ylabel="Number of people",
+            title="US retail employment",
+            rm_legend=False)
+```
+
+## Residual diagnostics
+
+```{python}
+plot_diagnostics(train_df)
+```
+
+# Evaluating point forecast accuracy
+
+## Training and test sets
+
+```{python}
+import matplotlib.pyplot as plt
+import numpy as np
+
+# --- Налаштування графіку ---
+fig, ax = plt.subplots(figsize=(12, 2))
+
+# Встановлюємо межі, щоб було достатньо місця
+ax.set_ylim(-1, 1)
+ax.set_xlim(-1, 26)
+
+# Прибираємо осі та рамку для чистого вигляду
+ax.axis('off')
+
+# --- Визначення даних та кольорів ---
+# Кількість точок для тренувальних та тестових даних
+n_train = 18
+n_test = 5
+
+# Створюємо масиви з позиціями точок на осі X
+train_points = np.arange(0, n_train)
+test_points = np.arange(n_train, n_train + n_test)
+
+# Кольори, що відповідають зображенню
+train_color = '#377eb8'  # Синій
+test_color = '#d95f02'   # Помаранчевий
+axis_color = 'black'
+
+# --- Малюємо елементи графіку ---
+
+# 1. Головна вісь часу зі стрілкою
+# Малюємо лінію, а потім додаємо стрілку за допомогою annotate
+ax.axhline(y=0, color=axis_color, zorder=1)
+# Використовуємо annotate для створення стрілки на кінці
+ax.annotate('', xy=(n_train + n_test + 1, 0), xytext=(-1, 0),
+            arrowprops=dict(arrowstyle="->", color=axis_color))
+
+
+# 2. Малюємо точки даних
+# Тренувальні дані
+ax.scatter(train_points, np.zeros_like(train_points),
+           color=train_color, s=100, zorder=2)
+
+# Тестові дані
+ax.scatter(test_points, np.zeros_like(test_points),
+           color=test_color, s=100, zorder=2)
+
+
+# 3. Додаємо текстові підписи
+# Підпис для тренувальних даних
+train_text_pos = np.mean(train_points)
+ax.text(train_text_pos, 0.4, 'Training data',
+        ha='center', va='center', fontsize=20, color=train_color)
+
+# Підпис для тестових даних
+test_text_pos = np.mean(test_points)
+ax.text(test_text_pos, 0.4, 'Test data',
+        ha='center', va='center', fontsize=20, color=test_color)
+
+# Підпис "time"
+ax.text(n_train + n_test + 1.5, 0.1, 'time',
+        ha='left', va='center', fontsize=18, color=axis_color)
+
+# --- Відображення результату ---
+plt.show()
+```
+
+- A model which fits the training data well will not necessarily forecast well.
+- A perfect fit can always be obtained by using a model with enough parameters.
+- Over-fitting a model to data is just as bad as failing to identify a systematic pattern in the data.
+
+## Forecast errors
+
+$$
+e_{T+h} = y_{T+h} - \hat{y}_{T+h|T}
+$$
+
+- Unlike residuals, forecast errors on the test set involve multi-step forecasts.
+- These are true forecast errors as the test data is not used in model fitting.
+
+---
+
+```{python}
+train_df = beers_df.query("ds.dt.year <= 2007")
+test_df = beers_df.query("ds.dt.year > 2007")
+
+mean_method = HistoricAverage()
+naive_method = Naive()
+drift_method = RandomWalkWithDrift()
+seasonal_naive = SeasonalNaive(4)
+
+sf = StatsForecast(
+    models=[drift_method, mean_method, naive_method, seasonal_naive],
+    freq="Q"
+)
+preds = sf.forecast(h=len(test_df), df=train_df)
+preds["y"] = test_df["y"].values
+
+plot_series(beers_df, preds,
+            xlabel="Quarter",
+            ylabel="Megalitres",
+            title="Forecasts for quarterly beer production",
+            rm_legend=False)
+```
+
+## Measures of forecast accuracy
+
+::: {.columns}
+::: {.column}
+$y_{T+h}$ --- actual value at time $T+h$
+
+$\hat{y}_{T+h|T}$ --- forecast value made at time $T$ for time $T+h$
+
+$e_{T+h} = y_{T+h} - \hat{y}_{T+h|T}$ --- forecast error at time $T+h$
+:::
+::: {.column}
+- **Mean Error (ME)**: $\text{ME} = \frac{1}{n} \sum_{h=1}^{n} e_{T+h}$
+- **Mean Absolute Error (MAE)**: $\text{MAE} = \frac{1}{n} \sum_{h=1}^{n} |e_{T+h}|$
+- **Mean Squared Error (MSE)**: $\text{MSE} = \frac{1}{n} \sum_{h=1}^{n} e_{T+h}^2$
+- **Root Mean Squared Error (RMSE)**: $\text{RMSE} = \sqrt{\frac{1}{n} \sum_{h=1}^{n} e_{T+h}^2}$
+- **Mean Absolute Percentage Error (MAPE)**: $\text{MAPE} = \frac{100}{n} \sum_{h=1}^{n} \left| \frac{e_{T+h}}{y_{T+h}} \right|$
+:::
+:::
+
+- MAE, MSE, RMSE are all scale-dependent.
+- MAPE is scale-independent but can be problematic if actual values are close to zero.
+
+## Scaled errors
+
+Proposed by Hyndman and Koehler (2006):
+
+- For non-seasonal data, scale errors using naive method:
+
+$$
+q_i = \frac{e_i}{\frac{1}{T-1} \sum_{t=2}^{T} |y_t - y_{t-1}|}
+$$
+
+- For seasonal data, scale errors using seasonal naive method:
+
+$$
+q_i = \frac{e_i}{\frac{1}{T-m} \sum_{t=m+1}^{T} |y_t - y_{t-m}|}
+$$
+
+## Scaled errors
+
+- **Mean Absolute Scaled Error (MASE)**:
+
+$$
+\text{MASE} = \frac{1}{n} \sum_{i=1}^{n} |q_i|
+$$
+
+- **Root Mean Squared Scaled Error (RMSSE)**:
+
+$$
+\text{RMSSE} = \sqrt{\frac{1}{n} \sum_{i=1}^{n} q_i^2}
+$$
+
+where
+
+$$
+q_i^2 = \frac{e_i^2}{\frac{1}{T-1} \sum_{t=m+1}^{T} (y_t - y_{t-1})^2}
+$$
+
+and we set $m=1$ for non-seasonal data.
+
+---
+
+::: {.columns}
+::: {.column}
+```{python}
+plot_series(beers_df, preds,
+            xlabel="Quarter",
+            ylabel="Megalitres",
+            title="Forecasts for quarterly beer production",
+            rm_legend=False)
+```
+:::
+::: {.column}
+
+```{python}
+evaluation = evaluate(preds, 
+  metrics=[rmse, mae, mape,
+  partial(mase, seasonality=4)],
+  train_df =train_df)
+
+evaluation.round(2)
+```
+:::
+:::
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Questions? {.unnumbered .unlisted background-iframe=".04_files/libs/colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=3416)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
