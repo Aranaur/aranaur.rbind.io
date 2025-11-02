@@ -1,0 +1,257 @@
+---
+title: "Advanced Forecasting Workflow with Decomposition"
+format: html
+execute:
+  warning: false
+  message: false
+---
+
+# ## 1. Імпорти та завантаження даних
+#
+# Спочатку імпортуємо необхідні бібліотеки та завантажуємо дані, як і в попередніх роботах.
+
+```{python}
+#| label: imports
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from statsmodels.tsa.seasonal import STL, MSTL
+from statsmodels.graphics.tsaplots import plot_acf
+from statsmodels.stats.diagnostic import acorr_ljungbox
+from functools import partial
+
+# Імпорти для прогнозування
+from statsforecast import StatsForecast
+from statsforecast.models import (
+    Naive,
+    SeasonalNaive,
+    RandomWalkWithDrift,
+    HistoricAverage,
+)
+
+# Імпорти для оцінки та візуалізації
+from utilsforecast.plotting import plot_series
+from utilsforecast.evaluation import evaluate
+from utilsforecast.losses import rmse, mae, mape as _mape, mase
+
+# Налаштування стилю графіків
+sns.set_style("whitegrid")
+plt.style.use("ggplot")
+plt.rcParams.update({
+    "figure.figsize": (14, 7),
+    "axes.titlesize": 16,
+    "axes.labelsize": 12,
+})
+
+# Функція для MAPE у відсотках
+def mape(df, models, id_col="unique_id", target_col="y"):
+    df_mape = _mape(df, models, id_col=id_col, target_col=target_col)
+    df_mape.loc[:, df_mape.select_dtypes(include='number').columns] *= 100
+    return df_mape
+```
+
+```{python}
+#| label: data-loading
+# Завантажуємо та готуємо дані
+electricity_df = pd.read_csv(
+    'https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/datasets/energy_ua/energy_ua_2014_2021.csv'
+)
+electricity_df.columns = [
+    'ds', 'nuclear_generation_mwh', 'total_consumption_mwh', 'pump_storage_generation_mwh',
+    'pump_storage_consumption_mwh', 'hydro_generation_mwh', 'cogeneration_generation_mwh',
+    'thermal_generation_mwh', 'export_blr_rus_mwh', 'export_eu_mwh', 'export_mld_mwh',
+    'renewable_generation_mwh'
+]
+df_long = electricity_df.melt(id_vars=['ds'], var_name='unique_id', value_name='y')
+df_long['ds'] = pd.to_datetime(df_long['ds'])
+
+# Агрегуємо до денного частоти
+df_d = df_long.groupby(['unique_id', pd.Grouper(key='ds', freq='D')])['y'].sum().reset_index()
+df_d_diff = df_d.copy()
+df_d_diff["y"] = df_d.sort_values(['unique_id', 'ds']).groupby('unique_id')['y'].diff().fillna(0)
+
+# Фокусуємося на генерації з відновлюваних джерел
+renewable_df = df_d_diff.query("unique_id == 'renewable_generation_mwh' and ds <= '2021-08-31' and ds >= '2019-01-01'").copy()
+
+print("Дані успішно завантажено та підготовлено.")
+```
+
+# ## 2. Декомпозиція всього часового ряду
+#
+# На відміну від попереднього підходу, ми спочатку виконаємо STL-декомпозицію для **всього** набору даних. Це дозволить нам працювати з компонентами тренду, сезонності та залишків як з окремими часовими рядами.
+
+```{python}
+#| label: decomposition
+stl = MSTL(renewable_df['y'], periods=[7, 31], windows=[7, 31])
+res_stl = stl.fit()
+
+# Створюємо новий DataFrame з компонентами
+decomposed_df = renewable_df.copy()
+decomposed_df['trend'] = res_stl.trend
+decomposed_df['seasonal_7'] = res_stl.seasonal['seasonal_7']
+decomposed_df['seasonal_31'] = res_stl.seasonal['seasonal_31']
+# decomposed_df['seasonal_365'] = res_stl.seasonal['seasonal_365']
+decomposed_df['resid'] = res_stl.resid
+decomposed_df['y_adjusted'] = decomposed_df['trend'] + decomposed_df['resid']
+
+print("STL декомпозиція завершена.")
+
+# Візуалізуємо компоненти
+fig = res_stl.plot()
+fig.set_size_inches(14, 8)
+plt.suptitle("STL Decomposition of Daily Renewable Generation", y=0.95)
+plt.show()
+```
+
+# ## 3. Розділення компонент на тренувальні та тестові вибірки
+#
+# Тепер ми розділимо DataFrame з компонентами на тренувальну та тестову частини.
+
+```{python}
+#| label: split-components
+train_df = decomposed_df.query("ds < '2021-01-01'").copy()
+test_df = decomposed_df.query("ds >= '2021-01-01'").copy()
+forecast_horizon = len(test_df)
+
+print(f"Тренувальні дані: з {train_df['ds'].min().date()} по {train_df['ds'].max().date()}")
+print(f"Тестові дані: з {test_df['ds'].min().date()} по {test_df['ds'].max().date()}")
+print(f"Горизонт прогнозування (h): {forecast_horizon} днів")
+```
+
+# ## 4. Прогнозування компонент та вибір найкращої комбінації
+#
+# Ми спрогнозуємо кожну компоненту окремо, використовуючи різні моделі, а потім оцінимо, яка комбінація дає найкращий результат.
+#
+# - **Сезонна компонента:** будемо прогнозувати за допомогою `SeasonalNaive`.
+# - **Сезонно-скоригована компонента (`y_adjusted`):** протестуємо `Naive`, `RandomWalkWithDrift` та `HistoricAverage`.
+
+```{python}
+#| label: forecast-components
+# --- Прогноз сезонної компоненти ---
+sf_seasonal_7 = StatsForecast(models=[SeasonalNaive(season_length=7)], freq='D')
+sf_seasonal_7.fit(train_df[['ds', 'unique_id', 'seasonal_7']].rename(columns={'seasonal_7': 'y'}))
+fcst_seasonal_7_df = sf_seasonal_7.predict(h=forecast_horizon)
+
+sf_seasonal_30 = StatsForecast(models=[SeasonalNaive(season_length=31)], freq='D')
+sf_seasonal_30.fit(train_df[['ds', 'unique_id', 'seasonal_31']].rename(columns={'seasonal_31': 'y'}))
+fcst_seasonal_30_df = sf_seasonal_30.predict(h=forecast_horizon)
+
+# sf_seasonal_365 = StatsForecast(models=[SeasonalNaive(season_length=365)], freq='D')
+# sf_seasonal_365.fit(train_df[['ds', 'unique_id', 'seasonal_365']].rename(columns={'seasonal_365': 'y'}))
+# fcst_seasonal_365_df = sf_seasonal_365.predict(h=forecast_horizon)
+
+# --- Прогноз сезонно-скоригованої компоненти ---
+adjusted_models = [Naive(), RandomWalkWithDrift(), HistoricAverage()]
+sf_adjusted = StatsForecast(models=adjusted_models, freq='D')
+sf_adjusted.fit(train_df[['ds', 'unique_id', 'y_adjusted']].rename(columns={'y_adjusted': 'y'}))
+fcst_adjusted_df = sf_adjusted.predict(h=forecast_horizon)
+
+# --- Комбінування та оцінка прогнозів ---
+final_forecasts_df = pd.DataFrame({'ds': test_df['ds'].values, 'unique_id': test_df['unique_id'].values})
+
+# Створюємо прогнози для кожної комбінації
+final_forecasts_df['Naive_Combo'] = fcst_adjusted_df['Naive'] + fcst_seasonal_7_df['SeasonalNaive'] + fcst_seasonal_30_df['SeasonalNaive']
+final_forecasts_df['Drift_Combo'] = fcst_adjusted_df['RWD'] + fcst_seasonal_7_df['SeasonalNaive'] + fcst_seasonal_30_df['SeasonalNaive']
+final_forecasts_df['Average_Combo'] = fcst_adjusted_df['HistoricAverage'] + fcst_seasonal_7_df['SeasonalNaive'] + fcst_seasonal_30_df['SeasonalNaive']
+
+# Додаємо фактичні значення для оцінки
+final_forecasts_df['y'] = test_df['y'].values
+
+# Оцінюємо точність
+metrics = [rmse, mae, mape, partial(mase, seasonality=7)]
+evaluation_df = evaluate(final_forecasts_df, metrics=metrics, train_df=train_df)
+
+print("Оцінка точності для різних комбінацій моделей:")
+display(evaluation_df)
+```
+
+# ## 5. Діагностика залишків для найкращої моделі
+#
+# Судячи з метрик, комбінація з `RandomWalkWithDrift` (`Drift_Combo`) є найкращою. Проведемо діагностику залишків для цієї моделі на тренувальних даних.
+
+```{python}
+#| label: best-model-diagnostics
+print("Проводимо діагностику залишків для моделі RandomWalkWithDrift на сезонно-скоригованих даних.")
+
+# Отримуємо fitted values для тренувальної вибірки
+sf_best_adjusted = StatsForecast(models=[HistoricAverage()], freq='D')
+fitted_df = sf_best_adjusted.forecast(
+    len(train_df),
+    df=train_df[['ds', 'unique_id', 'y_adjusted']].rename(columns={'y_adjusted': 'y'}),
+    fitted=True
+)
+
+# Розраховуємо залишки
+train_df['residuals_adjusted'] = train_df['y_adjusted'] - fitted_df['HistoricAverage'].values
+
+# Будуємо діагностичні графіки
+fig, axes = plt.subplots(3, 1, figsize=(14, 12))
+fig.suptitle("Діагностика залишків для моделі Drift (сезонно-скориговані дані)", fontsize=18)
+
+# 1. Залишки в часі
+axes[0].plot(train_df['ds'], train_df['residuals_adjusted'])
+axes[0].set_title("Залишки в часі")
+axes[0].axhline(0, color='red', linestyle='--')
+
+# 2. ACF графік залишків
+plot_acf(train_df['residuals_adjusted'].dropna(), ax=axes[1], lags=35, title="ACF залишків")
+
+# 3. Гістограма залишків
+sns.histplot(train_df['residuals_adjusted'].dropna(), ax=axes[2], kde=True)
+axes[2].set_title("Гістограма розподілу залишків")
+
+plt.tight_layout(rect=[0, 0, 1, 0.96])
+plt.show()
+```
+
+# Тест Льюнга-Бокса
+
+```{python}
+ljung_box_results = acorr_ljungbox(train_df['residuals_adjusted'].dropna(), lags=[10], return_df=True)
+print("Результати тесту Льюнга-Бокса:")
+print(ljung_box_results)
+```
+
+
+# ## 6. Побудова фінального прогнозу на майбутнє
+#
+# Ми визначили, що найкраща стратегія — це `SeasonalNaive` для сезонності та `RandomWalkWithDrift` для сезонно-скоригованого ряду. Тепер ми перенавчимо ці моделі на **всіх доступних даних** (`decomposed_df`) і згенеруємо прогноз на наступні 90 днів.
+
+```{python}
+#| label: final-forecast
+future_horizon = 30
+print(f"Будуємо фінальний прогноз на {future_horizon} днів у майбутнє...")
+
+# --- Перенавчаємо модель для сезонності на всіх даних ---
+sf_seasonal_7 = StatsForecast(models=[SeasonalNaive(season_length=7)], freq='D')
+sf_seasonal_7.fit(decomposed_df[['ds', 'unique_id', 'seasonal_7']].rename(columns={'seasonal_7': 'y'}))
+future_seasonal_fcst = sf_seasonal_7.predict(h=future_horizon)
+
+sf_seasonal_30 = StatsForecast(models=[SeasonalNaive(season_length=31)], freq='D')
+sf_seasonal_30.fit(decomposed_df[['ds', 'unique_id', 'seasonal_31']].rename(columns={'seasonal_31': 'y'}))
+future_seasonal_fcst_30 = sf_seasonal_30.predict(h=future_horizon)
+
+# --- Перенавчаємо модель для сезонно-скоригованих даних на всіх даних ---
+sf_adjusted_final = StatsForecast(models=[HistoricAverage()], freq='D')
+sf_adjusted_final.fit(decomposed_df[['ds', 'unique_id', 'y_adjusted']].rename(columns={'y_adjusted': 'y'}))
+future_adjusted_fcst = sf_adjusted_final.predict(h=future_horizon, level=[95])
+
+# --- Комбінуємо прогнози ---
+final_future_forecast = future_adjusted_fcst.copy()
+final_future_forecast['Final_Forecast'] = future_adjusted_fcst['HistoricAverage'] + future_seasonal_fcst['SeasonalNaive'] + future_seasonal_fcst_30['SeasonalNaive']
+
+# Додаємо сезонну компоненту до довірчих інтервалів (спрощений підхід)
+final_future_forecast['Final_Forecast-lo-95'] = future_adjusted_fcst['HistoricAverage-lo-95'] + future_seasonal_fcst['SeasonalNaive']
+final_future_forecast['Final_Forecast-hi-95'] = future_adjusted_fcst['HistoricAverage-hi-95'] + future_seasonal_fcst['SeasonalNaive']
+
+print("Фінальний прогноз побудовано.")
+
+# --- Візуалізація фінального прогнозу ---
+plot_series(
+    decomposed_df,
+    final_future_forecast,
+    level=[95],
+    max_insample_length=365*2 # Показуємо останні 2 роки історії
+)
+```

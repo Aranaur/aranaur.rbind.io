@@ -225,6 +225,8 @@ Ihor Miroshnychenko
 <li><a href="#/forecasting-using-transformations" id="/toc-forecasting-using-transformations">Forecasting using transformations</a></li>
 <li><a href="#/forecasting-with-decomposition" id="/toc-forecasting-with-decomposition">Forecasting with decomposition</a></li>
 <li><a href="#/evaluating-point-forecast-accuracy" id="/toc-evaluating-point-forecast-accuracy">Evaluating point forecast accuracy</a></li>
+<li><a href="#/evaluating-distributional-accuracy" id="/toc-evaluating-distributional-accuracy">Evaluating distributional accuracy</a></li>
+<li><a href="#/times-series-cross-validation" id="/toc-times-series-cross-validation">Times series cross-validation</a></li>
 </ul>
 </nav>
 </section>
@@ -249,7 +251,7 @@ Ihor Miroshnychenko
 <h2>A tidy forecasting workflow</h2>
 
 <img data-src=".04_files/figure-revealjs/cell-3-output-1.svg" class="r-stretch"></section>
-<section id="data-preparation" class="slide level2">
+<section id="data-preparation" class="slide level2 smaller">
 <h2>Data preparation</h2>
 <div id="cell-load-data" class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="" aria-hidden="true" tabindex="-1"></a>gsheetkey <span class="op">=</span> <span class="st">'1wrSjwahn_OCY6JcS6Bumxu9ucuzGX1eN2yeQTIVhF3c'</span></span>
@@ -338,40 +340,63 @@ Ihor Miroshnychenko
 </section>
 <section id="data-visualization" class="slide level2">
 <h2>Data visualization</h2>
-<div id="f464c6be" class="cell" data-execution_count="4">
+<div id="8f829517" class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(gdp_df, ids<span class="op">=</span>[<span class="st">"Sweden"</span>],</span>
 <span id="cb2-2"><a href="" aria-hidden="true" tabindex="-1"></a>            xlabel<span class="op">=</span><span class="st">"Year [1Y]"</span>, ylabel<span class="op">=</span><span class="st">"$US"</span>,</span>
 <span id="cb2-3"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"GDP per capita for Sweden"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
 </div>
 <img data-src=".04_files/figure-revealjs/cell-5-output-1.svg" class="r-stretch"></section>
-<section id="model-estimation" class="slide level2">
-<h2>Model estimation</h2>
-<div id="73d3ed0c" class="cell" data-execution_count="5">
-<div class="cell-output cell-output-display" data-execution_count="5">
-<pre><code>LinearRegression</code></pre>
-</div>
-</div>
-</section>
 <section id="train-the-model" class="slide level2">
 <h2>Train the model</h2>
+<div id="42f6917b" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="" aria-hidden="true" tabindex="-1"></a>train_df <span class="op">=</span> gdp_df.copy()</span>
+<span id="cb3-2"><a href="" aria-hidden="true" tabindex="-1"></a>train_df.drop([<span class="st">"GDP"</span>, <span class="st">"Population"</span>], axis<span class="op">=</span><span class="dv">1</span>, inplace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-3"><a href="" aria-hidden="true" tabindex="-1"></a>sweden_df <span class="op">=</span> train_df.query(<span class="st">"unique_id == 'Sweden'"</span>)</span>
+<span id="cb3-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="" aria-hidden="true" tabindex="-1"></a>train_features, valid_features <span class="op">=</span> pipeline(</span>
+<span id="cb3-6"><a href="" aria-hidden="true" tabindex="-1"></a>    sweden_df,</span>
+<span id="cb3-7"><a href="" aria-hidden="true" tabindex="-1"></a>    features<span class="op">=</span>[trend],</span>
+<span id="cb3-8"><a href="" aria-hidden="true" tabindex="-1"></a>    freq<span class="op">=</span><span class="st">"YE"</span>,</span>
+<span id="cb3-9"><a href="" aria-hidden="true" tabindex="-1"></a>    h<span class="op">=</span><span class="dv">3</span>,</span>
+<span id="cb3-10"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-11"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(</span>
+<span id="cb3-12"><a href="" aria-hidden="true" tabindex="-1"></a>    models<span class="op">=</span>[SklearnModel(LinearRegression())],</span>
+<span id="cb3-13"><a href="" aria-hidden="true" tabindex="-1"></a>    freq<span class="op">=</span><span class="st">"YE"</span>,</span>
+<span id="cb3-14"><a href="" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
 </section>
 <section id="produce-forecasts" class="slide level2">
 <h2>Produce forecasts</h2>
+<div id="c7a74cbd" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="" aria-hidden="true" tabindex="-1"></a>sf.fit(df<span class="op">=</span>train_features)</span>
+<span id="cb4-2"><a href="" aria-hidden="true" tabindex="-1"></a>fcasts <span class="op">=</span> sf.predict(</span>
+<span id="cb4-3"><a href="" aria-hidden="true" tabindex="-1"></a>    h<span class="op">=</span><span class="dv">3</span>,</span>
+<span id="cb4-4"><a href="" aria-hidden="true" tabindex="-1"></a>    X_df<span class="op">=</span>valid_features,</span>
+<span id="cb4-5"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-6"><a href="" aria-hidden="true" tabindex="-1"></a>fcasts <span class="op">=</span> sf.fitted_[<span class="dv">0</span>][<span class="dv">0</span>].model_[<span class="st">"model"</span>].add_prediction_intervals(fcasts,</span>
+<span id="cb4-7"><a href="" aria-hidden="true" tabindex="-1"></a>  valid_features.rename(columns<span class="op">=</span>{<span class="st">"trend"</span>: <span class="st">"x1"</span>}))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
 </section>
 <section class="slide level2">
 
 
-<img data-src=".04_files/figure-revealjs/cell-9-output-1.svg" class="r-stretch"></section></section>
+<img data-src=".04_files/figure-revealjs/cell-8-output-1.svg" class="r-stretch"></section></section>
 <section>
 <section id="some-simple-forecasting-methods" class="title-slide slide level1 center">
 <h1>Some simple forecasting methods</h1>
 
 </section>
-<section id="data" class="slide level2">
+<section id="data" class="slide level2 smaller">
 <h2>Data</h2>
-<div id="f27471a1" class="cell" data-execution_count="9">
-<div class="cell-output cell-output-display" data-execution_count="9">
+<div id="4c7b8a41" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="" aria-hidden="true" tabindex="-1"></a>gsheetkey <span class="op">=</span> <span class="st">'10Y3HqO91-87jSvxmmxuTlAlbKyD67pZ9hWP8RIp7JSE'</span></span>
+<span id="cb5-2"><a href="" aria-hidden="true" tabindex="-1"></a>url <span class="op">=</span> <span class="ss">f'https://docs.google.com/spreadsheet/ccc?key=</span><span class="sc">{</span>gsheetkey<span class="sc">}</span><span class="ss">&amp;output=csv'</span></span>
+<span id="cb5-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="" aria-hidden="true" tabindex="-1"></a>production_df <span class="op">=</span> pd.read_csv(url,</span>
+<span id="cb5-5"><a href="" aria-hidden="true" tabindex="-1"></a>  parse_dates<span class="op">=</span>[<span class="st">"ds"</span>])</span>
+<span id="cb5-6"><a href="" aria-hidden="true" tabindex="-1"></a>production_df.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="8">
 <div>
 <style scoped="">
     .dataframe tbody tr th:only-of-type {
@@ -434,53 +459,118 @@ Ihor Miroshnychenko
 </div>
 </div>
 </section>
-<section id="mean-method" class="slide level2">
+<section id="mean-method" class="slide level2 smaller">
 <h2>Mean method</h2>
 <ul>
 <li>Forecast of all future values is the mean of the historical data</li>
 <li>Forecast: <span class="math inline">\(\hat{y}_{t+h|t} = \bar{y}_t = \frac{1}{T} \sum_{i=1}^{T} y_i\)</span></li>
 </ul>
-
-<img data-src=".04_files/figure-revealjs/cell-11-output-1.svg" class="r-stretch"></section>
-<section id="naïve-method" class="slide level2">
+<div id="cd956a3a" class="cell columns column-output-location" data-execution_count="9">
+<div class="column">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> production_df[production_df[<span class="st">'unique_id'</span>] <span class="op">==</span> <span class="st">'Bricks'</span>].dropna()</span>
+<span id="cb6-2"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[HistoricAverage()], freq<span class="op">=</span><span class="st">'QE'</span>)</span>
+<span id="cb6-3"><a href="" aria-hidden="true" tabindex="-1"></a>fcasts_avg <span class="op">=</span> sf.forecast(h<span class="op">=</span><span class="dv">20</span>, df<span class="op">=</span>df)</span>
+<span id="cb6-4"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(df, fcasts_avg,</span>
+<span id="cb6-5"><a href="" aria-hidden="true" tabindex="-1"></a>            xlabel<span class="op">=</span><span class="st">"Quarter"</span>,</span>
+<span id="cb6-6"><a href="" aria-hidden="true" tabindex="-1"></a>            ylabel<span class="op">=</span><span class="st">"Production"</span>,</span>
+<span id="cb6-7"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"Mean method forecasts for Bricks production"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div><div class="column">
+<div class="cell-output cell-output-display" data-execution_count="9">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".04_files/figure-revealjs/cell-10-output-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></div>
+</section>
+<section id="naïve-method" class="slide level2 smaller">
 <h2>Naïve method</h2>
 <ul>
 <li>Forecast of all future values is the last observed value</li>
 <li>Forecast: <span class="math inline">\(\hat{y}_{t+h|t} = y_t\)</span></li>
 </ul>
-
-<img data-src=".04_files/figure-revealjs/cell-12-output-1.svg" class="r-stretch"></section>
-<section id="seasonal-naïve-method" class="slide level2">
+<div id="55423e01" class="cell columns column-output-location" data-execution_count="10">
+<div class="column">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[Naive()], freq<span class="op">=</span><span class="st">'QE'</span>)</span>
+<span id="cb7-2"><a href="" aria-hidden="true" tabindex="-1"></a>fcasts_naive <span class="op">=</span> sf.forecast(h<span class="op">=</span><span class="dv">20</span>, df<span class="op">=</span>df)</span>
+<span id="cb7-3"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(df, fcasts_naive,</span>
+<span id="cb7-4"><a href="" aria-hidden="true" tabindex="-1"></a>            xlabel<span class="op">=</span><span class="st">"Quarter"</span>,</span>
+<span id="cb7-5"><a href="" aria-hidden="true" tabindex="-1"></a>            ylabel<span class="op">=</span><span class="st">"Production"</span>,</span>
+<span id="cb7-6"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"Naïve method forecasts for Bricks production"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div><div class="column">
+<div class="cell-output cell-output-display" data-execution_count="10">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".04_files/figure-revealjs/cell-11-output-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></div>
+</section>
+<section id="seasonal-naïve-method" class="slide level2 smaller">
 <h2>Seasonal naïve method</h2>
 <ul>
 <li>Forecast of all future values is the last observed value from the same season</li>
 <li>Forecast: <span class="math inline">\(\hat{y}_{t+h|t} = y_{t+h-m(k+1)}\)</span>, where <span class="math inline">\(m\)</span> is the seasonal period and <span class="math inline">\(k = (h-1)/m\)</span></li>
 </ul>
-
-<img data-src=".04_files/figure-revealjs/cell-13-output-1.svg" class="r-stretch"></section>
-<section id="drift-method" class="slide level2">
+<div id="8e586601" class="cell columns column-output-location" data-execution_count="11">
+<div class="column">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[SeasonalNaive(season_length<span class="op">=</span><span class="dv">4</span>)], freq<span class="op">=</span><span class="st">'QE'</span>)</span>
+<span id="cb8-2"><a href="" aria-hidden="true" tabindex="-1"></a>fcasts_snaive <span class="op">=</span> sf.forecast(h<span class="op">=</span><span class="dv">20</span>, df<span class="op">=</span>df)</span>
+<span id="cb8-3"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(df, fcasts_snaive,</span>
+<span id="cb8-4"><a href="" aria-hidden="true" tabindex="-1"></a>            xlabel<span class="op">=</span><span class="st">"Quarter"</span>,</span>
+<span id="cb8-5"><a href="" aria-hidden="true" tabindex="-1"></a>            ylabel<span class="op">=</span><span class="st">"Production"</span>,</span>
+<span id="cb8-6"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"Seasonal naïve method forecasts for Bricks"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div><div class="column">
+<div class="cell-output cell-output-display" data-execution_count="11">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".04_files/figure-revealjs/cell-12-output-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></div>
+</section>
+<section id="drift-method" class="slide level2 smaller">
 <h2>Drift method</h2>
 <ul>
 <li>Forecast equals last observed value plus average change observed in historical data</li>
 <li>Forecast: <span class="math inline">\(\hat{y}_{T+h \mid T}=y_T+\frac{h}{T-1} \sum_{t=2}^T\left(y_t-y_{t-1}\right)=y_T+h\left(\frac{y_T-y_1}{T-1}\right)\)</span>.</li>
 <li>Equivalent to fitting a line between the first and last observation and extrapolating it into the future</li>
 </ul>
-
-<img data-src=".04_files/figure-revealjs/cell-14-output-1.svg" class="r-stretch"></section>
+<div id="6fb46c36" class="cell columns column-output-location" data-execution_count="12">
+<div class="column">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[RandomWalkWithDrift()], freq<span class="op">=</span><span class="st">'QE'</span>)</span>
+<span id="cb9-2"><a href="" aria-hidden="true" tabindex="-1"></a>fcasts_drift <span class="op">=</span> sf.forecast(h<span class="op">=</span><span class="dv">20</span>, df<span class="op">=</span>df)</span>
+<span id="cb9-3"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(df, fcasts_drift,</span>
+<span id="cb9-4"><a href="" aria-hidden="true" tabindex="-1"></a>            xlabel<span class="op">=</span><span class="st">"Quarter"</span>,</span>
+<span id="cb9-5"><a href="" aria-hidden="true" tabindex="-1"></a>            ylabel<span class="op">=</span><span class="st">"Production"</span>,</span>
+<span id="cb9-6"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"Drift method forecasts for Bricks production"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div><div class="column">
+<div class="cell-output cell-output-display" data-execution_count="12">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".04_files/figure-revealjs/cell-13-output-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></div>
+</section>
 <section id="example-australian-beer-production" class="slide level2">
 <h2>Example: Australian beer production</h2>
 
-<img data-src=".04_files/figure-revealjs/cell-15-output-1.svg" class="r-stretch"></section>
+<img data-src=".04_files/figure-revealjs/cell-14-output-1.svg" class="r-stretch"></section>
 <section id="example-googles-daily-closing-stock-price" class="slide level2">
 <h2>Example: Google’s daily closing stock price</h2>
 
-<img data-src=".04_files/figure-revealjs/cell-16-output-1.svg" class="r-stretch"></section></section>
+<img data-src=".04_files/figure-revealjs/cell-15-output-1.svg" class="r-stretch"></section></section>
 <section>
 <section id="fitted-values-and-residuals" class="title-slide slide level1 center">
 <h1>Fitted values and residuals</h1>
 
 </section>
-<section id="fitted-values" class="slide level2">
+<section id="fitted-values" class="slide level2 smaller">
 <h2>Fitted values</h2>
 <ul>
 <li><span class="math inline">\(\hat{y}_{t|t-1}\)</span> is the forecast of <span class="math inline">\(y_t\)</span> based on all available information up to time <span class="math inline">\(t-1\)</span>.</li>
@@ -502,20 +592,20 @@ Ihor Miroshnychenko
 </div>
 </div>
 </section>
-<section id="forecasting-residuals" class="slide level2">
+<section id="forecasting-residuals" class="slide level2 smaller">
 <h2>Forecasting residuals</h2>
 <ul>
 <li>The residuals are the differences between the observed values and the fitted values: <span class="math inline">\(e_t = y_t - \hat{y}_{t|t-1}\)</span>.</li>
 </ul>
 <p>Assumptions:</p>
 <ol type="1">
-<li><span class="math inline">\(\{e_t\}\)</span> uncorrelated. If they aren’t, then information left in residuals can be used to improve forecasts.</li>
-<li><span class="math inline">\(\{e_t\}\)</span> have mean zero. If they don’t, then the model is systematically over- or under-predicting.</li>
+<li><span class="math inline">\(\{e_t\}\)</span> <span class="hi">uncorrelated</span>. If they aren’t, then information left in residuals can be used to improve forecasts.</li>
+<li><span class="math inline">\(\{e_t\}\)</span> <span class="hi">have mean zero</span>. If they don’t, then the model is systematically over- or under-predicting.</li>
 </ol>
 <p>Useful properties (for distribution and prediction intervals):</p>
 <ol start="3" type="1">
-<li><span class="math inline">\(\{e_t\}\)</span> are normally distributed. If they aren’t, then prediction intervals may be invalid.</li>
-<li><span class="math inline">\(\{e_t\}\)</span> are homoscedastic. If they aren’t, then prediction intervals may be invalid.</li>
+<li><span class="math inline">\(\{e_t\}\)</span> are <span class="hi-slate">normally distributed</span>. If they aren’t, then prediction intervals may be invalid.</li>
+<li><span class="math inline">\(\{e_t\}\)</span> are <span class="hi-slate">homoscedastic</span>. If they aren’t, then prediction intervals may be invalid.</li>
 </ol>
 </section></section>
 <section>
@@ -523,14 +613,29 @@ Ihor Miroshnychenko
 <h1>Residual diagnostics</h1>
 
 </section>
-<section id="google-daily-closing-stock-prices" class="slide level2">
+<section id="google-daily-closing-stock-prices" class="slide level2 smaller">
 <h2>Google daily closing stock prices</h2>
+<div id="b7f633b6" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="" aria-hidden="true" tabindex="-1"></a>train <span class="op">=</span> goog_df.query(<span class="st">"ds.dt.year == 2015"</span>)</span>
+<span id="cb10-2"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(train,</span>
+<span id="cb10-3"><a href="" aria-hidden="true" tabindex="-1"></a>            xlabel<span class="op">=</span><span class="st">"day [1]"</span>,</span>
+<span id="cb10-4"><a href="" aria-hidden="true" tabindex="-1"></a>            ylabel<span class="op">=</span><span class="st">"$US"</span>,</span>
+<span id="cb10-5"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"Google daily closing stock prices in 2015"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
-<img data-src=".04_files/figure-revealjs/cell-17-output-1.svg" class="r-stretch"></section>
-<section id="google-stock-prices-and-naive-method" class="slide level2">
+</div>
+<img data-src=".04_files/figure-revealjs/cell-16-output-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="google-stock-prices-and-naive-method" class="slide level2 smaller">
 <h2>Google stock prices and Naive method</h2>
-<div id="8b5a7e8a" class="cell" data-execution_count="17">
-<div class="cell-output cell-output-display" data-execution_count="17">
+<div id="eaca29d8" class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="" aria-hidden="true" tabindex="-1"></a>naive_method <span class="op">=</span> Naive()</span>
+<span id="cb11-2"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[naive_method], freq<span class="op">=</span><span class="st">'1d'</span>)</span>
+<span id="cb11-3"><a href="" aria-hidden="true" tabindex="-1"></a>sf.forecast(h<span class="op">=</span><span class="dv">14</span>, df<span class="op">=</span>train, fitted<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb11-4"><a href="" aria-hidden="true" tabindex="-1"></a>fitted_values <span class="op">=</span> sf.forecast_fitted_values()</span>
+<span id="cb11-5"><a href="" aria-hidden="true" tabindex="-1"></a>train[<span class="st">"fitted"</span>] <span class="op">=</span> fitted_values[<span class="st">"Naive"</span>].values</span>
+<span id="cb11-6"><a href="" aria-hidden="true" tabindex="-1"></a>train[<span class="st">"resid"</span>] <span class="op">=</span> train[<span class="st">"y"</span>] <span class="op">-</span> train[<span class="st">"fitted"</span>]</span>
+<span id="cb11-7"><a href="" aria-hidden="true" tabindex="-1"></a>train[<span class="st">"innov"</span>] <span class="op">=</span> train[<span class="st">"y"</span>] <span class="op">-</span> train[<span class="st">"fitted"</span>]</span>
+<span id="cb11-8"><a href="" aria-hidden="true" tabindex="-1"></a>train.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="16">
 <div>
 <style scoped="">
     .dataframe tbody tr th:only-of-type {
@@ -611,52 +716,106 @@ Ihor Miroshnychenko
 </div>
 </div>
 </section>
-<section id="true-vs-fitted-values" class="slide level2">
+<section id="true-vs-fitted-values" class="slide level2 smaller">
 <h2>True vs Fitted values</h2>
+<div id="f70e2f82" class="cell" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb12-2"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(train[<span class="st">"ds"</span>], train[<span class="st">"y"</span>], label<span class="op">=</span><span class="st">"Observed"</span>, color<span class="op">=</span>blue)</span>
+<span id="cb12-3"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(train[<span class="st">"ds"</span>], train[<span class="st">"fitted"</span>], label<span class="op">=</span><span class="st">"Fitted"</span>, color<span class="op">=</span>orange)</span>
+<span id="cb12-4"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
-<img data-src=".04_files/figure-revealjs/cell-19-output-1.svg" class="r-stretch"></section>
-<section id="last-observations" class="slide level2">
+</div>
+<img data-src=".04_files/figure-revealjs/cell-18-output-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="last-observations" class="slide level2 smaller">
 <h2>Last observations</h2>
+<div id="0af2bd16" class="cell" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb13-2"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(train[<span class="st">"ds"</span>][<span class="op">-</span><span class="dv">40</span>:], train[<span class="st">"y"</span>][<span class="op">-</span><span class="dv">40</span>:], label<span class="op">=</span><span class="st">"Observed"</span>, color<span class="op">=</span>blue)</span>
+<span id="cb13-3"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(train[<span class="st">"ds"</span>][<span class="op">-</span><span class="dv">40</span>:], train[<span class="st">"fitted"</span>][<span class="op">-</span><span class="dv">40</span>:], label<span class="op">=</span><span class="st">"Fitted"</span>, color<span class="op">=</span>orange)</span>
+<span id="cb13-4"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
-<img data-src=".04_files/figure-revealjs/cell-20-output-1.svg" class="r-stretch"></section>
-<section id="residual-diagnostics-1" class="slide level2">
+</div>
+<img data-src=".04_files/figure-revealjs/cell-19-output-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="residual-diagnostics-1" class="slide level2 smaller">
 <h2>Residual diagnostics</h2>
+<div id="5e0123f4" class="cell" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="" aria-hidden="true" tabindex="-1"></a>train[<span class="st">"resid"</span>] <span class="op">=</span> train[<span class="st">"y"</span>].diff().values</span>
+<span id="cb14-2"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(train, target_col<span class="op">=</span><span class="st">"resid"</span>,</span>
+<span id="cb14-3"><a href="" aria-hidden="true" tabindex="-1"></a>            xlabel<span class="op">=</span><span class="st">"day [1]"</span>,</span>
+<span id="cb14-4"><a href="" aria-hidden="true" tabindex="-1"></a>            ylabel<span class="op">=</span><span class="st">"$US"</span>,</span>
+<span id="cb14-5"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"Residuals from the naive method"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
-<img data-src=".04_files/figure-revealjs/cell-21-output-1.svg" class="r-stretch"></section>
-<section id="histogram-of-residuals" class="slide level2">
+</div>
+<img data-src=".04_files/figure-revealjs/cell-20-output-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="histogram-of-residuals" class="slide level2 smaller">
 <h2>Histogram of residuals</h2>
+<div id="afd76f1e" class="cell" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="" aria-hidden="true" tabindex="-1"></a>ax <span class="op">=</span> train[<span class="st">"resid"</span>].hist()</span>
+<span id="cb15-2"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Histogram of residuals"</span>)</span>
+<span id="cb15-3"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
-<img data-src=".04_files/figure-revealjs/cell-22-output-1.svg" class="r-stretch"></section>
-<section id="acf-of-residuals" class="slide level2">
+</div>
+<img data-src=".04_files/figure-revealjs/cell-21-output-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="acf-of-residuals" class="slide level2 smaller">
 <h2>ACF of residuals</h2>
+<div id="1d4673c5" class="cell" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="" aria-hidden="true" tabindex="-1"></a>fig <span class="op">=</span> plot_acf(train[<span class="st">"resid"</span>][<span class="dv">1</span>:], zero<span class="op">=</span><span class="va">False</span>, auto_ylims<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb16-2"><a href="" aria-hidden="true" tabindex="-1"></a>         bartlett_confint<span class="op">=</span><span class="va">False</span>, title<span class="op">=</span><span class="st">"Residuals from the naïve method"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
-<img data-src=".04_files/figure-revealjs/cell-23-output-1.svg" class="r-stretch"></section>
-<section id="all-together" class="slide level2">
+</div>
+<img data-src=".04_files/figure-revealjs/cell-22-output-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="all-together" class="slide level2 smaller">
 <h2>All together</h2>
+<div id="f45e2f54" class="cell" data-execution_count="22">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> plot_diagnostics(data):</span>
+<span id="cb17-2"><a href="" aria-hidden="true" tabindex="-1"></a>  fig <span class="op">=</span> plt.figure(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">5</span>))</span>
+<span id="cb17-3"><a href="" aria-hidden="true" tabindex="-1"></a>  ax1 <span class="op">=</span> fig.add_subplot(<span class="dv">2</span>, <span class="dv">2</span>, (<span class="dv">1</span>, <span class="dv">2</span>))</span>
+<span id="cb17-4"><a href="" aria-hidden="true" tabindex="-1"></a>  ax1.plot(data[<span class="st">'ds'</span>], data[<span class="st">"resid"</span>])</span>
+<span id="cb17-5"><a href="" aria-hidden="true" tabindex="-1"></a>  ax1.set_title(<span class="st">"Innovation Residuals"</span>)</span>
+<span id="cb17-6"><a href="" aria-hidden="true" tabindex="-1"></a>  ax2 <span class="op">=</span> fig.add_subplot(<span class="dv">2</span>, <span class="dv">2</span>, <span class="dv">3</span>)</span>
+<span id="cb17-7"><a href="" aria-hidden="true" tabindex="-1"></a>  plot_acf(data[<span class="st">"resid"</span>].dropna(), ax<span class="op">=</span>ax2, zero<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb17-8"><a href="" aria-hidden="true" tabindex="-1"></a>    bartlett_confint<span class="op">=</span><span class="va">False</span>, auto_ylims<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb17-9"><a href="" aria-hidden="true" tabindex="-1"></a>  ax2.set_title(<span class="st">"ACF Plot"</span>)</span>
+<span id="cb17-10"><a href="" aria-hidden="true" tabindex="-1"></a>  ax2.set_xlabel(<span class="st">'lag[1]'</span>)</span>
+<span id="cb17-11"><a href="" aria-hidden="true" tabindex="-1"></a>  ax3 <span class="op">=</span> fig.add_subplot(<span class="dv">2</span>, <span class="dv">2</span>, <span class="dv">4</span>)</span>
+<span id="cb17-12"><a href="" aria-hidden="true" tabindex="-1"></a>  ax3.hist(data[<span class="st">"resid"</span>], bins<span class="op">=</span><span class="dv">20</span>)</span>
+<span id="cb17-13"><a href="" aria-hidden="true" tabindex="-1"></a>  ax3.set_title(<span class="st">"Histogram"</span>)</span>
+<span id="cb17-14"><a href="" aria-hidden="true" tabindex="-1"></a>  ax3.set_xlabel(<span class="st">".resid"</span>)</span>
+<span id="cb17-15"><a href="" aria-hidden="true" tabindex="-1"></a>  ax3.set_ylabel(<span class="st">"Count"</span>)</span>
+<span id="cb17-16"><a href="" aria-hidden="true" tabindex="-1"></a>  plt.tight_layout()</span>
+<span id="cb17-17"><a href="" aria-hidden="true" tabindex="-1"></a>  plt.show()</span>
+<span id="cb17-18"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-19"><a href="" aria-hidden="true" tabindex="-1"></a>plot_diagnostics(train)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
 
-<img data-src=".04_files/figure-revealjs/cell-24-output-1.svg" class="r-stretch"></section>
-<section id="acf-of-residuals-1" class="slide level2">
+</section>
+<section id="all-together-output" class="slide level2 smaller output-location-slide"><h2>All together</h2><div class="cell output-location-slide" data-execution_count="22">
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".04_files/figure-revealjs/cell-23-output-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></section><section id="acf-of-residuals-1" class="slide level2">
 <h2>ACF of residuals</h2>
 <ul>
-<li>We assume that the residuals are white noise. If they are not, then there is information left in the residuals that can be used to improve the forecasts.</li>
-<li>So a standard residual diagnostic is to plot the ACF of the residuals and check for significant autocorrelations.</li>
-<li>We <em>expect</em> all autocorrelations to be close to zero and within the 95% confidence bounds.</li>
+<li>We assume that the <span class="hi">residuals are white noise</span>. If they are not, then there is information left in the residuals that can be used to improve the forecasts.</li>
+<li>So a standard residual diagnostic is to <span class="hi">plot the ACF</span> of the residuals and check for significant autocorrelations.</li>
+<li>We <span class="hi"><em>expect</em></span> all autocorrelations to be close to zero and within the 95% confidence bounds.</li>
 </ul>
 </section>
-<section id="portmanteau-test" class="slide level2">
+<section id="portmanteau-test" class="slide level2 smaller">
 <h2>Portmanteau test</h2>
 <p><span class="math inline">\(r_k\)</span> — autocorrelation of residual at lag <span class="math inline">\(k\)</span>.</p>
 <p>Consider a whole set of <span class="math inline">\(r_k\)</span> values, and develop a test to see whether they are significantly different from zero.</p>
 <ul>
-<li><span class="math inline">\(H_0\)</span>: All <span class="math inline">\(r_k = 0\)</span> for <span class="math inline">\(k = 1, 2, \ldots, l\)</span></li>
-<li><span class="math inline">\(H_a\)</span>: At least one <span class="math inline">\(r_k \neq 0\)</span> for <span class="math inline">\(k = 1, 2, \ldots, l\)</span></li>
+<li><span class="math inline">\(H_0\)</span>: variable follows a white noise process (all <span class="math inline">\(r_k = 0\)</span> for <span class="math inline">\(k = 1, 2, \ldots, l\)</span>)</li>
+<li><span class="math inline">\(H_a\)</span>: variable does not follow a white noise process (at least one <span class="math inline">\(r_k \neq 0\)</span> for <span class="math inline">\(k = 1, 2, \ldots, l\)</span>)</li>
 </ul>
-<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout callout-note no-icon callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
 <p><strong>Box-Pierce test</strong></p>
 </div>
 <div class="callout-content">
@@ -670,16 +829,13 @@ Ihor Miroshnychenko
 <li>If some <span class="math inline">\(r_k\)</span> significantly different from zero, then <span class="math inline">\(Q\)</span> will be large.</li>
 </ul>
 </section>
-<section id="portmanteau-test-1" class="slide level2">
+<section id="portmanteau-test-1" class="slide level2 smaller">
 <h2>Portmanteau test</h2>
 <p><span class="math inline">\(r_k\)</span> — autocorrelation of residual at lag <span class="math inline">\(k\)</span>.</p>
 <p>Consider a whole set of <span class="math inline">\(r_k\)</span> values, and develop a test to see whether they are significantly different from zero.</p>
-<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout callout-note no-icon callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
 <p><strong>Ljung-Box test</strong></p>
 </div>
 <div class="callout-content">
@@ -693,13 +849,102 @@ Ihor Miroshnychenko
 <li>Better performance for small samples compared to Box-Pierce test.</li>
 </ul>
 </section>
-<section id="portmanteau-test-for-naive-method-residuals" class="slide level2">
+<section id="portmanteau-test-for-naive-method-residuals" class="slide level2 smaller">
 <h2>Portmanteau test for naive method residuals</h2>
 <ul>
 <li>If data are white noise, then <span class="math inline">\(Q^*\)</span> has a <span class="math inline">\(\chi^2\)</span> distribution with <span class="math inline">\(l\)</span> degrees of freedom.</li>
 <li>lag = <span class="math inline">\(l\)</span></li>
 </ul>
-<div id="cd397e4d" class="cell" data-execution_count="24">
+<div id="ecd9a8f4" class="cell columns column-output-location" data-execution_count="23">
+<div class="column">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="" aria-hidden="true" tabindex="-1"></a>resid_test <span class="op">=</span> acorr_ljungbox(train[<span class="st">"resid"</span>].dropna(),</span>
+<span id="cb18-2"><a href="" aria-hidden="true" tabindex="-1"></a>  boxpierce<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb18-3"><a href="" aria-hidden="true" tabindex="-1"></a>resid_test.<span class="bu">round</span>(<span class="dv">4</span>).head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div><div class="column">
+<div class="cell-output cell-output-display" data-execution_count="23">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">lb_stat</th>
+<th data-quarto-table-cell-role="th">lb_pvalue</th>
+<th data-quarto-table-cell-role="th">bp_stat</th>
+<th data-quarto-table-cell-role="th">bp_pvalue</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">1</td>
+<td>2.417</td>
+<td>0.120</td>
+<td>2.389</td>
+<td>0.122</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">2</td>
+<td>3.761</td>
+<td>0.152</td>
+<td>3.711</td>
+<td>0.156</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">3</td>
+<td>5.193</td>
+<td>0.158</td>
+<td>5.115</td>
+<td>0.164</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">4</td>
+<td>5.675</td>
+<td>0.225</td>
+<td>5.585</td>
+<td>0.232</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">5</td>
+<td>6.084</td>
+<td>0.298</td>
+<td>5.984</td>
+<td>0.308</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div></div>
+</section>
+<section id="portmanteau-test-for-rw" class="slide level2 smaller">
+<h2>Portmanteau test for RW</h2>
+<div id="82cabb24" class="cell columns column-output-location" data-execution_count="24">
+<div class="column">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="" aria-hidden="true" tabindex="-1"></a>train <span class="op">=</span> goog_df.query(<span class="st">"ds.dt.year == 2015"</span>)</span>
+<span id="cb19-2"><a href="" aria-hidden="true" tabindex="-1"></a>drift_method <span class="op">=</span> RandomWalkWithDrift()</span>
+<span id="cb19-3"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[drift_method], freq<span class="op">=</span><span class="st">"B"</span>)</span>
+<span id="cb19-4"><a href="" aria-hidden="true" tabindex="-1"></a>sf.fit(train)</span>
+<span id="cb19-5"><a href="" aria-hidden="true" tabindex="-1"></a>fcasts <span class="op">=</span> sf.forecast(df<span class="op">=</span>train, h<span class="op">=</span><span class="dv">10</span>, fitted<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb19-6"><a href="" aria-hidden="true" tabindex="-1"></a>insample_preds <span class="op">=</span> sf.forecast_fitted_values()</span>
+<span id="cb19-7"><a href="" aria-hidden="true" tabindex="-1"></a>insample_preds[<span class="st">"resid"</span>] <span class="op">=</span> insample_preds[<span class="st">"y"</span>] <span class="op">-</span> insample_preds[<span class="st">"RWD"</span>]</span>
+<span id="cb19-8"><a href="" aria-hidden="true" tabindex="-1"></a>resid_test <span class="op">=</span> acorr_ljungbox(insample_preds[<span class="st">"resid"</span>].dropna(),</span>
+<span id="cb19-9"><a href="" aria-hidden="true" tabindex="-1"></a>  boxpierce<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb19-10"><a href="" aria-hidden="true" tabindex="-1"></a>resid_test.<span class="bu">round</span>(<span class="dv">4</span>).head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div><div class="column">
 <div class="cell-output cell-output-display" data-execution_count="24">
 <div>
 <style scoped="">
@@ -767,89 +1012,18 @@ Ihor Miroshnychenko
 
 </div>
 </div>
-</div>
-</section>
-<section id="portmanteau-test-for-rw" class="slide level2">
-<h2>Portmanteau test for RW</h2>
-<div id="0cba02f2" class="cell" data-execution_count="25">
-<div class="cell-output cell-output-display" data-execution_count="25">
-<div>
-<style scoped="">
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-
-<table class="dataframe caption-top" data-quarto-postprocess="true" data-border="1">
-<thead>
-<tr class="header" style="text-align: right;">
-<th data-quarto-table-cell-role="th"></th>
-<th data-quarto-table-cell-role="th">lb_stat</th>
-<th data-quarto-table-cell-role="th">lb_pvalue</th>
-<th data-quarto-table-cell-role="th">bp_stat</th>
-<th data-quarto-table-cell-role="th">bp_pvalue</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td data-quarto-table-cell-role="th">1</td>
-<td>2.417</td>
-<td>0.120</td>
-<td>2.389</td>
-<td>0.122</td>
-</tr>
-<tr class="even">
-<td data-quarto-table-cell-role="th">2</td>
-<td>3.761</td>
-<td>0.152</td>
-<td>3.711</td>
-<td>0.156</td>
-</tr>
-<tr class="odd">
-<td data-quarto-table-cell-role="th">3</td>
-<td>5.193</td>
-<td>0.158</td>
-<td>5.115</td>
-<td>0.164</td>
-</tr>
-<tr class="even">
-<td data-quarto-table-cell-role="th">4</td>
-<td>5.675</td>
-<td>0.225</td>
-<td>5.585</td>
-<td>0.232</td>
-</tr>
-<tr class="odd">
-<td data-quarto-table-cell-role="th">5</td>
-<td>6.084</td>
-<td>0.298</td>
-<td>5.984</td>
-<td>0.308</td>
-</tr>
-</tbody>
-</table>
-
-</div>
-</div>
-</div>
+</div></div>
 </section></section>
 <section>
 <section id="forecasting-using-transformations" class="title-slide slide level1 center">
 <h1>Forecasting using transformations</h1>
 
 </section>
-<section id="backtransformation" class="slide level2">
+<section id="backtransformation" class="slide level2 smaller">
 <h2>Backtransformation</h2>
 <p>We must reverse the transformation to obtain forecasts on the original scale.</p>
 <p>For Box-Cox transformation with parameter <span class="math inline">\(\lambda\)</span>:</p>
+<p><br></p>
 <div class="columns">
 <div class="column">
 <p>Box-Cox transformation:</p>
@@ -874,20 +1048,97 @@ y_t =
 <section class="slide level2">
 
 
-<img data-src=".04_files/figure-revealjs/cell-27-output-1.svg" class="r-stretch"></section>
-<section id="modeling-with-transformations" class="slide level2">
+<img data-src=".04_files/figure-revealjs/cell-26-output-1.svg" class="r-stretch"></section>
+<section id="modeling-with-transformations" class="slide level2 smaller">
 <h2>Modeling with transformations</h2>
-
-<img data-src=".04_files/figure-revealjs/cell-28-output-1.svg" class="r-stretch"></section>
+<div id="f44a6a7b" class="cell columns column-output-location" data-execution_count="26">
+<div class="column">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="" aria-hidden="true" tabindex="-1"></a>gsheetkey <span class="op">=</span> <span class="st">'1V2HAc5bwBXq1KJg9Dv7dX0R0C3s1mcGxfWmEVwoI1bs'</span></span>
+<span id="cb20-2"><a href="" aria-hidden="true" tabindex="-1"></a>url<span class="op">=</span><span class="ss">f'https://docs.google.com/spreadsheet/ccc?key=</span><span class="sc">{</span>gsheetkey<span class="sc">}</span><span class="ss">&amp;output=csv'</span></span>
+<span id="cb20-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-4"><a href="" aria-hidden="true" tabindex="-1"></a>egg_df <span class="op">=</span> pd.read_csv(url, parse_dates<span class="op">=</span>[<span class="st">"ds"</span>])</span>
+<span id="cb20-5"><a href="" aria-hidden="true" tabindex="-1"></a>egg_df_log <span class="op">=</span> egg_df.copy()</span>
+<span id="cb20-6"><a href="" aria-hidden="true" tabindex="-1"></a>egg_df_log[<span class="st">'y'</span>] <span class="op">=</span> np.log(egg_df_log[<span class="st">'y'</span>])</span>
+<span id="cb20-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-8"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># plot original and log-transformed data</span></span>
+<span id="cb20-9"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(<span class="dv">2</span>, <span class="dv">1</span>, figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
+<span id="cb20-10"><a href="" aria-hidden="true" tabindex="-1"></a>ax[<span class="dv">0</span>].plot(egg_df[<span class="st">'ds'</span>], egg_df[<span class="st">'y'</span>], color<span class="op">=</span>blue)</span>
+<span id="cb20-11"><a href="" aria-hidden="true" tabindex="-1"></a>ax[<span class="dv">0</span>].set_title(<span class="st">'Original Egg Production Data'</span>)</span>
+<span id="cb20-12"><a href="" aria-hidden="true" tabindex="-1"></a>ax[<span class="dv">0</span>].set_xlabel(<span class="st">'Date'</span>)</span>
+<span id="cb20-13"><a href="" aria-hidden="true" tabindex="-1"></a>ax[<span class="dv">0</span>].set_ylabel(<span class="st">'Egg Production'</span>)</span>
+<span id="cb20-14"><a href="" aria-hidden="true" tabindex="-1"></a>ax[<span class="dv">1</span>].plot(egg_df_log[<span class="st">'ds'</span>], egg_df_log[<span class="st">'y'</span>], color<span class="op">=</span>orange)</span>
+<span id="cb20-15"><a href="" aria-hidden="true" tabindex="-1"></a>ax[<span class="dv">1</span>].set_title(<span class="st">'Log-Transformed Egg Production Data'</span>)</span>
+<span id="cb20-16"><a href="" aria-hidden="true" tabindex="-1"></a>ax[<span class="dv">1</span>].set_xlabel(<span class="st">'Date'</span>)</span>
+<span id="cb20-17"><a href="" aria-hidden="true" tabindex="-1"></a>ax[<span class="dv">1</span>].set_ylabel(<span class="st">'Log(Egg Production)'</span>)</span>
+<span id="cb20-18"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb20-19"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div><div class="column">
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".04_files/figure-revealjs/cell-27-output-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></div>
+</section>
 <section class="slide level2">
 
+<div id="d4f4d48a" class="cell" data-execution_count="27">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="" aria-hidden="true" tabindex="-1"></a>rwd_method <span class="op">=</span> RandomWalkWithDrift()</span>
+<span id="cb21-2"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[rwd_method], freq<span class="op">=</span><span class="st">"YE"</span>)</span>
+<span id="cb21-3"><a href="" aria-hidden="true" tabindex="-1"></a>sf.fit(egg_df_log)</span>
+<span id="cb21-4"><a href="" aria-hidden="true" tabindex="-1"></a>fcasts <span class="op">=</span> sf.forecast(df<span class="op">=</span>egg_df_log, h<span class="op">=</span><span class="dv">50</span>, level<span class="op">=</span>[<span class="dv">80</span>, <span class="dv">95</span>])</span>
+<span id="cb21-5"><a href="" aria-hidden="true" tabindex="-1"></a>sigma_h <span class="op">=</span> (fcasts[<span class="st">'RWD-hi-80'</span>] <span class="op">-</span> fcasts[<span class="st">'RWD-lo-80'</span>]) <span class="op">/</span> (<span class="dv">2</span> <span class="op">*</span> <span class="fl">1.28</span>)</span>
+<span id="cb21-6"><a href="" aria-hidden="true" tabindex="-1"></a>sigma_h_squared <span class="op">=</span> sigma_h<span class="op">**</span><span class="dv">2</span></span>
+<span id="cb21-7"><a href="" aria-hidden="true" tabindex="-1"></a>bias_adjusted <span class="op">=</span> np.exp(fcasts[<span class="st">'RWD'</span>]) <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> sigma_h_squared<span class="op">/</span><span class="dv">2</span>)</span>
+<span id="cb21-8"><a href="" aria-hidden="true" tabindex="-1"></a>fcasts_original <span class="op">=</span> fcasts.copy()</span>
+<span id="cb21-9"><a href="" aria-hidden="true" tabindex="-1"></a>columns_to_transform <span class="op">=</span> <span class="op">\</span></span>
+<span id="cb21-10"><a href="" aria-hidden="true" tabindex="-1"></a>  [<span class="st">'RWD'</span>, <span class="st">'RWD-lo-80'</span>, <span class="st">'RWD-lo-95'</span>, <span class="st">'RWD-hi-80'</span>, <span class="st">'RWD-hi-95'</span>]</span>
+<span id="cb21-11"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> col <span class="kw">in</span> columns_to_transform:</span>
+<span id="cb21-12"><a href="" aria-hidden="true" tabindex="-1"></a>    fcasts_original[col] <span class="op">=</span> np.exp(fcasts[col])</span>
+<span id="cb21-13"><a href="" aria-hidden="true" tabindex="-1"></a>fcasts_original[<span class="st">'RWD-adjusted'</span>] <span class="op">=</span> bias_adjusted</span>
+<span id="cb21-14"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-15"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots()</span>
+<span id="cb21-16"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(egg_df[<span class="st">'ds'</span>], egg_df[<span class="st">'y'</span>], color<span class="op">=</span><span class="st">'black'</span>, label<span class="op">=</span><span class="st">'Historical'</span>,</span>
+<span id="cb21-17"><a href="" aria-hidden="true" tabindex="-1"></a>  linewidth<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb21-18"><a href="" aria-hidden="true" tabindex="-1"></a>ax.fill_between(fcasts_original[<span class="st">'ds'</span>],</span>
+<span id="cb21-19"><a href="" aria-hidden="true" tabindex="-1"></a>                fcasts_original[<span class="st">'RWD-lo-80'</span>],</span>
+<span id="cb21-20"><a href="" aria-hidden="true" tabindex="-1"></a>                fcasts_original[<span class="st">'RWD-hi-80'</span>],</span>
+<span id="cb21-21"><a href="" aria-hidden="true" tabindex="-1"></a>                alpha<span class="op">=</span><span class="fl">0.3</span>, color<span class="op">=</span><span class="st">'#B8BFFF'</span>, label<span class="op">=</span><span class="st">'80% CI'</span>)</span>
+<span id="cb21-22"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(fcasts_original[<span class="st">'ds'</span>], fcasts_original[<span class="st">'RWD'</span>],</span>
+<span id="cb21-23"><a href="" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span><span class="st">'blue'</span>, linestyle<span class="op">=</span><span class="st">'--'</span>, label<span class="op">=</span><span class="st">'Median forecast'</span>, linewidth<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb21-24"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(fcasts_original[<span class="st">'ds'</span>], fcasts_original[<span class="st">'RWD-adjusted'</span>],</span>
+<span id="cb21-25"><a href="" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span><span class="st">'blue'</span>, linestyle<span class="op">=</span><span class="st">'-'</span>, label<span class="op">=</span><span class="st">'Bias-adjusted mean'</span>, linewidth<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb21-26"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">'Annual egg prices'</span>)</span>
+<span id="cb21-27"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">'year'</span>)</span>
+<span id="cb21-28"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">'$US (in cents adjusted for inflation)'</span>)</span>
+<span id="cb21-29"><a href="" aria-hidden="true" tabindex="-1"></a>handles, labels <span class="op">=</span> fig.axes[<span class="dv">0</span>].get_legend_handles_labels()</span>
+<span id="cb21-30"><a href="" aria-hidden="true" tabindex="-1"></a>fig.legend(</span>
+<span id="cb21-31"><a href="" aria-hidden="true" tabindex="-1"></a>  handles,</span>
+<span id="cb21-32"><a href="" aria-hidden="true" tabindex="-1"></a>  labels,</span>
+<span id="cb21-33"><a href="" aria-hidden="true" tabindex="-1"></a>  loc<span class="op">=</span><span class="st">"center left"</span>,</span>
+<span id="cb21-34"><a href="" aria-hidden="true" tabindex="-1"></a>  bbox_to_anchor<span class="op">=</span>(<span class="fl">1.02</span>, <span class="fl">0.5</span>),</span>
+<span id="cb21-35"><a href="" aria-hidden="true" tabindex="-1"></a>  borderaxespad<span class="op">=</span><span class="fl">0.0</span>,</span>
+<span id="cb21-36"><a href="" aria-hidden="true" tabindex="-1"></a>  frameon<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb21-37"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb21-38"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
 
-<img data-src=".04_files/figure-revealjs/cell-29-output-1.svg" class="r-stretch"></section>
-<section id="bias-adjustment" class="slide level2">
+</section>
+<section id="" class="slide level2 output-location-slide"><div class="cell output-location-slide" data-execution_count="27">
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".04_files/figure-revealjs/cell-28-output-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></section><section id="bias-adjustment" class="slide level2 smaller">
 <h2>Bias adjustment</h2>
 <ul>
-<li>Back transformed point forecassts are median.</li>
-<li>Back transformed PI have the correct coverage.</li>
+<li>Back transformed point forecassts are <span class="hi">median</span>.</li>
+<li>Back transformed <strong>PI</strong> have the <strong>correct</strong> coverage.</li>
 </ul>
 <p>Back-transformed means:</p>
 <ol type="1">
@@ -923,41 +1174,164 @@ y_t = \hat{S_t} + \hat{A_t}
 </ul>
 <div class="fragment">
 <ul>
-<li>Forecast <span class="math inline">\(\hat{S_t}\)</span> using seasonal naïve method</li>
-<li>Forecast <span class="math inline">\(\hat{A_t}\)</span> using appropriate method (e.g., drift method)</li>
-<li>Combine forecasts to obtain final forecasts</li>
+<li>Forecast <span class="math inline">\(\hat{S_t}\)</span> using <span class="hi">seasonal naïve method</span></li>
+<li>Forecast <span class="math inline">\(\hat{A_t}\)</span> using <span class="hi">appropriate method</span> (e.g., drift method)</li>
+<li><strong>Combine</strong> forecasts to obtain final forecasts</li>
 </ul>
 </div>
 </section>
-<section id="us-retail-employment" class="slide level2">
+<section id="us-retail-employment" class="slide level2 smaller">
 <h2>US Retail Employment</h2>
-
-<img data-src=".04_files/figure-revealjs/cell-30-output-1.svg" class="r-stretch"></section>
+<div id="b4d74830" class="cell columns column-output-location" data-execution_count="28">
+<div class="column">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="" aria-hidden="true" tabindex="-1"></a>gsheetkey <span class="op">=</span> <span class="st">'1VoHDwazrwCVOyooH7AyBqMAJZmq5sD7jRgzzPl7AyZA'</span></span>
+<span id="cb22-2"><a href="" aria-hidden="true" tabindex="-1"></a>url <span class="op">=</span> <span class="ss">f'https://docs.google.com/spreadsheet/ccc?key=</span><span class="sc">{</span>gsheetkey<span class="sc">}</span><span class="ss">&amp;output=csv'</span></span>
+<span id="cb22-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-4"><a href="" aria-hidden="true" tabindex="-1"></a>us_employment_df <span class="op">=</span> pd.read_csv(url,</span>
+<span id="cb22-5"><a href="" aria-hidden="true" tabindex="-1"></a>  parse_dates<span class="op">=</span>[<span class="st">"ds"</span>])</span>
+<span id="cb22-6"><a href="" aria-hidden="true" tabindex="-1"></a>us_retail_employment_df <span class="op">=</span> us_employment_df.query(</span>
+<span id="cb22-7"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Title == 'Retail Trade' and ds.dt.year &gt;= 1992"</span></span>
+<span id="cb22-8"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb22-9"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-10"><a href="" aria-hidden="true" tabindex="-1"></a>train_df <span class="op">=</span> us_retail_employment_df.drop([<span class="st">"Title"</span>], axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb22-11"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-12"><a href="" aria-hidden="true" tabindex="-1"></a>stl <span class="op">=</span> STL(train_df[<span class="st">"y"</span>].values, period<span class="op">=</span><span class="dv">12</span>, robust<span class="op">=</span><span class="va">True</span>, trend_deg<span class="op">=</span><span class="dv">7</span>)</span>
+<span id="cb22-13"><a href="" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> stl.fit()</span>
+<span id="cb22-14"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-15"><a href="" aria-hidden="true" tabindex="-1"></a>train_df[<span class="st">"seasonal"</span>] <span class="op">=</span> res.seasonal</span>
+<span id="cb22-16"><a href="" aria-hidden="true" tabindex="-1"></a>train_df[<span class="st">"y_adjusted"</span>] <span class="op">=</span> train_df[<span class="st">"y"</span>] <span class="op">-</span> train_df[<span class="st">"seasonal"</span>]</span>
+<span id="cb22-17"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-18"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot original and seasonally adjusted data</span></span>
+<span id="cb22-19"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(<span class="dv">2</span>, <span class="dv">1</span>, figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
+<span id="cb22-20"><a href="" aria-hidden="true" tabindex="-1"></a>ax[<span class="dv">0</span>].plot(train_df[<span class="st">'ds'</span>], train_df[<span class="st">'y'</span>], color<span class="op">=</span><span class="st">'blue'</span>)</span>
+<span id="cb22-21"><a href="" aria-hidden="true" tabindex="-1"></a>ax[<span class="dv">0</span>].set_title(<span class="st">'Original US Retail Employment Data'</span>)</span>
+<span id="cb22-22"><a href="" aria-hidden="true" tabindex="-1"></a>ax[<span class="dv">1</span>].plot(train_df[<span class="st">'ds'</span>], train_df[<span class="st">'y_adjusted'</span>], color<span class="op">=</span><span class="st">'orange'</span>)</span>
+<span id="cb22-23"><a href="" aria-hidden="true" tabindex="-1"></a>ax[<span class="dv">1</span>].set_title(<span class="st">'Seasonally Adjusted US Retail Employment Data'</span>)</span>
+<span id="cb22-24"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb22-25"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div><div class="column">
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".04_files/figure-revealjs/cell-29-output-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></div>
+</section>
 <section id="seasonally-adjusted-with-naive-method" class="slide level2">
 <h2>Seasonally Adjusted with naive method</h2>
+<div id="0c0538c2" class="cell" data-execution_count="29">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="" aria-hidden="true" tabindex="-1"></a>naive_method <span class="op">=</span> Naive()</span>
+<span id="cb23-2"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[naive_method], freq<span class="op">=</span><span class="st">"M"</span>)</span>
+<span id="cb23-3"><a href="" aria-hidden="true" tabindex="-1"></a>adjusted_fcasts <span class="op">=</span> sf.forecast(h<span class="op">=</span><span class="dv">24</span>, level<span class="op">=</span>[<span class="dv">80</span>, <span class="dv">95</span>], df<span class="op">=</span>train_df,</span>
+<span id="cb23-4"><a href="" aria-hidden="true" tabindex="-1"></a>                              target_col<span class="op">=</span><span class="st">"y_adjusted"</span>, fitted<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb23-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-6"><a href="" aria-hidden="true" tabindex="-1"></a>adjusted_fcasts_fitted <span class="op">=</span> sf.forecast_fitted_values()</span>
+<span id="cb23-7"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(train_df, adjusted_fcasts, target_col<span class="op">=</span><span class="st">"y_adjusted"</span>,</span>
+<span id="cb23-8"><a href="" aria-hidden="true" tabindex="-1"></a>            level<span class="op">=</span>[<span class="dv">80</span>, <span class="dv">95</span>],</span>
+<span id="cb23-9"><a href="" aria-hidden="true" tabindex="-1"></a>            xlabel<span class="op">=</span><span class="st">"Month"</span>,</span>
+<span id="cb23-10"><a href="" aria-hidden="true" tabindex="-1"></a>            ylabel<span class="op">=</span><span class="st">"Number of people"</span>,</span>
+<span id="cb23-11"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"US retail employment"</span>,</span>
+<span id="cb23-12"><a href="" aria-hidden="true" tabindex="-1"></a>            rm_legend<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
 
-<img data-src=".04_files/figure-revealjs/cell-31-output-1.svg" class="r-stretch"></section>
-<section id="seasonal-component-with-seasonal-naive" class="slide level2">
+</section>
+<section id="seasonally-adjusted-with-naive-method-output" class="slide level2 output-location-slide"><h2>Seasonally Adjusted with naive method</h2><div class="cell output-location-slide" data-execution_count="29">
+<div class="cell-output cell-output-display" data-execution_count="29">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".04_files/figure-revealjs/cell-30-output-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></section><section id="seasonal-component-with-seasonal-naive" class="slide level2">
 <h2>Seasonal component with seasonal naive</h2>
+<div id="9e0e7a38" class="cell" data-execution_count="30">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="" aria-hidden="true" tabindex="-1"></a>seasonal_naive_method <span class="op">=</span> SeasonalNaive(season_length<span class="op">=</span><span class="dv">12</span>)</span>
+<span id="cb24-2"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[seasonal_naive_method], freq<span class="op">=</span><span class="st">"M"</span>)</span>
+<span id="cb24-3"><a href="" aria-hidden="true" tabindex="-1"></a>seasonal_fcasts <span class="op">=</span> sf.forecast(h<span class="op">=</span><span class="dv">24</span>, level<span class="op">=</span>[<span class="dv">80</span>, <span class="dv">95</span>], df<span class="op">=</span>train_df,</span>
+<span id="cb24-4"><a href="" aria-hidden="true" tabindex="-1"></a>                               target_col<span class="op">=</span><span class="st">"seasonal"</span>, fitted<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb24-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-6"><a href="" aria-hidden="true" tabindex="-1"></a>seasonal_fcasts_fitted <span class="op">=</span> sf.forecast_fitted_values()</span>
+<span id="cb24-7"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(train_df, seasonal_fcasts, target_col<span class="op">=</span><span class="st">"seasonal"</span>,</span>
+<span id="cb24-8"><a href="" aria-hidden="true" tabindex="-1"></a>            level<span class="op">=</span>[<span class="dv">80</span>, <span class="dv">95</span>],</span>
+<span id="cb24-9"><a href="" aria-hidden="true" tabindex="-1"></a>            xlabel<span class="op">=</span><span class="st">"Month"</span>,</span>
+<span id="cb24-10"><a href="" aria-hidden="true" tabindex="-1"></a>            ylabel<span class="op">=</span><span class="st">"Number of people"</span>,</span>
+<span id="cb24-11"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"US retail employment"</span>,</span>
+<span id="cb24-12"><a href="" aria-hidden="true" tabindex="-1"></a>            rm_legend<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
 
-<img data-src=".04_files/figure-revealjs/cell-32-output-1.svg" class="r-stretch"></section>
-<section id="final-forecasts" class="slide level2">
+</section>
+<section id="seasonal-component-with-seasonal-naive-output" class="slide level2 output-location-slide"><h2>Seasonal component with seasonal naive</h2><div class="cell output-location-slide" data-execution_count="30">
+<div class="cell-output cell-output-display" data-execution_count="30">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".04_files/figure-revealjs/cell-31-output-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></section><section id="final-forecasts" class="slide level2">
 <h2>Final forecasts</h2>
+<div id="585bfb5c" class="cell" data-execution_count="31">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="" aria-hidden="true" tabindex="-1"></a>seasonal_naive <span class="op">=</span> SeasonalNaive(<span class="dv">12</span>)</span>
+<span id="cb25-2"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[seasonal_naive], freq<span class="op">=</span><span class="st">"M"</span>)</span>
+<span id="cb25-3"><a href="" aria-hidden="true" tabindex="-1"></a>seasonal_fcasts <span class="op">=</span> sf.forecast(h<span class="op">=</span><span class="dv">24</span>, level<span class="op">=</span>[<span class="dv">80</span>, <span class="dv">95</span>], df<span class="op">=</span>train_df,</span>
+<span id="cb25-4"><a href="" aria-hidden="true" tabindex="-1"></a>  target_col<span class="op">=</span><span class="st">"seasonal"</span>, fitted<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb25-5"><a href="" aria-hidden="true" tabindex="-1"></a>merged_df <span class="op">=</span> adjusted_fcasts.merge(seasonal_fcasts, on<span class="op">=</span>[<span class="st">'unique_id'</span>, <span class="st">'ds'</span>],</span>
+<span id="cb25-6"><a href="" aria-hidden="true" tabindex="-1"></a>  how<span class="op">=</span><span class="st">'inner'</span>)</span>
+<span id="cb25-7"><a href="" aria-hidden="true" tabindex="-1"></a>merged_df_fitted <span class="op">=</span> adjusted_fcasts_fitted.merge(sf.forecast_fitted_values(),</span>
+<span id="cb25-8"><a href="" aria-hidden="true" tabindex="-1"></a>  on<span class="op">=</span>[<span class="st">'unique_id'</span>, <span class="st">'ds'</span>], how<span class="op">=</span><span class="st">'inner'</span>)</span>
+<span id="cb25-9"><a href="" aria-hidden="true" tabindex="-1"></a>merged_df_fitted[<span class="st">"combined"</span>] <span class="op">=</span> merged_df_fitted[<span class="st">'Naive'</span>] <span class="op">+</span> <span class="op">\</span></span>
+<span id="cb25-10"><a href="" aria-hidden="true" tabindex="-1"></a>  merged_df_fitted[<span class="st">'SeasonalNaive'</span>]</span>
+<span id="cb25-11"><a href="" aria-hidden="true" tabindex="-1"></a>merged_df_fitted <span class="op">=</span> merged_df_fitted.merge(train_df, on<span class="op">=</span>[<span class="st">"unique_id"</span>, <span class="st">"ds"</span>],</span>
+<span id="cb25-12"><a href="" aria-hidden="true" tabindex="-1"></a>  how<span class="op">=</span><span class="st">"right"</span>)</span>
+<span id="cb25-13"><a href="" aria-hidden="true" tabindex="-1"></a>final_df <span class="op">=</span> merged_df[[<span class="st">'unique_id'</span>, <span class="st">'ds'</span>]].copy() <span class="co"># Start with identifiers</span></span>
+<span id="cb25-14"><a href="" aria-hidden="true" tabindex="-1"></a>final_df[<span class="st">'combined'</span>] <span class="op">=</span> merged_df[<span class="st">'Naive'</span>] <span class="op">+</span> merged_df[<span class="st">'SeasonalNaive'</span>]</span>
+<span id="cb25-15"><a href="" aria-hidden="true" tabindex="-1"></a>train_df[<span class="st">"resid"</span>] <span class="op">=</span> merged_df_fitted[<span class="st">"y"</span>].values <span class="op">-</span> <span class="op">\</span></span>
+<span id="cb25-16"><a href="" aria-hidden="true" tabindex="-1"></a>  merged_df_fitted[<span class="st">"Naive"</span>].values <span class="op">-</span> <span class="op">\</span></span>
+<span id="cb25-17"><a href="" aria-hidden="true" tabindex="-1"></a>  merged_df_fitted[<span class="st">"SeasonalNaive"</span>].values</span>
+<span id="cb25-18"><a href="" aria-hidden="true" tabindex="-1"></a>final_df[<span class="st">'combined-lo-80'</span>] <span class="op">=</span> merged_df[<span class="st">'Naive-lo-80'</span>] <span class="op">+</span> <span class="op">\</span></span>
+<span id="cb25-19"><a href="" aria-hidden="true" tabindex="-1"></a>  merged_df[<span class="st">'SeasonalNaive-lo-80'</span>]</span>
+<span id="cb25-20"><a href="" aria-hidden="true" tabindex="-1"></a>final_df[<span class="st">'combined-lo-95'</span>] <span class="op">=</span> merged_df[<span class="st">'Naive-lo-95'</span>] <span class="op">+</span> <span class="op">\</span></span>
+<span id="cb25-21"><a href="" aria-hidden="true" tabindex="-1"></a>  merged_df[<span class="st">'SeasonalNaive-lo-95'</span>]</span>
+<span id="cb25-22"><a href="" aria-hidden="true" tabindex="-1"></a>final_df[<span class="st">'combined-hi-80'</span>] <span class="op">=</span> merged_df[<span class="st">'Naive-hi-80'</span>] <span class="op">+</span> <span class="op">\</span></span>
+<span id="cb25-23"><a href="" aria-hidden="true" tabindex="-1"></a>  merged_df[<span class="st">'SeasonalNaive-hi-80'</span>]</span>
+<span id="cb25-24"><a href="" aria-hidden="true" tabindex="-1"></a>final_df[<span class="st">'combined-hi-95'</span>] <span class="op">=</span> merged_df[<span class="st">'Naive-hi-95'</span>] <span class="op">+</span> <span class="op">\</span></span>
+<span id="cb25-25"><a href="" aria-hidden="true" tabindex="-1"></a>  merged_df[<span class="st">'SeasonalNaive-hi-95'</span>]</span>
+<span id="cb25-26"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-27"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(train_df, final_df, target_col<span class="op">=</span><span class="st">"y"</span>, level<span class="op">=</span>[<span class="dv">80</span>, <span class="dv">95</span>],</span>
+<span id="cb25-28"><a href="" aria-hidden="true" tabindex="-1"></a>            xlabel<span class="op">=</span><span class="st">"Month"</span>,</span>
+<span id="cb25-29"><a href="" aria-hidden="true" tabindex="-1"></a>            ylabel<span class="op">=</span><span class="st">"Number of people"</span>,</span>
+<span id="cb25-30"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"US retail employment"</span>,</span>
+<span id="cb25-31"><a href="" aria-hidden="true" tabindex="-1"></a>            rm_legend<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
 
-<img data-src=".04_files/figure-revealjs/cell-33-output-1.svg" class="r-stretch"></section>
-<section id="residual-diagnostics-2" class="slide level2">
+</section>
+<section id="final-forecasts-output" class="slide level2 output-location-slide"><h2>Final forecasts</h2><div class="cell output-location-slide" data-execution_count="31">
+<div class="cell-output cell-output-display" data-execution_count="31">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".04_files/figure-revealjs/cell-32-output-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></section><section id="residual-diagnostics-2" class="slide level2 smaller">
 <h2>Residual diagnostics</h2>
+<div id="07540623" class="cell" data-execution_count="32">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="" aria-hidden="true" tabindex="-1"></a>plot_diagnostics(train_df)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 
-<img data-src=".04_files/figure-revealjs/cell-34-output-1.svg" class="r-stretch"></section></section>
+</div>
+<img data-src=".04_files/figure-revealjs/cell-33-output-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section></section>
 <section>
 <section id="evaluating-point-forecast-accuracy" class="title-slide slide level1 center">
 <h1>Evaluating point forecast accuracy</h1>
 
 </section>
-<section id="training-and-test-sets" class="slide level2">
+<section id="training-and-test-sets" class="slide level2 smaller">
 <h2>Training and test sets</h2>
 
-<img data-src=".04_files/figure-revealjs/cell-35-output-1.svg" class="r-stretch"><ul>
+<img data-src=".04_files/figure-revealjs/cell-34-output-1.svg" class="quarto-figure quarto-figure-center r-stretch"><ul>
 <li>A model which fits the training data well will not necessarily forecast well.</li>
 <li>A perfect fit can always be obtained by using a model with enough parameters.</li>
 <li>Over-fitting a model to data is just as bad as failing to identify a systematic pattern in the data.</li>
@@ -975,15 +1349,45 @@ e_{T+h} = y_{T+h} - \hat{y}_{T+h|T}
 </section>
 <section class="slide level2">
 
+<div id="bdafdcb6" class="cell" data-execution_count="34">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="" aria-hidden="true" tabindex="-1"></a>train_df <span class="op">=</span> beers_df.query(<span class="st">"ds.dt.year &lt;= 2007"</span>)</span>
+<span id="cb27-2"><a href="" aria-hidden="true" tabindex="-1"></a>test_df <span class="op">=</span> beers_df.query(<span class="st">"ds.dt.year &gt; 2007"</span>)</span>
+<span id="cb27-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-4"><a href="" aria-hidden="true" tabindex="-1"></a>mean_method <span class="op">=</span> HistoricAverage()</span>
+<span id="cb27-5"><a href="" aria-hidden="true" tabindex="-1"></a>naive_method <span class="op">=</span> Naive()</span>
+<span id="cb27-6"><a href="" aria-hidden="true" tabindex="-1"></a>drift_method <span class="op">=</span> RandomWalkWithDrift()</span>
+<span id="cb27-7"><a href="" aria-hidden="true" tabindex="-1"></a>seasonal_naive <span class="op">=</span> SeasonalNaive(<span class="dv">4</span>)</span>
+<span id="cb27-8"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-9"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(</span>
+<span id="cb27-10"><a href="" aria-hidden="true" tabindex="-1"></a>    models<span class="op">=</span>[drift_method, mean_method, naive_method, seasonal_naive],</span>
+<span id="cb27-11"><a href="" aria-hidden="true" tabindex="-1"></a>    freq<span class="op">=</span><span class="st">"Q"</span></span>
+<span id="cb27-12"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb27-13"><a href="" aria-hidden="true" tabindex="-1"></a>preds <span class="op">=</span> sf.forecast(h<span class="op">=</span><span class="bu">len</span>(test_df), df<span class="op">=</span>train_df)</span>
+<span id="cb27-14"><a href="" aria-hidden="true" tabindex="-1"></a>preds[<span class="st">"y"</span>] <span class="op">=</span> test_df[<span class="st">"y"</span>].values</span>
+<span id="cb27-15"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-16"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(beers_df, preds,</span>
+<span id="cb27-17"><a href="" aria-hidden="true" tabindex="-1"></a>            xlabel<span class="op">=</span><span class="st">"Quarter"</span>,</span>
+<span id="cb27-18"><a href="" aria-hidden="true" tabindex="-1"></a>            ylabel<span class="op">=</span><span class="st">"Megalitres"</span>,</span>
+<span id="cb27-19"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"Forecasts for quarterly beer production"</span>,</span>
+<span id="cb27-20"><a href="" aria-hidden="true" tabindex="-1"></a>            rm_legend<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
 
-<img data-src=".04_files/figure-revealjs/cell-36-output-1.svg" class="r-stretch"></section>
-<section id="measures-of-forecast-accuracy" class="slide level2">
+</section>
+<section id="" class="slide level2 output-location-slide"><div class="cell output-location-slide" data-execution_count="34">
+<div class="cell-output cell-output-display" data-execution_count="34">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".04_files/figure-revealjs/cell-35-output-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></section><section id="measures-of-forecast-accuracy" class="slide level2 smaller">
 <h2>Measures of forecast accuracy</h2>
 <div class="columns">
 <div class="column">
-<p><span class="math inline">\(y_{T+h}\)</span> — actual value at time <span class="math inline">\(T+h\)</span></p>
-<p><span class="math inline">\(\hat{y}_{T+h|T}\)</span> — forecast value made at time <span class="math inline">\(T\)</span> for time <span class="math inline">\(T+h\)</span></p>
-<p><span class="math inline">\(e_{T+h} = y_{T+h} - \hat{y}_{T+h|T}\)</span> — forecast error at time <span class="math inline">\(T+h\)</span></p>
+<p><span class="math inline">\(y_{T+h}\)</span> — <span class="hi">actual value</span> at time <span class="math inline">\(T+h\)</span></p>
+<p><span class="math inline">\(\hat{y}_{T+h|T}\)</span> — <span class="hi">forecast value</span> made at time <span class="math inline">\(T\)</span> for time <span class="math inline">\(T+h\)</span></p>
+<p><span class="math inline">\(e_{T+h} = y_{T+h} - \hat{y}_{T+h|T}\)</span> — <span class="hi">forecast error</span> at time <span class="math inline">\(T+h\)</span></p>
 </div><div class="column">
 <ul>
 <li><strong>Mean Error (ME)</strong>: <span class="math inline">\(\text{ME} = \frac{1}{n} \sum_{h=1}^{n} e_{T+h}\)</span></li>
@@ -998,30 +1402,33 @@ e_{T+h} = y_{T+h} - \hat{y}_{T+h|T}
 <li>MAPE is scale-independent but can be problematic if actual values are close to zero.</li>
 </ul>
 </section>
-<section id="scaled-errors" class="slide level2">
+<section id="scaled-errors" class="slide level2 smaller">
 <h2>Scaled errors</h2>
-<p>Proposed by Hyndman and Koehler (2006):</p>
+<p>Proposed by <a href="https://www.sciencedirect.com/science/article/abs/pii/S0169207006000239?via%3Dihub">Hyndman and Koehler (2006)</a>:</p>
 <ul>
-<li>For non-seasonal data, scale errors using naive method:</li>
+<li>For <span class="hi">non-seasonal data</span>, scale errors using naive method:</li>
 </ul>
 <p><span class="math display">\[
 q_i = \frac{e_i}{\frac{1}{T-1} \sum_{t=2}^{T} |y_t - y_{t-1}|}
 \]</span></p>
 <ul>
-<li>For seasonal data, scale errors using seasonal naive method:</li>
+<li>For <span class="hi">seasonal data</span>, scale errors using seasonal naive method:</li>
 </ul>
 <p><span class="math display">\[
 q_i = \frac{e_i}{\frac{1}{T-m} \sum_{t=m+1}^{T} |y_t - y_{t-m}|}
 \]</span></p>
 </section>
-<section id="scaled-errors-1" class="slide level2">
+<section id="scaled-errors-1" class="slide level2 smaller">
 <h2>Scaled errors</h2>
+<div class="columns">
+<div class="column">
 <ul>
 <li><strong>Mean Absolute Scaled Error (MASE)</strong>:</li>
 </ul>
 <p><span class="math display">\[
 \text{MASE} = \frac{1}{n} \sum_{i=1}^{n} |q_i|
 \]</span></p>
+</div><div class="column">
 <ul>
 <li><strong>Root Mean Squared Scaled Error (RMSSE)</strong>:</li>
 </ul>
@@ -1033,23 +1440,22 @@ q_i = \frac{e_i}{\frac{1}{T-m} \sum_{t=m+1}^{T} |y_t - y_{t-m}|}
 q_i^2 = \frac{e_i^2}{\frac{1}{T-1} \sum_{t=m+1}^{T} (y_t - y_{t-1})^2}
 \]</span></p>
 <p>and we set <span class="math inline">\(m=1\)</span> for non-seasonal data.</p>
+</div></div>
 </section>
 <section class="slide level2">
 
-<div class="columns">
-<div class="column">
-<div id="836bb1bd" class="cell" data-execution_count="36">
+
+<img data-src=".04_files/figure-revealjs/cell-36-output-1.svg" class="r-stretch"><div id="b0945b06" class="cell" data-execution_count="36">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="" aria-hidden="true" tabindex="-1"></a>evaluation <span class="op">=</span> evaluate(preds, </span>
+<span id="cb28-2"><a href="" aria-hidden="true" tabindex="-1"></a>  metrics<span class="op">=</span>[rmse, mae, mape,</span>
+<span id="cb28-3"><a href="" aria-hidden="true" tabindex="-1"></a>  partial(mase, seasonality<span class="op">=</span><span class="dv">4</span>)],</span>
+<span id="cb28-4"><a href="" aria-hidden="true" tabindex="-1"></a>  train_df <span class="op">=</span> train_df)</span>
+<span id="cb28-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-6"><a href="" aria-hidden="true" tabindex="-1"></a>evaluation.<span class="bu">round</span>(<span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+
+</section><section id="" class="slide level2 output-location-slide"><div class="cell output-location-slide" data-execution_count="36">
 <div class="cell-output cell-output-display" data-execution_count="36">
-<div>
-<figure>
-<p><img data-src=".04_files/figure-revealjs/cell-37-output-1.svg"></p>
-</figure>
-</div>
-</div>
-</div>
-</div><div class="column">
-<div id="7bbe204a" class="cell" data-execution_count="37">
-<div class="cell-output cell-output-display" data-execution_count="37">
 <div>
 <style scoped="">
     .dataframe tbody tr th:only-of-type {
@@ -1118,6 +1524,456 @@ q_i^2 = \frac{e_i^2}{\frac{1}{T-1} \sum_{t=m+1}^{T} (y_t - y_{t-1})^2}
 </table>
 
 </div>
+</div>
+</div></section></section>
+<section>
+<section id="evaluating-distributional-accuracy" class="title-slide slide level1 center">
+<h1>Evaluating distributional accuracy</h1>
+
+</section>
+<section id="quantile-scores" class="slide level2">
+<h2>Quantile scores</h2>
+<div id="97fc1738" class="cell" data-execution_count="37">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="" aria-hidden="true" tabindex="-1"></a>train_df <span class="op">=</span> goog_df.query(<span class="st">"ds.dt.year == 2015"</span>)</span>
+<span id="cb29-2"><a href="" aria-hidden="true" tabindex="-1"></a>test_df <span class="op">=</span> goog_df.query(<span class="st">"ds.dt.year == 2016"</span>)</span>
+<span id="cb29-3"><a href="" aria-hidden="true" tabindex="-1"></a>train_df[<span class="st">"ds"</span>] <span class="op">=</span> np.arange(<span class="bu">len</span>(train_df[<span class="st">"ds"</span>]))</span>
+<span id="cb29-4"><a href="" aria-hidden="true" tabindex="-1"></a>test_df[<span class="st">"ds"</span>] <span class="op">=</span> np.arange(<span class="bu">len</span>(test_df[<span class="st">"ds"</span>]))</span>
+<span id="cb29-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-6"><a href="" aria-hidden="true" tabindex="-1"></a>naive_model <span class="op">=</span> Naive()</span>
+<span id="cb29-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-8"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[naive_model], freq<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb29-9"><a href="" aria-hidden="true" tabindex="-1"></a>preds <span class="op">=</span> sf.forecast(h<span class="op">=</span><span class="dv">19</span>, level<span class="op">=</span>[<span class="dv">80</span>], df<span class="op">=</span>train_df)</span>
+<span id="cb29-10"><a href="" aria-hidden="true" tabindex="-1"></a>preds[<span class="st">"y"</span>] <span class="op">=</span> test_df[<span class="st">"y"</span>].values</span>
+<span id="cb29-11"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-12"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(train_df, preds, level<span class="op">=</span>[<span class="dv">80</span>],</span>
+<span id="cb29-13"><a href="" aria-hidden="true" tabindex="-1"></a>            xlabel<span class="op">=</span><span class="st">"day"</span>,</span>
+<span id="cb29-14"><a href="" aria-hidden="true" tabindex="-1"></a>            ylabel<span class="op">=</span><span class="st">"$US"</span>,</span>
+<span id="cb29-15"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"Google closing stock prices"</span>,</span>
+<span id="cb29-16"><a href="" aria-hidden="true" tabindex="-1"></a>            rm_legend<span class="op">=</span><span class="va">False</span>,)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+
+</section>
+<section id="quantile-scores-output" class="slide level2 output-location-slide"><h2>Quantile scores</h2><div class="cell output-location-slide" data-execution_count="37">
+<div class="cell-output cell-output-display" data-execution_count="37">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src=".04_files/figure-revealjs/cell-38-output-1.svg" class="quarto-figure quarto-figure-center"></p>
+</figure>
+</div>
+</div>
+</div></section><section id="quantile-scores-1" class="slide level2 tiny">
+<h2>Quantile scores</h2>
+<div class="columns">
+<div class="column">
+<ul>
+<li>For a given quantile level <span class="math inline">\(\alpha\)</span>, the quantile score (QS) is defined as:</li>
+</ul>
+<p><span class="math display">\[
+Q_{p, t}= \begin{cases}2(1-p)\left(f_{p, t}-y_t\right), &amp; \text { if } y_t&lt;f_{p, t} \\ 2 p\left(y_t-f_{p, t}\right), &amp; \text { if } y_t \geq f_{p, t}\end{cases}
+\]</span></p>
+<p>where <span class="math inline">\(f_{p, t}\)</span> is quantile forecast at level <span class="math inline">\(p\)</span> for time <span class="math inline">\(t\)</span>.</p>
+<p><span class="math inline">\(y_t\)</span> is the actual value at time <span class="math inline">\(t\)</span>.</p>
+<p>Expect probability <span class="math inline">\((y_t &lt; f_{p, t}) = p\)</span>.</p>
+</div><div class="column">
+<p><img data-src="img/quantile_score_animation.gif"></p>
+</div></div>
+<ul>
+<li>Low <span class="math inline">\(Q_{p,t}\)</span> is better.</li>
+</ul>
+</section>
+<section id="quantile-scores-2" class="slide level2 smaller">
+<h2>Quantile scores</h2>
+<ul>
+<li>One-step ahead 10% quantile forecast (for 4 January 2016) is <span class="math inline">\(f_{0.1, t} = 744.54\)</span>.</li>
+<li>Actual value is <span class="math inline">\(y_t = 741.84\)</span>. Then:</li>
+</ul>
+<p><span class="math display">\[
+Q_{0.1, t} = 2 \times 0.1 \times (741.84 - 744.54) = 4.86
+\]</span></p>
+<div id="27ee8d57" class="cell" data-execution_count="39">
+<div class="cell-output cell-output-display" data-execution_count="38">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Method</th>
+<th data-quarto-table-cell-role="th">Quantile loss (q=0.1)</th>
+<th data-quarto-table-cell-role="th">Quantile loss (q=0.9)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>Naive</td>
+<td>4.775</td>
+<td>8.355</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+</section>
+<section id="winkler-score" class="slide level2">
+<h2>Winkler score</h2>
+<p>Winkler score evaluates the accuracy of prediction intervals.</p>
+<p>For a <span class="math inline">\((1-\alpha)100\%\)</span> prediction interval <span class="math inline">\([l_{\alpha, t}, u_{\alpha, t}]\)</span>:</p>
+<p><span class="math display">\[
+W_{\alpha, t}= \begin{cases}\left(u_{\alpha, t}-\ell_{\alpha, t}\right)+\frac{2}{\alpha}\left(\ell_{\alpha, t}-y_t\right) &amp; \text { if } y_t&lt;\ell_{\alpha, t} \\ \left(u_{\alpha, t}-\ell_{\alpha, t}\right) &amp; \text { if } \ell_{\alpha, t} \leq y_t \leq u_{\alpha, t} \\ \left(u_{\alpha, t}-\ell_{\alpha, t}\right)+\frac{2}{\alpha}\left(y_t-u_{\alpha, t}\right) &amp; \text { if } y_t&gt;u_{\alpha, t}\end{cases}
+\]</span></p>
+<p>where <span class="math inline">\(l_{\alpha, t}\)</span> and <span class="math inline">\(u_{\alpha, t}\)</span> are the lower and upper bounds of the prediction interval at time <span class="math inline">\(t\)</span>, respectively.</p>
+</section>
+<section id="winkler-score-1" class="slide level2">
+<h2>Winkler score</h2>
+<ul>
+<li>One-step ahead 80% prediction interval for 4 January 2016 is <span class="math inline">\([l_{0.2, t}, u_{0.2, t}] = [744.54,773.22]\)</span>.</li>
+<li>Actual value is <span class="math inline">\(y_t = 741.84\)</span>. Then:</li>
+</ul>
+<p><span class="math display">\[
+W_{0.2, t} = (773.22 - 744.54) + \frac{2}{0.2} (744.54 - 741.84) = 55.68
+\]</span></p>
+</section>
+<section id="continuous-ranked-probability-score" class="slide level2 smaller">
+<h2>Continuous Ranked Probability Score</h2>
+<p><span class="math display">\[
+\text{CRPS}(F_t, y_t) = \int_{-\infty}^{\infty} (F_t(z) - \mathbf{1}\{y_t \leq z\})^2 dz
+\]</span></p>
+<ul>
+<li><span class="math inline">\(F_t(z)\)</span> is the predictive cumulative distribution function (CDF) at time <span class="math inline">\(t\)</span>.</li>
+<li><span class="math inline">\(y_t\)</span> is the actual observed value at time <span class="math inline">\(t\)</span>.</li>
+<li><span class="math inline">\(\mathbf{1}\{y_t \leq z\}\)</span> is an indicator function that equals 1 if <span class="math inline">\(y_t \leq z\)</span> and 0 otherwise.</li>
+<li>CRPS measures the difference between the predicted CDF and the actual outcome, integrating over all possible values.</li>
+<li>Lower CRPS values indicate better probabilistic forecasts.</li>
+</ul>
+</section>
+<section class="slide level2">
+
+<div id="eb43277a" class="cell" data-execution_count="40">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="" aria-hidden="true" tabindex="-1"></a>train_df <span class="op">=</span> goog_df.query(<span class="st">"ds.dt.year == 2015"</span>)</span>
+<span id="cb30-2"><a href="" aria-hidden="true" tabindex="-1"></a>test_df <span class="op">=</span> goog_df.query(<span class="st">"ds.dt.year == 2016"</span>)</span>
+<span id="cb30-3"><a href="" aria-hidden="true" tabindex="-1"></a>mean_method <span class="op">=</span> HistoricAverage()</span>
+<span id="cb30-4"><a href="" aria-hidden="true" tabindex="-1"></a>naive_method <span class="op">=</span> Naive()</span>
+<span id="cb30-5"><a href="" aria-hidden="true" tabindex="-1"></a>drift_method <span class="op">=</span> RandomWalkWithDrift()</span>
+<span id="cb30-6"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(</span>
+<span id="cb30-7"><a href="" aria-hidden="true" tabindex="-1"></a>  models<span class="op">=</span>[drift_method, naive_method, mean_method], freq<span class="op">=</span><span class="st">"B"</span></span>
+<span id="cb30-8"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb30-9"><a href="" aria-hidden="true" tabindex="-1"></a>levels <span class="op">=</span> <span class="bu">list</span>(np.arange(<span class="dv">0</span>, <span class="dv">100</span>, <span class="dv">1</span> <span class="op">/</span> <span class="dv">10</span>))</span>
+<span id="cb30-10"><a href="" aria-hidden="true" tabindex="-1"></a>preds <span class="op">=</span> sf.forecast(df<span class="op">=</span>train_df, h<span class="op">=</span><span class="bu">len</span>(test_df), level<span class="op">=</span>levels)</span>
+<span id="cb30-11"><a href="" aria-hidden="true" tabindex="-1"></a>preds[<span class="st">"y"</span>] <span class="op">=</span> test_df[<span class="st">"y"</span>].values</span>
+<span id="cb30-12"><a href="" aria-hidden="true" tabindex="-1"></a>models <span class="op">=</span> [<span class="st">'RWD'</span>, <span class="st">'HistoricAverage'</span>, <span class="st">'Naive'</span>]</span>
+<span id="cb30-13"><a href="" aria-hidden="true" tabindex="-1"></a>crps_df <span class="op">=</span> evaluate(</span>
+<span id="cb30-14"><a href="" aria-hidden="true" tabindex="-1"></a>    df<span class="op">=</span>preds,</span>
+<span id="cb30-15"><a href="" aria-hidden="true" tabindex="-1"></a>    models<span class="op">=</span>models,</span>
+<span id="cb30-16"><a href="" aria-hidden="true" tabindex="-1"></a>    metrics <span class="op">=</span> [mqloss],</span>
+<span id="cb30-17"><a href="" aria-hidden="true" tabindex="-1"></a>    level<span class="op">=</span>levels,</span>
+<span id="cb30-18"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb30-19"><a href="" aria-hidden="true" tabindex="-1"></a>crps_df <span class="op">=</span> crps_df[models].T.reset_index()</span>
+<span id="cb30-20"><a href="" aria-hidden="true" tabindex="-1"></a>crps_df.columns <span class="op">=</span> [<span class="st">"method"</span>, <span class="st">"CRPS"</span>]</span>
+<span id="cb30-21"><a href="" aria-hidden="true" tabindex="-1"></a>crps_df[<span class="st">"CRPS"</span>] <span class="op">*=</span> <span class="dv">2</span></span>
+<span id="cb30-22"><a href="" aria-hidden="true" tabindex="-1"></a>crps_df.<span class="bu">round</span>(<span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+
+</section>
+<section id="" class="slide level2 output-location-slide"><div class="cell output-location-slide" data-execution_count="40">
+<div class="cell-output cell-output-display" data-execution_count="39">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">method</th>
+<th data-quarto-table-cell-role="th">CRPS</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>RWD</td>
+<td>33.557</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>HistoricAverage</td>
+<td>76.789</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>Naive</td>
+<td>26.500</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div></section><section id="scale-free-comparisons-using-skill-scores" class="slide level2">
+<h2>Scale-free comparisons using skill scores</h2>
+<ul>
+<li>Skill score compares forecast accuracy relative to a benchmark model.</li>
+<li>For a given accuracy measure <span class="math inline">\(M\)</span>, the skill score is defined as:</li>
+</ul>
+<p><span class="math display">\[
+\text{Skill Score} = 1 - \frac{M_{\text{model}}}{M_{\text{benchmark}}}
+\]</span></p>
+<div id="d2deb04f" class="cell" data-execution_count="41">
+<div class="cell-output cell-output-display" data-execution_count="40">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">method</th>
+<th data-quarto-table-cell-role="th">CRPS</th>
+<th data-quarto-table-cell-role="th">skill_score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>RWD</td>
+<td>33.56</td>
+<td>-0.27</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>HistoricAverage</td>
+<td>76.79</td>
+<td>-1.90</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>Naive</td>
+<td>26.50</td>
+<td>0.00</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="times-series-cross-validation" class="title-slide slide level1 center">
+<h1>Times series cross-validation</h1>
+
+</section>
+<section id="time-series-cross-validation" class="slide level2 smaller">
+<h2>Time series cross-validation</h2>
+<p>Traditional evaluation:</p>
+
+<img data-src=".04_files/figure-revealjs/cell-43-output-1.svg" class="r-stretch"></section>
+<section class="slide level2">
+
+<p>Time series cross-validation:</p>
+
+<img data-src=".04_files/figure-revealjs/cell-44-output-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section class="slide level2">
+
+<p>Time series cross-validation:</p>
+
+<img data-src=".04_files/figure-revealjs/cell-45-output-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section class="slide level2">
+
+<p>Time series cross-validation:</p>
+
+<img data-src=".04_files/figure-revealjs/cell-46-output-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section class="slide level2">
+
+<p>Time series cross-validation:</p>
+
+<img data-src=".04_files/figure-revealjs/cell-47-output-1.svg" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="cross-validation" class="slide level2 smaller">
+<h2>Cross-validation</h2>
+<p><code>cross_validation()</code> function from StatsForecast package:</p>
+<div id="25ade7ef" class="cell columns column-output-location" data-execution_count="47">
+<div class="column">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="" aria-hidden="true" tabindex="-1"></a>goog_2015 <span class="op">=</span> goog_df.query(<span class="st">"ds.dt.year == 2015"</span>)</span>
+<span id="cb31-2"><a href="" aria-hidden="true" tabindex="-1"></a>drift_method <span class="op">=</span> RandomWalkWithDrift()</span>
+<span id="cb31-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-4"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[drift_method], freq<span class="op">=</span><span class="st">"B"</span>)</span>
+<span id="cb31-5"><a href="" aria-hidden="true" tabindex="-1"></a>cv_df <span class="op">=</span> sf.cross_validation(h<span class="op">=</span><span class="dv">1</span>, df<span class="op">=</span>goog_2015, step_size<span class="op">=</span><span class="dv">1</span>, test_size<span class="op">=</span><span class="dv">249</span>)</span>
+<span id="cb31-6"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-7"><a href="" aria-hidden="true" tabindex="-1"></a>cv_df.<span class="bu">round</span>(<span class="dv">2</span>).head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div><div class="column">
+<div class="cell-output cell-output-display" data-execution_count="46">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">cutoff</th>
+<th data-quarto-table-cell-role="th">y</th>
+<th data-quarto-table-cell-role="th">RWD</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>GOOG_Close</td>
+<td>2015-01-07</td>
+<td>2015-01-06</td>
+<td>498.36</td>
+<td>487.85</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>GOOG_Close</td>
+<td>2015-01-08</td>
+<td>2015-01-07</td>
+<td>499.93</td>
+<td>490.50</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>GOOG_Close</td>
+<td>2015-01-09</td>
+<td>2015-01-08</td>
+<td>493.45</td>
+<td>494.43</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>GOOG_Close</td>
+<td>2015-01-12</td>
+<td>2015-01-09</td>
+<td>489.85</td>
+<td>487.76</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>GOOG_Close</td>
+<td>2015-01-13</td>
+<td>2015-01-12</td>
+<td>493.46</td>
+<td>484.51</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div></div>
+</section>
+<section id="cross-validation-1" class="slide level2 smaller">
+<h2>Cross-validation</h2>
+<div id="0d9fbcaa" class="cell columns column-output-location" data-execution_count="48">
+<div class="column">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="" aria-hidden="true" tabindex="-1"></a>evaluation_cv <span class="op">=</span> evaluate(</span>
+<span id="cb32-2"><a href="" aria-hidden="true" tabindex="-1"></a>    df<span class="op">=</span>cv_df,</span>
+<span id="cb32-3"><a href="" aria-hidden="true" tabindex="-1"></a>    models<span class="op">=</span>[<span class="st">'RWD'</span>],</span>
+<span id="cb32-4"><a href="" aria-hidden="true" tabindex="-1"></a>    metrics<span class="op">=</span>[rmse, mae, mape],</span>
+<span id="cb32-5"><a href="" aria-hidden="true" tabindex="-1"></a>    train_df<span class="op">=</span>goog_2015</span>
+<span id="cb32-6"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb32-7"><a href="" aria-hidden="true" tabindex="-1"></a>evaluation_cv.<span class="bu">round</span>(<span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div><div class="column">
+<div class="cell-output cell-output-display" data-execution_count="47">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">metric</th>
+<th data-quarto-table-cell-role="th">RWD</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>GOOG_Close</td>
+<td>rmse</td>
+<td>11.27</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>GOOG_Close</td>
+<td>mae</td>
+<td>7.26</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>GOOG_Close</td>
+<td>mape</td>
+<td>1.19</td>
+</tr>
+</tbody>
+</table>
+
 </div>
 </div>
 </div></div>

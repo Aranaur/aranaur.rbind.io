@@ -89,7 +89,7 @@ plt.rcParams.update({
 })
 import matplotlib as mpl
 from cycler import cycler
-mpl.rcParams['axes.prop_cycle'] = cycler(color=["#000000", blue, turquoise, orange, red, green, purple, yellow, red_pink, slate])
+mpl.rcParams['axes.prop_cycle'] = cycler(color=[slate, blue, turquoise, orange, red, green, purple, yellow, red_pink])
 from fpppy.utils import plot_series
 
 from IPython.display import Image
@@ -249,7 +249,7 @@ plt.title("Data Analysis Workflow", fontsize=16)
 plt.show()
 ```
 
-## Data preparation
+## Data preparation {.smaller}
 
 ```{python}
 #| label: load-data
@@ -275,15 +275,10 @@ plot_series(gdp_df, ids=["Sweden"],
             title="GDP per capita for Sweden")
 ```
 
-## Model estimation
-
-```{python}
-SklearnModel(LinearRegression())
-```
-
 ## Train the model
 
 ```{python}
+#| echo: true
 train_df = gdp_df.copy()
 train_df.drop(["GDP", "Population"], axis=1, inplace=True)
 sweden_df = train_df.query("unique_id == 'Sweden'")
@@ -303,6 +298,7 @@ sf = StatsForecast(
 ## Produce forecasts
 
 ```{python}
+#| echo: true
 sf.fit(df=train_features)
 fcasts = sf.predict(
     h=3,
@@ -327,9 +323,10 @@ plot_series(train_df, fcasts,
 
 # Some simple forecasting methods
 
-## Data
+## Data {.smaller}
 
 ```{python}
+#| echo: true
 gsheetkey = '10Y3HqO91-87jSvxmmxuTlAlbKyD67pZ9hWP8RIp7JSE'
 url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
 
@@ -338,12 +335,15 @@ production_df = pd.read_csv(url,
 production_df.head()
 ```
 
-## Mean method
+## Mean method {.smaller}
 
 - Forecast of all future values is the mean of the historical data
 - Forecast: $\hat{y}_{t+h|t} = \bar{y}_t = \frac{1}{T} \sum_{i=1}^{T} y_i$
 
 ```{python}
+#| fig-align: center
+#| echo: true
+#| output-location: column
 df = production_df[production_df['unique_id'] == 'Bricks'].dropna()
 sf = StatsForecast(models=[HistoricAverage()], freq='QE')
 fcasts_avg = sf.forecast(h=20, df=df)
@@ -353,12 +353,15 @@ plot_series(df, fcasts_avg,
             title="Mean method forecasts for Bricks production")
 ```
 
-## Naïve method
+## Naïve method {.smaller}
 
 - Forecast of all future values is the last observed value
 - Forecast: $\hat{y}_{t+h|t} = y_t$
 
 ```{python}
+#| fig-align: center
+#| echo: true
+#| output-location: column
 sf = StatsForecast(models=[Naive()], freq='QE')
 fcasts_naive = sf.forecast(h=20, df=df)
 plot_series(df, fcasts_naive,
@@ -367,27 +370,33 @@ plot_series(df, fcasts_naive,
             title="Naïve method forecasts for Bricks production")
 ```
 
-## Seasonal naïve method
+## Seasonal naïve method {.smaller}
 
 - Forecast of all future values is the last observed value from the same season
 - Forecast: $\hat{y}_{t+h|t} = y_{t+h-m(k+1)}$, where $m$ is the seasonal period and $k = (h-1)/m$
 
 ```{python}
+#| fig-align: center
+#| echo: true
+#| output-location: column
 sf = StatsForecast(models=[SeasonalNaive(season_length=4)], freq='QE')
 fcasts_snaive = sf.forecast(h=20, df=df)
 plot_series(df, fcasts_snaive,
             xlabel="Quarter",
             ylabel="Production",
-            title="Seasonal naïve method forecasts for Bricks production")
+            title="Seasonal naïve method forecasts for Bricks")
 ```
 
-## Drift method
+## Drift method {.smaller}
 
 - Forecast equals last observed value plus average change observed in historical data
 - Forecast: $\hat{y}_{T+h \mid T}=y_T+\frac{h}{T-1} \sum_{t=2}^T\left(y_t-y_{t-1}\right)=y_T+h\left(\frac{y_T-y_1}{T-1}\right)$.
 - Equivalent to fitting a line between the first and last observation and extrapolating it into the future
 
 ```{python}
+#| fig-align: center
+#| echo: true
+#| output-location: column
 sf = StatsForecast(models=[RandomWalkWithDrift()], freq='QE')
 fcasts_drift = sf.forecast(h=20, df=df)
 plot_series(df, fcasts_drift,
@@ -458,7 +467,7 @@ plot_series(train, fcasts,
 
 # Fitted values and residuals
 
-## Fitted values
+## Fitted values {.smaller}
 
 - $\hat{y}_{t|t-1}$ is the forecast of $y_t$ based on all available information up to time $t-1$.
 - We call this the **fitted value**
@@ -472,25 +481,27 @@ plot_series(train, fcasts,
 - $\hat{y}_{t|t-1}=y_{t-1}+(y_T-y_1)/(T-1)$ for drift method
 :::
 
-## Forecasting residuals
+## Forecasting residuals {.smaller}
 
 - The residuals are the differences between the observed values and the fitted values: $e_t = y_t - \hat{y}_{t|t-1}$.
 
 Assumptions:
 
-1. $\{e_t\}$ uncorrelated. If they aren't, then information left in residuals can be used to improve forecasts.
-2. $\{e_t\}$ have mean zero. If they don't, then the model is systematically over- or under-predicting.
+1. $\{e_t\}$ [uncorrelated]{.hi}. If they aren't, then information left in residuals can be used to improve forecasts.
+2. $\{e_t\}$ [have mean zero]{.hi}. If they don't, then the model is systematically over- or under-predicting.
 
 Useful properties (for distribution and prediction intervals):
 
-3. $\{e_t\}$ are normally distributed. If they aren't, then prediction intervals may be invalid.
-4. $\{e_t\}$ are homoscedastic. If they aren't, then prediction intervals may be invalid.
+3. $\{e_t\}$ are [normally distributed]{.hi-slate}. If they aren't, then prediction intervals may be invalid.
+4. $\{e_t\}$ are [homoscedastic]{.hi-slate}. If they aren't, then prediction intervals may be invalid.
 
 # Residual diagnostics
 
-## Google daily closing stock prices
+## Google daily closing stock prices {.smaller}
 
 ```{python}
+#| echo: true
+#| fig-align: center
 train = goog_df.query("ds.dt.year == 2015")
 plot_series(train,
             xlabel="day [1]",
@@ -498,9 +509,10 @@ plot_series(train,
             title="Google daily closing stock prices in 2015")
 ```
 
-## Google stock prices and Naive method
+## Google stock prices and Naive method {.smaller}
 
 ```{python}
+#| echo: true
 naive_method = Naive()
 sf = StatsForecast(models=[naive_method], freq='1d')
 sf.forecast(h=14, df=train, fitted=True)
@@ -511,18 +523,22 @@ train["innov"] = train["y"] - train["fitted"]
 train.head()
 ```
 
-## True vs Fitted values
+## True vs Fitted values {.smaller}
 
 ```{python}
+#| echo: true
+#| fig-align: center
 fig, ax = plt.subplots()
 ax.plot(train["ds"], train["y"], label="Observed", color=blue)
 ax.plot(train["ds"], train["fitted"], label="Fitted", color=orange)
 ax.legend()
 ```
 
-## Last observations
+## Last observations {.smaller}
 
 ```{python}
+#| echo: true
+#| fig-align: center
 fig, ax = plt.subplots()
 ax.plot(train["ds"][-40:], train["y"][-40:], label="Observed", color=blue)
 ax.plot(train["ds"][-40:], train["fitted"][-40:], label="Fitted", color=orange)
@@ -530,9 +546,11 @@ ax.legend()
 ```
 
 
-## Residual diagnostics
+## Residual diagnostics {.smaller}
 
 ```{python}
+#| echo: true
+#| fig-align: center
 train["resid"] = train["y"].diff().values
 plot_series(train, target_col="resid",
             xlabel="day [1]",
@@ -540,24 +558,31 @@ plot_series(train, target_col="resid",
             title="Residuals from the naive method")
 ```
 
-## Histogram of residuals
+## Histogram of residuals {.smaller}
 
 ```{python}
+#| echo: true
+#| fig-align: center
 ax = train["resid"].hist()
 ax.set_title("Histogram of residuals")
 plt.show()
 ```
 
-## ACF of residuals
+## ACF of residuals {.smaller}
 
 ```{python}
+#| echo: true
+#| fig-align: center
 fig = plot_acf(train["resid"][1:], zero=False, auto_ylims=True,
          bartlett_confint=False, title="Residuals from the naïve method")
 ```
 
-## All together
+## All together {.smaller}
 
 ```{python}
+#| echo: true
+#| output-location: slide
+#| fig-align: center
 def plot_diagnostics(data):
   fig = plt.figure(figsize=(8, 5))
   ax1 = fig.add_subplot(2, 2, (1, 2))
@@ -575,25 +600,26 @@ def plot_diagnostics(data):
   ax3.set_ylabel("Count")
   plt.tight_layout()
   plt.show()
+
 plot_diagnostics(train)
 ```
 
 ## ACF of residuals
 
-- We assume that the residuals are white noise. If they are not, then there is information left in the residuals that can be used to improve the forecasts.
-- So a standard residual diagnostic is to plot the ACF of the residuals and check for significant autocorrelations.
-- We *expect* all autocorrelations to be close to zero and within the 95% confidence bounds.
+- We assume that the [residuals are white noise]{.hi}. If they are not, then there is information left in the residuals that can be used to improve the forecasts.
+- So a standard residual diagnostic is to [plot the ACF]{.hi} of the residuals and check for significant autocorrelations.
+- We [*expect*]{.hi} all autocorrelations to be close to zero and within the 95% confidence bounds.
 
-## Portmanteau test
+## Portmanteau test {.smaller}
 
 $r_k$ --- autocorrelation of residual at lag $k$.
 
 Consider a whole set of $r_k$ values, and develop a test to see whether they are significantly different from zero.
 
-- $H_0$: All $r_k = 0$ for $k = 1, 2, \ldots, l$
-- $H_a$: At least one $r_k \neq 0$ for $k = 1, 2, \ldots, l$
+- $H_0$: variable follows a white noise process (all $r_k = 0$ for $k = 1, 2, \ldots, l$)
+- $H_a$: variable does not follow a white noise process (at least one $r_k \neq 0$ for $k = 1, 2, \ldots, l$)
 
-::: {.callout-note}
+::: {.callout-note icon="false"}
 ## Box-Pierce test
 
 $$Q = T \sum_{k=1}^{l} r_k^2$$
@@ -604,13 +630,13 @@ where $T$ is the number of residuals and $l$ is the number of lags being tested.
 - If each $r_k$ close to zero, then $Q$ will be small.
 - If some $r_k$ significantly different from zero, then $Q$ will be large.
 
-## Portmanteau test
+## Portmanteau test {.smaller}
 
 $r_k$ --- autocorrelation of residual at lag $k$.
 
 Consider a whole set of $r_k$ values, and develop a test to see whether they are significantly different from zero.
 
-::: {.callout-note}
+::: {.callout-note icon="false"}
 ## Ljung-Box test
 
 $$Q^* = T(T+2) \sum_{k=1}^{l} \frac{r_k^2}{T-k}$$
@@ -621,20 +647,24 @@ where $T$ is the number of residuals and $l$ is the number of lags being tested.
 - Preferences: $l = 10$ for non-seasonal data, $l = 2 \times m$ for seasonal data with period $m$.
 - Better performance for small samples compared to Box-Pierce test.
 
-## Portmanteau test for naive method residuals
+## Portmanteau test for naive method residuals {.smaller}
 
 - If data are white noise, then $Q^*$ has a $\chi^2$ distribution with $l$ degrees of freedom.
 - lag = $l$
 
 ```{python}
+#| echo: true
+#| output-location: column
 resid_test = acorr_ljungbox(train["resid"].dropna(),
   boxpierce=True)
 resid_test.round(4).head()
 ```
 
-## Portmanteau test for RW
+## Portmanteau test for RW {.smaller}
 
 ```{python}
+#| echo: true
+#| output-location: column
 train = goog_df.query("ds.dt.year == 2015")
 drift_method = RandomWalkWithDrift()
 sf = StatsForecast(models=[drift_method], freq="B")
@@ -649,11 +679,13 @@ resid_test.round(4).head()
 
 # Forecasting using transformations
 
-## Backtransformation
+## Backtransformation {.smaller}
 
 We must reverse the transformation to obtain forecasts on the original scale.
 
 For Box-Cox transformation with parameter $\lambda$:
+
+<br>
 
 ::: {.columns}
 ::: {.column}
@@ -689,110 +721,111 @@ import matplotlib.pyplot as plt
 import scipy.stats as stats
 from matplotlib.patches import ConnectionPatch
 
-# Використовуємо стиль XKCD для імітації малюнка від руки
-with plt.xkcd():
-    # 1. Створення фігури та двох підграфіків
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+# 1. Створення фігури та двох підграфіків
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
 
-    # --- ЗМІНА: Встановлюємо білий фон для фігури та осей ---
-    fig.patch.set_facecolor('white')
-    ax1.set_facecolor('white')
-    ax2.set_facecolor('white')
-    # ---------------------------------------------------------
+# --- Встановлюємо білий фон для фігури та осей ---
+fig.patch.set_facecolor('white')
+ax1.set_facecolor('white')
+ax2.set_facecolor('white')
+# ---------------------------------------------------------
 
-    fig.suptitle(
-        "Transformations to reduce skewness",
-        fontsize=18, y=0.98
-    )
+fig.suptitle(
+  "Transformations to reduce skewness",
+  fontsize=18, y=0.98
+)
 
-    # --- Графік 1: Асиметричний (вихідний) розподіл ---
+# --- Графік 1: Асиметричний (вихідний) розподіл ---
 
-    # Генеруємо дані для правостороннього асиметричного розподілу
-    a = 4  # Параметр асиметрії
-    x_skewed = np.linspace(stats.skewnorm.ppf(0.001, a), stats.skewnorm.ppf(0.999, a), 200)
-    pdf_skewed = stats.skewnorm.pdf(x_skewed, a)
+# Генеруємо дані для правостороннього асиметричного розподілу
+a = 4  # Параметр асиметрії
+x_skewed = np.linspace(stats.skewnorm.ppf(0.001, a), stats.skewnorm.ppf(0.999, a), 200)
+pdf_skewed = stats.skewnorm.pdf(x_skewed, a)
 
-    # Розраховуємо моду, медіану та середнє
-    mean_val = stats.skewnorm.mean(a)
-    median_val = stats.skewnorm.median(a)
-    mode_val = x_skewed[np.argmax(pdf_skewed)] # Мода - це пік розподілу
+# Розраховуємо моду, медіану та середнє
+mean_val = stats.skewnorm.mean(a)
+median_val = stats.skewnorm.median(a)
+mode_val = x_skewed[np.argmax(pdf_skewed)] # Мода - це пік розподілу
 
-    # Малюємо криву розподілу
-    ax1.plot(x_skewed, pdf_skewed, 'k')
+# Малюємо криву розподілу
+ax1.plot(x_skewed, pdf_skewed, 'k', linewidth=1.5)
 
-    # Малюємо вертикальні лінії для моди, медіани та середнього
-    ax1.vlines([mode_val, median_val, mean_val], 0,
-               [stats.skewnorm.pdf(mode_val, a),
-                stats.skewnorm.pdf(median_val, a),
-                stats.skewnorm.pdf(mean_val, a)],
-               colors='k', lw=2)
+# Малюємо вертикальні лінії для моди, медіани та середнього
+ax1.vlines([mode_val, median_val, mean_val], 0,
+       [stats.skewnorm.pdf(mode_val, a),
+      stats.skewnorm.pdf(median_val, a),
+      stats.skewnorm.pdf(mean_val, a)],
+       colors='k', lw=2)
 
-    # Додаємо текстові підписи
-    ax1.text(mode_val, stats.skewnorm.pdf(mode_val, a) + 0.05, 'mode', ha='center', fontsize=14)
-    ax1.text(median_val, stats.skewnorm.pdf(median_val, a) + 0.08, 'median', ha='center', fontsize=14)
-    ax1.text(mean_val + 0.1, stats.skewnorm.pdf(mean_val, a) + 0.04, 'mean', ha='left', fontsize=14)
+# Додаємо текстові підписи
+ax1.text(mode_val, stats.skewnorm.pdf(mode_val, a) + 0.05, 'mode', ha='center', fontsize=14)
+ax1.text(median_val, stats.skewnorm.pdf(median_val, a) + 0.08, 'median', ha='center', fontsize=14)
+ax1.text(mean_val + 0.1, stats.skewnorm.pdf(mean_val, a) + 0.04, 'mean', ha='left', fontsize=14)
 
-    # --- Графік 2: Симетричний (трансформований) розподіл ---
+# --- Графік 2: Симетричний (трансформований) розподіл ---
 
-    # Генеруємо дані для нормального розподілу
-    x_norm = np.linspace(-3, 3, 200)
-    pdf_norm = stats.norm.pdf(x_norm)
+# Генеруємо дані для нормального розподілу
+x_norm = np.linspace(-3, 3, 200)
+pdf_norm = stats.norm.pdf(x_norm)
 
-    # Малюємо криву
-    ax2.plot(x_norm, pdf_norm, 'k')
+# Малюємо криву
+ax2.plot(x_norm, pdf_norm, 'k', linewidth=1.5)
 
-    # Малюємо центральну лінію (середнє = медіана = мода)
-    ax2.vlines(0, 0, stats.norm.pdf(0), 'k', lw=2)
-    ax2.text(0, stats.norm.pdf(0) + 0.05, 'symmetric', ha='center', fontsize=16)
+# Малюємо центральну лінію (середнє = медіана = мода)
+ax2.vlines(0, 0, stats.norm.pdf(0), 'k', lw=2)
+ax2.text(0, stats.norm.pdf(0) + 0.05, 'symmetric', ha='center', fontsize=16)
 
-    # --- Стрілки та анотації ---
+# --- Стрілки та анотації ---
 
-    # 1. Головна чорна стрілка: з'єднує середнє симетричного розподілу з медіаною асиметричного
-    con = ConnectionPatch(
-        xyA=(0, 0), xyB=(median_val, 0),
-        coordsA='data', coordsB='data',
-        axesA=ax2, axesB=ax1,
-        arrowstyle="->", shrinkB=5,
-        connectionstyle="arc3,rad=-0.4", # Вигин стрілки вниз
-        color='k', lw=2
-    )
-    ax2.add_artist(con)
+# 1. Головна чорна стрілка: з'єднує середнє симетричного розподілу з медіаною асиметричного
+con = ConnectionPatch(
+  xyA=(0, 0), xyB=(median_val, 0),
+  coordsA='data', coordsB='data',
+  axesA=ax2, axesB=ax1,
+  arrowstyle="->", shrinkB=5,
+  connectionstyle="arc3,rad=-0.4", # Вигин стрілки вниз
+  color='k', lw=2
+)
+ax2.add_artist(con)
 
-    # 2. Зелена анотація з поясненням
-    ax1.annotate(
-        'adjust to get to\nthe mean',
-        xy=(mean_val, 0.2), xycoords='data',
-        xytext=(mean_val + 0.3, 0.1), textcoords='data',
-        ha='left', va='top', fontsize=14, color='green',
-        arrowprops=dict(
-            arrowstyle='->',
-            connectionstyle="arc3,rad=0.3",
-            color='green',
-            lw=2
-        )
-    )
+# 2. Зелена анотація з поясненням
+ax1.annotate(
+  'adjust to get to\nthe mean',
+  xy=(mean_val, 0.2), xycoords='data',
+  xytext=(mean_val + 0.3, 0.1), textcoords='data',
+  ha='left', va='top', fontsize=14, color='green',
+  arrowprops=dict(
+    arrowstyle='->',
+    connectionstyle="arc3,rad=0.3",
+    color='green',
+    lw=2
+  )
+)
 
-    # --- Фінальне налаштування вигляду графіків ---
-    for ax in [ax1, ax2]:
-        ax.set_yticks([])
-        ax.set_xticks([])
-        # Малюємо осі X та Y
-        ax.axhline(0, color='k', lw=2)
-        ax.axvline(ax.get_xlim()[0], color='k', lw=2)
-        # Прибираємо зайві рамки
-        for spine in ['right', 'top', 'left', 'bottom']:
-            ax.spines[spine].set_visible(False)
-        ax.set_ylim(bottom=-0.3) # Додаємо місце знизу для анотацій
+# --- Фінальне налаштування вигляду графіків ---
+for ax in [ax1, ax2]:
+  ax.set_yticks([])
+  ax.set_xticks([])
+  # Малюємо осі X та Y
+  ax.axhline(0, color='k', lw=1)
+  ax.axvline(ax.get_xlim()[0], color='k', lw=1)
+  # Прибираємо зайві рамки
+  for spine in ['right', 'top', 'left', 'bottom']:
+    ax.spines[spine].set_visible(False)
+  ax.set_ylim(bottom=-0.3) # Додаємо місце знизу для анотацій
 
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-    plt.show()
+plt.tight_layout(rect=[0, 0, 1, 0.95])
+plt.show()
 ```
 
-## Modeling with transformations
+## Modeling with transformations {.smaller}
 
 ```{python}
+#| echo: true
+#| output-location: column
+#| fig-align: center
 gsheetkey = '1V2HAc5bwBXq1KJg9Dv7dX0R0C3s1mcGxfWmEVwoI1bs'
-url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
+url=f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
 
 egg_df = pd.read_csv(url, parse_dates=["ds"])
 egg_df_log = egg_df.copy()
@@ -815,6 +848,9 @@ plt.show()
 ---
 
 ```{python}
+#| echo: true
+#| output-location: slide
+#| fig-align: center
 rwd_method = RandomWalkWithDrift()
 sf = StatsForecast(models=[rwd_method], freq="YE")
 sf.fit(egg_df_log)
@@ -855,10 +891,10 @@ fig.legend(
 plt.show()
 ```
 
-## Bias adjustment
+## Bias adjustment {.smaller}
 
-- Back transformed point forecassts are median.
-- Back transformed PI have the correct coverage.
+- Back transformed point forecassts are [median]{.hi}.
+- Back transformed **PI** have the **correct** coverage.
 
 Back-transformed means:
 
@@ -895,13 +931,16 @@ $$
 
 . . .
 
-- Forecast $\hat{S_t}$ using seasonal naïve method
-- Forecast $\hat{A_t}$ using appropriate method (e.g., drift method)
-- Combine forecasts to obtain final forecasts
+- Forecast $\hat{S_t}$ using [seasonal naïve method]{.hi}
+- Forecast $\hat{A_t}$ using [appropriate method]{.hi} (e.g., drift method)
+- **Combine** forecasts to obtain final forecasts
 
-## US Retail Employment
+## US Retail Employment {.smaller}
 
 ```{python}
+#| echo: true
+#| output-location: column
+#| fig-align: center
 gsheetkey = '1VoHDwazrwCVOyooH7AyBqMAJZmq5sD7jRgzzPl7AyZA'
 url = f'https://docs.google.com/spreadsheet/ccc?key={gsheetkey}&output=csv'
 
@@ -932,6 +971,9 @@ plt.show()
 ## Seasonally Adjusted with naive method
 
 ```{python}
+#| echo: true
+#| output-location: slide
+#| fig-align: center
 naive_method = Naive()
 sf = StatsForecast(models=[naive_method], freq="M")
 adjusted_fcasts = sf.forecast(h=24, level=[80, 95], df=train_df,
@@ -949,6 +991,9 @@ plot_series(train_df, adjusted_fcasts, target_col="y_adjusted",
 ## Seasonal component with seasonal naive
 
 ```{python}
+#| echo: true
+#| output-location: slide
+#| fig-align: center
 seasonal_naive_method = SeasonalNaive(season_length=12)
 sf = StatsForecast(models=[seasonal_naive_method], freq="M")
 seasonal_fcasts = sf.forecast(h=24, level=[80, 95], df=train_df,
@@ -966,6 +1011,9 @@ plot_series(train_df, seasonal_fcasts, target_col="seasonal",
 ## Final forecasts
 
 ```{python}
+#| echo: true
+#| output-location: slide
+#| fig-align: center
 seasonal_naive = SeasonalNaive(12)
 sf = StatsForecast(models=[seasonal_naive], freq="M")
 seasonal_fcasts = sf.forecast(h=24, level=[80, 95], df=train_df,
@@ -999,19 +1047,20 @@ plot_series(train_df, final_df, target_col="y", level=[80, 95],
             rm_legend=False)
 ```
 
-## Residual diagnostics
+## Residual diagnostics {.smaller}
 
 ```{python}
+#| echo: true
+#| fig-align: center
 plot_diagnostics(train_df)
 ```
 
 # Evaluating point forecast accuracy
 
-## Training and test sets
+## Training and test sets {.smaller}
 
 ```{python}
-import matplotlib.pyplot as plt
-import numpy as np
+#| fig-align: center
 
 # --- Налаштування графіку ---
 fig, ax = plt.subplots(figsize=(12, 2))
@@ -1092,6 +1141,9 @@ $$
 ---
 
 ```{python}
+#| echo: true
+#| output-location: slide
+#| fig-align: center
 train_df = beers_df.query("ds.dt.year <= 2007")
 test_df = beers_df.query("ds.dt.year > 2007")
 
@@ -1114,15 +1166,15 @@ plot_series(beers_df, preds,
             rm_legend=False)
 ```
 
-## Measures of forecast accuracy
+## Measures of forecast accuracy {.smaller}
 
 ::: {.columns}
 ::: {.column}
-$y_{T+h}$ --- actual value at time $T+h$
+$y_{T+h}$ --- [actual value]{.hi} at time $T+h$
 
-$\hat{y}_{T+h|T}$ --- forecast value made at time $T$ for time $T+h$
+$\hat{y}_{T+h|T}$ --- [forecast value]{.hi} made at time $T$ for time $T+h$
 
-$e_{T+h} = y_{T+h} - \hat{y}_{T+h|T}$ --- forecast error at time $T+h$
+$e_{T+h} = y_{T+h} - \hat{y}_{T+h|T}$ --- [forecast error]{.hi} at time $T+h$
 :::
 ::: {.column}
 - **Mean Error (ME)**: $\text{ME} = \frac{1}{n} \sum_{h=1}^{n} e_{T+h}$
@@ -1136,30 +1188,33 @@ $e_{T+h} = y_{T+h} - \hat{y}_{T+h|T}$ --- forecast error at time $T+h$
 - MAE, MSE, RMSE are all scale-dependent.
 - MAPE is scale-independent but can be problematic if actual values are close to zero.
 
-## Scaled errors
+## Scaled errors {.smaller}
 
-Proposed by Hyndman and Koehler (2006):
+Proposed by [Hyndman and Koehler (2006)](https://www.sciencedirect.com/science/article/abs/pii/S0169207006000239?via%3Dihub):
 
-- For non-seasonal data, scale errors using naive method:
+- For [non-seasonal data]{.hi}, scale errors using naive method:
 
 $$
 q_i = \frac{e_i}{\frac{1}{T-1} \sum_{t=2}^{T} |y_t - y_{t-1}|}
 $$
 
-- For seasonal data, scale errors using seasonal naive method:
+- For [seasonal data]{.hi}, scale errors using seasonal naive method:
 
 $$
 q_i = \frac{e_i}{\frac{1}{T-m} \sum_{t=m+1}^{T} |y_t - y_{t-m}|}
 $$
 
-## Scaled errors
+## Scaled errors {.smaller}
 
+::: {.columns}
+::: {.column}
 - **Mean Absolute Scaled Error (MASE)**:
 
 $$
 \text{MASE} = \frac{1}{n} \sum_{i=1}^{n} |q_i|
 $$
-
+:::
+::: {.column}
 - **Root Mean Squared Scaled Error (RMSSE)**:
 
 $$
@@ -1173,11 +1228,11 @@ q_i^2 = \frac{e_i^2}{\frac{1}{T-1} \sum_{t=m+1}^{T} (y_t - y_{t-1})^2}
 $$
 
 and we set $m=1$ for non-seasonal data.
+:::
+:::
 
 ---
 
-::: {.columns}
-::: {.column}
 ```{python}
 plot_series(beers_df, preds,
             xlabel="Quarter",
@@ -1185,33 +1240,469 @@ plot_series(beers_df, preds,
             title="Forecasts for quarterly beer production",
             rm_legend=False)
 ```
-:::
-::: {.column}
 
 ```{python}
+#| echo: true
+#| output-location: slide
 evaluation = evaluate(preds, 
   metrics=[rmse, mae, mape,
   partial(mase, seasonality=4)],
-  train_df =train_df)
+  train_df = train_df)
 
 evaluation.round(2)
 ```
+
+# Evaluating distributional accuracy
+
+## Quantile scores
+
+```{python}
+#| echo: true
+#| output-location: slide
+#| fig-align: center
+train_df = goog_df.query("ds.dt.year == 2015")
+test_df = goog_df.query("ds.dt.year == 2016")
+train_df["ds"] = np.arange(len(train_df["ds"]))
+test_df["ds"] = np.arange(len(test_df["ds"]))
+
+naive_model = Naive()
+
+sf = StatsForecast(models=[naive_model], freq=1)
+preds = sf.forecast(h=19, level=[80], df=train_df)
+preds["y"] = test_df["y"].values
+
+plot_series(train_df, preds, level=[80],
+            xlabel="day",
+            ylabel="$US",
+            title="Google closing stock prices",
+            rm_legend=False,)
+```
+
+## Quantile scores {.tiny}
+
+::: {.columns}
+::: {.column}
+- For a given quantile level $\alpha$, the quantile score (QS) is defined as:
+
+$$
+Q_{p, t}= \begin{cases}2(1-p)\left(f_{p, t}-y_t\right), & \text { if } y_t<f_{p, t} \\ 2 p\left(y_t-f_{p, t}\right), & \text { if } y_t \geq f_{p, t}\end{cases}
+$$
+
+where $f_{p, t}$ is quantile forecast at level $p$ for time $t$. 
+
+$y_t$ is the actual value at time $t$.
+
+Expect probability $(y_t < f_{p, t}) = p$.
+:::
+::: {.column}
+```{python}
+#| eval: false
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+
+# Визначаємо функцію квантильного рахунку (pinball loss)
+def quantile_score(error, p):
+    """
+    Розраховує квантильний рахунок.
+    error: y_true - y_pred
+    p: квантиль (0 < p < 1)
+    """
+    return np.where(error < 0, 2 * (1 - p) * (-error), 2 * p * error)
+
+# Налаштування анімації
+fig, ax = plt.subplots(figsize=(8, 6))
+ax.set_xlim(-10, 10)
+ax.set_ylim(0, 10)
+ax.set_xlabel("Forecast error ($y_t - f_{p,t}$)")
+ax.set_ylabel("Quantile score ($Q_{p,t}$)")
+ax.grid(True)
+
+line, = ax.plot([], [], lw=2.5)
+title = ax.set_title("")
+ax.axvline(0, color='grey', linestyle='--', lw=1)
+
+# Дані для анімації
+p_values = np.arange(0.95, 0.04, -0.05)
+error_range = np.linspace(-10, 10, 400)
+
+# Функція ініціалізації для анімації
+def init():
+    line.set_data([], [])
+    title.set_text("")
+    return line, title
+
+# Функція для оновлення кожного кадру анімації
+def update(frame):
+    p = p_values[frame]
+    qs = quantile_score(error_range, p)
+    
+    line.set_data(error_range, qs)
+    title.set_text(f"Залежність $Q_{{p,t}}$ від помилки при $p = {p:.2f}$")
+    
+    # Оновлюємо колір лінії для кращої візуалізації
+    # Колір змінюється від синього (p~1) до червоного (p~0)
+    color_intensity = (p - 0.05) / 0.9
+    line.set_color(plt.cm.coolwarm(color_intensity))
+    
+    return line, title
+
+# Створення анімації
+ani = animation.FuncAnimation(
+    fig, 
+    update, 
+    frames=len(p_values),
+    init_func=init, 
+    blit=True,
+    interval=200  # Інтервал між кадрами в мілісекундах
+)
+
+output_dir = 'img'
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+# Зберігаємо анімацію як GIF
+gif_path = os.path.join(output_dir, 'quantile_score_animation.gif')
+ani.save(gif_path, writer='pillow', fps=5)
+
+# Для відображення в Jupyter/Quarto
+plt.close(fig) # Запобігаємо статичному відображенню
+```
+
+![](img/quantile_score_animation.gif)
 :::
 :::
 
+- Low $Q_{p,t}$ is better.
+
+## Quantile scores {.smaller}
+
+- One-step ahead 10% quantile forecast (for 4 January 2016) is $f_{0.1, t} = 744.54$.
+- Actual value is $y_t = 741.84$. Then:
+
+$$
+Q_{0.1, t} = 2 \times 0.1 \times (741.84 - 744.54) = 4.86
+$$
+
+```{python}
+evaluation = evaluate(preds, metrics=[quantile_loss], level=[80])
+
+methods = ['Naive']
+evaluation_transformed = pd.DataFrame({
+    'Method': methods,
+    'Quantile loss (q=0.1)': evaluation[evaluation['metric'] ==
+        'quantile_loss_q0.1'][methods].iloc[0].values,
+    'Quantile loss (q=0.9)': evaluation[evaluation['metric'] ==
+        'quantile_loss_q0.9'][methods].iloc[0].values,
+})
+evaluation_transformed.round(4)
+```
+
+## Winkler score
+
+Winkler score evaluates the accuracy of prediction intervals.
+
+For a $(1-\alpha)100\%$ prediction interval $[l_{\alpha, t}, u_{\alpha, t}]$:
+
+$$
+W_{\alpha, t}= \begin{cases}\left(u_{\alpha, t}-\ell_{\alpha, t}\right)+\frac{2}{\alpha}\left(\ell_{\alpha, t}-y_t\right) & \text { if } y_t<\ell_{\alpha, t} \\ \left(u_{\alpha, t}-\ell_{\alpha, t}\right) & \text { if } \ell_{\alpha, t} \leq y_t \leq u_{\alpha, t} \\ \left(u_{\alpha, t}-\ell_{\alpha, t}\right)+\frac{2}{\alpha}\left(y_t-u_{\alpha, t}\right) & \text { if } y_t>u_{\alpha, t}\end{cases}
+$$
+
+where $l_{\alpha, t}$ and $u_{\alpha, t}$ are the lower and upper bounds of the prediction interval at time $t$, respectively.
+
+## Winkler score
+
+- One-step ahead 80% prediction interval for 4 January 2016 is $[l_{0.2, t}, u_{0.2, t}] = [744.54,773.22]$.
+- Actual value is $y_t = 741.84$. Then:
+
+$$
+W_{0.2, t} = (773.22 - 744.54) + \frac{2}{0.2} (744.54 - 741.84) = 55.68
+$$
+
+## Continuous Ranked Probability Score {.smaller}
+
+$$
+\text{CRPS}(F_t, y_t) = \int_{-\infty}^{\infty} (F_t(z) - \mathbf{1}\{y_t \leq z\})^2 dz
+$$
+
+- $F_t(z)$ is the predictive cumulative distribution function (CDF) at time $t$.
+- $y_t$ is the actual observed value at time $t$.
+- $\mathbf{1}\{y_t \leq z\}$ is an indicator function that equals 1 if $y_t \leq z$ and 0 otherwise.
+- CRPS measures the difference between the predicted CDF and the actual outcome, integrating over all possible values.
+- Lower CRPS values indicate better probabilistic forecasts.
+
+---
+
+```{python}
+#| echo: true
+#| output-location: slide
+train_df = goog_df.query("ds.dt.year == 2015")
+test_df = goog_df.query("ds.dt.year == 2016")
+mean_method = HistoricAverage()
+naive_method = Naive()
+drift_method = RandomWalkWithDrift()
+sf = StatsForecast(
+  models=[drift_method, naive_method, mean_method], freq="B"
+)
+levels = list(np.arange(0, 100, 1 / 10))
+preds = sf.forecast(df=train_df, h=len(test_df), level=levels)
+preds["y"] = test_df["y"].values
+models = ['RWD', 'HistoricAverage', 'Naive']
+crps_df = evaluate(
+    df=preds,
+    models=models,
+    metrics = [mqloss],
+    level=levels,
+)
+crps_df = crps_df[models].T.reset_index()
+crps_df.columns = ["method", "CRPS"]
+crps_df["CRPS"] *= 2
+crps_df.round(4)
+```
+
+## Scale-free comparisons using skill scores
+
+- Skill score compares forecast accuracy relative to a benchmark model.
+- For a given accuracy measure $M$, the skill score is defined as:
+
+$$
+\text{Skill Score} = 1 - \frac{M_{\text{model}}}{M_{\text{benchmark}}}
+$$
+
+```{python}
+naive_crps = crps_df.query("method == 'Naive'")["CRPS"].iloc[0]
+crps_df['skill_score'] = crps_df.apply(
+    lambda row: (naive_crps - row['CRPS']) / \
+      naive_crps if row['method'] != 'Naive' else 0,
+    axis=1
+)
+crps_df.round(2)
+```
+
+# Times series cross-validation
+
+## Time series cross-validation {.smaller}
+
+Traditional evaluation:
+
+```{python}
+import matplotlib.pyplot as plt
+import numpy as np
+
+# --- Налаштування графіку ---
+fig, ax = plt.subplots(figsize=(12, 2))
+
+# Встановлюємо межі, щоб було достатньо місця
+ax.set_ylim(-1, 1)
+ax.set_xlim(-1, 26)
+
+# Прибираємо осі та рамку для чистого вигляду
+ax.axis('off')
+
+# --- Визначення даних та кольорів ---
+# Кількість точок для тренувальних та тестових даних
+n_train = 18
+n_test = 5
+
+# Створюємо масиви з позиціями точок на осі X
+train_points = np.arange(0, n_train)
+test_points = np.arange(n_train, n_train + n_test)
+
+# Кольори, що відповідають зображенню
+train_color = blue
+test_color = orange
+axis_color = 'black'
+
+# --- Малюємо елементи графіку ---
+
+# 1. Головна вісь часу зі стрілкою
+# Малюємо лінію, а потім додаємо стрілку за допомогою annotate
+ax.axhline(y=0, color=axis_color, zorder=1)
+# Використовуємо annotate для створення стрілки на кінці
+ax.annotate('', xy=(n_train + n_test + 1, 0), xytext=(-1, 0),
+            arrowprops=dict(arrowstyle="->", color=axis_color))
+
+
+# 2. Малюємо точки даних
+# Тренувальні дані
+ax.scatter(train_points, np.zeros_like(train_points),
+           color=train_color, s=100, zorder=2)
+
+# Тестові дані
+ax.scatter(test_points, np.zeros_like(test_points),
+           color=test_color, s=100, zorder=2)
+
+
+# 3. Додаємо текстові підписи
+# Підпис для тренувальних даних
+train_text_pos = np.mean(train_points)
+ax.text(train_text_pos, 0.4, 'Training data',
+        ha='center', va='center', fontsize=20, color=train_color)
+
+# Підпис для тестових даних
+test_text_pos = np.mean(test_points)
+ax.text(test_text_pos, 0.4, 'Test data',
+        ha='center', va='center', fontsize=20, color=test_color)
+
+# Підпис "time"
+ax.text(n_train + n_test + 1.5, 0.1, 'time',
+        ha='left', va='center', fontsize=18, color=axis_color)
+
+# --- Відображення результату ---
+plt.show()
+```
+
+---
+
+Time series cross-validation:
+
+```{python}
+#| fig-align: center
+def plot_ts_cross_validation(
+    n_folds=15,
+    initial_train_size=4,
+    h=1,
+    step=1,
+    window_size=25,  # Новий параметр для фіксованої кількості точок
+    ax=None
+):
+    """
+    Візуалізує перехресну валідацію для часових рядів з фіксованим вікном.
+
+    Параметри:
+    - n_folds (int): Кількість ітерацій (зрізів) валідації.
+    - initial_train_size (int): Початковий розмір тренувального набору.
+    - h (int): Горизонт прогнозування.
+    - step (int): Крок, на який збільшується тренувальний набір.
+    - window_size (int): Загальна кількість точок для відображення в кожному рядку.
+    - ax (matplotlib.axes.Axes, optional): Вісь для малювання.
+    """
+    # Кольори
+    train_color = blue
+    test_color = orange
+    future_color = 'lightgray'
+    axis_color = 'black'
+
+    # Створення графіку, якщо не надано існуючий
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Ітерація по кожному зрізу перехресної валідації
+    for i in range(n_folds):
+        y_pos = n_folds - 1 - i  # Позиція по осі Y (малюємо згори донизу)
+        
+        # Розмір тренувального набору для поточного зрізу
+        current_train_size = initial_train_size + i * step
+        
+        # Визначаємо точки для прогнозу
+        forecast_start = current_train_size
+        forecast_end = forecast_start + h
+        
+        # Визначаємо точки для візуалізації в межах window_size
+        all_points = np.arange(window_size)
+        
+        # Розподіляємо точки по категоріях
+        train_points = all_points[all_points < forecast_start]
+        gap_points = all_points[(all_points >= forecast_start) & (all_points < forecast_end - 1)]
+        test_point = all_points[all_points == forecast_end - 1]
+        future_points = all_points[all_points >= forecast_end]
+
+        # 1. Малюємо вісь часу зі стрілкою
+        ax.arrow(0, y_pos, window_size, 0, 
+                 head_width=0.2, head_length=0.4, 
+                 fc=axis_color, ec=axis_color, 
+                 length_includes_head=True, zorder=1)
+
+        # 2. Малюємо точки даних
+        ax.scatter(train_points, np.full_like(train_points, y_pos),
+                   color=train_color, s=50, zorder=2)
+        if h > 1 and len(gap_points) > 0:
+            ax.scatter(gap_points, np.full_like(gap_points, y_pos),
+                       color=future_color, s=50, zorder=2)
+        if len(test_point) > 0:
+            ax.scatter(test_point, y_pos,
+                       color=test_color, s=50, zorder=2)
+        if len(future_points) > 0:
+            ax.scatter(future_points, np.full_like(future_points, y_pos),
+                       color=future_color, s=50, zorder=2)
+
+    # --- Фінальне налаштування вигляду ---
+    ax.set_xlabel('time', fontsize=14)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    ax.set_xticks([])
+    ax.set_xlim(-1, window_size + 1)
+    ax.set_ylim(-1, n_folds)
+
+# Приклад використання функції для відтворення оригінального малюнка
+plot_ts_cross_validation(n_folds = 15, h=1, window_size=25)
+plt.show()
+```
+
+---
+
+Time series cross-validation:
+
+```{python}
+#| fig-align: center
+plot_ts_cross_validation(n_folds = 15, h=2, window_size=25)
+plt.show()
+```
+
+---
+
+Time series cross-validation:
+
+```{python}
+#| fig-align: center
+plot_ts_cross_validation(n_folds = 15, h=3, window_size=25)
+plt.show()
+```
+
+---
+
+Time series cross-validation:
+
+```{python}
+#| fig-align: center
+plot_ts_cross_validation(n_folds = 15, h=4, window_size=25)
+plt.show()
+```
+
+## Cross-validation {.smaller}
+
+`cross_validation()` function from StatsForecast package:
 
 
 
+```{python}
+#| echo: true
+#| output-location: column
+goog_2015 = goog_df.query("ds.dt.year == 2015")
+drift_method = RandomWalkWithDrift()
 
+sf = StatsForecast(models=[drift_method], freq="B")
+cv_df = sf.cross_validation(h=1, df=goog_2015, step_size=1, test_size=249)
 
+cv_df.round(2).head()
+```
 
+## Cross-validation {.smaller}
 
-
-
-
-
-
-
+```{python}
+#| echo: true
+#| output-location: column
+evaluation_cv = evaluate(
+    df=cv_df,
+    models=['RWD'],
+    metrics=[rmse, mae, mape],
+    train_df=goog_2015
+)
+evaluation_cv.round(2)
+```
 
 
 # Questions? {.unnumbered .unlisted background-iframe=".04_files/libs/colored-particles/index.html"}
