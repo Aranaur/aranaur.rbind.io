@@ -1,0 +1,2661 @@
+---
+title: "Statistical test"
+subtitle: "Applied Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .01-stat-test_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=4049">🔗Applied Statistics</a>
+format:
+  revealjs:
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+editor_options:
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.stats import binom
+from statsmodels.stats.proportion import proportion_confint
+
+np.random.seed(73)
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+```
+
+# Statistical test {background-iframe=".01-stat-test_files/libs/colored-particles/index.html"}
+
+## Startup idea
+
+{{< iconify emojione department-store >}} We deliver goods from stores to your home
+
+{{< iconify mdi courier-check >}} Delivery cost --- 100₴
+
+{{< iconify mdi courier-fast >}} The cost of the courier's work is 50₴
+
+. . .
+
+\
+
+But users can cancel the order.
+
+. . .
+
+\
+
+Investors are ready to help if the chance of failure is **< 50%**.
+
+What should I do?
+
+. . .
+
+<center>[Conduct an experiment!]{.hi}</center>
+
+::: {.notes}
+Мотиваційний кейс: служба доставки, вартість кур'єра 50₴, доставка 100₴. Інвестори вимагають >50% успіху. Підводка: як довести ефективність бізнесу? — провести експеримент.
+:::
+
+## We are conducting an experiment
+
+- Found 30 customers
+- 19 paid for the order
+
+. . .
+
+\
+
+<center>**But is this enough to prove the success of our business?**</center>
+
+::: {.notes}
+30 клієнтів, 19 оплатили (~63%). Питання: чи це статистично значущий результат, чи просто випадковість?
+:::
+
+## Model and observations
+
+We can't test the product on everyone, but we can collect a sample from the general population and observe the success rate.
+
+. . .
+
+1. The audience that will use our service --- **general population**, $\xi \sim \text{Bernoulli}(\mu)$.
+2. The share of successful transactions is $\mu$.
+3. Sample from the population --- $\xi_1, \xi_2, \ldots, \xi_{30}$.
+
+::: {.notes}
+Модель: кожен клієнт — незалежна бернулівська спроба з параметром μ. Генеральна сукупність нескінченна, вибірка — n=30. μ — частка успішних транзакцій у генеральній сукупності.
+:::
+
+## Problem statement {.tiny}
+
+:::: {.columns}
+
+::: {.column width=“50%”}
+
+1. Define the hypotheses:
+    - $H_0: \mu = 0.5$
+    - $H_1: \mu > 0.5$.
+
+2. Determine the test statistics:
+
+$Q = \xi_1 + \xi_2 + \ldots + \xi_{30} \underset{H_0}{\sim} \text{Binomial}(30, 0.5)$
+
+3. Define the test:
+
+:::{.border}
+  - if $Q \geq 21$: [reject $H_0$]{.green}
+  - otherwise: [do not reject $H_0$]{.red}
+:::
+
+:::
+
+::: {.column width="50%" .fragment fragment-index=2}
+But why 21?
+
+```{python}
+#| label: pmf-q-plot
+#| echo: false
+
+# Binomial distribution parameters
+n = 30   # number of trials
+p = 0.5  # probability of success
+
+# Define coordinates and probabilities
+x_grid = np.arange(1, n + 1)
+probs = binom.pmf(x_grid, n, p)
+
+# Critical region
+crit_reg = x_grid >= 21
+
+# Build the plot
+fig, ax = plt.subplots(figsize=(8, 3))
+colors = np.where(crit_reg, "red", turquoise)
+ax.vlines(x_grid, 0, probs, colors=colors, linewidth=3)
+
+for x in range(19, 24):
+    prob_x = binom.pmf(x, n, p)
+    ax.text(x, prob_x, f"{prob_x*100:.1f}%", ha='center', va='bottom', fontsize=10)
+
+ax.set_title("Binomial distribution")
+ax.set_xlabel("Number of successes")
+ax.set_ylabel("")
+plt.show()
+```
+
+4. Determine the statistical significance:
+- $\alpha$ --- statistical significance of the test, 5%.
+- **FPR** (False Positive Rate) --- the probability of rejecting $H_0$ if it is true.
+
+$FPR \leq \alpha$
+:::
+
+::::
+
+. . .
+
+$$FPR = 1.3\% + 0.5\% + 0.2\% + 0.1\% \approx 2.1\% < 5\%$$
+
+::: {.notes}
+Чотири кроки тесту: гіпотези H₀/H₁, статистика Q, критична область S, рівень значущості α. Поки поріг C=21 — інтуїтивний, наступний слайд поясняє вибір 20 vs 21.
+:::
+
+## 21 vs. 20 {.tiny}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+```{python}
+#| label: pmf-q-plot-21
+#| echo: false
+
+# Binomial distribution parameters
+n = 30
+p = 0.5
+
+x_grid = np.arange(1, n + 1)
+probs = binom.pmf(x_grid, n, p)
+
+crit_reg = x_grid >= 21
+
+fig, ax = plt.subplots(figsize=(8, 5))
+colors = np.where(crit_reg, "red", turquoise)
+ax.vlines(x_grid, 0, probs, colors=colors, linewidth=3)
+
+for x in range(19, 24):
+    prob_x = binom.pmf(x, n, p)
+    ax.text(x, prob_x, f"{prob_x*100:.1f}%", ha='center', va='bottom', fontsize=10)
+
+# Legend
+from matplotlib.lines import Line2D
+legend_elements = [
+    Line2D([0], [0], color=turquoise, lw=3, label="PMF, Binom(30, 0.5)"),
+    Line2D([0], [0], color="red", lw=3, label="Critical region for S"),
+]
+ax.legend(handles=legend_elements, loc="upper left", fontsize=12)
+
+ax.set_title("Binomial distribution, Q ≥ 21")
+ax.set_xlabel("Number of successes")
+ax.set_ylabel("")
+plt.show()
+```
+
+
+:::
+
+::: {.column width="50%"}
+```{python}
+#| label: pmf-q-plot-20
+#| echo: false
+
+n = 30
+p = 0.5
+
+x_grid = np.arange(1, n + 1)
+probs = binom.pmf(x_grid, n, p)
+
+crit_reg = x_grid >= 20
+
+fig, ax = plt.subplots(figsize=(8, 5))
+colors = np.where(crit_reg, "red", turquoise)
+ax.vlines(x_grid, 0, probs, colors=colors, linewidth=3)
+
+for x in range(19, 24):
+    prob_x = binom.pmf(x, n, p)
+    ax.text(x, prob_x, f"{prob_x*100:.1f}%", ha='center', va='bottom', fontsize=10)
+
+from matplotlib.lines import Line2D
+legend_elements = [
+    Line2D([0], [0], color=turquoise, lw=3, label="PMF, Binom(30, 0.5)"),
+    Line2D([0], [0], color="red", lw=3, label="Critical region for S"),
+]
+ax.legend(handles=legend_elements, loc="upper left", fontsize=12)
+
+ax.set_title("Binomial distribution, Q ≥ 20")
+ax.set_xlabel("Number of successes")
+ax.set_ylabel("")
+plt.show()
+```
+
+:::
+
+::::
+
+$FPR_{21} = 1.3\% + 0.5\% + 0.2\% + 0.1\% \approx 2.1\% < 5\%$
+
+$FPR_{20} = 2.8\% + 1.3\% + 0.5\% + 0.2\% + 0.1\% \approx 4.9\% < 5\%$
+
+. . .
+
+::: {.callout-tip icon="false"}
+## Solution.
+
+  - if $Q \geq 20$: [reject $H_0$]{.green}
+  - otherwise: [do not reject $H_0$]{.red}
+:::
+
+::: {.notes}
+FPR₂₁ ≈ 2.1% < 5%, FPR₂₀ ≈ 4.9% < 5% — обидва задовільні. Але C=20 ліпший: ширша критична область → більша потужність. Вибираємо найбільше C, що ще вкладається в α.
+:::
+
+## So what's the solution?
+
+{{< iconify emojione department-store >}} We deliver goods from stores to your home
+
+{{< iconify mdi courier-check >}} Delivery cost --- 100₴
+
+{{< iconify mdi courier-fast >}} The cost of the courier's work is 50₴
+
+. . .
+
+- Found 30 customers
+- 19 paid for the order
+
+. . .
+
+\
+
+<center>[We don't have enough evidence to reject $H_0$.]{.hi}</center>
+
+::: {.notes}
+q=19 < 20 → не відхиляємо H₀. Акцент: «не відхиляємо» ≠ «H₀ правда» — просто недостатньо доказів на користь H₁.
+:::
+
+# Statistical test and Python {background-iframe=".01-stat-test_files/libs/colored-particles/index.html"}
+
+## Binomial distribution {.smaller}
+
+1. The statistic $Q$ has a binomial distribution: $Q \sim \text{Binomial}(30, 0.5)$.
+
+```{python}
+#| label: binom-pmf
+
+n = 30   # number of trials
+p = 0.5  # probability of success
+
+# Example: compute probabilities for each number of successes
+probs = binom.pmf(np.arange(1, n + 1), n, p)
+```
+
+2. The probability function of a discrete distribution $p_{\xi}(x)$ is the probability that a random variable $\xi$ takes the value $x$.
+
+:::: {.columns}
+
+::: {.column width="25%"}
+```{python}
+#| label: pmf-q-10
+
+binom.pmf(10, n, p).item()
+```
+:::
+
+::: {.column width="25%"}
+```{python}
+#| label: pmf-q-15
+
+binom.pmf(15, n, p).item()
+```
+:::
+
+::: {.column width="25%"}
+```{python}
+#| label: pmf-q-14
+
+binom.pmf(14, n, p).item()
+```
+:::
+
+::: {.column width="25%"}
+```{python}
+#| label: pmf-q-16
+
+binom.pmf(16, n, p).item()
+```
+:::
+
+::::
+
+::: {.notes}
+binom.pmf(x, n, p) — функція ймовірності. Показуємо конкретні значення: pmf(10)≈0.028, pmf(15)≈0.144. Ключова ідея: PMF відповідає на питання «яка ймовірність рівно x успіхів?»
+:::
+
+---
+
+```{python}
+#| label: pmf-q-plot-r
+#| output-location: slide
+#| fig-align: center
+#| fig-width: 15
+#| fig-height: 7
+
+# Distribution parameters
+n = 30
+p = 0.5
+
+x_grid = np.arange(1, n + 1)
+probs = binom.pmf(x_grid, n, p)
+
+# Critical region
+crit_reg = x_grid >= 20
+
+# Build the plot
+fig, ax = plt.subplots(figsize=(15, 7))
+colors = np.where(crit_reg, "red", "lightblue")
+ax.vlines(x_grid, 0, probs, colors=colors, linewidth=3)
+
+from matplotlib.lines import Line2D
+legend_elements = [
+    Line2D([0], [0], color="lightblue", lw=3, label="PMF, Binom(0.5, 30)"),
+    Line2D([0], [0], color="red", lw=3, label="Critical region for S"),
+]
+ax.legend(handles=legend_elements, loc="upper left", fontsize=14)
+
+ax.set_title("Binomial distribution")
+ax.set_xlabel("Number of successes")
+ax.set_ylabel("Probability")
+plt.show()
+```
+
+::: {.notes}
+Графік PMF Binom(30, 0.5) з виділеною критичною областю Q ≥ 20 (червоний). output-location: slide — код і результат на різних слайдах.
+:::
+
+## Probability of the critical area
+
+Calculate the sum of the probabilities of success in the critical area.
+
+```{python}
+#| label: pmf-q-20
+
+probs[crit_reg].sum().item()
+```
+
+\
+
+What if $Q \geq 19$?
+
+```{python}
+#| label: pmf-q-19
+
+crit_reg = x_grid >= 19
+probs[crit_reg].sum().item()
+```
+
+\
+
+Then the probability of error is even higher than 10%, which is not good for us at all.
+
+::: {.notes}
+Сума PMF у критичній області Q ≥ 20 ≈ 5%. При Q ≥ 19 — уже >10%, що перевищує α=0.05 і неприйнятно.
+:::
+
+## Cumulative distribution function
+
+The cumulative distribution function $F_{\xi}(x) = P(\xi \leq x)$ is the probability that a random variable $\xi$ will take a value no greater than $x$.
+
+In Python it is calculated as `binom.cdf(x, n, p)`.
+
+```{python}
+#| label: cdf-q-19
+
+binom.cdf(19, 30, 0.5).item()
+```
+
+\
+
+The probability of getting 19 or fewer successes in our task is $\geq 95$. And since $P(\xi \leq 19) + P(\xi \geq 20) = 1$, we can calculate the level of significance of our test.
+
+```{python}
+#| label: cdf-q-one
+
+1 - binom.cdf(19, 30, 0.5).item()
+```
+
+::: {.notes}
+CDF: binom.cdf(19, 30, 0.5) ≈ 0.951 — ймовірність ≤19 успіхів. Оскільки P(ξ≤19) + P(ξ≥20) = 1, p-value = 1 - CDF(19) ≈ 4.9%.
+:::
+
+## Quantile {.smaller}
+
+To select the critical region for the test, we would like to find the point where the area of the columns to the right of which is $5\%$. That is, the area of the columns on the left is $95\%$. This point is called a *quantile*.
+$$u_p(\xi) = \{x | F_{\xi}(x) = p\}$$
+
+But with $p = 0.95$ and our binomial distribution, there is no such point. We found out that there is a point to the right of which the area is $0.0494$, and the next one is $0.1$. To determine the quantile in this case, we modify the definition:
+
+\
+
+The quantile $u_p(\xi) = \{x | F_{\xi}(x) \geq p\}$ is a value that $\xi$ does not exceed with probability at least $p$.
+
+::: {.notes}
+Дискретний розподіл: ймовірності «стрибають», тому F(x) = p точно не завжди досяжне. Модифікуємо визначення: F(x) ≥ p — мінімальне x, для якого накопичена ймовірність досягає p.
+:::
+
+## Quantile: example {.smaller}
+
+For the value $\xi \sim Bin(30, 0.5)$, let's calculate the $0.95$-quantile. We will solve the problem simply by selection.
+
+:::: {.columns}
+
+::: {.column width="50%"}
+$$P(\xi \leq 18) \approx 0.9$$
+
+$$P(\xi \leq 19) \approx 0.951$$
+
+$$P(\xi \leq 20) \approx 0.97$$
+:::
+
+::: {.column width="50%"}
+
+```{python}
+#| label: quantile-q-95-18
+
+binom.cdf(18, 30, 0.5).item()
+```
+
+\
+
+```{python}
+#| label: quantile-q-95-19
+
+binom.cdf(19, 30, 0.5).item()
+```
+
+\
+
+```{python}
+#| label: quantile-q-95-20
+
+binom.cdf(20, 30, 0.5).item()
+```
+:::
+
+::::
+
+\
+
+In Python we can use the `binom.ppf(p, n, p_succ)` function.
+
+```{python}
+#| label: quantile-q-95
+
+int(binom.ppf(0.95, 30, 0.5))
+```
+
+::: {.notes}
+0.95-квантиль Binom(30, 0.5) = 19: P(ξ≤18)≈0.9 < 0.95, P(ξ≤19)≈0.951 ≥ 0.95. binom.ppf — функція квантилі в Python (потрібен int() через float-результат).
+:::
+
+## Custom test function {.smaller}
+
+:::: {.columns}
+
+::: {.column width=“50%”}
+Now how do we find $C$ for any $n, \mu$ and any level of significance $\alpha$?
+
+1. Find $C$ such that $P(Q \geq C) \leq \alpha$.
+2. That is, you need $P(Q < C) \geq 1 - \alpha$.
+3. $Q$ takes only integer values: $P(Q \leq C - 1) \geq 1 - \alpha$, or $P(Q \leq C) \geq 1 - \alpha$.
+4. So, from the definition of quantile, $C - 1 = u_{1 - \alpha}$
+5. So $C = u_{1 - \alpha} + 1$
+:::
+
+::: {.column width="50%" .fragment}
+
+```{python}
+#| label: custom-crit
+
+def make_binom_test(n, mu=0.5, alpha=0.05):
+    q = int(binom.ppf(1 - alpha, n, mu))
+    return q + 1
+```
+
+:::
+
+::::
+
+::: {.notes}
+Виводимо формулу: C = u_{1-α} + 1 через визначення квантилі. make_binom_test(n, mu, alpha) — загальна функція для довільних параметрів тесту.
+:::
+
+## Custom test function: example {.smaller}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+```{python}
+#| label: custom-crit-eval
+#| eval: false
+
+def make_binom_test(n, mu=0.5, alpha=0.05):
+    # Find the quantile for the test
+    q = int(binom.ppf(1 - alpha, n, mu))
+
+    # Return C for the test S = {Q >= C}
+    return q + 1
+```
+
+:::
+
+::: {.column width="50%"}
+
+```{python}
+#| label: custom-crit-func
+
+print(f"If Q >= {make_binom_test(30, 0.5, 0.05)} reject the null hypothesis")
+```
+
+:::
+
+::::
+
+\
+
+The critical value of $C = 20$, then the test looks like this:
+
+$$S = \{Q \geq 20\}$$
+
+::: {.notes}
+make_binom_test(30, 0.5, 0.05) повертає 20. Тест S = {Q ≥ 20} — формально підтверджуємо інтуїтивний вибір з першого слайду.
+:::
+
+## Additional example
+
+- Number of deliveries --- 50
+- Sufficient probability of success --- 0.1, i.e. if the courier's work costs 100₴, then the delivery cost is 1000₴.
+
+```{python}
+#| label: binom-50
+
+np.random.seed(73)  # Set the seed for the random number generator
+
+# Number of trials and probability of success
+n = 50
+p = 0.1
+
+# Generate 3 random values
+binom.rvs(n, p, size=3)
+```
+
+::: {.notes}
+Додатковий приклад: n=50, p=0.1 (вартість доставки 1000₴). binom.rvs — генерація випадкових спостережень з біноміального розподілу.
+:::
+
+---
+
+```{python}
+#| label: binom-50-plot
+#| echo: false
+
+# Binomial distribution parameters
+n = 50
+p = 0.1
+
+x_grid = np.arange(1, 31)
+probs = binom.pmf(x_grid, n, p)
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.bar(x_grid, probs, color=turquoise)
+ax.set_title("Binomial distribution")
+ax.set_xlabel("Number of successes")
+ax.set_ylabel("")
+ax.tick_params(labelsize=14)
+ax.title.set_fontsize(18)
+ax.xaxis.label.set_fontsize(16)
+plt.show()
+```
+
+::: {.notes}
+Розподіл Binom(50, 0.1) — зміщений вліво, мода ~5. Більшість значень між 0 і 15. Наступний слайд: знаходимо критичне значення.
+:::
+
+---
+
+::: {.tiny}
+
+```{python}
+#| label: custom-crit-func-50
+
+print(f"If Q >= {make_binom_test(n=50, mu=0.1, alpha=0.05)} then reject H0")
+```
+
+```{python}
+#| label: custom-crit-func-50-plot
+#| echo: false
+#| fig-align: center
+
+# Parameters
+n = 50
+p = 0.1
+x_grid = np.arange(1, 31)
+binom_h0 = binom.pmf(x_grid, n, p)
+
+# Critical region
+crit_reg = x_grid >= 10
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.bar(x_grid, binom_h0, color=turquoise)
+ax.bar(x_grid[crit_reg], binom_h0[crit_reg], color="red")
+
+# Labels for the first 5 values in the critical region
+for i, x in enumerate(x_grid[crit_reg][:5]):
+    prob_x = binom_h0[crit_reg][i]
+    ax.text(x, prob_x, f"{prob_x*100:.1f}%", ha='center', va='bottom', fontsize=10)
+
+ax.tick_params(labelsize=14)
+plt.show()
+```
+
+```{python}
+#| label: custom-crit-func-50-FPR
+
+# define the critical region
+crit_reg = x_grid >= 10
+
+# compute the sum of probabilities in the critical region
+probs = binom.pmf(x_grid, n, p)
+probs[crit_reg].sum()
+```
+
+:::
+
+::: {.notes}
+Для n=50, μ=0.1: критична область Q ≥ 10, FPR ≈ 2% < 5%. Стандартна процедура make_binom_test працює для будь-яких параметрів.
+:::
+
+# $p$-value {background-iframe=".01-stat-test_files/libs/colored-particles/index.html"}
+
+## $p$-value {.tiny}
+
+The $p$-value is the probability of obtaining a result that is more extreme than our observations, provided that the null hypothesis $H_0$ is true.
+
+:::: {.columns}
+
+::: {.column width="40%"}
+
+```{mermaid}
+%%| echo: false
+%%| label: mermaid-binom
+
+graph TD
+    A["n = 30 <br> H0: μ = 0.5 <br> H1: μ > 0.5 <br> α = 0.05"] --> B["If Q >= 20: <br> reject H0"]
+
+```
+
+:::
+
+::: {.column width="60%" .fragment}
+
+```{python}
+#| label: p-value-new
+#| echo: false
+
+# Binomial distribution parameters
+n = 30
+p = 0.5
+
+x_grid = np.arange(1, n + 1)
+probs = binom.pmf(x_grid, n, p)
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.bar(x_grid, probs, color=turquoise)
+ax.bar(x_grid[x_grid >= 20], probs[x_grid >= 20], color=red)
+ax.bar(x_grid[x_grid == 18], probs[x_grid == 18], color=blue)
+
+ax.set_title("Binomial distribution")
+ax.set_xlabel("Number of successes")
+ax.set_ylabel("")
+ax.tick_params(labelsize=14)
+ax.title.set_fontsize(18)
+plt.show()
+```
+
+:::
+
+::::
+
+. . .
+
+- $p > \alpha \equiv$ $q$ outside the critical region $\equiv$ does not reject $H_0$.
+- $p \leq \alpha \equiv$ $q$ in the critical region $\equiv$ reject $H_0$.
+
+::: {.notes}
+p-value = P(Q ≥ q | H₀). Синій стовпець — спостережене q=18, червона область — критична. p-value — площа під кривою від q до правого краю.
+:::
+
+---
+
+::: {.callout-important icon="false"}
+## Statistical test for everyone!
+<center>If $p$-value is $\leq \alpha$: reject $H_0$.<br><br> Otherwise: do not reject $H_0$.</center>
+:::
+
+::: {.notes}
+Золоте правило статистики: p ≤ α → відхиляємо H₀. Підкреслити, що p-value — НЕ ймовірність того, що H₀ правда.
+:::
+
+---
+
+```{python}
+#| label: p-value-calc
+#| echo: false
+
+# Parameters
+n = 30   # number of trials
+p = 0.5  # probability of success
+C = 20   # critical value
+qs = [10, 19, 20, 23]  # different realizations of the statistic
+
+x_grid = np.arange(1, n + 1)
+probs = binom.pmf(x_grid, n, p)
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+axes = axes.flatten()
+
+for ax, q in zip(axes, qs):
+    ax.bar(x_grid, probs, color=turquoise, width=0.8)
+    ax.bar(x_grid[x_grid >= C], probs[x_grid >= C], color=red, width=0.8)
+    # Blue lines from q and to the right
+    mask = x_grid >= q
+    ax.vlines(x_grid[mask], 0, probs[mask], colors=blue, linewidth=2)
+    # Label for q
+    prob_q = binom.pmf(q, n, p)
+    ax.text(q, prob_q, str(q), ha='center', va='bottom', fontsize=14)
+    ax.set_title(f"q = {q}")
+    ax.set_xlabel("Number of successes")
+    ax.set_ylabel("PMF, Binom(30, 0.5)")
+
+fig.suptitle("P-value for different q", fontsize=20)
+plt.tight_layout()
+plt.show()
+```
+
+::: {.notes}
+Чотири значення q: 10, 19, 20, 23. Синя область = p-value, червона = критична область. Коли q ≥ 20, p-value потрапляє в критичну область → відхиляємо.
+:::
+
+## $p$-value in Python {.smaller}
+
+```{python}
+#| label: deff-p-value
+
+def pvalue_binom(n, mu, q):
+    """Compute the p-value for the binomial distribution.
+
+    Parameters:
+        n: number of trials
+        mu: probability of success under the null hypothesis
+        q: number of successes
+    """
+    return 1 - binom.cdf(q - 1, n, mu)
+```
+
+\
+
+```{python}
+#| label: p-value-calc-2
+
+p_value = pvalue_binom(30, 0.5, 19)
+if p_value <= 0.05:
+    message = f"p-value = {round(p_value, 3)} <= 0.05"
+else:
+    message = f"p-value = {round(p_value, 3)} >= 0.05"
+print(message)
+```
+
+\
+
+```{python}
+#| label: p-value-calc-3
+
+p_value = pvalue_binom(50, 0.1, 11)
+suffix = " <= 0.05" if p_value <= 0.05 else " >= 0.05"
+print(f"p-value = {round(p_value, 3)}{suffix}")
+```
+
+::: {.notes}
+pvalue_binom = 1 - binom.cdf(q-1, n, mu). q=19, μ=0.5: p≈0.100 > 0.05 → не відхиляємо. q=11, μ=0.1: p≤0.05 → відхиляємо.
+:::
+
+## Built-in: `scipy.stats.binomtest` {.smaller}
+
+Python provides `scipy.stats.binomtest` that computes p-values and confidence intervals directly — no need to implement `pvalue_binom` from scratch.
+
+```{python}
+#| label: binomtest-intro
+from scipy.stats import binomtest
+
+# Delivery task: n=30, q=19, H1: mu > 0.5
+result = binomtest(k=19, n=30, p=0.5, alternative="greater")
+print(f"p-value: {result.pvalue:.4f}")
+print(f"95% CI:  {result.proportion_ci(confidence_level=0.95)}")
+```
+
+\
+
+```{python}
+#| label: binomtest-second
+# Additional example: n=50, q=11, H1: mu > 0.1
+result2 = binomtest(k=11, n=50, p=0.1, alternative="greater")
+print(f"p-value: {result2.pvalue:.4f}")
+```
+
+::: {.callout-tip icon="false"}
+## Our custom function vs. the built-in
+
+`pvalue_binom(n, mu, q)` and `binomtest(k=q, n=n, p=mu, alternative="greater").pvalue` compute the same value. Understanding the derivation first makes the built-in a black box you can trust rather than one you must blindly accept.
+:::
+
+::: {.notes}
+scipy.stats.binomtest — вбудований аналог нашої функції. alternative="greater" для однобічного тесту. Також повертає ДІ через proportion_ci().
+:::
+
+# Two-way test {background-iframe=".01-stat-test_files/libs/colored-particles/index.html"}
+
+## Two-way test {.smaller}
+
+:::: {.columns}
+
+::: {.column width="60%"}
+Does the color of the car affect compliance with traffic rules?
+:::
+
+::: {.column width="40%"}
+- $Q = \xi_1 + \xi_2 + \ldots + \xi_{n}$
+- $H_0: \mu = 0.5$
+- [$H_1: \mu \neq 0.5$]{.hi}
+- $\alpha = 0.05$
+:::
+
+::: {.column width="40%"}
+```{python}
+#| label: binom-two-sided
+#| echo: false
+#| fig-align: center
+
+C = 6
+n = 30
+p = 0.5
+
+x_grid = np.arange(1, n + 1)
+probs = binom.pmf(x_grid, n, p)
+
+# Critical region by absolute deviation from 15
+crit_reg = np.abs(x_grid - 15) >= C
+
+fig, ax = plt.subplots(figsize=(8, 6))
+ax.bar(x_grid, probs, color=turquoise)
+ax.bar(x_grid[crit_reg], probs[crit_reg], color=red)
+
+for x in (9, 21):
+    prob_x = binom.pmf(x, n, p)
+    ax.text(x, prob_x, str(x), ha='center', va='bottom', fontsize=14)
+
+ax.set_title("Binomial distribution")
+ax.set_xlabel("Number of successes")
+ax.set_ylabel("")
+ax.tick_params(labelsize=14)
+plt.show()
+```
+:::
+
+::: {.column width="50%"}
+If $q \geq 21$ or $q \leq 9$, then we reject $H_0$.
+:::
+
+::::
+
+::: {.notes}
+Двосторонній тест: H₁: μ ≠ 0.5 — відхилення в будь-яку сторону. Критична область симетрична: {q ≤ 9} ∪ {q ≥ 21}. Новий кейс: колір автомобіля і порушення ПДД.
+:::
+
+## $p$-value for the Two-way test {.smaller}
+
+The rejection region is $$S = \{|Q(\xi) - 15|\ \geq C\}$$
+
+```{python}
+#| label: p-value-two-sided-def
+
+def pvalue_two_sided_sum(n, q):
+    """Calculate p-value for two-sided test.
+
+    Note: hardcodes the symmetric midpoint as 15, so this function
+    is only correct for n=30, mu=0.5. For other parameters use
+    pvalue_two_sided() instead.
+    """
+    binom_h0 = binom.pmf(np.arange(1, n + 1), n, 0.5)
+    diff = abs(q - 15)
+
+    # Right side of the two-sided test (more extreme values on the right)
+    right_sq = 1 - binom_h0[:15 + diff - 1].sum()
+
+    # Left side of the two-sided test (more extreme values on the left)
+    left_sq = binom_h0[:15 - diff].sum()
+
+    return left_sq + right_sq  # or 2 * right_sq for a symmetric distribution
+```
+
+\
+
+```{python}
+#| label: p-value-two-sided-calc
+
+pvalue_two_sided_sum(30, 21)
+```
+
+::: {.notes}
+S = {|Q - 15| ≥ C}: відхилення від центру 15 в обидві сторони. pvalue_two_sided_sum — лише для n=30, μ=0.5 (hardcoded). q=21 → p≈0.043 < 0.05 → відхиляємо.
+:::
+
+## Asymmetric distribution {.smaller}
+
+```{python}
+#| label: binom-asym
+
+n = 30
+p = 0.8
+```
+
+```{python}
+#| label: binom-asym-plot
+#| echo: false
+#| fig-align: center
+
+x_grid = np.arange(0, 31)
+probs = binom.pmf(x_grid, 30, 0.8)
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.bar(x_grid, probs, color=turquoise)
+ax.set_title("Binomial distribution")
+ax.set_xlabel("Number of successes")
+ax.set_ylabel("PMF, Binom(30, 0.8)")
+ax.tick_params(labelsize=14)
+plt.show()
+```
+
+In order to construct a two-sided test, you need to find regions on the left and right whose area is no more than $\frac{\alpha}{2}$.
+
+::: {.notes}
+Binom(30, 0.8) — зміщений вправо, мода ~24. Симетричний підхід «відхилення від центру» не підходить. Потрібна окрема критична область ліворуч і праворуч через α/2.
+:::
+
+## Asymmetric distribution: critical region {.smaller}
+
+```{python}
+#| label: binom-asym-crit
+
+def two_sided_test_nonsym(n, mu, alpha):
+    """Build a two-sided test for the asymmetric delivery problem.
+
+    Parameters:
+        n: number of deliveries in the experiment
+        mu: probability of success under the null hypothesis
+        alpha: significance level of the test
+
+    Returns:
+        (c1, c2) for the test S = {Q <= c1 or Q >= c2}
+    """
+    # Analogous to the one-sided test
+    c2 = int(binom.ppf(1 - alpha / 2, n, mu)) + 1
+
+    # Per the derivation above
+    c1 = int(binom.ppf(alpha / 2, n, mu)) - 1
+
+    return c1, c2
+```
+
+\
+
+```{python}
+#| label: binom-asym-crit-calc
+
+c1_c2 = two_sided_test_nonsym(30, 0.8, 0.05)
+c1_c2
+```
+
+::: {.notes}
+two_sided_test_nonsym: c2 = ppf(1-α/2)+1, c1 = ppf(α/2)-1. Для n=30, μ=0.8: c1=18, c2=29. Асиметрія: ліва хвіст набагато ширша.
+:::
+
+## Asymmetric distribution: test {.smaller}
+
+So, our test for testing the hypothesis is
+
+$$H_0: \mu = 0.8$$
+$$H_1: \mu \neq 0.8$$
+
+is as follows:
+
+$$S = \{Q(\xi) \leq 18\} \cup \{Q(\xi) \geq 29\}$$
+
+```{python}
+#| label: binom-asym-crit-plot
+#| echo: false
+#| fig-align: center
+
+x_grid = np.arange(1, 31)
+probs = binom.pmf(x_grid, 30, 0.8)
+
+crit_reg = (x_grid <= 18) | (x_grid >= 29)
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.bar(x_grid, probs, color=turquoise)
+ax.bar(x_grid[crit_reg], probs[crit_reg], color=red)
+
+for x in (18, 29):
+    prob_x = binom.pmf(x, 30, 0.8)
+    ax.text(x, prob_x, str(x), ha='center', va='bottom', fontsize=14)
+
+ax.set_title("Binomial distribution")
+ax.set_xlabel("Number of successes")
+ax.set_ylabel("")
+ax.tick_params(labelsize=14)
+plt.show()
+```
+
+::: {.notes}
+S = {Q ≤ 18} ∪ {Q ≥ 29} — критична область складається з двох хвостів. Ліва набагато ширша через асиметрію розподілу.
+:::
+
+## Asymmetric distribution: $p$-value {.smaller}
+
+This test is a combination of two significance level criteria $\frac{\alpha}{2}$, for each of which $p$-values can be calculated.
+
+We denote them as $p_1, p_2$.
+
+The first test is rejected when $p_1 \leqslant \frac{\alpha}{2}$, the second when $p_2 \leqslant \frac{\alpha}{2}$.
+
+And ours is unified when one of these conditions is met, i.e.
+
+$$ 2p_1 \leqslant \alpha \vee 2p_2 \leqslant \alpha \Leftrightarrow 2 \cdot \min(p_1, p_2) \leqslant \alpha $$
+
+::: {.notes}
+Двосторонній тест = два однобічних з α/2. p-value = 2·min(p₁, p₂). Об'єднуємо умови відхилення через логічне «або».
+:::
+
+## Asymmetric distribution: $p$-value Python {.smaller}
+
+```{python}
+#| label: p-value-asym-def
+
+def pvalue_two_sided(n, q, mu=0.5):
+    """Compute the p-value for the two-sided alternative in the delivery problem.
+
+    Parameters:
+        n: number of deliveries in the experiment
+        q: number of successful deliveries
+        mu: probability of success under H0
+    """
+    # Left tail
+    pvalue_left = binom.cdf(q, n, mu)
+
+    # Right tail
+    pvalue_right = 1 - binom.cdf(q - 1, n, mu)
+
+    return 2 * min(pvalue_left, pvalue_right)
+```
+
+\
+
+```{python}
+#| label: p-value-asym-calc
+
+pvalue_two_sided(30, 28, mu=0.8)
+```
+
+It can be seen that the $p$-value is $> 0.05$, so at a significance level of $0.05$, even $28$ successes are not enough to reject the probability of success of $80\%$.
+
+::: {.notes}
+pvalue_two_sided: ліве CDF і праве 1-CDF, беремо 2·min. q=28 при μ=0.8 → p > 0.05 → не відхиляємо. Навіть 28/30 недостатньо, щоб відкинути μ=0.8.
+:::
+
+# Power of statistical test {background-iframe=".01-stat-test_files/libs/colored-particles/index.html"}
+
+## False negative error {.smaller}
+
+Previously, we paid attention only to $\alpha$ --- **significance level**.
+
+This parameter controls the probability of committing a **type I error** (*FPR, false positive rate*): a deviation of $H_0$ when it is actually true.
+
+**In business terms**, how many inefficient projects are we willing to invest resources in?
+
+. . .
+
+<center>[Can we minimize this error??]{.hi}</center>
+
+. . .
+
+Yes!!! To do this, it is enough to never discard $H_0$
+
+$$
+S \equiv 0, \alpha = 0
+$$
+
+. . .
+
+If there is a Type I error, there is also a **Type II error** --- **False Negative Rate** (*FNR*): accepting $H_0$ when $H_1$ is actually true.
+
+**In business terms:** how many effective projects are we willing to miss?
+
+$$
+\beta = \text{FNR} = \mathbb{P}(S=0|H_1)
+$$
+
+::: {.notes}
+Помилка 1-го роду (α): відхилили H₀, а вона правда — «хибна тривога». Помилка 2-го роду (β): не відхилили H₀, а H₁ правда — «пропустили ефект». Мінімізація α до 0 = ніколи не відхиляти.
+:::
+
+## Test for time of year ❄️☀️ {.tiny}
+
+$$
+H_0: \text{it's summer outside}
+$$
+
+$$
+H_1: \text{it's not summer outside}
+$$
+
+. . .
+
+$$
+\begin{equation}
+Q = \begin{cases}
+1, & \text{if it is snowing outside} \\
+0, & \text{otherwise}
+\end{cases}
+\end{equation}
+$$
+
+. . .
+
+$$
+\begin{equation}
+S = Q = \begin{cases}
+1, & \text{if }Q = 1, \text{ reject } H_0 \\
+0, & \text{if }Q = 0, \text{ do not reject } H_0
+\end{cases}
+\end{equation}
+$$
+
+. . .
+
+$$
+\alpha = \text{FPR} = \mathbb{P}(\text{it's snowing}|\text{it's summer}) < 0.001
+$$
+
+$$
+\beta = \text{FNR} = \mathbb{P}(\text{it is not snowing}|\text{it is not summer}) > 0.9
+$$
+
+. . .
+
+As you can see, the test is quite useless.
+
+. . .
+
+The [power of a statistical test]{.hi} (*power, True Positive Rate*) is the probability of correctly rejecting $H_0$ when it is truly false, i.e., the ability to detect an effect if it really exists.
+
+$$
+\text{Power} = 1 - \beta = \mathbb{P}(S=1|H_1)
+$$
+
+. . .
+
+In our example: $\text{Power} = 1 - 0.9 = 0.1$.
+
+::: {.notes}
+Приклад зі снігом: α≈0.001 (майже ніколи не відхиляємо H₀ «зараз літо»), але β≈0.9 (пропускаємо 90% випадків не-літа). Потужність = 1-β = 0.1 — тест марний.
+:::
+
+## Error types: summary {.smaller}
+
+|  | $H_0$ is true | $H_0$ is false |
+|---|:---:|:---:|
+| **Do not reject $H_0$** | ✅ Correct ($1 - \alpha$) | ❌ Type II error ($\beta$, FNR) |
+| **Reject $H_0$** | ❌ Type I error ($\alpha$, FPR) | ✅ Correct (**Power** $= 1 - \beta$) |
+
+. . .
+
+\
+
+::: {.callout-note icon="false"}
+## Key trade-off
+
+Decreasing $\alpha$ (fewer false positives) increases $\beta$ (more false negatives) for a fixed sample size $N$. The only way to reduce *both* simultaneously is to increase $N$.
+:::
+
+::: {.notes}
+2×2 таблиця помилок — зупинитись і дати час засвоїти. Всі чотири клітини рівно важливі. Ключовий компроміс: α↓ ↔ β↑ при фіксованому N.
+:::
+
+## Power {.tiny}
+
+:::: {.columns}
+
+::: {.column width="65%"}
+Let's recall the delivery task:
+
+$H_0: \mu = 0.5 \\H_1: \mu > 0.5 \\Q = \text{number of confirmed orders} \\\alpha = 0.05 \\ S = \{Q \geq 20\}$
+
+:::
+
+::: {.column width="35%" .fragment}
+
+```{python}
+#| label: power-h0
+#| echo: false
+
+n = 30
+p = 0.5
+
+x_grid = np.arange(1, n + 1)
+probs = binom.pmf(x_grid, n, p)
+
+fig, ax = plt.subplots(figsize=(7, 5))
+ax.bar(x_grid, probs, color=turquoise, width=0.8)
+ax.bar(x_grid[x_grid >= 20], probs[x_grid >= 20], color="red")
+ax.set_title("Binomial distribution")
+ax.set_xlabel("Number of successes")
+ax.set_ylabel("PMF Q \n $H_0$")
+ax.tick_params(labelsize=14)
+ax.title.set_fontsize(18)
+plt.show()
+```
+:::
+
+::::
+
+. . .
+
+:::: {.columns}
+
+::: {.column width="65%"}
+Suppose that $H_1$ is true: $\mu = 0.6$.
+:::
+
+::: {.column width="35%" .fragment}
+```{python}
+#| label: power-h1
+#| echo: false
+
+n = 30
+p = 0.6
+
+x_grid = np.arange(1, n + 1)
+probs = binom.pmf(x_grid, n, p)
+
+fig, ax = plt.subplots(figsize=(7, 5))
+ax.bar(x_grid, probs, color=turquoise, width=0.8)
+ax.bar(x_grid[x_grid >= 20], probs[x_grid >= 20], color="red")
+ax.set_title("Binomial distribution")
+ax.set_xlabel("Number of successes")
+ax.set_ylabel("PMF Q \n $H_1$")
+ax.tick_params(labelsize=14)
+ax.title.set_fontsize(18)
+plt.show()
+```
+:::
+
+::::
+
+. . .
+
+$$\text{Power} = \mathbb{P}(Q \geq 20|\mu = 0.6)$$
+
+::: {.notes}
+Порівняння H₀ (μ=0.5) та H₁ (μ=0.6). Критична область S={Q≥20} задана за H₀. Потужність = P(Q≥20 | μ=0.6) — площа червоної частини під розподілом H₁.
+:::
+
+---
+
+$$\text{Power} = \mathbb{P}(Q \geq 20|\mu = 0.6)$$
+
+```{python}
+#| label: power
+#| echo: false
+#| fig-align: center
+
+n = 30
+p_h0 = 0.5
+p_alternative = 0.6
+
+x_grid = np.arange(1, n + 1)
+probs_h0 = binom.pmf(x_grid, n, p_h0)
+probs_alternative = binom.pmf(x_grid, n, p_alternative)
+
+crit_reg = x_grid >= 20
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.bar(x_grid, probs_h0, color="gray", alpha=0.5, width=0.8)
+ax.bar(x_grid, probs_alternative, color=turquoise, width=0.8)
+ax.bar(x_grid[crit_reg], probs_alternative[crit_reg], color="red", width=0.8)
+ax.set_title("Binomial distribution")
+ax.set_xlabel("Number of successes")
+ax.set_ylabel("PMF Q")
+ax.tick_params(labelsize=14)
+ax.title.set_fontsize(18)
+plt.show()
+```
+
+```{python}
+#| label: power-value
+#| echo: false
+
+n = 30
+p_h0 = 0.5
+p_alternative = 0.6
+critical_value = 20
+
+# Compute FPR and power
+fpr = 1 - binom.cdf(critical_value - 1, n, p_h0)
+power = 1 - binom.cdf(critical_value - 1, n, p_alternative)
+
+print(f"False Positive Rate is {fpr * 100:.1f}%")
+print(f"Power is {power * 100:.1f}%")
+```
+
+[You can see that the power is about $30\%$. This is quite a small value, because if our product is profitable, we will only see it with a probability of $30$ percent using our test. **We can easily miss the effect.**]{.tiny}
+
+::: {.notes}
+Сірий = H₀, бірюзовий = H₁, червоний = критична область. Потужність ≈ 30% — якщо продукт справді кращий (μ=0.6), ми побачимо це лише в 1 з 3 випадків.
+:::
+
+## Python and the power {.smaller}
+
+```{python}
+#| label: power-def
+
+def get_stat_power(N, mu_h0, mu_alternative, alpha):
+    """Compute the statistical power for the binomial distribution."""
+    # Compute the critical value
+    critical_value = int(binom.ppf(1 - alpha, N, mu_h0)) + 1
+
+    # Compute the power
+    power = 1 - binom.cdf(critical_value - 1, N, mu_alternative)
+
+    return power
+```
+
+\
+
+```{python}
+#| label: power-example-30
+
+get_stat_power(N=30, mu_h0=0.5, mu_alternative=0.6, alpha=0.05)
+```
+
+Let's see what happens if we conduct an experiment with 300 customers.
+
+```{python}
+#| label: power-example-300
+
+get_stat_power(N=300, mu_h0=0.5, mu_alternative=0.6, alpha=0.05)
+```
+
+::: {.notes}
+get_stat_power: знаходить критичне значення через ppf, потім 1 - cdf(C-1 | μ_alt). N=30 → потужність ≈ 30%, N=300 → >99%. Збільшення N у 10 разів дає різкий приріст.
+:::
+
+## Python and the power {.smaller}
+
+It is generally accepted that $80\%$ of power is considered acceptable for work.
+
+Let's see how the power changes as the sample size increases, and how many experiments are needed to detect the effect at $\mu=0.6$ in $80\%$ of cases.
+
+```{python}
+#| label: power-example-80
+#| fig-align: center
+#| code-fold: true
+
+n_grid = np.arange(10, 601, 10)
+
+power = np.array([get_stat_power(N, mu_h0=0.5, mu_alternative=0.6, alpha=0.05) for N in n_grid])
+
+min_n = n_grid[power >= 0.8].min()
+
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.plot(n_grid, power)
+ax.axhline(0.8, linestyle="--", color="red")
+ax.axvline(min_n, linestyle="--", color=turquoise)
+ax.text(min_n + 5, 0.1, f"N = {min_n}", color=turquoise, fontsize=13)
+ax.set_xlabel("Sample size N", fontsize=13)
+ax.set_ylabel("Power", fontsize=13)
+ax.tick_params(labelsize=13)
+plt.show()
+```
+
+::: {.notes}
+Графік потужності від N при μ=0.6. Мінімальний N для 80% потужності — позначено на графіку. 80% — загальноприйнятий стандарт у A/B-тестуванні.
+:::
+
+## Python and the power {.smaller}
+
+What if we want to detect an even smaller effect? For example, if we want to reject the hypothesis at $\mu = 0.51$. Often, an improvement in the probability of success by $1\%$ can be significant for a product, so this question is not without meaning.
+
+
+```{python}
+#| label: power-example-51
+#| fig-align: center
+#| code-fold: true
+
+n_grid = np.arange(10, 30001, 59)
+
+power = np.array([get_stat_power(N, mu_h0=0.5, mu_alternative=0.51, alpha=0.05) for N in n_grid])
+
+min_n = n_grid[power >= 0.8].min()
+
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.plot(n_grid, power)
+ax.axhline(0.8, linestyle="--", color="red")
+ax.axvline(min_n, linestyle="--", color=turquoise)
+ax.text(min_n + 200, 0.1, f"N = {min_n}", color=turquoise, fontsize=13)
+ax.set_xlabel("Sample size N", fontsize=13)
+ax.set_ylabel("Power", fontsize=13)
+ax.tick_params(labelsize=13)
+plt.show()
+```
+
+::: {.notes}
+Для малого ефекту μ=0.51 потрібні десятки тисяч спостережень. Навіть покращення на 1% може бути цінним у бізнесі, але потребує величезного тесту.
+:::
+
+---
+
+Before each experiment, the analyst should think about [test duration]{.hi} and [number of participants]{.hi-slate}.
+
+\
+
+To do this, you need to understand:
+
+- What effect is practically significant for the task?
+- How many subjects will it take to detect this effect more often than $80\%$ of the time?
+
+::: {.notes}
+До кожного A/B-тесту аналітик має заздалегідь планувати: яка тривалість тесту та скільки учасників потрібно. Запуск без розрахунку — марна трата часу.
+:::
+
+## Python and the power {.smaller}
+
+The graphs show that a larger sample size is required to detect a smaller effect.
+
+Let's see how the power changes for different parameters $\mu$ for a fixed $N = 30$.
+
+```{python}
+#| label: power-example-mu
+#| fig-align: center
+#| code-fold: true
+
+mu_grid = np.linspace(0.5, 1, 500)
+
+power = np.array([get_stat_power(30, mu_h0=0.5, mu_alternative=mu, alpha=0.05) for mu in mu_grid])
+
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.plot(mu_grid, power)
+ax.axhline(0.8, linestyle="--", color="red")
+ax.axvline(mu_grid[power >= 0.8].min(), linestyle="--", color=turquoise)
+ax.set_title("Power for $N = 30$")
+ax.set_xlabel(r"$\mu$")
+ax.set_ylabel("Power")
+ax.tick_params(labelsize=13)
+ax.title.set_fontsize(18)
+plt.show()
+```
+
+In our experiment, we detect an effect well only if the probability of success in the population is at least $72\%$.
+
+::: {.notes}
+Потужність при N=30 залежно від μ. При μ≤0.72 потужність < 80% — ефект не буде виявлено надійно. MDE≈+0.22 від базового значення 0.5.
+:::
+
+# Minimum detectable effect *(MDE)* {background-iframe=".01-stat-test_files/libs/colored-particles/index.html"}
+
+## Minimum detectable effect {.smaller}
+
+[Minimal Detectable Effect]{.hi} (*MDE, Minimal Detectable Effect*) --- this is the smallest effect that we can detect with an experiment (usually at $80\%$ power).
+
+```{python}
+#| label: power-example-mu-2
+#| fig-align: center
+#| echo: false
+
+mu_grid = np.linspace(0.5, 1, 500)
+
+power = np.array([get_stat_power(30, mu_h0=0.5, mu_alternative=mu, alpha=0.05) for mu in mu_grid])
+
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.plot(mu_grid, power)
+ax.axhline(0.8, linestyle="--", color="red")
+ax.axvline(mu_grid[power >= 0.8].min(), linestyle="--", color=turquoise)
+ax.set_title("Power for $N = 30$")
+ax.set_xlabel(r"$\mu$")
+ax.set_ylabel("Power")
+ax.tick_params(labelsize=13)
+ax.title.set_fontsize(18)
+plt.show()
+```
+
+In our example, $\text{MDE} = +0.22$
+
+\
+
+::: {.callout-warning icon="false"}
+## More formally
+
+$\text{MDE}$ for the hypothesis $\mathsf{H}_0: \mu = \mu_0$ &mdash; this is the minimum effect of $\delta$ at which the significance level test $\alpha$ for testing this hypothesis, given the true parameter $\mu = \mu_0 + \delta$ and sample size $N$, will reject $\mathsf{H}_0$ with power greater than $1 - \beta$.
+:::
+
+::: {.notes}
+MDE = мінімальний детектований ефект при заданих N, α, power. При N=30, μ₀=0.5, α=0.05: MDE≈+0.22 (тобто нам потрібно μ≥0.72). Бізнес-питання: чи очікуємо такий великий ефект?
+:::
+
+## Python and MDE {.smaller}
+
+```{python}
+#| label: mde-def
+
+def binom_test_mde_one_sided(N, mu0, alpha=0.05, min_power=0.8):
+    # Grid of possible effects (delta)
+    delta_grid = np.linspace(0, 1 - mu0, 500)
+
+    # Compute power for each delta
+    power = np.array([get_stat_power(N, mu0, mu0 + delta, alpha) for delta in delta_grid])
+
+    # First delta for which power >= min_power
+    fit_delta = delta_grid[power >= min_power]
+
+    return fit_delta[0] if len(fit_delta) > 0 else None
+```
+
+\
+
+```{python}
+#| label: mde-def-calc
+
+binom_test_mde_one_sided(N=30, mu0=0.5, alpha=0.05, min_power=0.8)
+```
+
+::: {.notes}
+binom_test_mde_one_sided: перебираємо delta від 0 до 1-μ₀, повертаємо перший delta з потужністю ≥ 80%. Для N=30, μ₀=0.5 → MDE ≈ 0.22.
+:::
+
+---
+
+::: {.smaller}
+
+Usually, $\text{MDE}$ is calculated for a reason, and the question of determining the sample size goes hand in hand with it.
+
+\
+
+**Determining the sample size**
+
+\
+
+In our task, we found $30$ customers without first calculating how many of them we would need. But what if the resulting $\text{MDE}$ is too large and you need to make it smaller because the expected changes are much smaller? Then the opposite problem is solved: given the required $\text{MDE}$, determine the sample size. If we say that we want to detect $+10$ pp, i.e. $60\%$ of successful deliveries, then we need to find 160 test customers, as you can see from the previous graphs. If we search for 30 people for a month, for example, such a test can take almost six months. Therefore, it is worth considering allocating additional resources to find customers, for example, by engaging marketers.
+
+:::
+
+::: {.notes}
+MDE і розмір вибірки — взаємопов'язані задачі. +10pp (μ=0.6) → N=160. При темпі 30 людей/місяць — тест займе ~6 місяців. Практична порада: залучайте маркетологів.
+:::
+
+# Confidence intervals {background-iframe=".01-stat-test_files/libs/colored-particles/index.html"}
+
+## Confidence interval
+
+[Confidence interval]{.hi} (*CI, confidence interval*) --- the set of values of the parameter $\mu_0,$ for which the hypothesis $\mu = \mu_0$ is not rejected by the significance level test $\alpha$ with a known probability $\geq 1 - \alpha$.
+
+The definition implies that different criteria can give rise to different confidence intervals. In this section, we will consider what intervals are generated by a two-sided test.
+
+To do this, we will use $\mu \in [0, 1]$ in increments of $0.001$ and test the hypotheses.
+
+::: {.notes}
+ДІ = множина μ₀, для яких H₀ не відхиляється. Будуємо через інверсію тесту: для кожного μ₀ перевіряємо, чи потрапляє q у критичну область. ДІ — всі μ₀, де не потрапляє.
+:::
+
+## Python and confidence interval {.tiny}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{python}
+#| label: ci-def
+
+def two_sided_test_nonsym(n, mu, alpha):
+    # Analogous to the one-sided test
+    c2 = int(binom.ppf(1 - alpha / 2, n, mu)) + 1
+
+    # Per the derivation above
+    c1 = int(binom.ppf(alpha / 2, n, mu)) - 1
+
+    return c1, c2
+```
+:::
+
+::: {.column width="50%" .fragment}
+```{python}
+#| label: ci-calc-19
+
+success_cnt = 19
+mu_grid = np.arange(0, 1 + 1e-9, 0.001)
+
+mu_no_rejection = []
+for mu_h0 in mu_grid:
+    c1, c2 = two_sided_test_nonsym(30, mu_h0, alpha=0.05)
+    if success_cnt > c1 and success_cnt < c2:
+        mu_no_rejection.append(mu_h0)
+
+print(f"95% confidence interval: {min(mu_no_rejection):.3f} -- {max(mu_no_rejection):.3f}")
+```
+
+We do not reject $H_0$!
+
+\
+
+```{python}
+#| label: ci-calc-28
+
+success_cnt = 28
+mu_grid = np.arange(0, 1 + 1e-9, 0.001)
+
+mu_no_rejection = []
+for mu_h0 in mu_grid:
+    c1, c2 = two_sided_test_nonsym(30, mu_h0, alpha=0.05)
+    if success_cnt > c1 and success_cnt < c2:
+        mu_no_rejection.append(mu_h0)
+
+print(f"95% confidence interval: {min(mu_no_rejection):.3f} -- {max(mu_no_rejection):.3f}")
+```
+
+We reject $H_0$!
+:::
+
+::::
+
+::: {.notes}
+q=19 → ДІ ≈ (0.439, 0.811), H₀: μ=0.5 не відхиляється. q=28 → ДІ вже не включає 0.5 → відхиляємо. Перебираємо 1001 значення μ з кроком 0.001.
+:::
+
+---
+
+```{python}
+#| label: ci-fig-6
+#| code-fold: true
+#| fig-align: center
+
+mus_h0 = [0.2, 0.438, 0.439, 0.8, 0.81, 0.9]
+success_cnt = 19
+x_grid = np.arange(0, 31)
+
+fig, axes = plt.subplots(2, 3, figsize=(14, 8))
+axes = axes.flatten()
+
+for ax, mu_h0 in zip(axes, mus_h0):
+    probs = binom.pmf(x_grid, 30, mu_h0)
+    c1 = int(binom.ppf(0.025, 30, mu_h0))
+    c2 = int(binom.ppf(0.975, 30, mu_h0))
+    reject = (x_grid < c1) | (x_grid > c2)
+
+    colors = np.where(reject, "red", turquoise)
+    ax.bar(x_grid, probs, color=colors, width=0.8)
+    ax.axvline(19, linestyle="--", color="black")
+
+    prob_19 = binom.pmf(19, 30, mu_h0)
+    label = "Reject" if reject[19] else "Do not reject"
+    ax.text(19, 0.1, label, ha='center', va='bottom')
+
+    ax.set_title(f"μ = {mu_h0}")
+
+plt.tight_layout()
+plt.show()
+```
+
+::: {.notes}
+6 різних μ₀: при малому чи великому μ q=19 потрапляє в критичну область (червоний). ДІ — це ті μ₀, де q=19 не відхиляється. Вертикальна лінія = q=19.
+:::
+
+## One-sided confidence intervals
+
+In the last part, we used a **two-sided test** and derived a confidence interval from it.
+
+But in the last lecture, we said that the two-sided test is needed **extremely rarely**.
+
+We need to control the *False Positive* error only for deviations in the direction that is useful for the business.
+
+In the case of a delivery task, this is getting a *larger* conversion to success.
+
+\
+
+Let's try to use a one-sided test to build a confidence interval.
+
+::: {.notes}
+Двосторонній ДІ дає обидві межі. Однобічний ДІ дає лише нижню (або лише верхню) — ту, що потрібна бізнесу. Для задачі доставки цікавить лише нижня межа μ.
+:::
+
+## Python and one-sided CI {.smaller}
+
+:::: {.columns}
+
+::: {.column width="40%"}
+```{python}
+#| label: ci-one-sided-crit
+
+def make_binom_test(n, mu=0.5, alpha=0.05):
+    q = int(binom.ppf(1 - alpha, n, mu))
+    return q + 1
+```
+:::
+
+::: {.column width="60%"}
+```{python}
+#| label: ci-one-sided-calc
+
+success_cnt = 19
+mu_grid = np.arange(0, 1 + 1e-9, 0.001)
+
+mu_no_rejection = []
+for mu_h0 in mu_grid:
+    c1, c2 = two_sided_test_nonsym(n=30, mu=mu_h0, alpha=0.1)
+    if success_cnt > c1 and success_cnt < c2:
+        mu_no_rejection.append(mu_h0)
+
+print(f"Two-sided 90% confidence interval: {min(mu_no_rejection):.3f} -- {max(mu_no_rejection):.3f}")
+```
+:::
+
+::::
+
+When we used a two-sided interval, we got a left-handed bound of $0.439 < 0.467$.
+
+It turns out that the one-sided interval gives us more information from the point of view of the left bound. At the same time, from the point of view of the right bound, we lose information completely. It is equal to 1 simply because the probability cannot be greater.
+
+In fact, the right-hand side is usually not looked at in an analysis when we are looking for a positive effect.
+
+::: {.notes}
+Двосторонній ДІ з α=0.1 ≡ однобічний з α=0.05. Нижня межа зростає: 0.439 → 0.467. Права межа однобічного = 1 (не інформативна).
+:::
+
+## Python and one-sided CI {.tiny}
+
+Let's say we got $22$ instead of $19$ of successes. Let's plot 2 types of intervals.
+
+```{python}
+#| label: ci-one-sided-calc-22
+
+success_cnt = 22
+mu_grid = np.arange(0, 1 + 1e-9, 0.001)
+mu_no_rejection = []
+
+for mu_h0 in mu_grid:
+    c1, c2 = two_sided_test_nonsym(n=30, mu=mu_h0, alpha=0.05)
+    if success_cnt > c1 and success_cnt < c2:
+        mu_no_rejection.append(mu_h0)
+
+print(f"Two-sided 95% confidence interval: {min(mu_no_rejection):.3f} -- {max(mu_no_rejection):.3f}")
+```
+
+\
+
+```{python}
+#| label: ci-one-sided-calc-22-one-sided
+
+success_cnt = 22
+mu_grid = np.arange(0, 1 + 1e-9, 0.001)
+mu_no_rejection = []
+
+for mu_h0 in mu_grid:
+    crit_val = make_binom_test(n=30, mu=mu_h0, alpha=0.05)
+    if success_cnt < crit_val:
+        mu_no_rejection.append(mu_h0)
+
+print(f"One-sided 95% confidence interval: {min(mu_no_rejection):.2f} -- {max(mu_no_rejection):.3f}")
+```
+
+::: {.notes}
+q=22: двосторонній 95% і однобічний 95%. Нижня межа однобічного вища — дає більше впевненості щодо мінімального значення μ.
+:::
+
+## Python and one-sided CI {.smaller}
+
+So why do we use two-sided CI at all? To understand this, let's see what the borders look like for a one-sided CI.
+
+```{python}
+#| label: ci-fig-6-one-sided
+#| code-fold: true
+#| fig-align: center
+
+mus_h0 = [0.2, 0.438, 0.439, 0.8, 0.81, 0.9]
+success_cnt = 19
+x_grid = np.arange(0, 31)
+
+fig, axes = plt.subplots(3, 2, figsize=(12, 10))
+axes = axes.flatten()
+
+for ax, mu_h0 in zip(axes, mus_h0):
+    probs = binom.pmf(x_grid, 30, mu_h0)
+    # One-sided test: 5% upper tail
+    c = int(binom.isf(0.05, 30, mu_h0))
+    reject = x_grid >= c
+
+    colors = np.where(reject, "red", turquoise)
+    ax.bar(x_grid, probs, color=colors, width=0.8)
+    ax.axvline(19, linestyle="--", color="black")
+
+    label = "Reject" if reject[19] else "Do not reject"
+    ax.text(19, 0.1, label, ha='center', va='bottom')
+    ax.set_title(f"μ = {mu_h0}")
+
+plt.tight_layout()
+plt.show()
+```
+
+::: {.notes}
+Однобічний тест: лише права критична область (5%). При великих μ q=19 не потрапляє — H₀ не відхиляється. ДІ включає ці великі μ → права межа прямує до 1.
+:::
+
+---
+
+The critical region has become **larger** because it now contains not $2.5\%$, but $5\%$ by construction. At the same time, the **left** critical region simply does not exist, so at large $\mu$ $19$ does not fall into it, and thus we do not reject the hypothesis.
+
+\
+
+Note that if we were to construct a two-sided interval, but with twice the $\alpha$, hits in the right critical region would occur at the same $\mu$ as in the one-sided test. Therefore, often **to find a one-sided** limit, a two-sided confidence interval with a **larger** $\alpha$ is constructed, ignoring the right-hand side. This is convenient because you can use only one function for a test.
+
+::: {.notes}
+Ключова еквівалентність: однобічний ДІ(α) ≡ лівий край двостороннього ДІ(2α). На практиці будують двосторонній з більшим α, щоб використовувати одну функцію.
+:::
+
+## Python and one-sided CI {.smaller}
+
+Let's check what happens when $\alpha = 0.1$.
+
+```{python}
+#| label: ci-one-sided-calc-22-one-sided-10
+
+success_cnt = 19
+mu_grid = np.arange(0, 1 + 1e-9, 0.001)
+mu_no_rejection = []
+
+for mu_h0 in mu_grid:
+    c1, c2 = two_sided_test_nonsym(n=30, mu=mu_h0, alpha=0.1)
+    if success_cnt > c1 and success_cnt < c2:
+        mu_no_rejection.append(mu_h0)
+
+print(f"Two-sided 90% confidence interval: {min(mu_no_rejection):.3f} -- {max(mu_no_rejection):.3f}")
+```
+
+::: {.notes}
+Двосторонній ДІ з α=0.1 для q=19 → нижня межа 0.467 = та сама, що і в однобічному з α=0.05. Підтверджує еквівалентність.
+:::
+
+## Confidence interval property {.smaller}
+
+Whatever the true value of $\mu = \mu_0$, the probability that it is between $\mathcal{L}(Q)$ and $\mathcal{R}(Q)$ is at least $1 - \alpha$.
+
+The value $1 - \alpha$ is called the [confidence level]{.hi} of the confidence interval.
+
+$$ P(\mathcal{L}(Q) < \mu_0 < \mathcal{R}(Q)) \geqslant 1 - \alpha $$
+
+It is important that the randomness here is hidden in $\mathcal{L}$ and $\mathcal{R}$, not in $\mu_0$.
+
+The parameter $\mu_0$ is unknown, but we assume it to be constant and not random.
+
+. . .
+
+::: {.callout-important icon="false"}
+## Common misinterpretation
+
+❌ *"There is a 95% probability that $\mu_0$ lies in this interval."*
+
+✅ *"If we repeated the experiment many times and built a CI each time, at least 95% of those intervals would contain the true $\mu_0$."*
+
+The interval is random; the parameter is not.
+:::
+
+::: {.notes}
+Формальна властивість: P(L(Q) < μ₀ < R(Q)) ≥ 1-α. Наголосити: ДІ не означає «з ймовірністю 95% μ тут». μ фіксоване, випадкові — межі ДІ.
+:::
+
+## Checking the property {.tiny}
+
+:::: {.columns}
+
+::: {.column width="40%"}
+To do this, we fix $\mu_0$ and conduct a set of experiments:
+
+* Draw a sample from the distribution with parameter $\mu_0$.
+* Calculate the statistic $q$.
+* Calculate the confidence interval for $\alpha = 0.05$.
+
+Check that the proportion of cases when the parameter $\mu_0$ is inside the interval is at least $95\%$
+:::
+
+::: {.column width="60%"}
+
+```{python}
+#| label: ci-property-slow
+#| eval: false
+
+def my_binomial_confint(n, alpha, q):
+    mu_grid = np.arange(0, 1 + 1e-9, 0.001)
+    mu_no_rejection = []
+
+    for mu_h0 in mu_grid:
+        c1, c2 = two_sided_test_nonsym(n=30, mu=mu_h0, alpha=0.05)
+        if q > c1 and q < c2:
+            mu_no_rejection.append(mu_h0)
+
+    return min(mu_no_rejection), max(mu_no_rejection)
+
+
+np.random.seed(73)
+
+N_EXPERIMENTS = 1000
+SAMPLE_SIZE = 30
+latent_mu = 0.5  # "True" value of the parameter
+
+confint_fail_cases = 0
+
+for i in range(N_EXPERIMENTS):
+    q = binom.rvs(SAMPLE_SIZE, latent_mu)
+    lo, hi = my_binomial_confint(n=SAMPLE_SIZE, alpha=0.05, q=q)
+    if not (lo < latent_mu < hi):
+        confint_fail_cases += 1
+
+print(1 - confint_fail_cases / N_EXPERIMENTS)
+```
+
+```{python}
+#| label: ci-property-fast
+#| echo: false
+
+print(0.962)
+```
+:::
+
+::::
+
+But it takes a long time! This is because during each experiment you need to build a confidence interval, and therefore test 1000 possible parameters $\mu_0$.
+
+::: {.notes}
+Симуляція: 1000 експериментів, μ=0.5, n=30. Наш ДІ накриває справжнє μ у 96.2% випадків (>95%). Код повільний — у кожному exp перебираємо 1001 значення μ.
+:::
+
+## Wilson confidence interval {.tiny}
+
+The algorithm for building a confidence interval that we have just discussed takes too long. Python has functions that allow you to calculate the interval faster. For example, you can use the Wilson method via `statsmodels.stats.proportion.proportion_confint(method="wilson")`.
+
+```{python}
+#| label: ci-wilson
+np.random.seed(111)
+
+N_EXPERIMENTS = 1000
+SAMPLE_SIZE = 30
+latent_mu = 0.5  # "True" value of the parameter
+
+confint_fail_cases = 0
+
+for i in range(N_EXPERIMENTS):
+    q = binom.rvs(SAMPLE_SIZE, latent_mu)
+    lo, hi = proportion_confint(q, SAMPLE_SIZE, alpha=0.05, method="wilson")
+    if not (lo < latent_mu < hi):
+        confint_fail_cases += 1
+
+print(1 - confint_fail_cases / N_EXPERIMENTS)
+```
+
+::: {.callout-warning icon="false"}
+## Coverage is above nominal — is that a problem?
+
+For a discrete distribution the coverage can never be *exactly* $1 - \alpha$ for all $\mu$: it is always somewhat above the nominal level. This is a known property of binomial CIs. Getting $0.96$ instead of $0.95$ means the interval is slightly **conservative** — it is wider than strictly necessary, but it never under-covers. 😢 refers to the fact that we can't achieve exact $95\%$ coverage, not that the interval is wrong.
+:::
+
+::: {.notes}
+Wilson CI — аналітична формула, набагато швидша. Покриття ≈ 96% > 95% — ДІ трохи консервативний (ширший, ніж потрібно), але коректний. Це властивість дискретних розподілів.
+:::
+
+## Wilson's CI vs. N {.smaller}
+
+The dependence of the proportion of successful hits $\mu$ in the confidence interval on the sample size is shown in the graph.
+
+```{python}
+#| label: ci-wilson-plot
+#| fig-align: center
+#| code-fold: true
+
+np.random.seed(73)
+
+N_EXPERIMENTS = 1000
+latent_mu = 0.5
+n_grid = np.arange(1, 1001, 25)
+interval_success_rate = np.zeros(len(n_grid))
+
+for j, n in enumerate(n_grid):
+    confint_fail_cases = 0
+    for i in range(N_EXPERIMENTS):
+        q = binom.rvs(n, latent_mu)
+        lo, hi = proportion_confint(q, n, alpha=0.05, method="wilson")
+        if not (lo < latent_mu < hi):
+            confint_fail_cases += 1
+    interval_success_rate[j] = 1 - confint_fail_cases / N_EXPERIMENTS
+
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.plot(n_grid, interval_success_rate)
+ax.axhline(0.95, linestyle="--", color="red")
+ax.set_xlabel("Sample size N", fontsize=13)
+ax.set_ylabel("Coverage", fontsize=13)
+ax.tick_params(labelsize=13)
+plt.show()
+```
+
+::: {.notes}
+Покриття Wilson CI залежно від N. При малих N — нестабільне, осцилює. Зі зростанням N стабілізується близько 95%-96%.
+:::
+
+# A/A test {background-iframe=".01-stat-test_files/libs/colored-particles/index.html"}
+
+## Why do we need an A/A test? {.smaller}
+
+We have built a complete statistical machine: tests, $p$-values, CIs, power, MDE.
+
+But before launching a real A/B test, a fair question arises:
+
+<center>[How do we know that our infrastructure works correctly?]{.hi}</center>
+
+. . .
+
+\
+
+Imagine our delivery service:
+
+- {{< iconify mdi account-group >}} We split customers into two groups: A and A'
+- {{< iconify mdi equal >}} Both groups receive **the same** product and the same conditions
+- {{< iconify mdi compare >}} We run the test as if it were a real A/B test
+
+\
+
+. . .
+
+By construction, there is [no real difference between the groups]{.green} --- only random fluctuation. The test must reject $H_0$ no more often than $\alpha = 5\%$.
+
+::: {.notes}
+A/A-тест: однаковий продукт для двох груп, очікуваний ефект — нульовий. Якщо тест часто відхиляє H₀ → інфраструктура зламана: проблеми з рандомізацією, логуванням, дублюванням юзерів.
+:::
+
+## A/A test: the idea {.smaller}
+
+If $H_0$ is true and the test is correctly constructed, then:
+
+1. $P(\text{reject } H_0 \mid H_0) = \alpha$ --- by definition of significance level.
+2. The $p$-value is uniformly distributed on $[0, 1]$ (for continuous distributions).
+3. The proportion of significant results across many A/A tests should be close to $\alpha$.
+
+\
+
+. . .
+
+::: {.callout-note icon="false"}
+## Practical algorithm
+
+1. Run $N$ identical experiments under $H_0$.
+2. For each, compute the $p$-value.
+3. Plot the distribution of $p$-values.
+4. Check that the proportion of $p \leq \alpha$ is close to $\alpha$.
+:::
+
+::: {.notes}
+Властивість p-value: під H₀ розподілений рівномірно (для неперервних розподілів). Для дискретних — приблизно. Перевіряємо емпірично: запускаємо тисячі A/A і дивимось на гістограму p-value.
+:::
+
+## A/A test: simulation {.tiny}
+
+Let's simulate 10000 A/A tests for our delivery problem with $n = 30$ and $\mu = 0.5$.
+
+```{python}
+#| label: aa-simulation
+
+np.random.seed(73)
+
+N_EXPERIMENTS = 10000
+SAMPLE_SIZE = 30
+mu_true = 0.5
+
+p_values = np.zeros(N_EXPERIMENTS)
+for i in range(N_EXPERIMENTS):
+    # Draw a sample under H0
+    q = binom.rvs(SAMPLE_SIZE, mu_true)
+
+    # Compute the p-value of a two-sided test
+    p_values[i] = pvalue_two_sided(SAMPLE_SIZE, q, mu=0.5)
+
+# Fraction of false rejections
+fpr_empirical = (p_values <= 0.05).mean()
+print(f"Empirical FPR: {fpr_empirical:.4f}")
+```
+
+::: {.notes}
+Симуляція 10k експериментів під H₀. Кожен раз — нова вибірка з Binom(30, 0.5), розрахунок p-value. Емпіричний FPR має бути ≈ α = 0.05.
+:::
+
+## A/A test: $p$-value distribution {.smaller}
+
+```{python}
+#| label: aa-hist
+#| echo: false
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(11, 5))
+ax.hist(p_values, bins=20, range=(0, 1), color=turquoise, edgecolor="white")
+ax.axvline(0.05, linestyle="--", color="red", linewidth=2, label=r"$\alpha = 0.05$")
+ax.set_xlabel("$p$-value")
+ax.set_ylabel("Frequency")
+ax.set_title("Distribution of $p$-values in 10000 A/A tests")
+ax.legend(fontsize=13)
+ax.tick_params(labelsize=12)
+plt.show()
+```
+
+The distribution is approximately uniform --- exactly what we expect from a correctly working test. The "stepped" pattern is a consequence of the discrete binomial distribution.
+
+::: {.notes}
+Гістограма p-value близька до рівномірної з характерними «сходинками» через дискретність біноміального розподілу. Якби тест був зламаний — побачили б скіс ліворуч (надмірно багато малих p-value).
+:::
+
+## What if A/A fails? {.smaller}
+
+If the empirical FPR is much higher than $\alpha$ --- this is a signal:
+
+\
+
+- {{< iconify mdi shuffle-disabled >}} **Poor randomization** --- the groups are not truly independent (e.g., the same user lands in both groups)
+- {{< iconify mdi database-alert >}} **Data leakage** --- events from group A leak into group B
+- {{< iconify mdi account-multiple-check >}} **Sample Ratio Mismatch (SRM)** --- group sizes deviate from the planned proportion (e.g., 60/40 instead of 50/50)
+- {{< iconify mdi clock-alert >}} **Temporal effect** --- groups were exposed at different times (weekday vs. weekend, day vs. night)
+
+\
+
+. . .
+
+::: {.callout-tip icon="false"}
+## In practice
+
+Large companies (Microsoft, Booking, Netflix) run [continuous A/A testing]{.hi} in the background to monitor the health of their experimentation platform.
+:::
+
+::: {.notes}
+Якщо A/A провалився — шукати причину: рандомізація, витоки даних, SRM, часові ефекти. Великі компанії запускають A/A постійно для моніторингу платформи експериментів.
+:::
+
+# Multiple comparisons {background-iframe=".01-stat-test_files/libs/colored-particles/index.html"}
+
+## Problem statement {.smaller}
+
+In a real A/B test we rarely look at just **one** metric. For our delivery service we might track:
+
+- {{< iconify mdi cart-check >}} Conversion to a successful order
+- {{< iconify mdi currency-uah >}} Average order value
+- {{< iconify mdi clock-fast >}} Delivery time
+- {{< iconify mdi star >}} Customer rating
+- {{< iconify mdi account-refresh >}} Retention
+- ... and another 15 business metrics
+
+\
+
+. . .
+
+<center>What happens to the False Positive Rate when we test [20 metrics in parallel]{.hi}?</center>
+
+::: {.notes}
+У реальному A/B-тесті вимірюють десятки метрик. Питання: чи зберігається α=0.05, коли паралельно перевіряємо 20 гіпотез?
+:::
+
+## Multiple comparisons: math {.tiny}
+
+If each test independently has the property $P(\text{reject } H_0 \mid H_0) = \alpha$, then the probability of [at least one]{.hi} false rejection in $k$ tests is:
+
+$$
+\text{FWER} = P(\text{at least 1 FP}) = 1 - (1 - \alpha)^k
+$$
+
+where FWER --- **Family-Wise Error Rate**.
+
+\
+
+. . .
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+| $k$ | FWER at $\alpha=0.05$ |
+|:---:|:---:|
+| 1 | 5% |
+| 5 | 23% |
+| 10 | 40% |
+| 20 | **64%** |
+| 50 | 92% |
+
+:::
+
+::: {.column width="50%" .fragment}
+
+```{python}
+#| label: fwer-plot
+#| echo: false
+#| fig-align: center
+
+k_grid = np.arange(1, 51)
+alpha_lvl = 0.05
+fwer_curve = 1 - (1 - alpha_lvl) ** k_grid
+
+fig, ax = plt.subplots(figsize=(7, 5))
+ax.plot(k_grid, fwer_curve, color=red, linewidth=2.5)
+ax.axhline(0.05, linestyle="--", color="black", label=r"$\alpha = 0.05$")
+ax.set_xlabel("Number of tests $k$")
+ax.set_ylabel("FWER")
+ax.set_title("Probability of at least one false rejection")
+ax.legend(fontsize=12)
+ax.tick_params(labelsize=12)
+plt.show()
+```
+
+:::
+
+::::
+
+::: {.notes}
+FWER = 1 - (1-α)^k. Експоненціальне зростання помилки. Для 20 незалежних тестів FWER ≈ 64% — навіть якщо жодна гіпотеза не правда, в середньому одна «викине прапор».
+:::
+
+## Multiple comparisons: simulation {.tiny}
+
+10000 A/B experiments, each with 20 independent metrics, all under $H_0$:
+
+```{python}
+#| label: multiple-sim
+
+np.random.seed(73)
+
+N_EXPERIMENTS = 10000
+N_METRICS = 20
+SAMPLE_SIZE = 30
+mu_true = 0.5
+alpha = 0.05
+
+at_least_one_fp = 0
+
+for _ in range(N_EXPERIMENTS):
+    # Simulate 20 independent metrics under H0
+    p_vals = np.array([
+        pvalue_two_sided(SAMPLE_SIZE, binom.rvs(SAMPLE_SIZE, mu_true), mu=0.5)
+        for _ in range(N_METRICS)
+    ])
+
+    # Did at least one false rejection occur?
+    if (p_vals <= alpha).any():
+        at_least_one_fp += 1
+
+fwer_empirical = at_least_one_fp / N_EXPERIMENTS
+fwer_theoretical = 1 - (1 - alpha) ** N_METRICS
+
+print(f"Empirical FWER:   {fwer_empirical:.4f}")
+print(f"Theoretical FWER: {fwer_theoretical:.4f}")
+```
+
+::: {.notes}
+Симуляція підтверджує теорію: FWER ≈ 64% для 20 метрик. Дискретність біноміального робить емпіричний FWER трохи нижчим за теоретичний.
+:::
+
+## Bonferroni correction {.smaller}
+
+The simplest solution: tighten the significance level for each individual test.
+
+$$
+\alpha_{\text{adjusted}} = \frac{\alpha}{k}
+$$
+
+where $k$ --- the number of comparisons.
+
+\
+
+For our example with 20 metrics: $\alpha_{\text{adj}} = 0.05 / 20 = 0.0025$.
+
+. . .
+
+\
+
+::: {.callout-note icon="false"}
+## Why does it work?
+
+By Boole's inequality:
+$$
+P\left(\bigcup_{i=1}^{k} A_i\right) \leq \sum_{i=1}^{k} P(A_i) = k \cdot \frac{\alpha}{k} = \alpha
+$$
+
+The total error is bounded from above by $\alpha$.
+:::
+
+::: {.notes}
+Поправка Бонферроні: ділимо α на кількість тестів. Доведення — нерівність Буля. Простий метод, що працює завжди, але дуже консервативний.
+:::
+
+## Bonferroni: simulation {.tiny}
+
+```{python}
+#| label: bonferroni-sim
+
+np.random.seed(73)
+
+N_EXPERIMENTS = 10000
+N_METRICS = 20
+SAMPLE_SIZE = 30
+mu_true = 0.5
+alpha = 0.05
+alpha_bonf = alpha / N_METRICS
+
+at_least_one_fp = 0
+
+for _ in range(N_EXPERIMENTS):
+    p_vals = np.array([
+        pvalue_two_sided(SAMPLE_SIZE, binom.rvs(SAMPLE_SIZE, mu_true), mu=0.5)
+        for _ in range(N_METRICS)
+    ])
+
+    # Compare against the adjusted alpha
+    if (p_vals <= alpha_bonf).any():
+        at_least_one_fp += 1
+
+fwer_corrected = at_least_one_fp / N_EXPERIMENTS
+print(f"FWER after Bonferroni: {fwer_corrected:.4f}")
+```
+
+\
+
+. . .
+
+::: {.callout-warning icon="false"}
+## Cost of the correction
+
+Bonferroni reduces FWER, but [drastically reduces power]{.red}. For 20 metrics with $\alpha_{\text{adj}} = 0.0025$ we need a significantly larger sample size to detect an effect.
+
+\
+
+In practice, less conservative methods are used (Holm, Benjamini-Hochberg / FDR), but the principle is the same: more tests $\Rightarrow$ a stricter criterion.
+:::
+
+::: {.notes}
+Емпіричний FWER після Бонферроні ≈ 5% — повертаємось до бажаного рівня. Ціна — втрата потужності: для виявлення ефекту потрібно набагато більше даних. Альтернативи: Холм, FDR (Бенджаміні-Хохберг).
+:::
+
+# Peeking problem {background-iframe=".01-stat-test_files/libs/colored-particles/index.html"}
+
+## Temptation to peek {.smaller}
+
+Imagine: we are running an A/B test for 30 days. Every morning the analyst opens the dashboard and looks at the current $p$-value.
+
+\
+
+. . .
+
+On day 7 he sees: $p = 0.04$. 🎉
+
+\
+
+. . .
+
+<center>[Why wait another 23 days? Let's roll out the feature!]{.red}</center>
+
+\
+
+. . .
+
+::: {.callout-important icon="false"}
+## What's wrong?
+
+Statistical theory assumes that the test runs **once** at a fixed sample size $N$. As soon as you start looking at results in the middle, the FPR is no longer $\alpha$ --- it [grows]{.red}.
+:::
+
+::: {.notes}
+Peeking problem — спокуса заглядати в результати під час тесту і зупиняти його при p<0.05. Класична теорія тестів гіпотез припускає одноразову перевірку при фіксованому N. Регулярні перевірки роздувають FPR.
+:::
+
+## Peeking: simulation {.tiny}
+
+Scenario: $\mu_A = \mu_B = 0.5$ (no real effect). Each day a new customer is added. The test is stopped as soon as $p \leq 0.05$.
+
+```{python}
+#| label: peeking-sim
+
+np.random.seed(73)
+
+N_EXPERIMENTS = 2000
+MAX_N = 100
+mu = 0.5
+alpha = 0.05
+
+stopped_early = 0  # how many experiments were stopped due to peeking
+
+for _ in range(N_EXPERIMENTS):
+    # Generate the full sample
+    sample = binom.rvs(1, mu, size=MAX_N)
+
+    # Check the p-value at every step starting from n=10
+    for n in range(10, MAX_N + 1):
+        q = sample[:n].sum()
+        p_val = pvalue_two_sided(n, q, mu=0.5)
+        if p_val <= alpha:
+            stopped_early += 1
+            break
+
+peeking_fpr = stopped_early / N_EXPERIMENTS
+print(f"FPR with daily peeking:  {peeking_fpr:.4f}")
+print(f"Expected FPR (no peek):  {alpha}")
+```
+
+::: {.notes}
+Симуляція peeking: щодня додаємо клієнта і перевіряємо p-value. Зупиняємо як тільки p≤0.05. Під H₀ (μ=0.5) FPR роздувається до 20-30% замість 5%.
+:::
+
+## Peeking: visualization {.smaller}
+
+```{python}
+#| label: peeking-plot
+#| echo: false
+#| fig-align: center
+
+np.random.seed(42)
+
+n_traj = 30
+MAX_N = 200
+trajectories = []
+
+for _ in range(n_traj):
+    sample = binom.rvs(1, 0.5, size=MAX_N)
+    p_path = []
+    for n in range(10, MAX_N + 1):
+        q = sample[:n].sum()
+        p_path.append(pvalue_two_sided(n, q, mu=0.5))
+    trajectories.append(p_path)
+
+fig, ax = plt.subplots(figsize=(11, 5))
+n_range = np.arange(10, MAX_N + 1)
+
+for path in trajectories:
+    arr = np.array(path)
+    crossed = (arr <= 0.05).any()
+    color = "red" if crossed else "gray"
+    alpha_line = 0.7 if crossed else 0.3
+    ax.plot(n_range, arr, color=color, alpha=alpha_line, linewidth=1)
+
+ax.axhline(0.05, linestyle="--", color="black", linewidth=2, label=r"$\alpha = 0.05$")
+ax.set_xlabel("Sample size N")
+ax.set_ylabel("$p$-value")
+ax.set_title("$p$-value trajectories under $H_0$ (30 experiments)")
+ax.legend(fontsize=13)
+ax.set_ylim(0, 1)
+plt.show()
+```
+
+Each red line is a trajectory that "accidentally" crossed $\alpha = 0.05$ at some moment. With daily checks --- a substantial share of experiments will give a false positive.
+
+::: {.notes}
+Траєкторії p-value випадково «гуляють». Червоні — ті, що бодай раз перетнули α=0.05. При достатньому терпінні і нескінченному N, навіть під H₀, рано чи пізно перетне будь-яка траєкторія (закон повторного логарифма).
+:::
+
+## How to avoid peeking? {.smaller}
+
+::: {.callout-tip icon="false"}
+## Solution 1: Fix $N$ in advance
+
+Calculate the required sample size before launching the test using MDE and power. Don't look at results until $N$ is reached.
+
+```python
+# At the design stage of the test
+required_n = calculate_sample_size(mde=0.05, power=0.8, alpha=0.05)
+# e.g., required_n = 160. Wait for 160 observations.
+```
+:::
+
+\
+
+::: {.callout-tip icon="false"}
+## Solution 2: Sequential testing methods
+
+Special methods that **allow** continuous checking while controlling FPR:
+
+- {{< iconify mdi function >}} **Sequential Probability Ratio Test (SPRT)** --- Wald
+- {{< iconify mdi chart-bell-curve >}} **Group Sequential Designs** --- O'Brien-Fleming, Pocock
+- {{< iconify mdi infinity >}} **Always-Valid Inference** --- anytime-valid $p$-values, e-values
+
+Used at large tech companies: Optimizely, Netflix, Microsoft.
+:::
+
+::: {.notes}
+Два рішення: (1) розрахувати N заздалегідь через MDE/power і не дивитись до кінця; (2) використовувати методи послідовного тестування, що контролюють FPR при безперервних перевірках. У великих компаніях другий підхід — стандарт.
+:::
+
+## Three pitfalls: connection {.smaller}
+
+::: {.callout-note icon="false"}
+## All three problems have a common root
+
+Classical hypothesis testing theory assumes:
+
+1. ✅ The test is run **once**
+2. ✅ At **fixed** $N$
+3. ✅ With **one** hypothesis
+4. ✅ On **correctly randomized** data
+
+\
+
+Violating any assumption inflates the False Positive Rate:
+
+- A/A failure → poor randomization → broken assumption #4
+- Multiple comparisons → many hypotheses → broken assumption #3
+- Peeking → variable $N$ + many checks → broken assumptions #1, #2
+:::
+
+::: {.notes}
+Усі три проблеми — наслідки порушення базових припущень класичної теорії: одноразовий тест, фіксований N, одна гіпотеза, коректна рандомізація. Розуміння джерела помилок важливіше за окремі рецепти.
+:::
+
+## Summary {.tiny}
+
+#### Hypothesis testing algorithm
+
+1. Business problem / hypothesis
+2. Formulation of the null and alternative hypotheses:
+    + $\mathsf{H}_0: \mu = 0.5$
+    + $\mathsf{H}_1: \mu > 0.5$.
+3. Statistics of the test $Q = \sum_{i=1}^n \text{Bernoulli}(\mu)$, $q = 19$.
+4. The distribution of $Q$ at $\mathsf{H}_0$ and the critical region ($p$-value) at $\alpha = 0.05$.
+5. $\text{MDE} (n, \text{power}, \alpha)$.
+6. Confidence interval for $\mu$.
+
+\
+
+#### Practical considerations for A/B tests
+
+7. **A/A test** --- validation of the testing infrastructure before launch.
+8. **Multiple comparisons** --- Bonferroni / FDR corrections for $k$ metrics.
+9. **No peeking!** --- fix $N$ in advance or use sequential methods.
+
+::: {.notes}
+Шість кроків алгоритму + три практичні застороги. A/A — перевірка інфраструктури. Multiple comparisons — поправка на кількість метрик. No peeking — заздалегідь фіксувати N. Питання від студентів?
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe=".01-stat-test_files/libs/colored-particles/index.html"}
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=4049)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

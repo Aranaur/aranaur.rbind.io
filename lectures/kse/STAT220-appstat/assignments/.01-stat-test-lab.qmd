@@ -1,0 +1,156 @@
+---
+title: "Lab 1"
+subtitle: "Design and Analysis of a Custom Business Experiment"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+execute:
+  echo: true
+  warning: false
+---
+
+# Objective
+
+In this lab you will complete the **full cycle of statistical hypothesis testing** --- from formulating a business problem to calculating the required sample size. Instead of working with a ready-made case, you must **create your own unique business experiment** and carry out the analysis in Python.
+
+# General Requirements
+
+::: {.callout-important icon="false"}
+## Prohibited
+
+- Using textbook examples: coin flips, basic landing-page conversion, or the delivery-service case from the lecture.
+- Copying another student's case.
+:::
+
+::: {.callout-note icon="false"}
+## Report Format
+
+Your report must be submitted in **one** of the following formats:
+
+- **Quarto → PDF** (`.qmd` → `.pdf`)
+- **Quarto → HTML** (`.qmd` → `.html`, hosted separately, e.g. on [Quarto Pub](https://quartopub.com/), [Posit Connect Cloud](https://connect.posit.cloud/), etc.)
+- **Jupyter Notebook** (`.ipynb`)
+- **Google Colab** (share the link with viewing permissions)
+
+The report must contain both code **and** narrative text. Each section should begin with a written explanation, not code.
+:::
+
+::: {.callout-warning icon="false"}
+## Deadline
+
+📅 **May 20, 2026, 23:59**
+:::
+
+# Tasks
+
+## Formulating the Business Problem {#sec-business}
+
+Choose any industry (GameDev, EdTech, E-commerce, healthcare, logistics, fintech, etc.) and describe a business problem or startup idea that requires experimental validation (an A/B test).
+
+::: {.border}
+1. Describe the context: what is the product / service, who is the user, and what problem is being solved.
+2. Define a **success metric** --- a binary outcome that can be modelled with a Bernoulli distribution (e.g. purchase conversion rate, share of successful transactions, retention rate, etc.).
+3. State the **current (baseline) value** of the metric $\mu_0$ and explain where it comes from (industry benchmarks, historical data, etc.).
+:::
+
+## Statistical Test and Hypotheses {#sec-hypotheses}
+
+::: {.border}
+1. Mathematically formulate the null hypothesis $H_0$ and the alternative hypothesis $H_1$.
+2. Justify the choice between a **one-sided** and a **two-sided** test:
+   - Does a two-sided test make sense for your problem? For instance, could the change make the metric *worse*?
+   - Why does the business usually care about a deviation in the *beneficial* direction only?
+3. Choose the significance level $\alpha$ and explain your choice.
+:::
+
+## Data Simulation, Critical Region, and p-value {#sec-simulation}
+
+::: {.border}
+1. Using a random number generator (`scipy.stats.binom.rvs`), create a sample: set the sample size $N$ and a hidden "true" success probability `latent_mu`.
+2. **Build the critical region from scratch:**
+   - Plot the PMF of the test statistic $Q$ under $H_0$ (`binom.pmf`).
+   - Find the critical value $C$ via the quantile function (`binom.ppf`).
+   - Visually highlight the critical region on the plot (use colour) and mark the observed value $q$.
+3. **Calculate the p-value:**
+   - First **manually** via `binom.cdf`.
+   - Then verify the result with `scipy.stats.binomtest`.
+   - Confirm that the two results match.
+4. **Interpret the result** in two ways:
+   - Formally: *"The p-value is the probability of obtaining a result as extreme as, or more extreme than, what was observed, assuming the null hypothesis is true."*
+   - In plain language for the **business stakeholder**: explain what the result means for the decision at hand.
+:::
+
+## Test Power and Errors {#sec-power}
+
+::: {.border}
+1. Explain the key trade-off: decreasing $\alpha$ (Type I error / FPR) increases the probability of a Type II error (FNR) for a fixed sample size $N$.
+2. Choose a specific alternative value $\mu_{alt}$ that you consider realistic for your business.
+3. Calculate the **power** of your test --- the probability of correctly rejecting $H_0$ when $\mu = \mu_{alt}$.
+4. Plot **power vs. sample size $N$** (with $\mu_{alt}$ fixed):
+   - Draw a horizontal reference line at 80 %.
+   - Mark the minimum $N$ at which power reaches 80 %.
+:::
+
+## MDE and Sample Size {#sec-mde}
+
+::: {.border}
+1. **Justify the MDE from a business perspective:**
+   - What is the smallest effect that is practically meaningful for your case?
+   - Provide concrete numbers: how much does one observation cost, what is the margin from one successful outcome, and at what MDE does the change become profitable?
+2. Plot **power vs. $\mu_{alt}$** (with $N$ fixed):
+   - Draw a horizontal reference line at 80 %.
+   - Identify and mark the MDE on the plot.
+3. **Calculate the required sample size $N$** for your desired MDE given $\alpha$ and 80 % power.
+4. Estimate the **experiment duration**: how many days / weeks will it take to collect the required number of observations? Is this realistic for your business?
+:::
+
+# Grading {.unnumbered}
+
+| Criterion | Points |
+|---|:---:|
+| Correctness of methodology | 3 |
+| Interpretation of results | 3 |
+| Code quality and organization | 2 |
+| **Total** | **8** |
+
+::: {.callout-tip icon="false"}
+## Grading Details
+
+**Correctness of methodology (3 pts):**
+
+- Proper formulation of $H_0$ / $H_1$
+- Correct construction of the critical region and p-value calculation (manual + `binomtest`)
+- Correct power and MDE calculations
+- Justified choice of one-sided vs. two-sided test
+
+**Interpretation of results (3 pts):**
+
+- Clear explanation of the p-value for a business audience
+- Explanation of the Type I / Type II error trade-off
+- Business justification of MDE (specific numbers, not generic statements)
+- Realistic estimate of experiment duration
+
+**Code quality and organization (2 pts):**
+
+- Well-structured report with narrative text before each code block
+- Informative plots with axis labels and titles
+- Clean, readable code with comments
+:::
+
+# Defense {.unnumbered}
+
+During the defense (5--7 minutes) you will be asked *"What if?"* questions, for example:
+
+- *"You calculated that you need 15,000 customers, but the business can only afford 500. What do you tell the stakeholder?"*
+- *"You got a p-value of 0.049. What if the sample were 30,000 instead of 30, and the effect stayed just as small? Would you still recommend rolling out the change?"*
+- *"Switch your one-sided test to a two-sided test in your code right now. What happens to the p-value?"*
+- *"If you reduce $\alpha$ from 0.05 to 0.001, what happens to the power?"*
+
+You may also be asked to **change one parameter** in your code and explain the result.

@@ -1,0 +1,1059 @@
+---
+title: "Практичне заняття 1"
+subtitle: "STAT250: Теорія ймовірностей та статистика"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: uk
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    section-numbering: "1.1."
+    columns: 1
+    margin:
+      x: 2.5cm
+      y: 2.5cm
+    font-size: 11pt
+    mainfont: "Times New Roman"
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+#| include: false
+library(tidyverse)
+library(patchwork)
+library(scales)
+```
+
+# Класична ймовірність та комбінаторика
+
+## Задача 1: Вибірка з урни
+
+В урні містяться **5 білих** і **3 чорних** кулі. Навмання виймають **3 кулі**. Знайти ймовірність того, що серед вийнятих куль буде рівно **2 білих і 1 чорна**.
+
+### Математичне розв'язання
+
+Загальна кількість способів вибрати 3 кулі з 8:
+
+$$|\Omega| = \binom{8}{3} = \frac{8!}{3! \cdot 5!} = 56$$
+
+Кількість сприятливих наслідків (2 білих з 5 та 1 чорна з 3):
+
+$$|A| = \binom{5}{2} \cdot \binom{3}{1} = 10 \cdot 3 = 30$$
+
+Ймовірність події $A$:
+
+$$P(A) = \frac{|A|}{|\Omega|} = \frac{30}{56} = \frac{15}{28} \approx 0{,}536$$
+
+### Розв'язання в R
+
+```{r}
+# Кількість способів вибрати 2 білих з 5
+white_ways <- choose(5, 2)
+
+# Кількість способів вибрати 1 чорну з 3
+black_ways <- choose(3, 1)
+
+# Загальна кількість способів вибрати 3 кулі з 8
+total_ways <- choose(8, 3)
+
+# Ймовірність події
+prob <- (white_ways * black_ways) / total_ways
+cat(sprintf("P(A) = %d * %d / %d = %.4f", white_ways, black_ways, total_ways, prob))
+```
+
+**Перевірка за допомогою симуляції:**
+
+```{r}
+set.seed(42)
+n_sim  <- 100000
+balls  <- c(rep(1, 5), rep(0, 3))
+
+tibble(white = replicate(n_sim, sum(sample(balls, 3)))) |>
+  summarise(
+    `Симуляційна ймовірність` = mean(white == 2),
+    `Теоретична ймовірність`  = 15 / 28
+  )
+```
+
+---
+
+## Задача 2: Правило додавання
+
+Гральний кубик кидають **один раз**. Знайти ймовірність того, що випаде **парне число або число, більше за 4**.
+
+### Математичне розв'язання
+
+Простір елементарних подій: $\Omega = \{1, 2, 3, 4, 5, 6\}$, $|\Omega| = 6$.
+
+Визначимо події:
+
+- $A = \{2, 4, 6\}$ — випаде парне число, $P(A) = \frac{3}{6} = \frac{1}{2}$
+- $B = \{5, 6\}$ — випаде число більше 4, $P(B) = \frac{2}{6} = \frac{1}{3}$
+- $A \cap B = \{6\}$ — обидві події, $P(A \cap B) = \frac{1}{6}$
+
+За **формулою включень-виключень**:
+
+$$P(A \cup B) = P(A) + P(B) - P(A \cap B) = \frac{1}{2} + \frac{1}{3} - \frac{1}{6} = \frac{3}{6} + \frac{2}{6} - \frac{1}{6} = \frac{4}{6} = \frac{2}{3}$$
+
+### Розв'язання в R
+
+```{r}
+tibble(x = 1:6) |>
+  mutate(
+    A = x %% 2 == 0,
+    B = x > 4
+  ) |>
+  summarise(
+    `P(A)`   = mean(A),
+    `P(B)`   = mean(B),
+    `P(A∩B)` = mean(A & B),
+    `P(A∪B)` = mean(A | B)
+  )
+```
+
+---
+
+# Умовна ймовірність та незалежність
+
+## Задача 3: Діти в сім'ї
+
+У сім'ї **двоє дітей**. Відомо, що **хоча б одна з них — дівчинка**. Яка ймовірність того, що **обидві діти — дівчинки**?
+
+### Математичне розв'язання
+
+Простір елементарних подій (Х — хлопчик, Д — дівчинка):
+
+$$\Omega = \{(Х,Х),\; (Х,Д),\; (Д,Х),\; (Д,Д)\}$$
+
+Визначимо події:
+
+- $A = \{(Д,Д)\}$ — обидві дівчинки, $P(A) = \frac{1}{4}$
+- $B = \{(Х,Д), (Д,Х), (Д,Д)\}$ — хоча б одна дівчинка, $P(B) = \frac{3}{4}$
+
+Оскільки $A \subset B$, маємо $A \cap B = A$.
+
+**Умовна ймовірність:**
+
+$$P(A \mid B) = \frac{P(A \cap B)}{P(B)} = \frac{P(A)}{P(B)} = \frac{1/4}{3/4} = \frac{1}{3} \approx 0{,}333$$
+
+### Розв'язання в R
+
+```{r}
+set.seed(123)
+n_sim <- 100000
+
+tibble(
+  child1 = sample(c("Х", "Д"), n_sim, replace = TRUE),
+  child2 = sample(c("Х", "Д"), n_sim, replace = TRUE)
+) |>
+  mutate(
+    has_girl   = child1 == "Д" | child2 == "Д",
+    both_girls = child1 == "Д" & child2 == "Д"
+  ) |>
+  filter(has_girl) |>
+  summarise(
+    `P(обидві | є хоча б одна)` = mean(both_girls),
+    `Теоретичне значення`        = 1 / 3
+  )
+```
+
+---
+
+## Задача 4: Незалежність подій
+
+Кидають два гральних кубики. Визначити, чи є незалежними події:
+
+- $A$ — на першому кубику випало **парне число**
+- $B$ — сума очок **більша за 7**
+
+### Математичне розв'язання
+
+$|\Omega| = 36$ (усі пари $(i, j)$, де $i, j \in \{1,\ldots,6\}$).
+
+**Подія $A$:** перший кубик показує 2, 4 або 6:
+
+$$P(A) = \frac{3 \cdot 6}{36} = \frac{18}{36} = \frac{1}{2}$$
+
+**Подія $B$:** сума $> 7$ (можливі суми 8, 9, 10, 11, 12):
+
+| Сума | Кількість |
+|------|-----------|
+| 8    | 5         |
+| 9    | 4         |
+| 10   | 3         |
+| 11   | 2         |
+| 12   | 1         |
+
+$$P(B) = \frac{5+4+3+2+1}{36} = \frac{15}{36} = \frac{5}{12}$$
+
+**Подія $A \cap B$:** перший парний **і** сума $> 7$:
+
+Перший кубик: 2 → другий $> 5$: {6} → 1 спосіб
+Перший кубик: 4 → другий $> 3$: {4,5,6} → 3 способи
+Перший кубик: 6 → другий $> 1$: {2,3,4,5,6} → 5 способів
+
+$$P(A \cap B) = \frac{1+3+5}{36} = \frac{9}{36} = \frac{1}{4}$$
+
+**Перевірка незалежності** $P(A) \cdot P(B) = \frac{1}{2} \cdot \frac{5}{12} = \frac{5}{24} \neq \frac{1}{4} = P(A \cap B)$.
+
+**Висновок:** події $A$ і $B$ є **залежними**.
+
+### Розв'язання в R
+
+```{r}
+expand_grid(d1 = 1:6, d2 = 1:6) |>
+  mutate(
+    A   = d1 %% 2 == 0,
+    B   = (d1 + d2) > 7,
+    AnB = A & B
+  ) |>
+  summarise(
+    `P(A)`       = mean(A),
+    `P(B)`       = mean(B),
+    `P(A∩B)`     = mean(AnB),
+    `P(A)×P(B)`  = mean(A) * mean(B),
+    `Незалежні`  = abs(mean(AnB) - mean(A) * mean(B)) < 1e-10
+  )
+```
+
+---
+
+# Теорема Байєса та повна ймовірність
+
+## Задача 5: Контроль якості на заводі
+
+На заводі працюють **три верстати**, які виробляють відповідно **40%, 35% і 25%** загального обсягу продукції. Відсоток бракованих виробів: **5%, 4% і 2%** відповідно. Навмання вибрано бракований виріб. Знайти ймовірність того, що він **виготовлений на першому верстаті**.
+
+### Математичне розв'язання
+
+Введемо гіпотези:
+
+| Гіпотеза | Зміст | $P(H_i)$ | $P(A \mid H_i)$ |
+|----------|-------|----------|-----------------|
+| $H_1$ | 1-й верстат | 0,40 | 0,05 |
+| $H_2$ | 2-й верстат | 0,35 | 0,04 |
+| $H_3$ | 3-й верстат | 0,25 | 0,02 |
+
+**Формула повної ймовірності** (подія $A$ — деталь бракована):
+
+$$P(A) = \sum_{i=1}^{3} P(H_i) \cdot P(A \mid H_i)$$
+
+$$P(A) = 0{,}4 \cdot 0{,}05 + 0{,}35 \cdot 0{,}04 + 0{,}25 \cdot 0{,}02 = 0{,}020 + 0{,}014 + 0{,}005 = 0{,}039$$
+
+**Формула Байєса:**
+
+$$P(H_1 \mid A) = \frac{P(H_1) \cdot P(A \mid H_1)}{P(A)} = \frac{0{,}4 \cdot 0{,}05}{0{,}039} = \frac{0{,}020}{0{,}039} \approx 0{,}513$$
+
+### Розв'язання в R
+
+```{r}
+df_bayes5 <- tibble(
+  Верстат    = factor(paste("Верстат", 1:3)),
+  prior      = c(0.40, 0.35, 0.25),
+  likelihood = c(0.05, 0.04, 0.02)
+) |>
+  mutate(
+    joint     = prior * likelihood,
+    posterior = joint / sum(joint)
+  )
+
+cat(sprintf("Повна ймовірність P(A) = %.4f\n\n", sum(df_bayes5$joint)))
+
+df_bayes5 |>
+  select(Верстат, posterior) |>
+  mutate(`P(Hi|A)` = sprintf("%.4f (%.1f%%)", posterior, posterior * 100)) |>
+  select(-posterior) |>
+  print()
+```
+
+**Візуалізація апостеріорних ймовірностей:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+df_bayes5 |>
+  select(Верстат, Апріорна = prior, Апостеріорна = posterior) |>
+  pivot_longer(-Верстат, names_to = "Тип", values_to = "Ймовірність") |>
+  ggplot(aes(x = Верстат, y = Ймовірність, fill = Тип)) +
+  geom_col(position = "dodge", width = 0.6) +
+  scale_fill_manual(values = c("#2166ac", "#d73027")) +
+  labs(title = "Апріорні та апостеріорні ймовірності гіпотез",
+       x = NULL, y = "Ймовірність", fill = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top")
+```
+
+---
+
+# Дискретні розподіли
+
+## Задача 6: Біноміальний розподіл
+
+Ймовірність потрапити в ціль при одному пострілі дорівнює $p = 0{,}7$. Стрілець робить $n = 8$ пострілів. Знайти:
+
+а) ймовірність рівно **5 влучень**;
+б) ймовірність **хоча б одного** влучення;
+в) **математичне сподівання** та **дисперсію** числа влучень.
+
+### Математичне розв'язання
+
+$X \sim \mathrm{Bin}(n = 8,\; p = 0{,}7)$
+
+**а)** Ймовірність рівно 5 влучень:
+
+$$P(X = 5) = \binom{8}{5} \cdot 0{,}7^5 \cdot 0{,}3^3 = 56 \cdot 0{,}16807 \cdot 0{,}027 \approx 0{,}2541$$
+
+**б)** Ймовірність хоча б одного влучення:
+
+$$P(X \geq 1) = 1 - P(X = 0) = 1 - \binom{8}{0} \cdot 0{,}7^0 \cdot 0{,}3^8 = 1 - 0{,}3^8 \approx 1 - 0{,}000066 \approx 0{,}9999$$
+
+**в)** Математичне сподівання та дисперсія:
+
+$$\mathbb{E}[X] = np = 8 \cdot 0{,}7 = 5{,}6$$
+$$\mathbb{D}[X] = np(1-p) = 8 \cdot 0{,}7 \cdot 0{,}3 = 1{,}68$$
+
+### Розв'язання в R
+
+```{r}
+n <- 8; p <- 0.7
+
+# а) P(X = 5)
+p_5 <- dbinom(5, size = n, prob = p)
+cat(sprintf("а) P(X = 5) = %.4f\n", p_5))
+
+# б) P(X >= 1) = 1 - P(X = 0)
+p_at_least_1 <- 1 - dbinom(0, size = n, prob = p)
+cat(sprintf("б) P(X ≥ 1) = %.6f\n", p_at_least_1))
+
+# в) Математичне сподівання та дисперсія
+mean_X <- n * p
+var_X  <- n * p * (1 - p)
+cat(sprintf("в) E[X] = %.2f, D[X] = %.2f\n", mean_X, var_X))
+```
+
+**Візуалізація розподілу:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+tibble(x = 0:n) |>
+  mutate(
+    prob      = dbinom(x, size = n, prob = p),
+    highlight = x == 5
+  ) |>
+  ggplot(aes(x = factor(x), y = prob, fill = highlight)) +
+  geom_col(width = 0.7, show.legend = FALSE) +
+  scale_fill_manual(values = c("grey70", "#d73027")) +
+  geom_text(aes(label = round(prob, 3)), vjust = -0.4, size = 3) +
+  labs(title = expression(paste("Bin(", italic(n), " = 8, ", italic(p), " = 0.7)")),
+       x = "Кількість влучень", y = "Ймовірність") +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+## Задача 7: Розподіл Пуассона
+
+На телефонну станцію в середньому надходить **$\lambda = 4$ дзвінки на хвилину**. Знайти ймовірність того, що за одну хвилину надійде:
+
+а) рівно **6 дзвінків**;
+б) **не більше 2** дзвінків;
+в) **більше 5** дзвінків.
+
+### Математичне розв'язання
+
+$X \sim \mathrm{Pois}(\lambda = 4)$, де $P(X = k) = \frac{\lambda^k e^{-\lambda}}{k!}$
+
+**а)** Ймовірність рівно 6 дзвінків:
+
+$$P(X = 6) = \frac{4^6 \cdot e^{-4}}{6!} = \frac{4096 \cdot 0{,}01832}{720} \approx 0{,}1042$$
+
+**б)** Ймовірність не більше 2 дзвінків:
+
+$$P(X \leq 2) = \sum_{k=0}^{2} \frac{4^k e^{-4}}{k!} = e^{-4}\left(1 + 4 + \frac{16}{2}\right) = e^{-4} \cdot 13 \approx 0{,}2381$$
+
+**в)** Ймовірність більше 5 дзвінків:
+
+$$P(X > 5) = 1 - P(X \leq 5) \approx 1 - 0{,}7851 = 0{,}2149$$
+
+### Розв'язання в R
+
+```{r}
+lambda <- 4
+
+# а) P(X = 6)
+p_6 <- dpois(6, lambda = lambda)
+cat(sprintf("а) P(X = 6) = %.4f\n", p_6))
+
+# б) P(X <= 2)
+p_le2 <- ppois(2, lambda = lambda)
+cat(sprintf("б) P(X ≤ 2) = %.4f\n", p_le2))
+
+# в) P(X > 5)
+p_gt5 <- 1 - ppois(5, lambda = lambda)
+cat(sprintf("в) P(X > 5) = %.4f\n", p_gt5))
+```
+
+**Візуалізація розподілу Пуассона:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+tibble(x = 0:15) |>
+  mutate(
+    prob = dpois(x, lambda = lambda),
+    zone = case_when(
+      x == 6 ~ "6 дзвінків",
+      x <= 2 ~ "≤ 2 дзвінки",
+      x > 5  ~ "> 5 дзвінків",
+      TRUE   ~ "інше"
+    )
+  ) |>
+  ggplot(aes(x = factor(x), y = prob, fill = zone)) +
+  geom_col(width = 0.7) +
+  scale_fill_manual(values = c(
+    "6 дзвінків"   = "#d73027",
+    "≤ 2 дзвінки"  = "#4393c3",
+    "> 5 дзвінків" = "#f4a582",
+    "інше"         = "grey70"
+  )) +
+  labs(title = expression(paste("Pois(", lambda, " = 4)")),
+       x = "Кількість дзвінків", y = "Ймовірність", fill = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top")
+```
+
+---
+
+# Додаткові задачі
+
+## Задача 8 (підвищена складність): Урнова модель та формула Байєса
+
+В **урні № 1** — 3 червоних і 5 синіх кульок. В **урні № 2** — 6 червоних і 2 синіх. Навмання вибирають одну урну (рівноймовірно), а з неї — одну кульку. Виявилося, що куля **червона**. Яка ймовірність, що її вийнято з **першої урни**?
+
+### Математичне розв'язання
+
+Гіпотези: $H_1$ — обрано урну № 1, $H_2$ — обрано урну № 2.
+
+$$P(H_1) = P(H_2) = \frac{1}{2}$$
+
+Правдоподібності (ймовірність витягнути червону):
+
+$$P(A \mid H_1) = \frac{3}{8}, \quad P(A \mid H_2) = \frac{6}{8} = \frac{3}{4}$$
+
+Повна ймовірність:
+
+$$P(A) = \frac{1}{2} \cdot \frac{3}{8} + \frac{1}{2} \cdot \frac{3}{4} = \frac{3}{16} + \frac{6}{16} = \frac{9}{16}$$
+
+Формула Байєса:
+
+$$P(H_1 \mid A) = \frac{P(H_1) \cdot P(A \mid H_1)}{P(A)} = \frac{\frac{1}{2} \cdot \frac{3}{8}}{\frac{9}{16}} = \frac{\frac{3}{16}}{\frac{9}{16}} = \frac{3}{9} = \frac{1}{3}$$
+
+### Розв'язання в R
+
+```{r}
+df_bayes8 <- tibble(
+  hypothesis = c("H1", "H2"),
+  prior      = c(0.5, 0.5),
+  likelihood = c(3/8, 6/8)
+) |>
+  mutate(
+    joint     = prior * likelihood,
+    posterior = joint / sum(joint)
+  )
+
+cat(sprintf("P(A) = %.4f\n", sum(df_bayes8$joint)))
+df_bayes8 |>
+  select(hypothesis, posterior) |>
+  mutate(label = sprintf("%.4f", posterior)) |>
+  print()
+```
+
+**Перевірка за допомогою симуляції:**
+
+```{r}
+set.seed(99)
+n_sim <- 100000
+
+tibble(urn = sample(1:2, n_sim, replace = TRUE)) |>
+  mutate(
+    ball = if_else(
+      urn == 1,
+      sample(c("red", "blue"), n_sim, replace = TRUE, prob = c(3/8, 5/8)),
+      sample(c("red", "blue"), n_sim, replace = TRUE, prob = c(6/8, 2/8))
+    )
+  ) |>
+  filter(ball == "red") |>
+  summarise(`P(H1 | червона)` = mean(urn == 1))
+```
+
+---
+
+# Задачі з лекції
+
+## Задача 9: Діагностичний тест
+
+Діагностичний тест на певне захворювання має **чутливість 95%** (true positive rate) і **специфічність 90%** (true negative rate). Поширеність захворювання в популяції становить **1%**. Яка ймовірність того, що людина з позитивним результатом тесту **дійсно хвора**?
+
+### Математичне розв'язання
+
+Визначимо події:
+
+- $D$ — людина хвора, $P(D) = 0{,}01$, $P(\bar{D}) = 0{,}99$
+- $T^+$ — тест позитивний
+
+З умови:
+
+$$P(T^+ \mid D) = 0{,}95 \quad \text{(чутливість)}$$
+$$P(T^- \mid \bar{D}) = 0{,}90 \Rightarrow P(T^+ \mid \bar{D}) = 0{,}10 \quad \text{(1 − специфічність)}$$
+
+**Повна ймовірність** позитивного тесту:
+
+$$P(T^+) = P(T^+ \mid D)\cdot P(D) + P(T^+ \mid \bar{D})\cdot P(\bar{D})$$
+$$P(T^+) = 0{,}95 \cdot 0{,}01 + 0{,}10 \cdot 0{,}99 = 0{,}0095 + 0{,}099 = 0{,}1085$$
+
+**Формула Байєса:**
+
+$$P(D \mid T^+) = \frac{P(T^+ \mid D)\cdot P(D)}{P(T^+)} = \frac{0{,}95 \cdot 0{,}01}{0{,}1085} = \frac{0{,}0095}{0{,}1085} \approx 0{,}0876$$
+
+> **Парадокс базового рівня:** незважаючи на високу точність тесту, лише ≈ 8,8% людей із позитивним результатом справді хворі — через низьку поширеність захворювання.
+
+### Розв'язання в R
+
+```{r}
+sensitivity    <- 0.95
+false_pos_rate <- 0.10   # 1 − specificity
+prevalence     <- 0.01
+
+tibble(
+  prior      = c(prevalence, 1 - prevalence),
+  likelihood = c(sensitivity, false_pos_rate),
+  стан       = c("хворий", "здоровий")
+) |>
+  mutate(joint = prior * likelihood) |>
+  mutate(posterior = joint / sum(joint)) |>
+  select(стан, prior, likelihood, posterior)
+```
+
+**Аналіз чутливості до поширеності:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+ppv_at_1pct <- (sensitivity * 0.01) /
+               (sensitivity * 0.01 + false_pos_rate * 0.99)
+
+tibble(prevalence = seq(0.001, 0.3, by = 0.001)) |>
+  mutate(ppv = (sensitivity * prevalence) /
+               (sensitivity * prevalence + false_pos_rate * (1 - prevalence))) |>
+  ggplot(aes(x = prevalence, y = ppv)) +
+  geom_line(color = "#d73027", linewidth = 1) +
+  geom_vline(xintercept = 0.01, linetype = "dashed", color = "grey40") +
+  geom_hline(yintercept = ppv_at_1pct, linetype = "dashed", color = "grey40") +
+  annotate("point", x = 0.01, y = ppv_at_1pct, size = 3, color = "#d73027") +
+  annotate("text", x = 0.05, y = ppv_at_1pct - 0.04,
+           label = sprintf("PPV = %.1f%% при prevalence = 1%%", ppv_at_1pct * 100),
+           size = 3.5) +
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent) +
+  labs(title = "Positive Predictive Value (PPV) залежно від поширеності",
+       x = "Поширеність захворювання", y = "P(хворий | T+)") +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+## Задача 10: Дискретна випадкова величина (брокер)
+
+Нехай $X$ — кількість успішних угод брокера за день, яка приймає значення $0, 1, 2, 3, 4$. Розподіл ймовірностей:
+
+$$P(0) = 0{,}1, \quad P(1) = 0{,}2, \quad P(2) = 0{,}2, \quad P(3) = 0{,}2$$
+
+1. Знайти $P(4)$.
+2. Знайти ймовірність того, що брокер укладе **хоча б 3 угоди**.
+3. Побудувати функцію розподілу $F(x)$.
+4. Обчислити $\mathbb{E}(X)$ та $\mathrm{Var}(X)$.
+
+### Математичне розв'язання
+
+**1) Знаходження $P(4)$:**
+
+Оскільки сума всіх ймовірностей дорівнює 1:
+
+$$P(4) = 1 - \sum_{k=0}^{3} P(k) = 1 - (0{,}1 + 0{,}2 + 0{,}2 + 0{,}2) = 1 - 0{,}7 = 0{,}3$$
+
+**2) $P(X \geq 3)$:**
+
+$$P(X \geq 3) = P(3) + P(4) = 0{,}2 + 0{,}3 = 0{,}5$$
+
+**3) Функція розподілу $F(x) = P(X \leq x)$:**
+
+$$F(x) = \begin{cases} 0 & x < 0 \\ 0{,}1 & 0 \leq x < 1 \\ 0{,}3 & 1 \leq x < 2 \\ 0{,}5 & 2 \leq x < 3 \\ 0{,}7 & 3 \leq x < 4 \\ 1{,}0 & x \geq 4 \end{cases}$$
+
+**4) Математичне сподівання та дисперсія:**
+
+$$\mathbb{E}(X) = \sum_{k=0}^{4} k \cdot P(k) = 0 \cdot 0{,}1 + 1 \cdot 0{,}2 + 2 \cdot 0{,}2 + 3 \cdot 0{,}2 + 4 \cdot 0{,}3$$
+$$= 0 + 0{,}2 + 0{,}4 + 0{,}6 + 1{,}2 = 2{,}4$$
+
+$$\mathbb{E}(X^2) = \sum_{k=0}^{4} k^2 \cdot P(k) = 0^2 \cdot 0{,}1 + 1^2 \cdot 0{,}2 + 2^2 \cdot 0{,}2 + 3^2 \cdot 0{,}2 + 4^2 \cdot 0{,}3$$
+$$= 0 + 0{,}2 + 0{,}8 + 1{,}8 + 4{,}8 = 7{,}6$$
+
+$$\mathrm{Var}(X) = \mathbb{E}(X^2) - [\mathbb{E}(X)]^2 = 7{,}6 - (2{,}4)^2 = 7{,}6 - 5{,}76 = 1{,}84$$
+
+### Розв'язання в R
+
+```{r}
+df_broker <- tibble(x = 0:4, prob = c(0.1, 0.2, 0.2, 0.2, NA)) |>
+  mutate(prob = if_else(is.na(prob), 1 - sum(prob, na.rm = TRUE), prob))
+
+df_broker |>
+  summarise(
+    `P(4)`   = prob[x == 4],
+    `P(X≥3)` = sum(prob[x >= 3]),
+    `E(X)`   = sum(x * prob),
+    `Var(X)` = sum(x^2 * prob) - sum(x * prob)^2
+  )
+```
+
+**3) Функція розподілу та її графік:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4.5
+
+p1 <- df_broker |>
+  mutate(x = factor(x)) |>
+  ggplot(aes(x = x, y = prob)) +
+  geom_col(fill = "#4393c3", width = 0.6) +
+  geom_text(aes(label = prob), vjust = -0.4, size = 3.5) +
+  labs(title = "PMF: P(X = x)", x = "x", y = "P(X = x)") +
+  theme_minimal(base_size = 11)
+
+p2 <- tibble(
+  x_start = c(-0.5, 0:4),
+  x_end   = c(0:4, 4.5),
+  y       = c(0, cumsum(df_broker$prob))
+) |>
+  ggplot(aes(x = x_start, xend = x_end, y = y, yend = y)) +
+  geom_segment(linewidth = 1, color = "#d73027") +
+  geom_point(aes(x = x_end, y = y), shape = 19, size = 2, color = "#d73027") +
+  geom_point(aes(x = x_start, y = y), shape = 1,  size = 2, color = "#d73027") +
+  labs(title = "CDF: F(x)", x = "x", y = "F(x)") +
+  theme_minimal(base_size = 11)
+
+p1 + p2
+```
+
+---
+
+## Задача 11: Експоненціальний розподіл (фінтех)
+
+Фінтех-компанія аналізує ефективність підтримки клієнтів. Час, який консультант витрачає на одну складну фінансову справу, має **експоненціальний розподіл** із середнім значенням **2 години**.
+
+1. Визначте функцію густини $f(x)$.
+2. Знайдіть ймовірність того, що консультант завершить справу **менш ніж за 1 годину**.
+3. Компанія хоче запровадити гарантію «Fast Track». Яка ймовірність, що справа займе **більше 4 годин**?
+4. Знайдіть $\mathrm{Var}(X)$.
+
+### Математичне розв'язання
+
+Середнє $\mu = 2$ год, отже інтенсивність $\lambda = \frac{1}{\mu} = \frac{1}{2} = 0{,}5$ год$^{-1}$.
+
+**1) Функція густини:**
+
+$$f(x) = \lambda e^{-\lambda x} = 0{,}5\, e^{-0{,}5x}, \quad x > 0; \qquad f(x) = 0, \quad x \leq 0$$
+
+*Перевірка нормування:*
+
+$$\int_0^{+\infty} 0{,}5\, e^{-0{,}5x}\,dx = 0{,}5 \cdot \left[\frac{e^{-0{,}5x}}{-0{,}5}\right]_0^{+\infty} = \left[-e^{-0{,}5x}\right]_0^{+\infty} = 0 - (-1) = 1$$ ✓
+
+**2) $P(X < 1)$:**
+
+Знаходимо первісну підінтегральної функції:
+
+$$\int 0{,}5\, e^{-0{,}5x}\, dx = 0{,}5 \cdot \frac{e^{-0{,}5x}}{-0{,}5} = -e^{-0{,}5x} + C$$
+
+Підставляємо межі:
+
+$$P(X < 1) = \int_0^1 0{,}5\, e^{-0{,}5x}\, dx = \left[-e^{-0{,}5x}\right]_0^1 = \left(-e^{-0{,}5 \cdot 1}\right) - \left(-e^{-0{,}5 \cdot 0}\right)$$
+$$= -e^{-0{,}5} + e^{0} = 1 - e^{-0{,}5} \approx 1 - 0{,}6065 \approx 0{,}3935$$
+
+**3) $P(X > 4)$:**
+
+Невласний інтеграл обчислюємо через границю:
+
+$$P(X > 4) = \int_4^{+\infty} 0{,}5\, e^{-0{,}5x}\, dx = \lim_{b \to +\infty} \left[-e^{-0{,}5x}\right]_4^{b}$$
+$$= \lim_{b \to +\infty}\left(-e^{-0{,}5b} + e^{-0{,}5 \cdot 4}\right) = 0 + e^{-2} \approx 0{,}1353$$
+
+**4) Дисперсія:**
+
+Спочатку знаходимо $\mathbb{E}(X)$ і $\mathbb{E}(X^2)$ методом інтегрування частинами ($\int u\,dv = uv - \int v\,du$):
+
+$$\mathbb{E}(X) = \int_0^{+\infty} x \cdot \lambda e^{-\lambda x}\,dx$$
+
+Покладемо $u = x$, $dv = \lambda e^{-\lambda x}\,dx$, тоді $du = dx$, $v = -e^{-\lambda x}$:
+
+$$\mathbb{E}(X) = \left[-x e^{-\lambda x}\right]_0^{+\infty} + \int_0^{+\infty} e^{-\lambda x}\,dx = 0 + \left[\frac{-e^{-\lambda x}}{\lambda}\right]_0^{+\infty} = \frac{1}{\lambda} = \frac{1}{0{,}5} = 2$$
+
+$$\mathbb{E}(X^2) = \int_0^{+\infty} x^2 \cdot \lambda e^{-\lambda x}\,dx$$
+
+Покладемо $u = x^2$, $dv = \lambda e^{-\lambda x}\,dx$, тоді $du = 2x\,dx$, $v = -e^{-\lambda x}$:
+
+$$\mathbb{E}(X^2) = \left[-x^2 e^{-\lambda x}\right]_0^{+\infty} + 2\int_0^{+\infty} x e^{-\lambda x}\,dx = 0 + \frac{2}{\lambda} \cdot \mathbb{E}(X) = \frac{2}{\lambda^2}$$
+
+Отже:
+
+$$\mathrm{Var}(X) = \mathbb{E}(X^2) - [\mathbb{E}(X)]^2 = \frac{2}{\lambda^2} - \frac{1}{\lambda^2} = \frac{1}{\lambda^2} = \frac{1}{0{,}5^2} = 4 \text{ год}^2 \quad \Rightarrow \quad \sigma = 2 \text{ год}$$
+
+### Розв'язання в R
+
+```{r}
+mu     <- 2          # середнє
+lambda <- 1 / mu     # інтенсивність = 0.5
+
+# 2) P(X < 1)
+p_lt1 <- pexp(1, rate = lambda)
+cat(sprintf("2) P(X < 1) = %.4f\n", p_lt1))
+
+# 3) P(X > 4)
+p_gt4 <- pexp(4, rate = lambda, lower.tail = FALSE)
+cat(sprintf("3) P(X > 4) = %.4f\n", p_gt4))
+
+# 4) Var(X)
+var_X <- 1 / lambda^2
+cat(sprintf("4) Var(X) = %.0f год², SD = %.0f год\n", var_X, sqrt(var_X)))
+```
+
+**Візуалізація PDF з виділеними областями:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+tibble(x = seq(0, 10, by = 0.01)) |>
+  mutate(fx = dexp(x, rate = lambda)) |>
+  ggplot(aes(x, fx)) +
+  geom_line(color = "grey40", linewidth = 1) +
+  geom_area(data = \(d) filter(d, x < 1), aes(y = fx), fill = "#4393c3", alpha = 0.6) +
+  geom_area(data = \(d) filter(d, x > 4), aes(y = fx), fill = "#d73027", alpha = 0.6) +
+  geom_vline(xintercept = mu, linetype = "dashed", color = "grey50") +
+  annotate("text", x = 0.45, y = 0.08,
+           label = sprintf("P(X<1)\n= %.3f", p_lt1), size = 3.5, color = "#2166ac") +
+  annotate("text", x = 6,    y = 0.04,
+           label = sprintf("P(X>4)\n= %.3f", p_gt4), size = 3.5, color = "#b2182b") +
+  annotate("text", x = mu + 0.2, y = 0.42,
+           label = sprintf("μ = %g", mu), size = 3.5, color = "grey40") +
+  labs(title = expression(paste("Exp(", lambda, " = 0.5),  середнє = 2 год")),
+       x = "Час (год)", y = "f(x)") +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+## Задача 12: Неперервний розподіл (частка ринку)
+
+Антимонопольне агентство вивчає нішу ринку цифрових послуг. Нехай $X$ — частка ринку випадково вибраної фірми ($0 \leq X \leq 1$). Функція густини:
+
+$$f(x) = \begin{cases} 3x^2 & 0 \leq x \leq 1 \\ 0 & \text{інакше} \end{cases}$$
+
+1. Перевірити, що $f(x)$ — коректна функція густини. Знайти $F(x)$.
+2. Обчислити $\mathbb{E}(X)$ та $\mathrm{Var}(X)$.
+3. Знайти ймовірність того, що фірма займає **домінуюче становище** (частка ринку > 80%).
+
+### Математичне розв'язання
+
+**1) Перевірка та CDF:**
+
+*Невід'ємність:* $f(x) = 3x^2 \geq 0$ для всіх $x \in [0,1]$. ✓
+
+*Нормування:* використовуємо степеневе правило $\int x^n\,dx = \frac{x^{n+1}}{n+1} + C$:
+
+$$\int_{-\infty}^{+\infty} f(x)\,dx = \int_0^1 3x^2\,dx = 3 \cdot \left[\frac{x^3}{3}\right]_0^1 = \left[x^3\right]_0^1 = 1^3 - 0^3 = 1$$ ✓
+
+*Функція розподілу* $F(x) = P(X \leq x)$:
+
+При $0 \leq x \leq 1$ інтегруємо від 0 до $x$:
+
+$$F(x) = \int_0^x 3t^2\,dt = 3 \cdot \left[\frac{t^3}{3}\right]_0^x = \left[t^3\right]_0^x = x^3 - 0^3 = x^3$$
+
+Повна формула:
+
+$$F(x) = \begin{cases} 0 & x < 0 \\ x^3 & 0 \leq x \leq 1 \\ 1 & x > 1 \end{cases}$$
+
+**2) Математичне сподівання та дисперсія:**
+
+$$\mathbb{E}(X) = \int_0^1 x \cdot f(x)\,dx = \int_0^1 x \cdot 3x^2\,dx = \int_0^1 3x^3\,dx$$
+$$= 3 \cdot \left[\frac{x^4}{4}\right]_0^1 = 3 \cdot \frac{1^4 - 0^4}{4} = \frac{3}{4} = 0{,}75$$
+
+$$\mathbb{E}(X^2) = \int_0^1 x^2 \cdot f(x)\,dx = \int_0^1 x^2 \cdot 3x^2\,dx = \int_0^1 3x^4\,dx$$
+$$= 3 \cdot \left[\frac{x^5}{5}\right]_0^1 = 3 \cdot \frac{1^5 - 0^5}{5} = \frac{3}{5} = 0{,}6$$
+
+Приводимо дроби до спільного знаменника 80:
+
+$$\mathrm{Var}(X) = \mathbb{E}(X^2) - [\mathbb{E}(X)]^2 = \frac{3}{5} - \left(\frac{3}{4}\right)^2 = \frac{3}{5} - \frac{9}{16} = \frac{3 \cdot 16}{80} - \frac{9 \cdot 5}{80} = \frac{48 - 45}{80} = \frac{3}{80} \approx 0{,}0375$$
+
+**3) Домінуюче становище:**
+
+Використовуємо знайдену $F(x) = x^3$:
+
+$$P(X > 0{,}8) = 1 - F(0{,}8) = 1 - (0{,}8)^3 = 1 - 0{,}512 = 0{,}488$$
+
+### Розв'язання в R
+
+```{r}
+# Визначаємо функції аналітично
+f_x <- function(x) ifelse(x >= 0 & x <= 1, 3 * x^2, 0)
+F_x <- function(x) ifelse(x < 0, 0, ifelse(x > 1, 1, x^3))
+
+# 1) Перевірка нормування (числова інтеграція)
+norm_check <- integrate(f_x, lower = 0, upper = 1)$value
+cat(sprintf("1) Інтеграл f(x) від 0 до 1 = %.6f\n", norm_check))
+
+# 2) E(X) та Var(X)
+EX  <- integrate(function(x) x * f_x(x), 0, 1)$value
+EX2 <- integrate(function(x) x^2 * f_x(x), 0, 1)$value
+VarX <- EX2 - EX^2
+cat(sprintf("2) E(X) = %.4f = 3/4\n", EX))
+cat(sprintf("   Var(X) = %.4f = 3/80\n", VarX))
+
+# 3) P(X > 0.8)
+p_dominant <- 1 - F_x(0.8)
+cat(sprintf("3) P(X > 0.8) = %.4f\n", p_dominant))
+```
+
+**Візуалізація PDF, CDF та виділеної області:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4.5
+
+df_cont <- tibble(x = seq(-0.1, 1.1, by = 0.001)) |>
+  mutate(pdf = f_x(x), cdf = F_x(x))
+
+p1 <- df_cont |>
+  ggplot(aes(x, pdf)) +
+  geom_line(color = "grey40", linewidth = 1) +
+  geom_area(data = \(d) filter(d, x >= 0.8, x <= 1),
+            aes(y = pdf), fill = "#d73027", alpha = 0.6) +
+  geom_vline(xintercept = EX, linetype = "dashed", color = "#4393c3") +
+  annotate("text", x = EX + 0.03, y = 2.7,
+           label = sprintf("E(X) = %.2f", EX), size = 3.2, color = "#2166ac") +
+  annotate("text", x = 0.92, y = 0.5,
+           label = sprintf("%.3f", p_dominant), size = 3.5, color = "#b2182b") +
+  labs(title = "PDF: f(x) = 3x²", x = "x", y = "f(x)") +
+  coord_cartesian(xlim = c(0, 1.05)) +
+  theme_minimal(base_size = 11)
+
+p2 <- df_cont |>
+  ggplot(aes(x, cdf)) +
+  geom_line(color = "#d73027", linewidth = 1) +
+  geom_hline(yintercept = c(0, 1), linetype = "dotted", color = "grey60") +
+  geom_segment(aes(x = 0.8, xend = 0.8, y = 0,        yend = F_x(0.8)),
+               linetype = "dashed", color = "grey50") +
+  geom_segment(aes(x = -0.1, xend = 0.8, y = F_x(0.8), yend = F_x(0.8)),
+               linetype = "dashed", color = "grey50") +
+  annotate("point", x = 0.8, y = F_x(0.8), size = 2.5, color = "#d73027") +
+  annotate("text",  x = 0.6, y = F_x(0.8) + 0.07,
+           label = sprintf("F(0.8) = 0.8³ = %.3f", F_x(0.8)), size = 3.2) +
+  labs(title = "CDF: F(x) = x³", x = "x", y = "F(x)") +
+  coord_cartesian(xlim = c(0, 1.05)) +
+  theme_minimal(base_size = 11)
+
+p1 + p2
+```
+
+---
+
+## Задача 13: Біноміальний розподіл (бейсбол)
+
+Бейсболіст реалізує **80% вільних кидків**. У грі він виконує **10 кидків**.
+
+1. Яка ймовірність, що він реалізує **не більше 7** кидків?
+2. Яка ймовірність, що він реалізує **рівно 7** кидків?
+3. Знайдіть **математичне сподівання** та **дисперсію** числа реалізованих кидків.
+
+### Математичне розв'язання
+
+$X \sim \mathrm{Bin}(n = 10,\; p = 0{,}8)$, де $P(X = k) = \binom{10}{k} 0{,}8^k \cdot 0{,}2^{10-k}$.
+
+**1) $P(X \leq 7)$** — через доповнення:
+
+$$P(X \leq 7) = 1 - P(X = 8) - P(X = 9) - P(X = 10)$$
+
+Обчислимо кожен доданок:
+
+$$P(X = 8) = \binom{10}{8} \cdot 0{,}8^8 \cdot 0{,}2^2 = 45 \cdot 0{,}16777 \cdot 0{,}04 \approx 0{,}3020$$
+
+$$P(X = 9) = \binom{10}{9} \cdot 0{,}8^9 \cdot 0{,}2^1 = 10 \cdot 0{,}13422 \cdot 0{,}2 \approx 0{,}2684$$
+
+$$P(X = 10) = \binom{10}{10} \cdot 0{,}8^{10} \cdot 0{,}2^0 = 1 \cdot 0{,}10737 \approx 0{,}1074$$
+
+$$P(X \leq 7) = 1 - (0{,}3020 + 0{,}2684 + 0{,}1074) = 1 - 0{,}6778 \approx 0{,}3222$$
+
+**2) $P(X = 7)$:**
+
+$$P(X = 7) = \binom{10}{7} \cdot 0{,}8^7 \cdot 0{,}2^3 = 120 \cdot 0{,}20972 \cdot 0{,}008 = 120 \cdot 0{,}001678 \approx 0{,}2013$$
+
+**3) Математичне сподівання та дисперсія:**
+
+$$\mathbb{E}(X) = np = 10 \cdot 0{,}8 = 8$$
+$$\mathrm{Var}(X) = np(1-p) = 10 \cdot 0{,}8 \cdot 0{,}2 = 1{,}6$$
+
+### Розв'язання в R
+
+```{r}
+n <- 10; p <- 0.8
+
+# 1) P(X <= 7) — напряму та через доповнення
+p_le7 <- pbinom(7, size = n, prob = p)
+cat(sprintf("1) P(X ≤ 7) = %.4f\n", p_le7))
+
+# Перевірка через доповнення
+p_complement <- 1 - sum(dbinom(8:10, size = n, prob = p))
+cat(sprintf("   (через доповнення) = %.4f\n", p_complement))
+
+# 2) P(X = 7)
+p_eq7 <- dbinom(7, size = n, prob = p)
+cat(sprintf("2) P(X = 7)  = %.4f\n", p_eq7))
+
+# 3) E(X) та Var(X)
+cat(sprintf("3) E(X) = %.1f,  Var(X) = %.1f\n", n * p, n * p * (1 - p)))
+```
+
+**Розподіл із виділеними областями:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+tibble(x = 0:n) |>
+  mutate(
+    prob = dbinom(x, size = n, prob = p),
+    zone = case_when(
+      x == 7 ~ "рівно 7",
+      x < 7  ~ "< 7",
+      TRUE   ~ "> 7"
+    )
+  ) |>
+  ggplot(aes(x = factor(x), y = prob, fill = zone)) +
+  geom_col(width = 0.7) +
+  scale_fill_manual(values = c("рівно 7" = "#d73027", "< 7" = "#92c5de", "> 7" = "grey75")) +
+  geom_text(aes(label = round(prob, 3)), vjust = -0.4, size = 2.8) +
+  labs(title = expression(paste("Bin(", italic(n), " = 10, ", italic(p), " = 0.8)")),
+       x = "Кількість реалізованих кидків", y = "P(X = x)", fill = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top")
+```
+
+---
+
+## Задача 14: Розподіл Пуассона + Біноміальний (кремнієві пластини)
+
+Виробник електроніки випускає кремнієві пластини. Кількість дрібних дефектів на 1 м² матеріалу підпорядковується **розподілу Пуассона з $\lambda = 2$ дефекти/м²**. Пластина 1 м² вважається **«браком»**, якщо містить більше 3 дефектів; інакше — **«якісною»**.
+
+- Обчисліть ймовірність $p$ того, що одна пластина буде бракованою.
+- Партія складається з $n = 1000$ незалежних пластин; $Y$ — кількість якісних пластин. Знайдіть ймовірність:
+  - усі пластини якісні,
+  - хоча б 900 пластин якісні,
+  - не більше 100 пластин бракованих.
+
+### Математичне розв'язання
+
+**Крок 1. Імовірність браку** ($X \sim \mathrm{Pois}(\lambda = 2)$):
+
+$$p = P(X > 3) = 1 - P(X \leq 3) = 1 - \sum_{k=0}^{3} \frac{2^k e^{-2}}{k!}$$
+
+Розпишемо кожен доданок:
+
+$$P(X=0) = \frac{2^0 e^{-2}}{0!} = e^{-2} \approx 0{,}1353$$
+
+$$P(X=1) = \frac{2^1 e^{-2}}{1!} = 2e^{-2} \approx 0{,}2707$$
+
+$$P(X=2) = \frac{2^2 e^{-2}}{2!} = \frac{4e^{-2}}{2} = 2e^{-2} \approx 0{,}2707$$
+
+$$P(X=3) = \frac{2^3 e^{-2}}{3!} = \frac{8e^{-2}}{6} = \frac{4}{3}e^{-2} \approx 0{,}1804$$
+
+$$P(X \leq 3) = e^{-2}\left(1 + 2 + 2 + \frac{4}{3}\right) = e^{-2} \cdot \frac{19}{3} \approx 0{,}8571$$
+
+$$\boxed{p = 1 - 0{,}8571 = 0{,}1429}, \quad q = 1 - p \approx 0{,}8571$$
+
+**Крок 2. Кількість якісних пластин** $Y \sim \mathrm{Bin}(n = 1000,\; q = 0{,}8571)$:
+
+*Усі пластини якісні:*
+
+$$P(Y = 1000) = q^{1000} = e^{1000 \ln(0{,}8571)} \approx e^{-154{,}2} \approx 0$$
+
+*Хоча б 900 якісних* — нормальна апроксимація ($n$ велике):
+
+$$\mu = nq = 1000 \cdot 0{,}8571 = 857{,}1, \quad \sigma = \sqrt{npq} = \sqrt{1000 \cdot 0{,}8571 \cdot 0{,}1429} \approx 11{,}07$$
+
+$$P(Y \geq 900) \approx P\!\left(Z \geq \frac{900 - 857{,}1}{11{,}07}\right) = P(Z \geq 3{,}876) \approx 0{,}0001$$
+
+*Не більше 100 бракованих:*
+
+Кількість браку $= 1000 - Y$, тому
+
+$$P(1000 - Y \leq 100) = P(Y \geq 900) \approx 0{,}0001$$
+
+Це **та сама подія**, що й попередня.
+
+### Розв'язання в R
+
+```{r}
+p_scrap <- 1 - ppois(3, lambda = 2)
+p_good  <- 1 - p_scrap
+
+tibble(стан = c("брак", "якісна"), prob = c(p_scrap, p_good))
+```
+
+```{r}
+n_lot   <- 1000
+p_ge900 <- 1 - pbinom(899, size = n_lot, prob = p_good)
+
+tibble(
+  подія    = c("P(Y = 1000)", "P(Y ≥ 900)", "P(брак ≤ 100)"),
+  ймовірність = c(
+    dbinom(1000, size = n_lot, prob = p_good),
+    p_ge900,
+    p_ge900
+  )
+)
+```
+
+**Нормальна апроксимація та розподіл Y:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+mu_Y  <- n_lot * p_good
+sig_Y <- sqrt(n_lot * p_good * p_scrap)
+
+tibble(метод = c("Нормальна апроксимація", "Точний (Bin)"),
+       `P(Y ≥ 900)` = c(pnorm((900 - mu_Y) / sig_Y, lower.tail = FALSE), p_ge900))
+
+tibble(y = seq(floor(mu_Y - 5 * sig_Y), ceiling(mu_Y + 5 * sig_Y))) |>
+  mutate(
+    prob = dbinom(y, size = n_lot, prob = p_good),
+    zone = if_else(y >= 900, "Y ≥ 900", "Y < 900")
+  ) |>
+  ggplot(aes(x = y, y = prob, fill = zone)) +
+  geom_col(width = 1) +
+  scale_fill_manual(values = c("Y ≥ 900" = "#d73027", "Y < 900" = "#92c5de")) +
+  geom_vline(xintercept = mu_Y, linetype = "dashed", color = "grey30") +
+  annotate("text", x = mu_Y - 1, y = max(dbinom(round(mu_Y), n_lot, p_good)) * 0.95,
+           label = sprintf("μ = %.0f", mu_Y), hjust = 1, size = 3.5) +
+  labs(title = sprintf("Bin(n = 1000, p_good ≈ %.4f)", p_good),
+       x = "Кількість якісних пластин (Y)", y = "P(Y = y)", fill = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top")
+```

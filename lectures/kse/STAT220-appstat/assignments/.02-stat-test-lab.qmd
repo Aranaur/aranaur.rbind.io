@@ -1,0 +1,303 @@
+---
+title: "Lab 2"
+subtitle: "Confidence Intervals and A/A Validation for an A/B Experiment"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+execute:
+  echo: true
+  warning: false
+---
+
+# Objective
+
+In **Lab 1** you designed a one-sample A/B experiment for your own
+business case and walked through the basic test mechanics: hypotheses,
+critical region, $p$-value, power, and MDE.
+
+In **Lab 2** you take the **same business case** and go beyond a
+single accept/reject decision. The focus of this lab is the
+**confidence interval** --- the object that actually drives product
+decisions in practice, because it tells the stakeholder *how much* the
+metric could have moved, not just *whether* it moved.
+
+You will:
+
+1. Wrap your test logic into a reusable `my_binom_test()` function that
+   returns a full structured result (estimate, $p$-value, CI, decision).
+2. Build confidence intervals **by several methods**, compare them, and
+   verify that they actually deliver the promised coverage.
+3. Run an **A/A test** to confirm that your testing infrastructure is
+   correctly calibrated before any real launch.
+4. Combine all of the above into a single stakeholder recommendation.
+
+# General Requirements
+
+::: {.callout-important icon="false"}
+## Continuity with Lab 1
+
+- You must reuse the **same business case** from Lab 1 (same product,
+  same metric, same baseline $\mu_0$). Inventing a brand-new case is
+  not allowed.
+- If your Lab 1 case had methodological issues, fix them in
+  @sec-recap and explain what you changed.
+- Copying another student's case (whether from Lab 1 or Lab 2) is still
+  prohibited.
+:::
+
+::: {.callout-note icon="false"}
+## Report Format
+
+Submit the report in **one** of the following formats:
+
+- **Quarto → PDF** (`.qmd` → `.pdf`)
+- **Quarto → HTML** (`.qmd` → `.html`, hosted separately, e.g. on
+  [Quarto Pub](https://quartopub.com/), [Posit Connect Cloud](https://connect.posit.cloud/), etc.)
+- **Jupyter Notebook** (`.ipynb`)
+- **Google Colab** (share the link with viewing permissions)
+
+The report must contain both code **and** narrative text. Every section
+begins with a written explanation, not code.
+:::
+
+::: {.callout-warning icon="false"}
+## Restrictions on libraries
+
+You may use `numpy`, `pandas`, `matplotlib`, `scipy.stats.binom`, and
+`statsmodels.stats.proportion.proportion_confint`. You **may not** use
+`scipy.stats.binomtest`, `statsmodels.stats.proportion.binom_test`, or
+any other ready-made hypothesis-test function except as a verification
+step. The core machinery must be your own code.
+:::
+
+::: {.callout-warning icon="false"}
+## Deadline
+
+📅 **May 27, 2026, 23:59**
+:::
+
+# Tasks
+
+## Recap of the Lab 1 Case {#sec-recap}
+
+::: {.border}
+1. In one paragraph, restate the business problem, the success metric,
+   and the baseline $\mu_0$.
+2. State the hypotheses, the chosen significance level $\alpha$, and the
+   business MDE (with its monetary justification from Lab 1).
+3. Briefly summarise what you found in Lab 1: the planned sample size
+   $N$, the observed $q$, the $p$-value, and your decision.
+4. If you discovered a methodological issue in Lab 1 (wrong
+   alternative, misjudged MDE, etc.), state the fix here and use the
+   corrected numbers throughout Lab 2.
+:::
+
+## A Reusable `my_binom_test()` Function {#sec-mybinom}
+
+::: {.border}
+1. Implement a function `my_binom_test(q, n, mu0, alternative, alpha, conf_int)`
+   with the following contract:
+   - Supports `alternative` $\in$ `{"greater", "less", "two-sided"}`.
+     For the two-sided case use $p = 2 \cdot \min(p_{\text{left}}, p_{\text{right}})$.
+   - When `conf_int=True`, also returns a confidence interval built by
+     **inverting the test** (the same algorithm shown in the lecture
+     and Practice 2).
+   - Returns a **dict** with at least: `estimate`, `p_value`, `reject`,
+     `ci_low`, `ci_high`.
+2. Apply the function to your Lab 1 observation $q$. Print the full
+   result for the alternative your business actually cares about.
+3. **Verify your implementation** against `scipy.stats.binomtest` (this
+   is the only legitimate use of the built-in function). Show that
+   $p$-values match to at least 4 decimal places. If the CI differs
+   slightly from `binomtest.proportion_ci`, explain why (which
+   construction does each one use?).
+:::
+
+## Confidence Intervals: Construction {#sec-ci-build}
+
+::: {.border}
+1. For your observed $q$ and $n$, compute a $95\%$ confidence interval
+   using **four** different constructions:
+   - **Inversion** (your own `my_binom_test`, two-sided).
+   - **Clopper–Pearson** (exact) via
+     `proportion_confint(method="beta")`.
+   - **Wilson** via `proportion_confint(method="wilson")`.
+   - **Normal (Wald) approximation** via
+     `proportion_confint(method="normal")`.
+2. Put all four intervals into a small table with columns
+   `method | lower | upper | width`.
+3. Comment on the differences. In particular:
+   - Which intervals are guaranteed to lie inside $[0, 1]$, and which
+     can produce nonsense bounds for small $n$ or extreme $\hat{\mu}$?
+   - Why is the Wald interval almost always the **narrowest**, and
+     why is that not a good reason to prefer it?
+   - Which two methods coincide for moderate $n$ and $\hat{\mu}$ near
+     $0.5$?
+4. **One-sided lower bound.** Using your `my_binom_test` with
+   `alternative` set to the side your business cares about, compute the
+   one-sided $95\%$ bound. Verify the lecture equivalence: the
+   one-sided lower bound at level $1 - \alpha$ equals the lower edge of
+   the **two-sided** interval at level $1 - 2\alpha$. Show both numbers
+   side by side.
+:::
+
+## Confidence Intervals: Properties and Interpretation {#sec-ci-props}
+
+::: {.border}
+1. **Coverage simulation.** Pick a "true" value `latent_mu` for your
+   metric (you may use the value from Lab 1) and your sample size $N$.
+   Run $\geq 5\,000$ independent simulated experiments under this
+   `latent_mu`. For each one, build a $95\%$ confidence interval using
+   *either* your inversion-based interval *or* Wilson. Report the
+   empirical **coverage probability** (the fraction of intervals that
+   contain `latent_mu`). It should be $\geq 0.95$. Why is the actual
+   coverage usually slightly **above** $0.95$ for the binomial?
+2. **CI width vs. sample size.** Holding $\hat{\mu} = q/n$ constant at
+   your Lab 1 value, plot the **Wilson CI width** as a function of $N$
+   for $N$ from a small value up to $\geq 5N_{\text{plan}}$. On the
+   plot, mark:
+   - The Lab 1 planned $N$.
+   - The $N$ at which the CI shrinks to a width your business
+     considers "tight enough" --- and explain that threshold in
+     monetary terms (one paragraph).
+3. **Decision rule from a CI.** Suppose your business agreed on a
+   threshold $\mu^{*}$ above which the new variant gets shipped (e.g.
+   $\mu^{*} = \mu_0 + \text{business MDE}$). Translate the following
+   three outcomes into ship/iterate/extend decisions, and justify each:
+   - Lower CI bound is $\geq \mu^{*}$.
+   - CI contains both $\mu_0$ and $\mu^{*}$.
+   - Lower CI bound is between $\mu_0$ and $\mu^{*}$.
+4. **Common pitfalls.** In one short paragraph, state in plain English:
+   - What the $95\%$ confidence level **does** mean.
+   - What it **does not** mean (the "probability of the parameter"
+     trap). Why is this distinction more than pedantic --- give a
+     scenario in which the wrong interpretation would lead to a wrong
+     decision.
+:::
+
+## BONUS: A/A Test: Validating Your Infrastructure {#sec-aa}
+
+Before any real A/B test goes to production, the standard sanity check
+is an **A/A test**: split users into two groups that get the *same*
+experience and confirm that the test rejects $H_0$ no more often than
+$\alpha$. If it does, the testing platform itself is broken (bad
+randomisation, leaked events, sample-ratio mismatch, ...) and any
+subsequent A/B result is meaningless.
+
+::: {.border}
+1. Run **$\geq 5\,000$** simulated A/A experiments under $H_0$ with
+   your sample size $N$ and your baseline $\mu_0$. For each one,
+   compute the $p$-value using your `my_binom_test`.
+2. Plot the **histogram of $p$-values**. Comment on its shape:
+   - Why is it expected to be approximately uniform on $[0, 1]$?
+   - Why does the binomial give a slightly "stepped" pattern, and what
+     would a *broken* infrastructure histogram look like (sketch the
+     shape verbally)?
+3. Report the **empirical FPR** (fraction of $p \leq \alpha$). Compute
+   a $95\%$ Wilson CI around this empirical FPR. Is the nominal
+   $\alpha$ inside it? Use this to argue, with simulation evidence,
+   that your test is correctly calibrated.
+4. **Two product-specific failure modes.** Describe two realistic ways
+   a real A/A test could fail *for your particular product* (not
+   generic "data is wrong"). Examples of the right level of
+   specificity: "the same household IP appears in both groups", "the
+   tutorial event is logged once for re-installers and counted twice",
+   "weekend traffic is exclusively routed to group A". For each
+   failure mode, predict what the $p$-value histogram would look like.
+:::
+
+## Final Recommendation {#sec-final}
+
+::: {.border}
+Putting all of the above together, write a **single-page
+recommendation memo** (≤ 400 words) addressed to a non-technical
+stakeholder. It must contain:
+
+1. The observed point estimate, the chosen $95\%$ confidence interval
+   (state which construction and why), and the one-sided lower bound.
+2. The decision (ship / iterate / extend the test) and the **reason**
+   behind it, framed in terms of the CI and the business threshold
+   $\mu^{*}$ --- not just the $p$-value.
+3. One honest caveat: did the A/A check pass cleanly, or are there
+   open questions about the infrastructure?
+
+The memo must be readable by someone who has never heard the word
+"p-value". You will be graded on whether a real product manager could
+act on it.
+:::
+
+# Grading {.unnumbered}
+
+| Criterion | Points |
+|---|:---:|
+| Correctness of methodology | 3 |
+| Interpretation of results | 3 |
+| Code quality and organization | 2 |
+| **Total** | **8** |
+
+::: {.callout-tip icon="false"}
+## Grading Details
+
+**Correctness of methodology (3 pts):**
+
+- `my_binom_test` implements all three alternatives correctly and
+  matches `scipy.stats.binomtest` on the $p$-value (1 pt).
+- All four CI constructions are computed correctly, and the one-sided
+  / two-sided equivalence (level $1-\alpha$ vs. $1-2\alpha$) is
+  verified numerically (1 pt).
+- The coverage simulation is set up correctly (independent samples,
+  correct $\geq 0.95$ result, conservative-coverage explanation) (1 pt).
+- A/A simulation produces an empirical FPR that is statistically
+  indistinguishable from $\alpha$, with a Wilson CI to back it up (1 pt).
+
+**Interpretation of results (3 pts):**
+
+- The four-method CI comparison shows real understanding (not a copy
+  of textbook descriptions) --- you explain why Wald is dangerous and
+  why Clopper–Pearson is conservative.
+- The decision rule based on $\mu^{*}$ is concrete and tied to the
+  business case.
+- The "what a CI does *not* mean" paragraph contains a real scenario,
+  not just a slogan.
+- A/A failure modes are realistic and product-specific.
+
+**Code quality and organization (2 pts):**
+
+- `my_binom_test` is a single reusable function used across all
+  subsequent sections (not re-implemented inline).
+- Plots have axis labels, titles, and legible legends.
+- Narrative text precedes every code block.
+:::
+
+# Defense {.unnumbered}
+
+During the defense (5–7 minutes) you will be asked *"What if?"*
+questions that probe whether you understand **why** each construction
+exists, for example:
+
+- *"Your Wilson CI is narrower than your inversion-based CI. Which one
+  should you put in the dashboard, and why?"*
+- *"The PM says: 'I see a 95% CI of [0.61, 0.69]. Doesn't that mean
+  there is a 95% chance the true rate is in that range?' What is your
+  one-sentence answer?"*
+- *"Your coverage simulation gave 0.962 instead of 0.95. Is that a bug,
+  or expected? How would you tell the difference?"*
+- *"Your A/A test gave an empirical FPR of 0.07 instead of 0.05. Is
+  the difference statistically meaningful, or is it just simulation
+  noise? Show me the calculation."*
+- *"Switch your test from one-sided to two-sided in your code right
+  now. By how much does the lower CI bound move, and does that change
+  your recommendation?"*
+- *"Set $N$ to half of your Lab 1 plan and re-run the CI. What does
+  the new width tell you about whether the test is actually
+  decisive?"*
+
+You may also be asked to **change one parameter live** in your code
+and explain the resulting shift.

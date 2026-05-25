@@ -1,0 +1,669 @@
+---
+title: "Практика 2"
+subtitle: "Будуємо власну `binom.test` для A/B-експерименту"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: ua
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import binom
+
+np.random.seed(73)
+
+turquoise = "#20B2AA"
+red       = "#fb6107"
+blue      = "#181485"
+gray      = "#A0A0A0"
+```
+
+# Що ми робимо сьогодні {.unnumbered}
+
+На лекції ми по черзі побудували окремі цеглинки: критичну область, $p$-value,
+потужність, MDE та довірчий інтервал. Сьогодні ми **збираємо їх в один
+інструмент** --- власну функцію `my_binom_test()`, схожу за духом на
+`binom.test()` в R або `scipy.stats.binomtest`. У кожній версії додаємо
+одну нову можливість і відразу перевіряємо її на наскрізному бізнес-кейсі.
+
+::: {.callout-note icon="false"}
+## Правила гри
+- Не використовуємо готовий `scipy.stats.binomtest` --- пишемо все самі через
+  `binom.pmf`, `binom.cdf`, `binom.ppf`.
+- Кожна версія функції --- це маленьке розширення попередньої.
+- Після кожної версії --- блок **«Ваша черга»** з мінізадачею. Спробуйте
+  спочатку передбачити результат, лише потім запустіть код.
+:::
+
+---
+
+# Кейс: онбординг мобільної гри
+
+Працюємо над грою **PixelQuest**. Продуктова команда переробила
+туторіал: він став коротший і має невелику внутрішньоігрову винагороду
+наприкінці. Перш ніж розкочувати його на всіх нових гравців, потрібно
+переконатись, що він **дійсно піднімає завершення**.
+
+::: {.border}
+- **Одиниця спостереження:** новий гравець після першого запуску.
+- **Метрика успіху:** гравець завершив туторіал (1) або ні (0).
+- **Модель:** $Q \sim \text{Binomial}(N, \mu)$ --- сума $N$ Бернуллі.
+- **Базовий рівень:** $\mu_0 = 0{,}60$ (історичні дані за 3 місяці).
+- **Бізнес-MDE:** ефект < +3 в.п. не вартий ресурсів на впровадження.
+- **Напрям:** нас цікавить лише $\mu > \mu_0$ → **однобічний тест**.
+- **Рівень значущості:** $\alpha = 0{,}05$.
+:::
+
+---
+
+# Версія 1 --- лише $p$-value
+
+Найпростіша версія: дано $n$, $\mu_0$ та спостережене $q$, повернути
+однобічний $p$-value для $H_1: \mu > \mu_0$.
+
+$$
+p\text{-value} = P(Q \geq q \mid \mu_0) = 1 - F_{\text{Binom}(n, \mu_0)}(q-1)
+$$
+
+```{python}
+#| label: v1
+
+def my_binom_test(q, n, mu0=0.5):
+    """
+    Версія 1. Однобічний біноміальний тест H1: mu > mu0.
+
+    Параметри
+    ---------
+    q   : кількість успіхів у вибірці
+    n   : розмір вибірки
+    mu0 : ймовірність успіху при H0
+
+    Повертає
+    --------
+    p-value (число у [0, 1])
+    """
+    return 1 - binom.cdf(q - 1, n, mu0)
+```
+
+Перевіримо її на нашому кейсі. Уявімо, що в експерименті взяли участь
+**100 гравців**, і **66 з них** завершили туторіал.
+
+```{python}
+#| label: v1-demo
+
+p_val = my_binom_test(q=66, n=100, mu0=0.60)
+print(f"p-value = {p_val:.4f}")
+```
+
+$p > 0{,}05$ --- доказів недостатньо. Це не означає, що нового ефекту
+немає; це означає, що **на 100 гравцях ми не побачили б його надійно
+навіть якби він був**. До цього питання повернемось у блоці про потужність.
+
+::: {.callout-tip icon="false"}
+## Ваша черга 1
+Викличте `my_binom_test` для $q \in \{60, 65, 70, 75\}$ при $n=100$, $\mu_0=0{,}60$.
+Як змінюється $p$-value? Знайдіть мінімальне $q$, при якому $p \leq 0{,}05$.
+:::
+
+---
+
+# Версія 2 --- три типи альтернативи
+
+Бізнес-команда інколи хоче перевірити «чи змінилося хоч якось» (двобічний
+тест), а команда антифроду --- «чи не *впала* конверсія» (one-sided less).
+Додамо параметр `alternative`.
+
+::: {.callout-note icon="false"}
+## Як рахувати двобічний $p$-value для біноміальної
+Біноміальний розподіл при $\mu_0 \neq 0{,}5$ **несиметричний**, тому
+просте «помножити на 2» не завжди коректне. Стандартне рішення (його ж
+використовує R-функція `binom.test`):
+
+$$
+p_{\text{two-sided}} = 2 \cdot \min(p_{\text{left}},\ p_{\text{right}})
+$$
+
+де $p_{\text{left}} = P(Q \leq q)$, а $p_{\text{right}} = P(Q \geq q)$. Це
+консервативно (не може перевищити 1) і працює для будь-якого $\mu_0$.
+:::
+
+```{python}
+#| label: v2
+
+def my_binom_test(q, n, mu0=0.5, alternative="greater"):
+    """
+    Версія 2. Додаємо параметр alternative.
+
+    alternative : {"greater", "less", "two-sided"}
+        "greater"   → H1: mu > mu0
+        "less"      → H1: mu < mu0
+        "two-sided" → H1: mu != mu0
+    """
+    p_right = 1 - binom.cdf(q - 1, n, mu0)   # P(Q >= q)
+    p_left  = binom.cdf(q, n, mu0)           # P(Q <= q)
+
+    if alternative == "greater":
+        return p_right
+    if alternative == "less":
+        return p_left
+    if alternative == "two-sided":
+        return min(1.0, 2 * min(p_left, p_right))
+
+    raise ValueError(f"Невідома альтернатива: {alternative!r}")
+```
+
+```{python}
+#| label: v2-demo
+
+for alt in ("greater", "less", "two-sided"):
+    p = my_binom_test(q=66, n=100, mu0=0.60, alternative=alt)
+    print(f"alternative={alt:>10s}  →  p-value = {p:.4f}")
+```
+
+Зверніть увагу: за тих самих даних **однобічний $p$-value вдвічі менший**
+за двобічний. Саме тому в продуктових A/B зазвичай використовують
+однобічний --- ми «не платимо» за хвіст, який нас не цікавить.
+
+::: {.callout-warning icon="false"}
+## Коли two-sided обов'язковий
+Якщо у продукта є реальний ризик нашкодити (наприклад, переробка
+пейволу --- може як підняти, так і обвалити конверсію), а ми готові
+відкотити зміну в обидва боки --- беремо two-sided. У туторіалі цей
+ризик відсутній: гірший туторіал ми просто не викочуємо.
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 2
+Для $q=66$, $n=100$, $\mu_0=0{,}60$ перевірте, що
+`p_two_sided ≈ 2 * p_greater`. Чому в загальному випадку рівність
+**не точна**?
+:::
+
+---
+
+# Версія 3 --- довірчий інтервал через інверсію тесту
+
+Тепер додаємо те, чого справді бракує бізнесу --- **довірчий інтервал**
+для $\mu$. Будуємо його так само, як на лекції: перебираємо сітку
+$\mu_0$ і збираємо ті значення, які тест **не відхиляє**.
+
+```{python}
+#| label: v3
+
+def my_binom_test(q, n, mu0=0.5, alternative="greater",
+                  alpha=0.05, conf_int=False, grid_step=0.001):
+    """
+    Версія 3. Додаємо conf_int=True → також повертаємо ДІ для mu.
+
+    Якщо conf_int=False → повертає лише p-value (як раніше).
+    Якщо conf_int=True  → повертає dict із p_value, ci_low, ci_high.
+    """
+    p_right = 1 - binom.cdf(q - 1, n, mu0)
+    p_left  = binom.cdf(q, n, mu0)
+
+    if alternative == "greater":
+        p_value = p_right
+    elif alternative == "less":
+        p_value = p_left
+    elif alternative == "two-sided":
+        p_value = min(1.0, 2 * min(p_left, p_right))
+    else:
+        raise ValueError(f"Невідома альтернатива: {alternative!r}")
+
+    if not conf_int:
+        return p_value
+
+    # Інверсія тесту: збираємо всі mu, які НЕ відхиляються
+    mu_grid  = np.arange(0, 1 + 1e-9, grid_step)
+    accepted = []
+
+    for mu in mu_grid:
+        pr = 1 - binom.cdf(q - 1, n, mu)
+        pl = binom.cdf(q, n, mu)
+
+        if alternative == "greater":
+            p_at_mu = pr
+        elif alternative == "less":
+            p_at_mu = pl
+        else:
+            p_at_mu = min(1.0, 2 * min(pl, pr))
+
+        if p_at_mu > alpha:
+            accepted.append(mu)
+
+    ci_low  = min(accepted) if accepted else None
+    ci_high = max(accepted) if accepted else None
+
+    return {"p_value": p_value, "ci_low": ci_low, "ci_high": ci_high}
+```
+
+Запустимо для нашого експерименту з 100 гравцями:
+
+```{python}
+#| label: v3-demo
+
+result = my_binom_test(q=66, n=100, mu0=0.60,
+                       alternative="two-sided",
+                       alpha=0.05, conf_int=True)
+
+print(f"p-value:        {result['p_value']:.4f}")
+print(f"95% CI for mu:  [{result['ci_low']:.3f}, {result['ci_high']:.3f}]")
+```
+
+::: {.callout-important icon="false"}
+## Інтерпретація для PM
+- **Точкова оцінка:** $\hat{\mu} = 66/100 = 0{,}66$.
+- **ДІ:** з ймовірністю $\geq 95\%$ повторні експерименти давали б
+  інтервали, що накривають справжнє $\mu$.
+- **$\mu_0 = 0{,}60$ всередині ДІ** → дані сумісні з гіпотезою «нічого
+  не змінилось». Вмикати фічу ще зарано.
+:::
+
+Тепер однобічний нижній бім (його зазвичай показують у дашбордах):
+
+```{python}
+#| label: v3-one-sided-ci
+
+res_g = my_binom_test(q=66, n=100, mu0=0.60,
+                      alternative="greater",
+                      alpha=0.05, conf_int=True)
+
+print(f"95% lower bound for mu (one-sided): {res_g['ci_low']:.3f}")
+print(f"Upper bound:                        {res_g['ci_high']:.3f}  ← завжди 1, не інформативно")
+```
+
+::: {.callout-tip icon="false"}
+## Ваша черга 3
+Заміняйте $q$: 60, 66, 72, 78 (n=100, mu0=0.60, two-sided, α=0.05).
+Зробіть таблицю «$q$ | $\hat{\mu}$ | ДІ | відхиляємо?». Який мінімальний
+$q$ потрібен, щоб 0.60 опинилось **поза** ДІ?
+:::
+
+---
+
+# Версія 4 --- окрема функція потужності
+
+Потужність --- це **інше питання**, не результат експерименту. Тому
+зробимо для неї окрему функцію `my_binom_power()`, яку наш тест зможе
+використовувати.
+
+$$
+\text{Power}(N, \mu_0, \mu_{alt}, \alpha) = P(\text{reject } H_0 \mid \mu = \mu_{alt})
+$$
+
+```{python}
+#| label: v4-power
+
+def my_binom_power(n, mu0, mu_alt, alpha=0.05, alternative="greater"):
+    """
+    Потужність однобічного або двобічного біноміального тесту.
+
+    Рахуємо «з другого боку»: припускаємо, що справжнє mu = mu_alt,
+    і питаємо --- з якою ймовірністю наш тест відхилить H0.
+    """
+    if alternative == "greater":
+        c = int(binom.ppf(1 - alpha, n, mu0)) + 1     # відхиляємо при Q >= c
+        return 1 - binom.cdf(c - 1, n, mu_alt)
+
+    if alternative == "less":
+        c = int(binom.ppf(alpha, n, mu0)) - 1         # відхиляємо при Q <= c
+        return binom.cdf(c, n, mu_alt)
+
+    if alternative == "two-sided":
+        c_low  = int(binom.ppf(alpha / 2,     n, mu0)) - 1
+        c_high = int(binom.ppf(1 - alpha / 2, n, mu0)) + 1
+        return binom.cdf(c_low, n, mu_alt) + (1 - binom.cdf(c_high - 1, n, mu_alt))
+
+    raise ValueError(f"Невідома альтернатива: {alternative!r}")
+```
+
+Перевіримо для нашого кейсу:
+
+```{python}
+#| label: v4-power-demo
+
+for n in (100, 500, 1000, 2000):
+    pw = my_binom_power(n=n, mu0=0.60, mu_alt=0.63, alpha=0.05, alternative="greater")
+    print(f"N = {n:>4d}  →  power = {pw:.3f}")
+```
+
+При $N=100$ потужність ~$0{,}2$: навіть якщо новий туторіал справді кращий
+на +3 в.п., ми побачимо це лише в 1 експерименті з 5. Це **не статистика
+винна** --- вибірка просто замала.
+
+```{python}
+#| label: v4-power-plot
+#| code-fold: true
+#| fig-align: center
+
+n_grid = np.arange(50, 3001, 25)
+power  = np.array([my_binom_power(n, 0.60, 0.63, 0.05, "greater") for n in n_grid])
+min_n  = n_grid[power >= 0.8].min()
+
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.plot(n_grid, power, color=turquoise, linewidth=2)
+ax.axhline(0.8,   linestyle="--", color="red",  label="цільова потужність = 0.8")
+ax.axvline(min_n, linestyle="--", color=blue,  label=f"мін. N = {min_n}")
+ax.set_xlabel("Розмір вибірки N")
+ax.set_ylabel("Потужність")
+ax.set_title("Потужність vs N для mu_0=0.60, mu_alt=0.63 (lift = +3 в.п.)")
+ax.legend()
+plt.show()
+```
+
+::: {.callout-tip icon="false"}
+## Ваша черга 4
+Побудуйте ту саму криву для $\mu_{alt}=0{,}65$ (lift +5 в.п.) і
+$\mu_{alt}=0{,}62$ (+2 в.п.). Прокоментуйте, як обраний MDE впливає на
+необхідне $N$.
+:::
+
+---
+
+# Версія 5 --- MDE і необхідний розмір вибірки
+
+Дві дзеркальні задачі планування. Робимо одну функцію з двома режимами.
+
+```{python}
+#| label: v5
+
+def plan_experiment(mu0, alpha=0.05, target_power=0.8,
+                    alternative="greater",
+                    n=None, mde=None,
+                    n_max=50000, n_step=10):
+    """
+    Допомагач для планування.
+
+    Передайте РІВНО ОДИН з:
+        n   → повертає MDE при цьому n (мін. ефект із target_power)
+        mde → повертає мінімальний n для виявлення ефекту mde
+
+    Параметри:
+        mu0           : базовий рівень метрики
+        alpha         : рівень значущості
+        target_power  : цільова потужність (за замовч. 0.8)
+        alternative   : "greater" / "less" / "two-sided"
+        mde           : ефект у долях (наприклад 0.03 = +3 в.п.)
+    """
+    if (n is None) == (mde is None):
+        raise ValueError("Передайте рівно одне: n або mde")
+
+    if n is not None:
+        # Шукаємо MDE на сітці delta
+        delta_grid = np.linspace(0, 1 - mu0 - 1e-9, 1000)
+        powers = np.array([
+            my_binom_power(n, mu0, mu0 + d, alpha, alternative)
+            for d in delta_grid
+        ])
+        fit = delta_grid[powers >= target_power]
+        return float(fit[0]) if len(fit) else None
+
+    # Шукаємо мінімальне n
+    mu_alt = mu0 + mde if alternative == "greater" else mu0 - mde
+    for n_try in range(10, n_max + 1, n_step):
+        if my_binom_power(n_try, mu0, mu_alt, alpha, alternative) >= target_power:
+            return n_try
+    return None
+```
+
+Сценарій А: маркетинг каже, що зможе залучити **500 нових гравців**. Який
+ефект ми зможемо виявити?
+
+```{python}
+#| label: v5-mde
+
+mde_500 = plan_experiment(mu0=0.60, n=500, alternative="greater")
+print(f"MDE при N=500: +{mde_500*100:.2f} в.п. (тобто mu_alt ≥ {0.60+mde_500:.3f})")
+```
+
+Сценарій Б: продакт-менеджер каже, що ефект менш ніж +3 в.п. не вартий
+впровадження. Скільки гравців потрібно?
+
+```{python}
+#| label: v5-n
+
+n_needed = plan_experiment(mu0=0.60, mde=0.03, alternative="greater")
+print(f"Потрібно гравців для виявлення +3 в.п.: {n_needed}")
+```
+
+::: {.callout-important icon="false"}
+## Ключовий компроміс
+- Halving the MDE ⇒ необхідне $N$ зростає приблизно **в 4 рази**.
+- Хочете виявляти +1 в.п. на baseline 0.60? Доведеться запускати тест на
+  десятках тисяч гравців. У продукті це означає або кілька місяців
+  чекання, або відмову від такого «малого» ефекту як бізнес-цілі.
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 5
+Заповніть таблицю «MDE → N» для MDE = 1, 2, 3, 5, 10 в.п. Намалюйте
+графік log(N) від log(MDE). Чи бачите ви степеневу залежність?
+:::
+
+---
+
+# Версія 6 --- фінальна `my_binom_test`
+
+Збираємо все в один зрозумілий результат, схожий на R-овий
+`binom.test()`. Додамо також точкову оцінку та читабельне резюме.
+
+```{python}
+#| label: v6
+
+def my_binom_test(q, n, mu0=0.5,
+                  alternative="greater",
+                  alpha=0.05,
+                  conf_int=True,
+                  mu_alt=None,
+                  grid_step=0.001):
+    """
+    Фінальна версія: робить повноцінний one-sample біноміальний тест.
+
+    Повертає словник:
+        - estimate        : q/n
+        - p_value         : p-value тесту
+        - reject          : True/False (p_value <= alpha)
+        - ci              : (ci_low, ci_high) для рівня 1 - alpha
+        - power_at_alt    : потужність для mu_alt (якщо передано)
+        - mde_at_n        : MDE при цьому n
+        - summary         : текстовий рядок з висновком
+    """
+    # p-value (логіка з версії 2)
+    p_right = 1 - binom.cdf(q - 1, n, mu0)
+    p_left  = binom.cdf(q, n, mu0)
+
+    if alternative == "greater":
+        p_value = p_right
+    elif alternative == "less":
+        p_value = p_left
+    elif alternative == "two-sided":
+        p_value = min(1.0, 2 * min(p_left, p_right))
+    else:
+        raise ValueError(f"Невідома альтернатива: {alternative!r}")
+
+    # ДІ через інверсію (логіка з версії 3)
+    ci = (None, None)
+    if conf_int:
+        mu_grid  = np.arange(0, 1 + 1e-9, grid_step)
+        accepted = []
+        for mu in mu_grid:
+            pr = 1 - binom.cdf(q - 1, n, mu)
+            pl = binom.cdf(q, n, mu)
+            if alternative == "greater":
+                pv = pr
+            elif alternative == "less":
+                pv = pl
+            else:
+                pv = min(1.0, 2 * min(pl, pr))
+            if pv > alpha:
+                accepted.append(mu)
+        if accepted:
+            ci = (min(accepted), max(accepted))
+
+    # Потужність і MDE (з версій 4-5)
+    power_at_alt = None
+    if mu_alt is not None:
+        power_at_alt = my_binom_power(n, mu0, mu_alt, alpha, alternative)
+
+    mde_at_n = plan_experiment(mu0=mu0, n=n, alpha=alpha,
+                               target_power=0.8, alternative=alternative)
+
+    # Резюме
+    decision = "ВІДХИЛЯЄМО H0" if p_value <= alpha else "не відхиляємо H0"
+    summary = (
+        f"n={n}, q={q}, mu_hat={q/n:.3f}\n"
+        f"H0: mu = {mu0}  vs  H1: mu {'>' if alternative=='greater' else ('<' if alternative=='less' else '!=')} {mu0}\n"
+        f"p-value = {p_value:.4f} (alpha = {alpha}) → {decision}\n"
+        f"{int((1-alpha)*100)}% CI for mu: [{ci[0]:.3f}, {ci[1]:.3f}]\n"
+        f"MDE при n={n}, power=0.8: +{mde_at_n*100:.2f} в.п."
+    )
+    if power_at_alt is not None:
+        summary += f"\nPower при mu_alt={mu_alt}: {power_at_alt:.3f}"
+
+    return {
+        "estimate":     q / n,
+        "p_value":      p_value,
+        "reject":       p_value <= alpha,
+        "ci":           ci,
+        "power_at_alt": power_at_alt,
+        "mde_at_n":     mde_at_n,
+        "summary":      summary,
+    }
+```
+
+---
+
+# Запускаємо повний цикл експерименту
+
+Тепер пройдемось «як на роботі»: спершу планування, потім симуляція
+запуску, потім звіт.
+
+## Крок 1. Планування
+
+```{python}
+#| label: run-plan
+
+mu0          = 0.60
+business_mde = 0.03         # +3 в.п. -- мінімальний цікавий ефект
+alpha        = 0.05
+target_power = 0.8
+
+N = plan_experiment(mu0=mu0, mde=business_mde,
+                    alpha=alpha, target_power=target_power,
+                    alternative="greater")
+
+print(f"План: запускаємо тест на N = {N} гравцях")
+print(f"      (мін. виявимий ефект = +{business_mde*100:.0f} в.п., power = {target_power})")
+```
+
+## Крок 2. Симульований запуск
+
+Симулюємо реальність, у якій новий туторіал **дійсно покращує**
+завершення до $0{,}635$ (значення, якого аналітик заздалегідь не знає).
+
+```{python}
+#| label: run-sim
+
+np.random.seed(2026)
+
+latent_mu = 0.635
+sample    = binom.rvs(1, latent_mu, size=N)
+q         = int(sample.sum())
+
+print(f"Спостережено: q = {q} завершень із {N} (mu_hat = {q/N:.3f})")
+```
+
+## Крок 3. Аналіз
+
+```{python}
+#| label: run-test
+
+result = my_binom_test(
+    q=q, n=N, mu0=mu0,
+    alternative="greater",
+    alpha=alpha,
+    conf_int=True,
+    mu_alt=mu0 + business_mde,
+)
+
+print(result["summary"])
+```
+
+## Крок 4. Звіт для стейкхолдера
+
+::: {.border}
+**Підсумок A/B-тесту нового туторіалу**
+
+- Спостережена конверсія: **`{python} round(result['estimate']*100, 1)`%**
+  (baseline 60.0%).
+- Однобічний 95% нижній бім: **`{python} round(result['ci'][0]*100, 1)`%**.
+- Тест за $\alpha=0{,}05$: **`{python} 'відхиляємо H0 - є докази покращення' if result['reject'] else 'не відхиляємо H0 - доказів недостатньо'`**
+  ($p = $ `{python} round(result['p_value'], 4)`).
+- Очікувана потужність плану на ефект +3 в.п.:
+  `{python} round(result['power_at_alt'], 3)`.
+
+**Рекомендація:** якщо нижня межа ДІ перевищує бізнес-поріг 63% --- викочуємо.
+Інакше --- ітеруємо дизайн або продовжуємо збирати дані.
+:::
+
+---
+
+# Підводні камені інтерпретації
+
+::: {.callout-warning icon="false"}
+## Три фрази, які менеджер не повинен почути
+
+❌ «$p = 0{,}03$, отже з ймовірністю 97% наш туторіал кращий».
+   Плутає $p$-value з $P(H_1 \mid \text{дані})$.
+
+❌ «Тест не показав значущого ефекту, отже туторіал не працює».
+   Відсутність доказів ≠ доказ відсутності. Треба питати **MDE**: чи тест
+   взагалі мав шанс знайти ефект?
+
+❌ «Давайте зупинимось --- ми вже бачимо $p < 0{,}05$ на 200 гравцях».
+   Це класичний *peeking* з лекції: він роздуває FPR.
+:::
+
+::: {.callout-important icon="false"}
+## Що ДІ **не означає**
+
+❌ «З ймовірністю 95% справжнє $\mu$ всередині цього інтервалу».
+
+✅ «Якщо повторити експеримент багато разів, у 95% випадків
+побудовані інтервали накриватимуть справжнє $\mu$».
+
+Випадковий тут інтервал, а не параметр.
+:::
+
+---
+
+# Самоперевірка перед запуском {.unnumbered}
+
+- [ ] Чи зрозуміло, **яке бізнес-рішення** прийматимемо за результатом тесту?
+- [ ] Чи відомий $\mu_0$ і **звідки** він узявся (дашборд, історія, бенчмарк)?
+- [ ] Однобічний чи двобічний тест --- і **чому**?
+- [ ] Який **бізнес-MDE** (мінімально цікавий ефект)?
+- [ ] Чи розрахований **N** під цей MDE і потужність $\geq 0{,}8$?
+- [ ] Як звітуватимемо: $p$-value, ДІ, чи разом?
+- [ ] Що робимо, якщо тест **inconclusive** (не відхиляємо, але й не достатньо потужний)?
+
+Якщо хоч на одне «ні» --- тест запускати **рано**.
