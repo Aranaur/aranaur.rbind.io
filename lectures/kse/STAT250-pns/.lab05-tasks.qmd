@@ -1,0 +1,603 @@
+---
+title: "Практичне заняття 5"
+subtitle: "STAT250: Теорія ймовірностей та статистика"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: uk
+format:
+  revealjs:
+    theme: default
+    slide-number: true
+    toc: false
+    chalkboard: true
+    preview-links: false
+    logo: ""
+    footer: "STAT250 · KSE · Практичне заняття 5"
+    highlight-style: github
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+#| include: false
+library(tidyverse)
+library(patchwork)
+library(scales)
+```
+
+# Центральна гранична теорема (CLT)
+
+## Задача 1: Ліфт (CLT для суми) {.smaller}
+
+Ліфт має максимальну вантажопідйомність **4 000 кг**. Вага кожного пасажира — i.i.d. випадкова величина з $\mu = 85$ кг та $\sigma = 15$ кг.
+
+::: {.callout-note appearance="simple"}
+У ліфт заходять **45 пасажирів**. Яка ймовірність, що їхня сумарна вага перевищить безпечний ліміт?
+:::
+
+<br>
+
+**Підказка:** використайте CLT для суми:
+
+$$E[S_n] = n\mu, \quad \sigma_{S_n} = \sigma\sqrt{n}$$
+
+$$P(S_n > a) = 1 - \Phi\left(\frac{a - n\mu}{\sigma\sqrt{n}}\right)$$
+
+## Задача 1: Аналітичне рішення {.smaller}
+
+**Крок 1.** Параметри: $n = 45$, $\mu = 85$, $\sigma = 15$. Оскільки $n \geq 30$, CLT добре працює.
+
+**Крок 2.** Математичне сподівання та дисперсія суми:
+
+$$
+E[S_{45}] = n\mu = 45 \times 85 = 3825 \text{ кг}
+$$
+
+$$
+\operatorname{Var}(S_{45}) = n\sigma^2 = 45 \times 15^2 = 10125, \quad \sigma_{S_{45}} = \sqrt{10125} \approx 100.62
+$$
+
+**Крок 3.** Стандартизація:
+
+$$
+P(S_{45} > 4000) = P\!\left(Z > \frac{4000 - 3825}{100.62}\right) \approx P(Z > 1.74) = 1 - \Phi(1.74) = 0.0409
+$$
+
+**Висновок:** ймовірність перевантаження ліфта ≈ **4.09%**.
+
+## Задача 1: Розв'язання в R {.smaller}
+
+```{r}
+n     <- 45
+mu    <- 85
+sigma <- 15
+limit <- 4000
+
+mu_S    <- n * mu
+sigma_S <- sqrt(n) * sigma
+
+p_overload <- 1 - pnorm(limit, mean = mu_S, sd = sigma_S)
+cat(sprintf("E[S_45] = %.0f кг\n", mu_S))
+cat(sprintf("σ(S_45) = %.2f кг\n", sigma_S))
+cat(sprintf("P(S_45 > 4000) = %.4f (%.2f%%)\n", p_overload, p_overload * 100))
+```
+
+```{r}
+set.seed(42)
+sim_sums <- replicate(100000, sum(rnorm(n, mean = mu, sd = sigma)))
+cat(sprintf("Емпіричне P(S > 4000) ≈ %.4f\n", mean(sim_sums > limit)))
+```
+
+## Задача 1: Візуалізація {.smaller}
+
+```{r}
+#| fig-width: 9
+#| fig-height: 4
+
+tibble(s = sim_sums) |>
+  ggplot(aes(x = s)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 60,
+                 fill = "#4393c3", color = "white", alpha = 0.7) +
+  stat_function(fun = dnorm, args = list(mean = mu_S, sd = sigma_S),
+                color = "#d73027", linewidth = 1) +
+  geom_vline(xintercept = limit, linetype = "dashed", color = "grey30", linewidth = 0.8) +
+  annotate("text", x = limit + 20, y = Inf,
+           label = "Ліміт: 4000 кг", vjust = 1.5, hjust = 0, size = 3.5) +
+  annotate("text", x = limit + 80, y = dnorm(limit, mu_S, sigma_S) * 0.7,
+           label = sprintf("P ≈ %.2f%%", p_overload * 100),
+           color = "#d73027", size = 4) +
+  labs(title = "Розподіл сумарної ваги 45 пасажирів (CLT)",
+       x = "Загальна вага, кг", y = "Щільність") +
+  theme_minimal(base_size = 12)
+```
+
+## Задача 2: Лампочки (CLT для середнього) {.smaller}
+
+Лампочки мають середній термін служби $\mu = 800$ годин та $\sigma = 40$ годин. Розподіл **сильно лівоскошений**. Інспектор обирає вибірку з $n = 64$ лампочок.
+
+::: {.callout-note appearance="simple"}
+Яка ймовірність, що вибіркове середнє $\bar{X}$ буде **менше 790 годин**?
+:::
+
+<br>
+
+**Підказка:** стандартна похибка (Standard Error):
+
+$$\text{SE} = \frac{\sigma}{\sqrt{n}}, \quad Z = \frac{\bar{X} - \mu}{\text{SE}}$$
+
+## Задача 2: Аналітичне рішення {.smaller}
+
+Незважаючи на те, що розподіл лівоскошений, $n = 64 \geq 30$ — CLT гарантує, що $\bar{X}$ має приблизно нормальний розподіл.
+
+**Стандартна похибка:**
+
+$$
+\sigma_{\bar{X}} = \frac{\sigma}{\sqrt{n}} = \frac{40}{\sqrt{64}} = \frac{40}{8} = 5 \text{ годин}
+$$
+
+**Стандартизація:**
+
+$$
+P(\bar{X} < 790) = P\!\left(Z < \frac{790 - 800}{5}\right) = P(Z < -2.00) = \Phi(-2.00) = 0.0228
+$$
+
+**Висновок:** ймовірність того, що середній термін служби 64 лампочок буде менше 790 годин — **2.28%**.
+
+## Задача 2: Розв'язання в R {.smaller}
+
+```{r}
+mu    <- 800
+sigma <- 40
+n     <- 64
+x_bar <- 790
+
+se <- sigma / sqrt(n)
+z  <- (x_bar - mu) / se
+p  <- pnorm(z)
+
+cat(sprintf("SE = σ/√n = %.1f годин\n", se))
+cat(sprintf("Z = (790 - 800) / 5 = %.2f\n", z))
+cat(sprintf("P(X̄ < 790) = Φ(%.2f) = %.4f\n", z, p))
+```
+
+## Задача 2: Візуалізація {.smaller}
+
+```{r}
+#| fig-width: 9
+#| fig-height: 4
+
+tibble(x = seq(mu - 4 * se, mu + 4 * se, length.out = 500)) |>
+  mutate(density = dnorm(x, mean = mu, sd = se),
+         region  = x < x_bar) |>
+  ggplot(aes(x = x, y = density)) +
+  geom_area(aes(fill = region), alpha = 0.7, show.legend = FALSE) +
+  geom_line(color = "grey30", linewidth = 1) +
+  geom_vline(xintercept = x_bar, linetype = "dashed", color = "#d73027") +
+  scale_fill_manual(values = c("TRUE" = "#d73027", "FALSE" = "grey80")) +
+  annotate("text", x = x_bar - 1, y = dnorm(x_bar, mu, se) * 0.5,
+           label = sprintf("P(X̄ < 790)\n= %.4f", p),
+           color = "#b2182b", size = 3.5, hjust = 1) +
+  labs(title = expression(paste("Розподіл вибіркового середнього ", bar(X),
+                                " ~ N(800, 5²)")),
+       x = "Середній термін служби, годин", y = "Щільність") +
+  theme_minimal(base_size = 12)
+```
+
+# Нерівності та граничні теореми
+
+## Задача 3: Кількість підкидань монети (Чебишев) {.smaller}
+
+Чесна монета підкидається $n$ разів.
+
+::: {.callout-note appearance="simple"}
+Скільки підкидань потрібно, щоб з імовірністю **не менше 0.95** частка «Орла» відхилялась від 0.5 **не більше ніж на 0.01**?
+:::
+
+<br>
+
+**Підказка:** $\hat{p} = \frac{1}{n}\sum X_i$, $X_i \sim \text{Bernoulli}(0.5)$.
+
+За Чебишевим: $P(|\hat{p} - 0.5| \geq \varepsilon) \leq \frac{\operatorname{Var}(\hat{p})}{\varepsilon^2}$.
+
+## Задача 3: Аналітичне рішення {.smaller}
+
+Нехай $\hat{p} = \frac{1}{n}\sum X_i$, $X_i \sim \text{Bernoulli}(0.5)$.
+
+$$
+E[\hat{p}] = 0.5, \quad \operatorname{Var}(\hat{p}) = \frac{0.5 \cdot 0.5}{n} = \frac{0.25}{n}
+$$
+
+За Чебишевим:
+
+$$
+P(|\hat{p} - 0.5| \geq \varepsilon) \leq \frac{\operatorname{Var}(\hat{p})}{\varepsilon^2} = \frac{0.25}{n \cdot 0.0001} = \frac{2500}{n}
+$$
+
+Вимога: $1 - \frac{2500}{n} \geq 0.95$, тобто $\frac{2500}{n} \leq 0.05$.
+
+$$
+n \geq \frac{2500}{0.05} = 50\,000
+$$
+
+## Задача 3: Розв'язання в R {.smaller}
+
+```{r}
+p_true <- 0.5
+eps    <- 0.01
+conf   <- 0.95
+var_p  <- p_true * (1 - p_true)
+
+n_min <- ceiling(var_p / (eps^2 * (1 - conf)))
+cat(sprintf("Мінімум n за Чебишевим: %d\n", n_min))
+```
+
+**Порівняння з нормальним наближенням (CLT):**
+
+```{r}
+z     <- qnorm(1 - (1 - conf) / 2)
+n_clt <- ceiling((z / eps)^2 * var_p)
+cat(sprintf("За нормальним наближенням (CLT): %d\n", n_clt))
+```
+
+**Емпірична перевірка:**
+
+```{r}
+set.seed(42)
+sim_means <- replicate(2000, mean(rbinom(n_min, 1, 0.5)))
+emp_prob  <- mean(abs(sim_means - 0.5) <= eps)
+cat(sprintf("Емпіричне P(|p̂ - 0.5| ≤ 0.01) при n = %d: %.4f\n", n_min, emp_prob))
+```
+
+> Емпірика підтверджує, що при $n = 50\,000$ ймовірність помітно вища від 0.95 — оцінка Чебишева груба, але **завжди коректна**.
+
+# CLT: задачі з лекції
+
+## Задача 4: Перевантаження вантажівки {.smaller}
+
+Вантажівка везе **100 коробок**, вага кожної — незалежна випадкова величина з $\mu = 20$ кг та $\sigma = 2$ кг.
+
+::: {.callout-note appearance="simple"}
+Знайти ймовірність, що загальна вага перевищить **2050 кг**.
+:::
+
+<br>
+
+**Підказка:** $S = \sum_{i=1}^{100} X_i \approx \mathcal{N}(n\mu, n\sigma^2)$.
+
+## Задача 4: Аналітичне рішення {.smaller}
+
+Позначимо $S = \sum_{i=1}^{100} X_i$. За CLT:
+
+$$
+E[S] = 100 \cdot 20 = 2000, \quad \sigma_S = \sqrt{100} \cdot 2 = 20
+$$
+
+$$
+S \approx \mathcal{N}(2000, 20^2)
+$$
+
+Стандартизація:
+
+$$
+P(S > 2050) = P\!\left(Z > \frac{2050 - 2000}{20}\right) = P(Z > 2.5) = 1 - \Phi(2.5) \approx 0.00621
+$$
+
+**Висновок:** ймовірність перевантаження ≈ **0.62%**.
+
+## Задача 4: Розв'язання в R {.smaller}
+
+```{r}
+n     <- 100
+mu    <- 20
+sigma <- 2
+
+mu_S    <- n * mu
+sigma_S <- sqrt(n) * sigma
+
+p_overload <- 1 - pnorm(2050, mu_S, sigma_S)
+cat(sprintf("E[S] = %.0f, σ(S) = %.1f\n", mu_S, sigma_S))
+cat(sprintf("P(S > 2050) = %.5f\n", p_overload))
+```
+
+**Перевірка симуляцією:**
+
+```{r}
+set.seed(42)
+sim <- replicate(1e5, sum(rnorm(n, mu, sigma)))
+cat(sprintf("Емпіричне P(S > 2050) ≈ %.5f\n", mean(sim > 2050)))
+```
+
+## Задача 4: Візуалізація {.smaller}
+
+```{r}
+#| fig-width: 9
+#| fig-height: 4
+
+tibble(s = sim) |>
+  ggplot(aes(x = s)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 60,
+                 fill = "#4393c3", color = "white", alpha = 0.7) +
+  stat_function(fun = dnorm, args = list(mean = mu_S, sd = sigma_S),
+                color = "#d73027", linewidth = 1) +
+  geom_vline(xintercept = 2050, linetype = "dashed", color = "#2166ac") +
+  annotate("text", x = 2055, y = Inf,
+           label = sprintf("P ≈ %.3f%%", p_overload * 100),
+           vjust = 1.5, hjust = 0, color = "#2166ac", size = 3.5) +
+  labs(title = "Розподіл загальної ваги S — CLT",
+       x = "S, кг", y = "Щільність") +
+  theme_minimal(base_size = 12)
+```
+
+## Задача 5: Страхування digital-творців {.smaller}
+
+Страхова компанія: $n = 10\,000$ творців. На одного: з імовірністю 0.995 — нуль виплат, з 0.005 — виплата **50 000 \$**. Премія: **300 \$** з кожного.
+
+::: {.callout-note appearance="simple"}
+1. Знайти $E[X]$ та $\sigma(X)$ виплати на одну поліс.
+2. Визначити розподіл $S_n$ за CLT.
+3. Обчислити ймовірність **чистого збитку** компанії.
+:::
+
+## Задача 5: Аналітичне рішення (1/2) {.smaller}
+
+**Очікувана виплата на одну поліс:**
+
+$$
+E[X] = 0 \cdot 0.995 + 50000 \cdot 0.005 = 250
+$$
+
+**Дисперсія:**
+
+$$
+E[X^2] = 50000^2 \cdot 0.005 = 12\,500\,000
+$$
+
+$$
+\operatorname{Var}(X) = 12\,500\,000 - 250^2 = 12\,437\,500, \quad \sigma \approx 3526.68
+$$
+
+**Розподіл $S_n$ за CLT** ($n = 10\,000$):
+
+$$
+E[S_n] = 10\,000 \cdot 250 = 2\,500\,000, \quad \sigma_{S_n} = 100 \cdot 3526.68 = 352\,668
+$$
+
+## Задача 5: Аналітичне рішення (2/2) {.smaller}
+
+**Загальні премії:** $R = 10\,000 \cdot 300 = 3\,000\,000$ \$.
+
+**Ймовірність збитку:**
+
+$$
+P(S_n > 3\,000\,000) = P\!\left(Z > \frac{3\,000\,000 - 2\,500\,000}{352\,668}\right) = P(Z > 1.418) \approx 0.078
+$$
+
+**Висновок:** при поточних тарифах ризик чистого збитку ≈ **7.8%** — досить високий для страхового бізнесу.
+
+## Задача 5: Розв'язання в R {.smaller}
+
+```{r}
+n       <- 10000
+p_claim <- 0.005
+payout  <- 50000
+premium <- 300
+
+EX   <- p_claim * payout
+EX2  <- p_claim * payout^2
+VarX <- EX2 - EX^2
+sdX  <- sqrt(VarX)
+
+mu_S    <- n * EX
+sigma_S <- sqrt(n) * sdX
+revenue <- n * premium
+
+p_loss <- 1 - pnorm(revenue, mu_S, sigma_S)
+
+cat(sprintf("E[X] = %.2f, σ(X) = %.2f\n", EX, sdX))
+cat(sprintf("E[S_n] = %.0f, σ(S_n) = %.0f\n", mu_S, sigma_S))
+cat(sprintf("Премії: %.0f, P(збиток) = %.4f\n", revenue, p_loss))
+```
+
+```{r}
+set.seed(42)
+sim_total <- replicate(5000, sum(rbinom(n, 1, p_claim) * payout))
+cat(sprintf("Емпіричне P(чистий збиток) ≈ %.4f\n", mean(sim_total > revenue)))
+```
+
+## Задача 5: Візуалізація {.smaller}
+
+```{r}
+#| fig-width: 9
+#| fig-height: 4.5
+
+tibble(s = sim_total) |>
+  ggplot(aes(x = s)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 50,
+                 fill = "#4393c3", color = "white", alpha = 0.7) +
+  stat_function(fun = dnorm, args = list(mean = mu_S, sd = sigma_S),
+                color = "#d73027", linewidth = 1) +
+  geom_vline(xintercept = revenue, linetype = "dashed",
+             color = "#2166ac", linewidth = 1) +
+  annotate("text", x = revenue, y = Inf,
+           label = sprintf("Премії: %s$", format(revenue, big.mark = ",")),
+           color = "#2166ac", vjust = 1.5, hjust = -0.05) +
+  labs(title = "Розподіл загальних виплат S_n — CLT vs симуляція",
+       x = "Сумарні виплати, $", y = "Щільність") +
+  theme_minimal(base_size = 12)
+```
+
+# Додаткові задачі
+
+## Задача 8: Контроль якості напоїв {.smaller}
+
+Автомат наповнює пляшки з напоєм: $\mu = 500$ мл, $\sigma = 8$ мл. Інспектор бере вибірку з $n = 36$ пляшок.
+
+::: {.callout-note appearance="simple"}
+Яка ймовірність, що середній об'єм у вибірці буде **між 498 та 502 мл**?
+:::
+
+<br>
+
+**Підказка:**
+
+$$P(a < \bar{X} < b) = \Phi\left(\frac{b - \mu}{\sigma/\sqrt{n}}\right) - \Phi\left(\frac{a - \mu}{\sigma/\sqrt{n}}\right)$$
+
+## Задача 8: Аналітичне рішення {.smaller}
+
+За CLT: $\bar{X} \approx \mathcal{N}\!\left(\mu, \frac{\sigma^2}{n}\right) = \mathcal{N}\!\left(500, \frac{64}{36}\right)$.
+
+**Стандартна похибка:**
+
+$$
+\text{SE} = \frac{\sigma}{\sqrt{n}} = \frac{8}{\sqrt{36}} = \frac{8}{6} \approx 1.333 \text{ мл}
+$$
+
+**Стандартизація:**
+
+$$
+P(498 < \bar{X} < 502) = P\!\left(\frac{498 - 500}{1.333} < Z < \frac{502 - 500}{1.333}\right) = P(-1.5 < Z < 1.5)
+$$
+
+$$
+= \Phi(1.5) - \Phi(-1.5) = 0.9332 - 0.0668 = 0.8664
+$$
+
+**Висновок:** ≈ **86.64%**.
+
+## Задача 8: Розв'язання в R {.smaller}
+
+```{r}
+mu    <- 500
+sigma <- 8
+n     <- 36
+se    <- sigma / sqrt(n)
+
+p_in_range <- pnorm(502, mu, se) - pnorm(498, mu, se)
+cat(sprintf("SE = %.4f мл\n", se))
+cat(sprintf("P(498 < X̄ < 502) = %.4f\n", p_in_range))
+```
+
+## Задача 8: Візуалізація {.smaller}
+
+```{r}
+#| fig-width: 9
+#| fig-height: 4
+
+tibble(x = seq(mu - 4 * se, mu + 4 * se, length.out = 500)) |>
+  mutate(density = dnorm(x, mu, se),
+         in_band = x >= 498 & x <= 502) |>
+  ggplot(aes(x = x, y = density)) +
+  geom_area(aes(fill = in_band), alpha = 0.7, show.legend = FALSE) +
+  geom_line(color = "grey30", linewidth = 1) +
+  geom_vline(xintercept = c(498, 502), linetype = "dashed", color = "#d73027") +
+  scale_fill_manual(values = c("TRUE" = "#4393c3", "FALSE" = "grey80")) +
+  annotate("text", x = 500, y = dnorm(500, mu, se) * 0.5,
+           label = sprintf("P ≈ %.2f%%", p_in_range * 100),
+           color = "#2166ac", size = 4.5) +
+  labs(title = expression(paste("Розподіл ", bar(X), " для n = 36 пляшок")),
+       x = "Середній об'єм, мл", y = "Щільність") +
+  theme_minimal(base_size = 12)
+```
+
+## Задача 9: Візуальна демонстрація CLT {.smaller}
+
+::: {.callout-note appearance="simple"}
+Продемонструйте CLT у R:
+
+- Згенеруйте вибіркові середні з **3 різних розподілів** (Exp, Uniform, Bernoulli).
+- Побудуйте гістограми для $n = 5, 30, 100$.
+- Покажіть, що при збільшенні $n$ вибіркове середнє стає нормально розподіленим.
+:::
+
+<br>
+
+**Підказка:** використайте `replicate()`, `facet_grid()`.
+
+## Задача 9: Розв'язання в R {.smaller}
+
+```{r}
+#| eval: false
+set.seed(42)
+n_sim     <- 10000
+sample_ns <- c(5, 30, 100)
+
+distributions <- list(
+  "Exp(λ = 1)"       = function(n) rexp(n, rate = 1),
+  "Uniform(0, 1)"    = function(n) runif(n, 0, 1),
+  "Bernoulli(p=0.3)" = function(n) rbinom(n, 1, 0.3)
+)
+
+sim_data <- expand_grid(
+  dist_name = names(distributions),
+  n = sample_ns
+) |>
+  mutate(
+    means = map2(dist_name, n, \(d, nn) {
+      gen <- distributions[[d]]
+      replicate(n_sim, mean(gen(nn)))
+    })
+  ) |>
+  unnest(means) |>
+  mutate(n_label = paste("n =", n))
+```
+
+## Задача 9: Візуалізація {.smaller}
+
+```{r}
+#| echo: false
+#| fig-width: 10
+#| fig-height: 5.5
+
+set.seed(42)
+n_sim     <- 10000
+sample_ns <- c(5, 30, 100)
+
+distributions <- list(
+  "Exp(λ = 1)"       = function(n) rexp(n, rate = 1),
+  "Uniform(0, 1)"    = function(n) runif(n, 0, 1),
+  "Bernoulli(p=0.3)" = function(n) rbinom(n, 1, 0.3)
+)
+
+sim_data <- expand_grid(
+  dist_name = names(distributions),
+  n = sample_ns
+) |>
+  mutate(
+    means = map2(dist_name, n, \(d, nn) {
+      gen <- distributions[[d]]
+      replicate(n_sim, mean(gen(nn)))
+    })
+  ) |>
+  unnest(means) |>
+  mutate(n_label = paste("n =", n))
+
+sim_data |>
+  ggplot(aes(x = means)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 50,
+                 fill = "#4393c3", color = "white", alpha = 0.7) +
+  facet_grid(dist_name ~ n_label, scales = "free") +
+  labs(title = "Демонстрація CLT: вибіркові середні з різних розподілів",
+       x = expression(bar(X)), y = "Щільність") +
+  theme_minimal(base_size = 11) +
+  theme(strip.text = element_text(size = 10, face = "bold"))
+```
+
+> При збільшенні $n$ розподіл вибіркового середнього стає все більш «нормальним», незалежно від вихідного розподілу.
+
+# Підсумок
+
+## Підсумкова таблиця {.smaller}
+
+| № | Тип задачі | Інструмент | Ключовий результат |
+|---|---|---|---|
+| 1 | CLT для суми (ліфт) | `pnorm` | $\approx 4.09\%$ перевантаження |
+| 2 | CLT для середнього (лампочки) | `pnorm` | $P(\bar{X} < 790) \approx 2.28\%$ |
+| 3 | Чебишев → $n$ | арифметика | $n \geq 50\,000$ |
+| 4 | CLT — сума (вантажівка) | `pnorm`, `replicate` | $\approx 0.62\%$ |
+| 5 | CLT — портфель (страхування) | `pnorm`, `replicate` | $\approx 7.8\%$ ризик збитку |
+| 8 | CLT для середнього (напої) | `pnorm` | $P \approx 86.64\%$ |
+| 9 | Візуальна демонстрація CLT | `replicate`, `facet_grid` | CLT працює для будь-якого розподілу |

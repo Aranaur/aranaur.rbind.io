@@ -1,0 +1,628 @@
+---
+title: "Практичне заняття 5"
+subtitle: "STAT250: Теорія ймовірностей та статистика"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: uk
+format:
+  typst:
+    toc: true
+    toc-depth: 2
+    section-numbering: "1.1."
+    columns: 1
+    margin:
+      x: 2.5cm
+      y: 2.5cm
+    font-size: 11pt
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+#| include: false
+library(tidyverse)
+library(patchwork)
+library(scales)
+```
+
+# Центральна гранична теорема (CLT)
+
+## Питання для розгляду
+
+### 1. Що стверджує Центральна гранична теорема (CLT) для суми?
+
+**Відповідь.** Нехай $X_1, X_2, \ldots, X_n$ — незалежні однаково розподілені (i.i.d.) випадкові величини з $E[X_i] = \mu$ та $\operatorname{Var}(X_i) = \sigma^2 > 0$. Позначимо $S_n = \sum_{i=1}^{n} X_i$. Тоді при $n \to \infty$ стандартизована сума збігається за розподілом до стандартного нормального:
+
+$$
+\frac{S_n - n\mu}{\sigma\sqrt{n}} \xrightarrow{d} \mathcal{N}(0, 1).
+$$
+
+**Ключова ідея:** розподіл суми наближається до нормального **незалежно від форми** розподілу окремих $X_i$ (чи він скошений, рівномірний, дискретний), за умови достатньо великого $n$ ($n \geq 30$ як грубе правило).
+
+*Аналогія.* Загальна маса 100 коробок у вантажівці: кожна коробка має довільний розподіл ваги, але сума — приблизно нормальна. Це дозволяє логістичним компаніям оцінювати ймовірність перевантаження.
+
+### 2. Які параметри має розподіл суми $S_n$ за CLT?
+
+**Відповідь.**
+
+$$
+E[S_n] = n\mu, \quad \operatorname{Var}(S_n) = n\sigma^2, \quad \sigma_{S_n} = \sigma\sqrt{n}.
+$$
+
+Отже $S_n \approx \mathcal{N}(n\mu, n\sigma^2)$ при великому $n$.
+
+### 3. Що стверджує CLT для вибіркового середнього?
+
+**Відповідь.** Вибіркове середнє $\bar{X}_n = \frac{1}{n}\sum_{i=1}^{n} X_i$ при $n \to \infty$ має розподіл:
+
+$$
+\bar{X}_n \xrightarrow{d} \mathcal{N}\left(\mu, \frac{\sigma^2}{n}\right), \quad \text{тобто} \quad Z = \frac{\bar{X}_n - \mu}{\sigma / \sqrt{n}} \xrightarrow{d} \mathcal{N}(0, 1).
+$$
+
+- $E[\bar{X}_n] = \mu$ — вибіркове середнє є **незміщеною** оцінкою $\mu$.
+- $\operatorname{Var}(\bar{X}_n) = \frac{\sigma^2}{n}$ — дисперсія зменшується з ростом $n$.
+- Стандартна похибка: $\text{SE} = \frac{\sigma}{\sqrt{n}}$.
+
+*Аналогія.* Пенсійний фонд тримає 10 000 угод. Кожна окремо нестабільна ($\sigma = 20\%$), але середня дохідність по портфелю має стандартне відхилення $\sigma / \sqrt{n} = 0.2\%$ — у 100 разів менш волатильна.
+
+### 4. Яка різниця між генеральною сукупністю (population) та вибіркою (sample)?
+
+**Відповідь.**
+
+| Поняття | Визначення | Приклад |
+|---------|-----------|---------|
+| **Генеральна сукупність** | Уся група об'єктів, що нас цікавить | Усі лампочки заводу |
+| **Вибірка** | Підмножина, на основі якої робимо висновки | 64 випадково обрані лампочки |
+
+**Описова статистика** (descriptive) — узагальнює дані вибірки (вибіркове середнє, вибіркова дисперсія, коваріація).
+
+**Статистичний висновок** (inferential) — робить висновки про генеральну сукупність на основі вибірки.
+
+### 5. Чим відрізняються частотний (frequentist) та байєсівський (Bayesian) підходи?
+
+**Відповідь.**
+
+| Ознака | Частотний (Frequentist) | Байєсівський (Bayesian) |
+|--------|-------------------------|------------------------|
+| Ймовірність | Гранична частота | Ступінь переконаності |
+| Параметри | Фіксовані невідомі | Випадкові величини |
+| Інференція | Перевірка гіпотез, довірчі інтервали | Апостеріорний розподіл |
+
+### 6. Які умови CLT є критичними?
+
+**Відповідь.**
+
+1. **Незалежність** — спостереження i.i.d. (однаково розподілені й незалежні).
+2. **Скінченна дисперсія** — $\sigma^2 < \infty$.
+
+Якщо дисперсія нескінченна (наприклад, розподіл Коші), CLT **не працює**, і нормальна апроксимація може бути оманливою.
+
+*Аналогія.* Дохідність біткоїна — товсті хвости. Ризик-менеджер, що припускає нормальність за CLT, недооцінить ризик у десятки разів.
+
+### 7. Звідки правило «$n \geq 30$»?
+
+**Відповідь.** Це **груба** евристика:
+
+- Симетричні розподіли — CLT працює вже при $n \approx 10$.
+- Сильно скошені (Bernoulli з $p = 0.005$) — потрібні **тисячі** спостережень.
+
+---
+
+## Задача 1. Ліфт (CLT для суми)
+
+> Ліфт має максимальну вантажопідйомність 4 000 кг. Вага кожного пасажира — i.i.d. випадкова величина з $\mu = 85$ кг та $\sigma = 15$ кг. У ліфт заходять 45 пасажирів. Яка ймовірність, що їхня сумарна вага перевищить безпечний ліміт?
+
+### Математичне розв'язання
+
+**Крок 1. Параметри та розподіли:**
+
+- Кількість пасажирів: $n = 45$ (оскільки $45 \geq 30$, CLT добре працює).
+- Індивідуальні параметри: $\mu = 85$, $\sigma = 15$.
+- Загальна вага: $S_{45} = \sum_{i=1}^{45} X_i$.
+
+**Крок 2. Математичне сподівання та дисперсія суми:**
+
+$$
+E[S_{45}] = n\mu = 45 \times 85 = 3825 \text{ кг}
+$$
+
+$$
+\operatorname{Var}(S_{45}) = n\sigma^2 = 45 \times 15^2 = 10125
+$$
+
+$$
+\sigma_{S_{45}} = \sqrt{10125} \approx 100.62 \text{ кг}
+$$
+
+**Крок 3. Стандартизація та обчислення ймовірності:**
+
+$$
+P(S_{45} > 4000) = P\left(\frac{S_{45} - n\mu}{\sigma\sqrt{n}} > \frac{4000 - 3825}{100.62}\right) \approx P(Z > 1.74)
+$$
+
+$$
+= 1 - \Phi(1.74) = 1 - 0.9591 = 0.0409
+$$
+
+**Висновок:** ймовірність перевантаження ліфта становить приблизно **4.09%**.
+
+### Розв'язання в R
+
+```{r}
+n     <- 45
+mu    <- 85
+sigma <- 15
+limit <- 4000
+
+mu_S    <- n * mu
+sigma_S <- sqrt(n) * sigma
+
+p_overload <- 1 - pnorm(limit, mean = mu_S, sd = sigma_S)
+cat(sprintf("E[S_45] = %.0f кг\n", mu_S))
+cat(sprintf("σ(S_45) = %.2f кг\n", sigma_S))
+cat(sprintf("P(S_45 > 4000) = %.4f (%.2f%%)\n", p_overload, p_overload * 100))
+```
+
+**Перевірка симуляцією:**
+
+```{r}
+set.seed(42)
+sim_sums <- replicate(100000, sum(rnorm(n, mean = mu, sd = sigma)))
+emp_prob <- mean(sim_sums > limit)
+cat(sprintf("Емпіричне P(S > 4000) ≈ %.4f\n", emp_prob))
+```
+
+**Візуалізація:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+tibble(s = sim_sums) |>
+  ggplot(aes(x = s)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 60,
+                 fill = "#4393c3", color = "white", alpha = 0.7) +
+  stat_function(fun = dnorm, args = list(mean = mu_S, sd = sigma_S),
+                color = "#d73027", linewidth = 1) +
+  geom_vline(xintercept = limit, linetype = "dashed", color = "grey30", linewidth = 0.8) +
+  annotate("text", x = limit + 20, y = Inf,
+           label = "Ліміт: 4000 кг", vjust = 1.5, hjust = 0, size = 3.5) +
+  annotate("text", x = limit + 80, y = dnorm(limit, mu_S, sigma_S) * 0.7,
+           label = sprintf("P ≈ %.2f%%", p_overload * 100),
+           color = "#d73027", size = 4) +
+  labs(title = "Розподіл сумарної ваги 45 пасажирів (CLT)",
+       x = "Загальна вага, кг", y = "Щільність") +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+## Задача 2. Лампочки (CLT для вибіркового середнього)
+
+> Лампочки, що виробляються на заводі, мають середній термін служби $\mu = 800$ годин та стандартне відхилення $\sigma = 40$ годин. Розподіл терміну служби **сильно лівоскошений**. Інспектор з контролю якості обирає випадкову вибірку з $n = 64$ лампочок. Яка ймовірність того, що вибіркове середнє $\bar{X}$ буде менше 790 годин?
+
+### Математичне розв'язання
+
+Незважаючи на те, що розподіл лівоскошений, $n = 64 \geq 30$ — CLT гарантує, що $\bar{X}$ має приблизно нормальний розподіл.
+
+**Стандартна похибка (Standard Error):**
+
+$$
+\sigma_{\bar{X}} = \frac{\sigma}{\sqrt{n}} = \frac{40}{\sqrt{64}} = \frac{40}{8} = 5 \text{ годин}
+$$
+
+**Стандартизація:**
+
+$$
+P(\bar{X} < 790) = P\left(\frac{\bar{X} - \mu}{\sigma / \sqrt{n}} < \frac{790 - 800}{5}\right) = P\left(Z < \frac{-10}{5}\right) = P(Z < -2.00)
+$$
+
+**Значення з таблиці стандартного нормального розподілу:**
+
+$$
+P(Z < -2.00) = \Phi(-2.00) = 0.0228
+$$
+
+**Висновок:** ймовірність того, що середній термін служби 64 лампочок буде менше 790 годин, становить **2.28%**.
+
+### Розв'язання в R
+
+```{r}
+mu    <- 800
+sigma <- 40
+n     <- 64
+x_bar <- 790
+
+se <- sigma / sqrt(n)
+z  <- (x_bar - mu) / se
+p  <- pnorm(z)
+
+cat(sprintf("SE = σ/√n = %.1f годин\n", se))
+cat(sprintf("Z = (790 - 800) / 5 = %.2f\n", z))
+cat(sprintf("P(X̄ < 790) = Φ(%.2f) = %.4f\n", z, p))
+```
+
+**Візуалізація розподілу вибіркового середнього:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+tibble(x = seq(mu - 4 * se, mu + 4 * se, length.out = 500)) |>
+  mutate(density = dnorm(x, mean = mu, sd = se),
+         region  = x < x_bar) |>
+  ggplot(aes(x = x, y = density)) +
+  geom_area(aes(fill = region), alpha = 0.7, show.legend = FALSE) +
+  geom_line(color = "grey30", linewidth = 1) +
+  geom_vline(xintercept = x_bar, linetype = "dashed", color = "#d73027") +
+  scale_fill_manual(values = c("TRUE" = "#d73027", "FALSE" = "grey80")) +
+  annotate("text", x = x_bar - 1, y = dnorm(x_bar, mu, se) * 0.5,
+           label = sprintf("P(X̄ < 790)\n= %.4f", p),
+           color = "#b2182b", size = 3.5, hjust = 1) +
+  labs(title = expression(paste("Розподіл вибіркового середнього ", bar(X),
+                                " ~ N(800, 5²)")),
+       x = "Середній термін служби, годин", y = "Щільність") +
+  theme_minimal(base_size = 12)
+```
+
+## Задача 3. Кількість підкидань монети (Чебишев)
+
+> Чесна монета підкидається $n$ разів. Скільки підкидань потрібно, щоб з імовірністю не менше 0.95 частка «Орла» відхилялась від 0.5 не більше ніж на 0.01? Використати нерівність Чебишева.
+
+### Математичне розв'язання
+
+Нехай $\hat{p} = \frac{1}{n}\sum X_i$, $X_i \sim \text{Bernoulli}(0.5)$.
+
+$$
+E[\hat{p}] = 0.5, \quad \operatorname{Var}(\hat{p}) = \frac{0.5 \cdot 0.5}{n} = \frac{0.25}{n}
+$$
+
+За Чебишевим:
+
+$$
+P(|\hat{p} - 0.5| \geq \varepsilon) \leq \frac{\operatorname{Var}(\hat{p})}{\varepsilon^2} = \frac{0.25}{n \cdot 0.0001} = \frac{2500}{n}
+$$
+
+Вимога: $1 - \frac{2500}{n} \geq 0.95$, тобто $\frac{2500}{n} \leq 0.05$.
+
+$$
+n \geq \frac{2500}{0.05} = 50\,000
+$$
+
+### Розв'язання в R
+
+```{r}
+p_true <- 0.5
+eps    <- 0.01
+conf   <- 0.95
+var_p  <- p_true * (1 - p_true)
+
+n_min <- ceiling(var_p / (eps^2 * (1 - conf)))
+cat(sprintf("Мінімум n за Чебишевим: %d\n", n_min))
+```
+
+**Порівняння з нормальним наближенням (CLT):**
+
+```{r}
+z     <- qnorm(1 - (1 - conf) / 2)
+n_clt <- ceiling((z / eps)^2 * var_p)
+cat(sprintf("За нормальним наближенням (CLT): %d\n", n_clt))
+```
+
+**Емпірична перевірка:**
+
+```{r}
+set.seed(42)
+n_check <- n_min
+
+sim_means <- replicate(2000, mean(rbinom(n_check, 1, 0.5)))
+emp_prob  <- mean(abs(sim_means - 0.5) <= eps)
+cat(sprintf("Емпіричне P(|p̂ - 0.5| ≤ 0.01) при n = %d: %.4f\n", n_check, emp_prob))
+```
+
+> Емпірика підтверджує, що при $n = 50\,000$ ймовірність помітно вища від 0.95 — оцінка Чебишева груба, але **завжди коректна**.
+
+---
+
+## Задача 4. Перевантаження вантажівки (CLT)
+
+> Вантажівка везе 100 коробок, вага кожної — незалежна випадкова величина з $\mu = 20$ кг та $\sigma = 2$ кг. Знайти ймовірність, що загальна вага перевищить 2050 кг.
+
+### Математичне розв'язання
+
+Позначимо $S = \sum_{i=1}^{100} X_i$. За CLT:
+
+$$
+E[S] = 100 \cdot 20 = 2000, \quad \sigma_S = \sqrt{100} \cdot 2 = 20, \quad S \approx \mathcal{N}(2000, 20^2).
+$$
+
+$$
+P(S > 2050) = P\left(Z > \frac{2050 - 2000}{20}\right) = P(Z > 2.5) = 1 - \Phi(2.5) \approx 0.00621
+$$
+
+### Розв'язання в R
+
+```{r}
+n     <- 100
+mu    <- 20
+sigma <- 2
+
+mu_S    <- n * mu
+sigma_S <- sqrt(n) * sigma
+
+p_overload <- 1 - pnorm(2050, mu_S, sigma_S)
+cat(sprintf("P(S > 2050) = %.5f\n", p_overload))
+```
+
+**Перевірка симуляцією:**
+
+```{r}
+set.seed(42)
+sim <- replicate(1e5, sum(rnorm(n, mu, sigma)))
+cat(sprintf("Емпіричне P(S > 2050) ≈ %.5f\n", mean(sim > 2050)))
+```
+
+**Візуалізація:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+tibble(s = sim) |>
+  ggplot(aes(x = s)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 60,
+                 fill = "#4393c3", color = "white", alpha = 0.7) +
+  stat_function(fun = dnorm, args = list(mean = mu_S, sd = sigma_S),
+                color = "#d73027", linewidth = 1) +
+  geom_vline(xintercept = 2050, linetype = "dashed", color = "#2166ac") +
+  annotate("text", x = 2055, y = Inf,
+           label = sprintf("P ≈ %.3f%%", p_overload * 100),
+           vjust = 1.5, hjust = 0, color = "#2166ac", size = 3.5) +
+  labs(title = "Розподіл загальної ваги S — CLT",
+       x = "S, кг", y = "Щільність") +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+## Задача 5. Страхування digital-творців (CLT)
+
+> Страхова компанія: $n = 10\,000$ незалежних творців. На одного: з імовірністю 0.995 — нуль виплат, з 0.005 — максимальна виплата 50 000 \$. Премія: 300 \$ з кожного. Знайти $E$, $\sigma$ виплати; розподіл $S_n$ за CLT; ймовірність загального чистого збитку.
+
+### Математичне розв'язання
+
+**Очікувана виплата на одну поліс:**
+
+$$
+E[X] = 0 \cdot 0.995 + 50000 \cdot 0.005 = 250
+$$
+
+**Дисперсія:**
+
+$$
+E[X^2] = 50000^2 \cdot 0.005 = 12\,500\,000
+$$
+
+$$
+\operatorname{Var}(X) = 12\,500\,000 - 250^2 = 12\,437\,500
+$$
+
+$$
+\sigma = \sqrt{12\,437\,500} \approx 3526.68
+$$
+
+**Розподіл $S_n$ за CLT** ($n = 10\,000$):
+
+$$
+E[S_n] = 10\,000 \cdot 250 = 2\,500\,000
+$$
+
+$$
+\sigma_{S_n} = \sqrt{10\,000} \cdot 3526.68 = 100 \cdot 3526.68 = 352\,668
+$$
+
+$$
+S_n \approx \mathcal{N}(2\,500\,000,\; 352\,668^2)
+$$
+
+**Загальні премії:** $R = 10\,000 \cdot 300 = 3\,000\,000$ \$.
+
+**Імовірність збитку:**
+
+$$
+P(S_n > 3\,000\,000) = P\left(Z > \frac{3\,000\,000 - 2\,500\,000}{352\,668}\right) = P(Z > 1.418) \approx 0.078
+$$
+
+**Висновок:** при поточних тарифах ризик чистого збитку ≈ 7.8% — досить високий для страхового бізнесу.
+
+### Розв'язання в R
+
+```{r}
+n       <- 10000
+p_claim <- 0.005
+payout  <- 50000
+premium <- 300
+
+EX   <- p_claim * payout
+EX2  <- p_claim * payout^2
+VarX <- EX2 - EX^2
+sdX  <- sqrt(VarX)
+
+mu_S    <- n * EX
+sigma_S <- sqrt(n) * sdX
+revenue <- n * premium
+
+p_loss <- 1 - pnorm(revenue, mu_S, sigma_S)
+
+tibble(
+  Показник = c("E[X]", "σ(X)", "E[S_n]", "σ(S_n)",
+               "Загальні премії, $", "P(чистий збиток)"),
+  Значення = c(EX, sdX, mu_S, sigma_S, revenue, p_loss)
+) |>
+  mutate(Значення = sprintf("%.4f", Значення))
+```
+
+**Перевірка симуляцією:**
+
+```{r}
+set.seed(42)
+sim_total <- replicate(5000, sum(rbinom(n, 1, p_claim) * payout))
+emp_loss  <- mean(sim_total > revenue)
+cat(sprintf("Емпіричне P(чистий збиток) ≈ %.4f\n", emp_loss))
+```
+
+**Візуалізація:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4.5
+
+tibble(s = sim_total) |>
+  ggplot(aes(x = s)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 50,
+                 fill = "#4393c3", color = "white", alpha = 0.7) +
+  stat_function(fun = dnorm, args = list(mean = mu_S, sd = sigma_S),
+                color = "#d73027", linewidth = 1) +
+  geom_vline(xintercept = revenue, linetype = "dashed",
+             color = "#2166ac", linewidth = 1) +
+  annotate("text", x = revenue, y = Inf,
+           label = sprintf("Премії: %s$", format(revenue, big.mark = ",")),
+           color = "#2166ac", vjust = 1.5, hjust = -0.05) +
+  labs(title = "Розподіл загальних виплат S_n — CLT vs симуляція",
+       x = "Сумарні виплати, $", y = "Щільність") +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+# Додаткові задачі
+
+## Задача 8. Контроль якості напоїв (CLT для середнього)
+
+> Автомат наповнює пляшки з напоєм. Об'єм рідини в пляшці — випадкова величина з $\mu = 500$ мл та $\sigma = 8$ мл. Інспектор бере вибірку з $n = 36$ пляшок. Яка ймовірність, що середній об'єм у вибірці буде між 498 та 502 мл?
+
+### Математичне розв'язання
+
+За CLT: $\bar{X} \approx \mathcal{N}\left(\mu, \frac{\sigma^2}{n}\right) = \mathcal{N}\left(500, \frac{64}{36}\right)$.
+
+Стандартна похибка:
+
+$$
+\text{SE} = \frac{\sigma}{\sqrt{n}} = \frac{8}{\sqrt{36}} = \frac{8}{6} \approx 1.333 \text{ мл}
+$$
+
+$$
+P(498 < \bar{X} < 502) = P\left(\frac{498 - 500}{1.333} < Z < \frac{502 - 500}{1.333}\right) = P(-1.5 < Z < 1.5)
+$$
+
+$$
+= \Phi(1.5) - \Phi(-1.5) = 0.9332 - 0.0668 = 0.8664
+$$
+
+### Розв'язання в R
+
+```{r}
+mu    <- 500
+sigma <- 8
+n     <- 36
+se    <- sigma / sqrt(n)
+
+p_in_range <- pnorm(502, mu, se) - pnorm(498, mu, se)
+cat(sprintf("SE = %.4f мл\n", se))
+cat(sprintf("P(498 < X̄ < 502) = %.4f\n", p_in_range))
+```
+
+**Візуалізація:**
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4
+
+tibble(x = seq(mu - 4 * se, mu + 4 * se, length.out = 500)) |>
+  mutate(density = dnorm(x, mu, se),
+         in_band = x >= 498 & x <= 502) |>
+  ggplot(aes(x = x, y = density)) +
+  geom_area(aes(fill = in_band), alpha = 0.7, show.legend = FALSE) +
+  geom_line(color = "grey30", linewidth = 1) +
+  geom_vline(xintercept = c(498, 502), linetype = "dashed", color = "#d73027") +
+  scale_fill_manual(values = c("TRUE" = "#4393c3", "FALSE" = "grey80")) +
+  annotate("text", x = 500, y = dnorm(500, mu, se) * 0.5,
+           label = sprintf("P ≈ %.2f%%", p_in_range * 100),
+           color = "#2166ac", size = 4.5) +
+  labs(title = expression(paste("Розподіл ", bar(X), " для n = 36 пляшок")),
+       x = "Середній об'єм, мл", y = "Щільність") +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+## Задача 9. Симуляція CLT (візуальна демонстрація)
+
+> Продемонструвати CLT: згенерувати вибіркові середні з різних розподілів (експоненціального, рівномірного, Бернуллі) та показати, що при збільшенні $n$ вони стають нормально розподіленими.
+
+### Розв'язання в R
+
+```{r}
+#| fig-width: 8
+#| fig-height: 7
+
+set.seed(42)
+n_sim     <- 10000
+sample_ns <- c(5, 30, 100)
+
+distributions <- list(
+  "Exp(λ = 1)"       = function(n) rexp(n, rate = 1),
+  "Uniform(0, 1)"    = function(n) runif(n, 0, 1),
+  "Bernoulli(p=0.3)" = function(n) rbinom(n, 1, 0.3)
+)
+
+params <- list(
+  "Exp(λ = 1)"       = list(mu = 1, sigma = 1),
+  "Uniform(0, 1)"    = list(mu = 0.5, sigma = 1/sqrt(12)),
+  "Bernoulli(p=0.3)" = list(mu = 0.3, sigma = sqrt(0.3 * 0.7))
+)
+
+sim_data <- expand_grid(
+  dist_name = names(distributions),
+  n = sample_ns
+) |>
+  mutate(
+    means = map2(dist_name, n, \(d, nn) {
+      gen <- distributions[[d]]
+      replicate(n_sim, mean(gen(nn)))
+    })
+  ) |>
+  unnest(means) |>
+  mutate(n_label = paste("n =", n))
+
+sim_data |>
+  ggplot(aes(x = means)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 50,
+                 fill = "#4393c3", color = "white", alpha = 0.7) +
+  facet_grid(dist_name ~ n_label, scales = "free") +
+  labs(title = "Демонстрація CLT: вибіркові середні з різних розподілів",
+       x = expression(bar(X)), y = "Щільність") +
+  theme_minimal(base_size = 11) +
+  theme(strip.text = element_text(size = 10, face = "bold"))
+```
+
+> При збільшенні $n$ розподіл вибіркового середнього стає все більш «нормальним» (дзвоноподібним), незалежно від вихідного розподілу — це наочне підтвердження CLT.
+
+---
+
+# Підсумок
+
+| № | Тип задачі | Інструмент | Ключовий результат |
+|---|---|---|---|
+| 1 | CLT для суми (ліфт) | `pnorm` | $\approx 4.09\%$ перевантаження |
+| 2 | CLT для середнього (лампочки) | `pnorm` | $P(\bar{X} < 790) \approx 2.28\%$ |
+| 3 | Маркова / Чебишева | арифметика | $\leq 0.5$ / $\leq 0.04$ |
+| 4 | 6-Sigma, $C_p$ | `pnorm` | $C_p = 1.67$ — не пройшов |
+| 5 | Чебишев → $n$ | арифметика | $n \geq 50\,000$ |
+| 6 | CLT — сума (вантажівка) | `pnorm`, `replicate` | $\approx 0.62\%$ |
+| 7 | CLT — портфель (страхування) | `pnorm`, `replicate` | $\approx 7.8\%$ ризик збитку |
+| 8 | CLT для середнього (напої) | `pnorm` | $P \approx 86.64\%$ |
+| 9 | Візуальна демонстрація CLT | `replicate`, `facet_grid` | CLT працює для будь-якого розподілу |
