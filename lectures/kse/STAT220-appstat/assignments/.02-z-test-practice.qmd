@@ -1,0 +1,908 @@
+---
+title: "Практика 3"
+subtitle: "Будуємо власний `proportions_ztest` для A/B-експерименту"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: ua
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import norm, binom
+
+np.random.seed(73)
+
+turquoise = "#20B2AA"
+red       = "#fb6107"
+blue      = "#181485"
+gray      = "#A0A0A0"
+```
+
+# Що ми робимо сьогодні {.unnumbered}
+
+На лекції ми по черзі побудували Z-тест: нормальний розподіл, ЦГТ, Z-статистику,
+continuity correction і нарешті --- двовибірковий Z-тест для пропорцій з
+довірчим інтервалом. Сьогодні **збираємо все в один інструмент** ---
+власну функцію `my_z_test()`, а потім її «двовибіркового близнюка»
+`my_two_sample_z_test()`, схожого за духом на
+`statsmodels.stats.proportion.proportions_ztest`.
+
+::: {.callout-note icon="false"}
+## Правила гри
+- Не використовуємо готовий `proportions_ztest` --- пишемо все самі через
+  `scipy.stats.norm` (`norm.cdf`, `norm.ppf`).
+- Кожна версія --- це маленьке розширення попередньої.
+- Кожен фінальний крок (Final, повний цикл) **перевикористовує**
+  попередні функції, а не дублює їх.
+- Після кожної версії --- блок **«Ваша черга»** з мінізадачею.
+:::
+
+---
+
+# Кейс: застосунок доставки їжі GreenBowl
+
+Працюємо над **GreenBowl** --- застосунком доставки здорової їжі. Продуктова
+команда додала на головному екрані кнопку **«1-click reorder»** ---
+повторити попереднє замовлення в один тап. Перш ніж розкочувати фічу на
+всю аудиторію, треба переконатись, що вона **дійсно піднімає метрику
+повторних замовлень**.
+
+::: {.border}
+- **Одиниця спостереження:** один користувач після першого замовлення.
+- **Метрика успіху:** користувач зробив ще одне замовлення впродовж 7 днів
+  (1) або ні (0).
+- **Модель:** $X_i \sim \text{Bernoulli}(\mu)$, кількість успіхів
+  $T = \sum X_i \sim \text{Binomial}(n, \mu)$.
+- **Базовий рівень:** $\mu_0 = 0{,}10$ (3 місяці історичних даних).
+- **Бізнес-MDE:** ефект < +1 в.п. не вартий ресурсів на впровадження.
+- **Напрям:** нас цікавить лише ефект «вгору» → **однобічний тест**.
+- **Рівень значущості:** $\alpha = 0{,}05$.
+:::
+
+::: {.callout-note icon="false"}
+## Чому Z-тест, а не точний біномний?
+Аудиторія GreenBowl --- сотні тисяч користувачів. На таких розмірах
+вибірки нормальна апроксимація дуже точна, а Z-тест на порядки швидший
+за точний біномний на вибірках $n > 10^4$. Це і є той «масштаб», заради
+якого існує Z-тест.
+:::
+
+---
+
+# Версія 1 --- Z-статистика і p-value
+
+Найпростіша версія: дано $n$, $\mu_0$ і кількість успіхів $q$. Повертаємо
+однобічний $p$-value для $H_1: \mu > \mu_0$ за нормальною апроксимацією.
+
+$$
+Z = \sqrt{n}\,\dfrac{\hat{p} - \mu_0}{\sqrt{\mu_0(1-\mu_0)}},\qquad
+p\text{-value} = 1 - \Phi(Z)
+$$
+
+```{python}
+#| label: v1
+
+def my_z_test(q, n, mu0=0.5):
+    """
+    Версія 1. Однобічний Z-тест для пропорції, H1: mu > mu0.
+    """
+    p_hat = q / n
+    se    = np.sqrt(mu0 * (1 - mu0) / n)
+    z     = (p_hat - mu0) / se
+    return 1 - norm.cdf(z)
+```
+
+Спробуймо на нашому кейсі. Маркетинг привів **2 000 нових користувачів**
+у тестовий когорт, і **226 з них** зробили повторне замовлення впродовж 7 днів.
+
+```{python}
+#| label: v1-demo
+
+p_val = my_z_test(q=226, n=2000, mu0=0.10)
+print(f"p-value = {p_val:.4f}")
+```
+
+$p < 0{,}05$ --- є докази на користь $H_1$. Конверсія 11.3% статистично
+вища за історичні 10%. Але **не поспішаймо «шипати»** --- ефект може
+бути на межі бізнес-значущості. Далі додамо CI, щоб побачити розмір.
+
+::: {.callout-tip icon="false"}
+## Ваша черга 1
+Викличте `my_z_test` для $q \in \{200, 210, 220, 230, 240\}$ при $n=2000$,
+$\mu_0=0{,}10$. Як змінюється $p$-value? Знайдіть найменше $q$, при якому
+$p \leq 0{,}05$.
+:::
+
+---
+
+# Версія 2 --- три варіанти альтернативи
+
+Антифрод-команда хоче перевіряти **падіння** метрики (одне-бічний `less`),
+продакт-команда іноді хоче «чи щось взагалі змінилось» (двобічний).
+Додаємо параметр `alternative`.
+
+```{python}
+#| label: v2
+
+def my_z_test(q, n, mu0=0.5, alternative="greater"):
+    """
+    Версія 2. Додає параметр `alternative`.
+
+    alternative : {"greater", "less", "two-sided"}
+    """
+    p_hat = q / n
+    se    = np.sqrt(mu0 * (1 - mu0) / n)
+    z     = (p_hat - mu0) / se
+
+    if alternative == "greater":
+        return 1 - norm.cdf(z)
+    if alternative == "less":
+        return norm.cdf(z)
+    if alternative == "two-sided":
+        return 2 * (1 - norm.cdf(abs(z)))
+
+    raise ValueError(f"Невідома альтернатива: {alternative!r}")
+```
+
+```{python}
+#| label: v2-demo
+
+for alt in ("greater", "less", "two-sided"):
+    p = my_z_test(q=226, n=2000, mu0=0.10, alternative=alt)
+    print(f"alternative={alt:>10s}  →  p-value = {p:.4f}")
+```
+
+Зверніть увагу: для тих самих даних **однобічний $p$-value дорівнює
+половині двобічного** --- бо нормальний розподіл симетричний. Це не
+співпадіння, а наслідок формули $2 \cdot (1 - \Phi(|z|))$.
+
+::: {.callout-warning icon="false"}
+## Коли двобічний обов'язковий
+Якщо продукт має реальний ризик нашкодити (наприклад, новий пейволл,
+який може як підняти, так і обвалити конверсію) --- беремо двобічний.
+У кейсі GreenBowl ризик однобічний: погану кнопку ми просто не випустимо.
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 2
+На вибірці $q=226$, $n=2000$, $\mu_0=0{,}10$ переконайтесь, що
+`p_two_sided == 2 * p_greater` **точно**. Чому в Z-тесті це строга
+рівність, а в біномному --- лише наближена?
+:::
+
+---
+
+# Версія 3 --- continuity correction
+
+Для маленьких $n$ Z-тест систематично занижує $p$-value відносно точного
+біномного. На лекції ми «допилили» це зсувом нормальної на $-0{,}5$.
+Додаємо прапор `use_cc`.
+
+```{python}
+#| label: v3
+
+def my_z_test(q, n, mu0=0.5, alternative="greater", use_cc=False):
+    """
+    Версія 3. Додає continuity correction (рекомендується при n < ~100).
+    """
+    p_hat = q / n
+    if use_cc:
+        # Зсуваємо спостережене на 0.5/n у бік mu0 — це і є коректування
+        if alternative == "greater":
+            p_hat = (q - 0.5) / n
+        elif alternative == "less":
+            p_hat = (q + 0.5) / n
+        else:
+            # two-sided: зсуваємо в бік mu0
+            p_hat = (q - 0.5) / n if p_hat >= mu0 else (q + 0.5) / n
+
+    se = np.sqrt(mu0 * (1 - mu0) / n)
+    z  = (p_hat - mu0) / se
+
+    if alternative == "greater":
+        return 1 - norm.cdf(z)
+    if alternative == "less":
+        return norm.cdf(z)
+    if alternative == "two-sided":
+        return 2 * (1 - norm.cdf(abs(z)))
+
+    raise ValueError(f"Невідома альтернатива: {alternative!r}")
+```
+
+**Сценарій A.** MVP-запуск на $n=30$ бета-тестерах, $q=19$ (приклад з лекції):
+
+```{python}
+#| label: v3-demo-small
+
+p_naive_small = my_z_test(q=19, n=30, mu0=0.5, use_cc=False)
+p_cc_small    = my_z_test(q=19, n=30, mu0=0.5, use_cc=True)
+p_exact_small = 1 - binom.cdf(19 - 1, 30, 0.5)
+
+print("MVP-запуск, n=30:")
+print(f"  Z-тест без correction:  p = {p_naive_small:.4f}")
+print(f"  Z-тест з correction:    p = {p_cc_small:.4f}")
+print(f"  Точний біномний:        p = {p_exact_small:.4f}")
+```
+
+Корекція суттєво наближає Z-тест до точного результату --- $p$-value
+збільшується з 0.07 до 0.10.
+
+**Сценарій B.** Запуск на повній GreenBowl-аудиторії, $n=2000$, $q=226$:
+
+```{python}
+#| label: v3-demo-big
+
+p_naive_big = my_z_test(q=226, n=2000, mu0=0.10, use_cc=False)
+p_cc_big    = my_z_test(q=226, n=2000, mu0=0.10, use_cc=True)
+
+print("GreenBowl-масштаб, n=2000:")
+print(f"  Z-тест без correction:  p = {p_naive_big:.6f}")
+print(f"  Z-тест з correction:    p = {p_cc_big:.6f}")
+print(f"  Різниця:                {abs(p_naive_big - p_cc_big):.6f}")
+```
+
+::: {.callout-note icon="false"}
+## Висновок
+Continuity correction --- це «милиця» для малих вибірок. На GreenBowl-масштабі
+різниця проявляється в 5-6-му знаку і на жодне бізнес-рішення не впливає.
+Саме тому для великих $n$ ми спокійно використовуємо Z-тест без корекції,
+а на MVP-етапі (десятки користувачів) переходимо або на correction, або
+одразу на точний біномний.
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 3
+Знайдіть мінімальне $n$, для якого різниця між Z-тестом з correction і
+без неї стає $< 0{,}001$. На якому $n$ correction перестає бути потрібною?
+:::
+
+---
+
+# Версія 4 --- довірчий інтервал для $\mu$
+
+Замість «так/ні» бізнес хоче **діапазон** для реальної конверсії.
+Найпростіший CI --- Вальдівський:
+
+$$
+\hat{p} \pm z_{1-\alpha/2}\,\sqrt{\dfrac{\hat{p}(1-\hat{p})}{n}}
+$$
+
+```{python}
+#| label: v4
+
+def my_z_test(q, n, mu0=0.5, alternative="greater",
+              use_cc=False, alpha=0.05, conf_int=False):
+    """
+    Версія 4. Додає conf_int=True → повертає dict з p-value і CI.
+    """
+    p_hat_raw = q / n
+
+    p_hat = p_hat_raw
+    if use_cc:
+        if alternative == "greater":
+            p_hat = (q - 0.5) / n
+        elif alternative == "less":
+            p_hat = (q + 0.5) / n
+        else:
+            p_hat = (q - 0.5) / n if p_hat_raw >= mu0 else (q + 0.5) / n
+
+    se_null = np.sqrt(mu0 * (1 - mu0) / n)
+    z       = (p_hat - mu0) / se_null
+
+    if alternative == "greater":
+        p_value = 1 - norm.cdf(z)
+    elif alternative == "less":
+        p_value = norm.cdf(z)
+    elif alternative == "two-sided":
+        p_value = 2 * (1 - norm.cdf(abs(z)))
+    else:
+        raise ValueError(f"Невідома альтернатива: {alternative!r}")
+
+    if not conf_int:
+        return p_value
+
+    # Вальдівський CI використовує SE з p_hat (а не mu0!)
+    se_emp = np.sqrt(p_hat_raw * (1 - p_hat_raw) / n)
+    z_crit = norm.ppf(1 - alpha / 2)
+    ci_low  = p_hat_raw - z_crit * se_emp
+    ci_high = p_hat_raw + z_crit * se_emp
+
+    return {"p_value": p_value, "ci_low": ci_low, "ci_high": ci_high}
+```
+
+::: {.callout-important icon="false"}
+## Тонкий момент: SE для тесту і SE для CI --- різні
+Для **тесту** беремо $\sqrt{\mu_0(1-\mu_0)/n}$ (припускаємо H₀).
+Для **CI** беремо $\sqrt{\hat{p}(1-\hat{p})/n}$ (описуємо спостережене,
+без припущень). Це та сама логіка pooled vs unpooled, яка з'явиться у
+двовибірковому тесті.
+:::
+
+::: {.callout-note icon="false"}
+## Коли Wald CI ламається
+Wald-інтервал може **виходити за межі $[0, 1]$** при крайніх $\hat p$
+(наприклад, $\hat p = 0{,}02$ на $n=50$). Для $p \lesssim 5\%$ або
+$p \gtrsim 95\%$ беріть Wilson або Clopper-Pearson:
+`statsmodels.stats.proportion.proportion_confint(q, n, method="wilson")`.
+:::
+
+```{python}
+#| label: v4-demo
+
+result = my_z_test(q=226, n=2000, mu0=0.10,
+                   alternative="two-sided",
+                   alpha=0.05, conf_int=True)
+
+print(f"p-value:        {result['p_value']:.4f}")
+print(f"95% CI for mu:  [{result['ci_low']:.4f}, {result['ci_high']:.4f}]")
+```
+
+::: {.callout-important icon="false"}
+## Інтерпретація для PM
+- **Точкова оцінка:** $\hat{\mu} = 226/2000 = 11{,}3\%$.
+- **CI:** з імовірністю $\geq 95\%$ повторні експерименти дадуть інтервали,
+  які покриють істинне $\mu$.
+- **$\mu_0 = 10\%$ за межами CI** → відхиляємо H₀. Базовий рівень не
+  пояснює спостереженого результату.
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 4
+Для $q=226$, $n=2000$ побудуйте однобічну нижню межу (`alternative="greater"`).
+Чи перетинає вона бізнес-поріг $\mu_0 + \text{MDE} = 11\%$? Що це означає
+для рішення «шипати»?
+:::
+
+---
+
+# Від однієї вибірки до двох {.unnumbered}
+
+`my_z_test` працює коли є **фіксований baseline** --- наприклад,
+моніторинг SLA («чи конверсія в продакшні $\geq 10\%$ за тиждень?») або
+порівняння поточного тижня з історією. Але **чесний A/B-тест** запускає
+дві когорти одночасно --- і обидві мають шум.
+
+Створюємо паралельну функцію `my_two_sample_z_test`. **Стара
+функція не зникає** --- вона залишається для baseline-сценаріїв: SLA-моніторинг,
+regression detection, sanity-перевірки історичних метрик.
+
+---
+
+# Версія 5 --- двовибірковий Z-тест
+
+Замість фіксованого $\mu_0$ використовуємо **pooled** оцінку:
+
+$$
+\hat{p}_{\text{pool}} = \dfrac{x_1 + x_2}{n_1 + n_2},\qquad
+SE_{\text{pool}} = \sqrt{\hat{p}_{\text{pool}}(1-\hat{p}_{\text{pool}})
+\left(\tfrac{1}{n_1} + \tfrac{1}{n_2}\right)}.
+$$
+
+```{python}
+#| label: v5
+
+def my_two_sample_z_test(x1, n1, x2, n2,
+                         alternative="two-sided",
+                         alpha=0.05, conf_int=False):
+    """
+    Двовибірковий Z-тест на різницю пропорцій.
+    Конвенція: alternative щодо p1 - p2 (control - test, якщо порядок такий).
+    """
+    p1, p2 = x1 / n1, x2 / n2
+
+    # Pooled SE — для тесту
+    p_pool  = (x1 + x2) / (n1 + n2)
+    se_pool = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
+    z       = (p1 - p2) / se_pool
+
+    if alternative == "greater":
+        p_value = 1 - norm.cdf(z)
+    elif alternative == "less":
+        p_value = norm.cdf(z)
+    elif alternative == "two-sided":
+        p_value = 2 * (1 - norm.cdf(abs(z)))
+    else:
+        raise ValueError(f"Невідома альтернатива: {alternative!r}")
+
+    if not conf_int:
+        return p_value
+
+    # Unpooled SE — для CI
+    se_unp = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+    z_crit = norm.ppf(1 - alpha / 2)
+    diff   = p1 - p2
+
+    return {
+        "z_stat": z,
+        "p_value": p_value,
+        "estimate_diff": diff,
+        "ci_low":  diff - z_crit * se_unp,
+        "ci_high": diff + z_crit * se_unp,
+    }
+```
+
+## Демо: чесний A/B GreenBowl
+
+Свідомо беремо **числа на межі бізнес-MDE**, щоб побачити реальну
+дилему «ship/no-ship», а не очевидний випадок.
+
+```{python}
+#| label: v5-demo
+
+# Control: стара версія
+# Test:    нова кнопка «1-click reorder»
+x1, n1 = 200, 2000   # control: 10.0%
+x2, n2 = 240, 2000   # test:    12.0%
+
+res = my_two_sample_z_test(x1, n1, x2, n2,
+                           alternative="less",   # H1: control < test
+                           alpha=0.05, conf_int=True)
+
+p1, p2 = x1/n1, x2/n2
+print(f"p1 (control) = {p1:.4f}")
+print(f"p2 (test)    = {p2:.4f}")
+print(f"lift         = {p2-p1:+.4f} ({(p2-p1)*100:+.2f} в.п.)")
+print(f"Z = {res['z_stat']:.4f},  p-value = {res['p_value']:.4f}")
+print(f"95% CI for p1 - p2 = [{res['ci_low']:+.4f}, {res['ci_high']:+.4f}]")
+print(f"95% CI for lift    = [{-res['ci_high']*100:+.2f}, {-res['ci_low']*100:+.2f}] в.п.")
+```
+
+::: {.callout-warning icon="false"}
+## Прочитайте результат уважно
+- **Тест:** $p < 0{,}05$ → відхиляємо $H_0$. Lift статистично значущий.
+- **CI для lift:** приблизно $[+0{,}06,\ +3{,}94]$ в.п. **Нижня межа** ---
+  лише +0.06 в.п., значно **нижча за бізнес-MDE +1 в.п.**
+- **PM-дилема:** статистично є, але бізнес-значущість невпевнена ---
+  істинний lift може виявитися 0.1 в.п., що не вартий деплою. Рішення:
+  або зібрати більше даних, або погодитись на ризик «потенційно
+  ефемерної» перемоги.
+:::
+
+## Cross-check з індустріальним стандартом
+
+```{python}
+#| label: v5-statsmodels
+
+from statsmodels.stats.proportion import proportions_ztest
+
+# statsmodels конвенція: alternative="smaller" → H1: p1 < p2 (наш "less")
+z_sm, p_sm = proportions_ztest([x1, x2], [n1, n2], alternative="smaller")
+print(f"statsmodels:   Z = {z_sm:.4f},  p = {p_sm:.4f}")
+print(f"мій код:       Z = {res['z_stat']:.4f},  p = {res['p_value']:.4f}")
+```
+
+Числа збігаються до 4-го знака --- наша реалізація коректна.
+
+## Unbalanced groups (90/10 split)
+
+У продакшні часто запускають нову фічу на меншому відсотку трафіку для
+безпеки. Перевіряємо: функція має працювати і для нерівних $n_1, n_2$.
+
+```{python}
+#| label: v5-unbalanced
+
+x1_u, n1_u = 1820, 18_000   # control 90% трафіку: 10.11%
+x2_u, n2_u =  243,  2_000   # test 10% трафіку:    12.15%
+
+res_u = my_two_sample_z_test(x1_u, n1_u, x2_u, n2_u,
+                             alternative="less", conf_int=True)
+print(f"Unbalanced 90/10: lift = {(x2_u/n2_u - x1_u/n1_u)*100:+.2f} в.п.")
+print(f"p-value = {res_u['p_value']:.4f}")
+print(f"CI ширина = {(res_u['ci_high'] - res_u['ci_low'])*100:.2f} в.п.")
+```
+
+::: {.callout-note icon="false"}
+## Чому unbalanced --- це дорожче
+Загальна вибірка $20\,000$ замість $4\,000$, але CI **ширше**, ніж у
+збалансованих $2\,000 \times 2$. Причина: ширина CI визначається меншою
+з груп. Для тієї самої точності unbalanced дизайн потребує більше
+користувачів сумарно.
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 5
+Збережіть сумарну вибірку $20\,000$ і змініть пропорцію контроль/тест:
+50/50, 70/30, 90/10. Як змінюється ширина CI? Підтвердіть, що 50/50 ---
+оптимальне.
+:::
+
+---
+
+# Версія 6 --- потужність і планування вибірки
+
+::: {.callout-note icon="false"}
+## Формула потужності для двовибіркового Z (one-sided)
+$$
+\text{Power}(\text{greater}) = 1 - \Phi\!\left(
+  \dfrac{z_{1-\alpha} \cdot SE_{\text{null}} - (p_1 - p_2)}{SE_{\text{alt}}}
+\right),
+$$
+де $SE_{\text{null}}$ рахуємо на $\bar p = (p_1+p_2)/2$ (pooled під H₀),
+а $SE_{\text{alt}}$ --- на справжніх $p_1, p_2$.
+:::
+
+```{python}
+#| label: v6-power
+
+def my_two_sample_z_power(p1, p2, n1, n2,
+                          alpha=0.05, alternative="two-sided"):
+    """
+    Потужність двовибіркового Z-тесту на пропорції.
+    Конвенція: Z = (p1 - p2) / SE_pool; alternative щодо p1 - p2.
+    """
+    delta   = p1 - p2
+    p_bar   = (p1 + p2) / 2
+    se_null = np.sqrt(p_bar * (1 - p_bar) * (1 / n1 + 1 / n2))
+    se_alt  = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+
+    if alternative == "greater":
+        z_a = norm.ppf(1 - alpha)
+        return 1 - norm.cdf((z_a * se_null - delta) / se_alt)
+    if alternative == "less":
+        z_a = norm.ppf(1 - alpha)
+        return norm.cdf((-z_a * se_null - delta) / se_alt)
+    if alternative == "two-sided":
+        z_a   = norm.ppf(1 - alpha / 2)
+        right = 1 - norm.cdf((z_a * se_null - delta) / se_alt)
+        left  = norm.cdf((-z_a * se_null - delta) / se_alt)
+        return right + left
+
+    raise ValueError(f"Невідома альтернатива: {alternative!r}")
+```
+
+`plan_ab_experiment` через **bisection** --- швидше і точніше за grid:
+
+```{python}
+#| label: v6-plan
+
+def plan_ab_experiment(p1, mde, alpha=0.05, target_power=0.8,
+                       alternative="less", n_lo=10, n_hi=500_000):
+    """
+    Скільки користувачів на групу треба, щоб задетектити ефект `mde`?
+    Bisection: ~log2(n_hi) кроків замість тисяч.
+    """
+    # alternative дає знак ефекту: "less" → p2 > p1; "greater" → p2 < p1
+    sign = +1 if alternative != "greater" else -1
+    p2   = p1 + sign * mde
+
+    # Sanity: чи n_hi достатньо
+    if my_two_sample_z_power(p1, p2, n_hi, n_hi, alpha, alternative) < target_power:
+        return None
+
+    while n_hi - n_lo > 1:
+        n_mid = (n_lo + n_hi) // 2
+        if my_two_sample_z_power(p1, p2, n_mid, n_mid, alpha, alternative) >= target_power:
+            n_hi = n_mid
+        else:
+            n_lo = n_mid
+    return n_hi
+```
+
+Подивимось на наш кейс. Базовий рівень --- 10%, бізнес-MDE --- +1 в.п.
+
+```{python}
+#| label: v6-demo
+
+# Сценарій A: маркетинг гарантує 2000 на групу. Що ми задетектимо?
+for n in (1000, 2000, 5000, 10_000):
+    pw = my_two_sample_z_power(p1=0.10, p2=0.11, n1=n, n2=n,
+                               alpha=0.05, alternative="less")
+    print(f"n = {n:>6d}  →  power(+1 в.п.) = {pw:.3f}")
+
+# Сценарій B: PM хоче гарантовано задетектити +1 в.п. з power = 0.8
+n_needed = plan_ab_experiment(p1=0.10, mde=0.01,
+                              alpha=0.05, target_power=0.8,
+                              alternative="less")
+print(f"\nДля детекції +1 в.п. потрібно: {n_needed} користувачів на групу")
+```
+
+::: {.callout-important icon="false"}
+## Ключовий trade-off
+- Half the MDE ⇒ потрібна вибірка зростає **приблизно вчетверо**.
+- На baseline 10% детекція +0{,}5 в.п. з power 0.8 = десятки тисяч на групу.
+  У продакт-термінах це 2-4 тижні чекання --- або відмова від «дрібного»
+  ефекту як від бізнес-цілі.
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 6
+Побудуйте графік: на осі X --- розмір вибірки на групу (від 500 до 30 000),
+на осі Y --- потужність для MDE = +1 в.п. Знайдіть мінімальне $n$, при
+якому power $\geq 0{,}8$, і звірте з результатом `plan_ab_experiment`.
+:::
+
+---
+
+# Фінал --- повний `my_ab_test`
+
+Тепер збираємо все **через перевикористання** V5 і V6. Жодного
+дублювання коду --- лише виклики готових функцій.
+
+```{python}
+#| label: vf
+
+def my_ab_test(x1, n1, x2, n2,
+               alternative="two-sided",
+               alpha=0.05, target_power=0.8):
+    """
+    Повний звіт для A/B-тесту. Reuses my_two_sample_z_test + my_two_sample_z_power.
+    """
+    # 1) Test + CI (reuse V5)
+    test = my_two_sample_z_test(x1, n1, x2, n2,
+                                alternative=alternative,
+                                alpha=alpha, conf_int=True)
+
+    p1, p2 = x1 / n1, x2 / n2
+    lift   = p2 - p1
+
+    # 2) Потужність при спостережених даних (reuse V6)
+    power_obs = my_two_sample_z_power(p1, p2, n1, n2, alpha, alternative)
+
+    # 3) MDE, який потяг би поточний n_avg (bisection)
+    n_avg = (n1 + n2) // 2
+    sign  = +1 if alternative != "greater" else -1
+
+    def has_power(mde):
+        return my_two_sample_z_power(p1, p1 + sign * mde, n_avg, n_avg,
+                                     alpha, alternative) >= target_power
+
+    mde_at_n = None
+    lo, hi = 0.0, min(p1, 1 - p1)
+    if has_power(hi):
+        for _ in range(40):
+            mid = (lo + hi) / 2
+            if has_power(mid):
+                hi = mid
+            else:
+                lo = mid
+        mde_at_n = hi
+
+    decision = "REJECT H0" if test["p_value"] <= alpha else "не відхиляємо H0"
+    summary_lines = [
+        f"n1={n1}, x1={x1} (p1={p1:.4f})  vs  n2={n2}, x2={x2} (p2={p2:.4f})",
+        f"lift = {lift:+.4f} ({lift*100:+.2f} в.п.)",
+        f"Z = {test['z_stat']:+.3f},  p-value = {test['p_value']:.4f}  →  {decision}",
+        f"{int((1-alpha)*100)}% CI для p1-p2: [{test['ci_low']:+.4f}, {test['ci_high']:+.4f}]",
+        f"power при спостережених = {power_obs:.3f}",
+    ]
+    if mde_at_n is not None:
+        summary_lines.append(
+            f"MDE при n_avg={n_avg}, power={target_power}: {mde_at_n*100:.2f} в.п."
+        )
+
+    return {
+        "p1": p1, "p2": p2, "lift": lift,
+        "z_stat": test["z_stat"],
+        "p_value": test["p_value"],
+        "reject": test["p_value"] <= alpha,
+        "ci_diff": (test["ci_low"], test["ci_high"]),
+        "power_at_observed": power_obs,
+        "mde_at_n": mde_at_n,
+        "summary": "\n".join(summary_lines),
+    }
+```
+
+---
+
+# Sanity check: A/A-симуляція
+
+Перш ніж довіряти A/B-висновкам, **перевірте інфраструктуру на A/A** ---
+запустіть тест на двох групах із однаковим $p$. Якщо все правильно
+налаштовано, частка хибно-позитивних має бути приблизно $\alpha$.
+
+```{python}
+#| label: aa-sim
+
+def simulate_AA(p_shared, n_per_group, n_simulations=2000,
+                alpha=0.05, alternative="two-sided"):
+    """
+    A/A-симуляція: оцінює емпіричний FPR.
+    """
+    rejections = 0
+    for _ in range(n_simulations):
+        s1 = binom.rvs(1, p_shared, size=n_per_group)
+        s2 = binom.rvs(1, p_shared, size=n_per_group)
+        p_val = my_two_sample_z_test(int(s1.sum()), n_per_group,
+                                     int(s2.sum()), n_per_group,
+                                     alternative=alternative)
+        if p_val <= alpha:
+            rejections += 1
+    return rejections / n_simulations
+
+
+np.random.seed(42)
+fpr_two_sided = simulate_AA(p_shared=0.10, n_per_group=2000,
+                            n_simulations=2000, alternative="two-sided")
+fpr_one_sided = simulate_AA(p_shared=0.10, n_per_group=2000,
+                            n_simulations=2000, alternative="less")
+
+print(f"FPR двобічного:  {fpr_two_sided:.3f}  (target ≈ 0.05)")
+print(f"FPR однобічного: {fpr_one_sided:.3f}  (target ≈ 0.05)")
+```
+
+::: {.callout-important icon="false"}
+## Що робити, якщо FPR далеко від $\alpha$
+- **FPR значно більший** за $\alpha$ → інфраструктура хибно «знаходить»
+  ефекти. Можливі причини: peeking, неправильна randomization, дані з
+  обох груп заходять не з однакового джерела.
+- **FPR значно менший** → тест надто консервативний. Можливо, неправильна
+  формула SE, або continuity correction там, де її не треба.
+- Запускати A/B на такій інфраструктурі --- марна трата трафіку.
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 7
+Запустіть A/A на МАЛІЙ вибірці ($n=50$ на групу), 2000 симуляцій. Чи
+все ще FPR $\approx 0{,}05$? Чи нормальна апроксимація ще тримається при
+$n \cdot p = 5$?
+:::
+
+---
+
+# Повний цикл A/B-експерименту
+
+Тепер пройдемо весь шлях «як це відбувається на роботі»: спочатку
+планування, потім симульований запуск, потім звіт.
+
+## Крок 1. Планування
+
+```{python}
+#| label: run-plan
+
+mu0           = 0.10
+business_mde  = 0.01           # +1 в.п. — найменший цікавий ефект
+alpha         = 0.05
+target_power  = 0.80
+
+N = plan_ab_experiment(p1=mu0, mde=business_mde,
+                       alpha=alpha, target_power=target_power,
+                       alternative="less")
+
+print(f"План: запускаємо тест на N = {N} користувачів НА ГРУПУ")
+print(f"      (мінімально цікавий ефект = +{business_mde*100:.0f} в.п., power = {target_power})")
+```
+
+## Крок 2. Симульований запуск
+
+Симулюємо реальність, де нова кнопка **справді** піднімає конверсію до 11.5%
+(значення, невідоме аналітику наперед).
+
+```{python}
+#| label: run-sim
+
+np.random.seed(2026)
+
+true_p_control = 0.10
+true_p_test    = 0.115
+
+sample_control = binom.rvs(1, true_p_control, size=N)
+sample_test    = binom.rvs(1, true_p_test,    size=N)
+
+x1 = int(sample_control.sum())
+x2 = int(sample_test.sum())
+
+print(f"Control: {x1} повторних замовлень з {N} (p_hat = {x1/N:.4f})")
+print(f"Test:    {x2} повторних замовлень з {N} (p_hat = {x2/N:.4f})")
+```
+
+## Крок 3. Аналіз
+
+```{python}
+#| label: run-test
+
+result = my_ab_test(x1, N, x2, N,
+                    alternative="less",
+                    alpha=alpha,
+                    target_power=target_power)
+
+print(result["summary"])
+```
+
+## Крок 4. Звіт для стейкхолдерів
+
+::: {.border}
+**Підсумок A/B-тесту кнопки «1-click reorder»**
+
+- Спостережена конверсія в повторні замовлення:
+  control = **`{python} round(result['p1']*100, 2)`%**,
+  test = **`{python} round(result['p2']*100, 2)`%**.
+- Lift: **`{python} f"{result['lift']*100:+.2f}"` в.п.**
+- 95% CI для lift:
+  **[`{python} f"{-result['ci_diff'][1]*100:+.2f}"`, `{python} f"{-result['ci_diff'][0]*100:+.2f}"`] в.п.**
+- Тест при $\alpha=0{,}05$:
+  **`{python} 'reject H0 — є докази lift' if result['reject'] else 'не відхиляємо H0 — недостатньо доказів'`**
+  ($p = $ `{python} round(result['p_value'], 4)`).
+- Потужність плану при спостережених даних:
+  `{python} round(result['power_at_observed'], 3)`.
+
+**Рекомендація:** якщо нижня межа CI для lift перевищує бізнес-MDE
+(+1 в.п.) --- шипаємо. Інакше --- збираємо більше даних або повертаємось
+до дизайн-етапу.
+:::
+
+---
+
+# Пастки інтерпретації
+
+::: {.callout-warning icon="false"}
+## Три речення, які менеджеру казати не варто
+
+❌ «$p = 0{,}03$, тому з імовірністю 97% наша кнопка краща».
+   Плутає $p$-value з $P(H_1 \mid \text{дані})$.
+
+❌ «Тест не показав значущого ефекту, тому кнопка не працює».
+   Відсутність доказів ≠ доказ відсутності. Завжди питайте про **MDE**:
+   чи тест взагалі міг задетектити цей ефект?
+
+❌ «Зупиняймо --- вже бачимо $p < 0{,}05$ на 500 користувачах».
+   Це класичний *peeking*: він роздуває FPR в рази.
+:::
+
+::: {.callout-important icon="false"}
+## Чого CI не означає
+
+❌ «З імовірністю 95% істинне $\mu$ лежить у цьому інтервалі».
+
+✅ «Якщо повторити експеримент багато разів, 95% побудованих інтервалів
+   накриють істинне $\mu$».
+
+Інтервал випадковий; параметр --- ні.
+:::
+
+::: {.callout-warning icon="false"}
+## Pooled vs unpooled SE --- не плутайте
+- **Тест на $H_0: p_1 = p_2$:** pooled SE (припускаємо, що ймовірності
+  однакові).
+- **CI для різниці $p_1 - p_2$:** unpooled SE (описуємо реальну різницю,
+  без припущень).
+
+Це частий баг у саморобних A/B-калькуляторах.
+:::
+
+::: {.callout-warning icon="false"}
+## Multiple testing
+Якщо одночасно тестуєте $k$ варіантів, ймовірність хоча б одного
+хибно-позитивного на рівні $\alpha=0{,}05$ зростає як $1 - (1-\alpha)^k$.
+Для $k=3$ це вже $\approx 14\%$. Прості корекції:
+
+- **Бонферроні:** використовуйте $\alpha/k$ на кожен тест (консервативно).
+- **Holm--Bonferroni** або **Benjamini--Hochberg** (FDR-контроль) ---
+  менш консервативні. Реалізації: `statsmodels.stats.multitest.multipletests`.
+:::
+
+---
+
+# Чек-лист перед запуском {.unnumbered}
+
+- [ ] Чи зрозуміло, **яке бізнес-рішення** буде прийнято за результатом тесту?
+- [ ] Чи відомий baseline $\mu_0$ і **звідки** він?
+- [ ] Однобічний чи двобічний тест --- і **чому**?
+- [ ] Який **бізнес-MDE**?
+- [ ] Чи розрахований $N$ під цей MDE з power $\geq 0{,}8$?
+- [ ] Як звітуватимемо: $p$-value, CI, чи разом?
+- [ ] **Пройдено A/A** на цій інфраструктурі (FPR $\approx \alpha$)?
+- [ ] Pooled SE для тесту, unpooled SE для CI --- не переплутані?
+- [ ] Чи скоригований $\alpha$ під multiple testing, якщо тестуєте кілька варіантів?
+- [ ] Що робимо, якщо тест **неінформативний** (не відхилили, але й не
+  набрали достатньої потужності)?
+
+Якщо хоч на одне питання відповідь «ні» --- **зарано** запускати.

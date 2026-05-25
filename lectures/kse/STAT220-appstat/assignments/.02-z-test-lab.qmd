@@ -1,0 +1,390 @@
+---
+title: "Lab 3"
+subtitle: "Two-Sample Z-test, Power, and A/A Validation for a Real A/B Experiment"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+execute:
+  echo: true
+  warning: false
+---
+
+# Objective
+
+In **Lab 1** you designed a one-sample test for your own business case
+(comparing the observed metric against a fixed historical baseline
+$\mu_0$).
+
+In **Lab 2** you went beyond accept/reject and built confidence
+intervals, ran an A/A on your one-sample infrastructure, and wrote a
+PM-readable memo.
+
+**Lab 3** takes the next, more realistic step: you switch from
+"observed vs. historical baseline" to a **proper two-sample A/B test**
+--- two cohorts running in parallel, both with their own noise. The
+historical baseline becomes a sanity reference, not a parameter of the
+test.
+
+You will:
+
+1. Convert your one-sample framing into a proper two-sample A/B design,
+   stating the hypotheses in terms of $p_1$ and $p_2$.
+2. Wrap your test logic into a reusable `my_z_test()` function for the
+   **two-sample** case, with the pooled-vs-unpooled SE distinction
+   correctly implemented.
+3. Build the confidence interval **for the lift** and compare it with
+   the reference implementation.
+4. Plan the experiment: compute power, MDE, and the required sample
+   size, and contrast the answer with your one-sample plan from Lab 1.
+5. Validate the infrastructure with a **two-sample A/A simulation**,
+   and (bonus) check for **Sample Ratio Mismatch (SRM)**.
+6. Write a stakeholder-ready recommendation memo.
+
+# General Requirements
+
+::: {.callout-important icon="false"}
+## Continuity with Labs 1–2
+
+- You must reuse the **same business case** from Labs 1–2 (same product,
+  same metric, same baseline $\mu_0$). Inventing a brand-new case is
+  not allowed.
+- If your Lab 2 case had methodological issues, fix them in
+  @sec-recap and explain what you changed.
+- Copying another student's case is prohibited.
+:::
+
+::: {.callout-note icon="false"}
+## Report Format
+
+Submit the report in **one** of the following formats:
+
+- **Quarto → PDF** (`.qmd` → `.pdf`)
+- **Quarto → HTML** (`.qmd` → `.html`, hosted separately, e.g. on
+  [Quarto Pub](https://quartopub.com/), [Posit Connect Cloud](https://connect.posit.cloud/), etc.)
+- **Jupyter Notebook** (`.ipynb`)
+- **Google Colab** (share the link with viewing permissions)
+
+The report must contain both code **and** narrative text. Every section
+begins with a written explanation, not code.
+:::
+
+::: {.callout-warning icon="false"}
+## Restrictions on libraries
+
+You may use `numpy`, `pandas`, `matplotlib`, `scipy.stats.norm`,
+`scipy.stats.binom`, `scipy.stats.chi2`,
+`statsmodels.stats.proportion.proportion_confint`, and
+`statsmodels.stats.proportion.confint_proportions_2indep`.
+
+You **may not** use `statsmodels.stats.proportion.proportions_ztest` or
+`scipy.stats.fisher_exact` as the **primary** test --- only as a
+**verification step**. The core machinery must be your own code.
+:::
+
+::: {.callout-warning icon="false"}
+## Deadline
+
+📅 **June 10, 2026, 23:59**
+:::
+
+# Tasks
+
+## Recap of the Lab 2 Case {#sec-recap}
+
+::: {.border}
+1. In one paragraph, restate the business problem, the success metric,
+   and the historical baseline $\mu_0$.
+2. State the **business MDE** with its monetary justification.
+3. Briefly summarise what you found in Lab 2: the planned $N$, the
+   observed $q$, the one-sample $p$-value, the chosen confidence
+   interval, and your decision.
+4. If you discovered a methodological issue, state the fix here and use
+   the corrected setup throughout Lab 3.
+:::
+
+## From One Sample to Two: Design the A/B {#sec-design}
+
+In a real A/B experiment we **do not compare against a frozen
+historical** $\mu_0$. We split incoming users into two cohorts ---
+**control** (current product) and **test** (new variant) --- and we
+test whether their **true conversion rates differ**.
+
+::: {.border}
+1. Define the two cohorts in product terms (who sees what, how users are
+   assigned, what the randomisation unit is). Make it specific to your
+   product.
+2. Restate the hypotheses in two-sample form:
+   $$H_0: p_1 = p_2 \quad\text{vs.}\quad H_1: p_1 \, \square \, p_2,$$
+   where $\square$ is $<$, $>$, or $\neq$. **Choose the alternative**
+   and justify it in one sentence (e.g. "we only want to ship if the
+   new variant is better, so one-sided 'less' for $p_1 < p_2$").
+3. State the **same** $\alpha$ and business MDE you used in Lab 2.
+   The MDE is now the smallest interesting **difference** $|p_2 - p_1|$,
+   not a deviation from a fixed baseline.
+4. Briefly explain (one paragraph) why the historical $\mu_0$ is no
+   longer a parameter of the test. What role does it still play in
+   *planning* the experiment?
+:::
+
+## A Reusable `my_z_test()` Function {#sec-myztest}
+
+::: {.border}
+1. Implement a function
+   `my_z_test(x1, n1, x2, n2, alternative, alpha, conf_int)` with the
+   following contract:
+   - Convention: $Z = (\hat p_1 - \hat p_2) / SE_{\text{pool}}$;
+     `alternative` is about $p_1 - p_2$.
+   - Supports `alternative` $\in$ `{"greater", "less", "two-sided"}`.
+   - Uses the **pooled** standard error
+     $SE_{\text{pool}} = \sqrt{\hat p_{\text{pool}}(1-\hat p_{\text{pool}})(1/n_1 + 1/n_2)}$
+     for the $p$-value.
+   - When `conf_int=True`, also returns a CI for the lift
+     $p_1 - p_2$ built with the **unpooled** SE
+     $SE_{\text{unp}} = \sqrt{\hat p_1(1-\hat p_1)/n_1 + \hat p_2(1-\hat p_2)/n_2}$.
+   - Returns a **dict** with at least: `p1`, `p2`, `lift`, `z_stat`,
+     `p_value`, `reject`, `ci_low`, `ci_high`.
+2. **Explain in one paragraph why the two SEs are different** ---
+   when each one is the "right" SE, and what bug would result from
+   using `SE_pool` for the CI (or `SE_unp` for the test).
+3. Apply the function to a small synthetic A/B based on your business
+   case (you may invent realistic $x_1, n_1, x_2, n_2$ at this point;
+   the planned $N$ comes in @sec-power). Print the full result.
+4. **Verify your implementation** against
+   `statsmodels.stats.proportion.proportions_ztest` --- this is the
+   only legitimate use of the built-in function. Show that the
+   $Z$-statistic and $p$-value match to at least 4 decimal places.
+   Be careful with the `alternative` mapping: `statsmodels`'s
+   `"smaller"`/`"larger"` is in terms of `prop1 - prop2`.
+:::
+
+## Confidence Interval for the Lift {#sec-ci-lift}
+
+::: {.border}
+1. For your synthetic A/B from @sec-myztest, compute a $95\%$ CI for
+   the lift $p_2 - p_1$ using **three** different constructions:
+   - **Wald (unpooled)** via your own `my_z_test`.
+   - The reference implementation
+     `confint_proportions_2indep(x2, n2, x1, n1, method="wald")` (note
+     the argument order: this function reports a CI for $p_2 - p_1$).
+   - One **better** method via `confint_proportions_2indep(method=...)`
+     (your choice: `"newcomb"`, `"agresti-caffo"`, or `"score"`). Briefly
+     state, in one sentence, why this method exists --- what does it
+     fix relative to plain Wald?
+2. Put all three intervals into a table with columns
+   `method | lower | upper | width`. Comment on:
+   - Which interval is the **narrowest**, and why is that not a
+     decisive reason to prefer it?
+   - For which kinds of observed $(\hat p_1, \hat p_2)$ would the
+     unpooled Wald interval cross zero in a way the better methods
+     would not?
+3. **Two business decisions read from the same CI.** Translate the CI
+   you computed into product language. Specifically, given the business
+   MDE from @sec-design:
+   - If the CI for the lift is **entirely above** the MDE → ship.
+   - If the CI **straddles zero** → no evidence of a difference.
+   - If the CI is **entirely above zero but its lower bound is below
+     the MDE** → there is a real lift, but it may not be worth
+     shipping. State exactly what you would do in this case for your
+     product.
+:::
+
+## Power and Sample-Size Planning {#sec-power}
+
+::: {.border}
+1. Implement (or reuse from Practice 3) a function
+   `my_two_sample_z_power(p1, p2, n1, n2, alpha, alternative)` based on
+   the formula:
+   $$
+   \text{Power}(\text{less}) =
+   \Phi\!\left(\dfrac{-z_{1-\alpha} \cdot SE_{\text{null}} - (p_1 - p_2)}{SE_{\text{alt}}}\right),
+   $$
+   with the symmetric expression for `"greater"` and the two-tailed sum
+   for `"two-sided"`. $SE_{\text{null}}$ uses
+   $\bar p = (p_1 + p_2)/2$; $SE_{\text{alt}}$ uses the actual
+   $p_1, p_2$.
+2. **Power vs. $n$ curve.** Plot power as a function of $n_1 = n_2 = n$
+   for $n$ from a small value up to a value where power is clearly above
+   $0.9$. Use $p_1 = \mu_0$ (your baseline) and
+   $p_2 = \mu_0 + \text{business MDE}$. Mark on the plot:
+   - The horizontal line at power $= 0.8$.
+   - The minimum $n$ at which the curve crosses it.
+3. **Plan the experiment.** Compute the required $N$ per group via
+   bisection. Compare with your Lab 1/Lab 2 plan:
+   - How many users do you need now per group?
+   - How does that compare to your one-sample plan (which only needed
+     one group of $N_{\text{plan}}$)? Two-sample roughly doubles the
+     total user requirement --- but the math is more subtle than just
+     "$\times 2$". Explain in one paragraph why
+     `(two-sample N per group)` is **not** simply equal to
+     `(one-sample N from Lab 1)`.
+4. **MDE vs. $n$ trade-off.** Hold power at $0.8$ and produce a
+   table or plot of the MDE you can reliably detect as a function of
+   $n$ (per group). Pick three or four $n$ values that are realistic
+   for your product (e.g. one week / one month / one quarter of
+   traffic). Translate each MDE into product language: "with one week
+   of traffic we can only detect lifts of at least X pp, which means we
+   are blind to anything smaller, which means …"
+:::
+
+## A/A Simulation (Two-Sample) {#sec-aa}
+
+::: {.border}
+1. Run **$\geq 5\,000$** simulated two-sample A/A experiments under
+   $H_0$ with your planned $N$ per group and $p_1 = p_2 = \mu_0$.
+   For each one, compute the $p$-value using your `my_z_test`.
+2. **Plot the histogram of $p$-values.** Comment on its shape:
+   - Why is it expected to be approximately uniform on $[0, 1]$?
+   - The two-sample Z-statistic is continuous, unlike the binomial ---
+     so the steps you saw in Lab 2 should be much smaller. Why?
+3. **Report the empirical FPR** (fraction of $p \leq \alpha$). Compute
+   a $95\%$ Wilson CI around the empirical FPR via
+   `proportion_confint(method="wilson")`. Is the nominal $\alpha$
+   inside it? Use this to argue, with simulation evidence, that the
+   test is correctly calibrated.
+4. **Two product-specific failure modes.** Describe two realistic ways
+   your A/A could fail *for your specific product* (not generic "the
+   data are wrong"). Examples of the right level of specificity:
+   "same-device cookie collisions between groups", "treatment assignment
+   leaks via cached static assets", "weekend traffic is exclusively
+   routed to group A". For each failure mode, predict what the $p$-value
+   histogram would look like and which direction the FPR would move.
+:::
+
+## BONUS: Sample Ratio Mismatch (SRM) {#sec-srm}
+
+In real A/B platforms users are supposed to be split between control
+and test in a known ratio (most often 50/50, sometimes 90/10).
+A **Sample Ratio Mismatch (SRM)** --- where the observed split differs
+significantly from the planned one --- is one of the strongest signals
+that something is broken in the assignment pipeline, and it
+**invalidates the experiment** *before* you even look at the lift.
+
+::: {.border}
+1. Implement an SRM check using $\chi^2$ on a single $1 \times 2$ table:
+   $$
+   \chi^2 = \sum_{i=1,2} \dfrac{(n_i^{\text{obs}} - n_i^{\text{exp}})^2}{n_i^{\text{exp}}},\qquad
+   \text{df} = 1.
+   $$
+   Compute the $p$-value via `scipy.stats.chi2.sf(chi2, df=1)`.
+2. Apply your check to:
+   - The synthetic A/B from @sec-myztest (it should *pass* if you set
+     $n_1 = n_2$).
+   - A clearly broken split (e.g. $n_1 = 2100, n_2 = 1900$ when the
+     plan was 50/50). Confirm that the check rejects.
+3. Run **$\geq 1\,000$** A/A simulations where each user is assigned
+   to a group with probability $0.5$. Plot the histogram of SRM
+   $p$-values and confirm that the empirical FPR of the SRM check is
+   close to $\alpha$.
+4. **One concrete failure scenario.** Describe one realistic way your
+   product could end up with SRM that has nothing to do with the
+   randomiser (e.g. one variant is heavier and times out for slow
+   connections, so those users never make it into the data → the
+   broken group has fewer users). What would you do in production if
+   the SRM check fails: roll back, debug, or both? In what order?
+:::
+
+## Final Recommendation {#sec-final}
+
+::: {.border}
+Putting all of the above together, write a **single-page recommendation
+memo** (≤ 400 words) addressed to a non-technical stakeholder. It must
+contain:
+
+1. The observed point estimates for control and test, the **lift**, and
+   the $95\%$ CI for the lift (state which construction and why).
+2. The decision (**ship / iterate / extend the test**) and the
+   **reason**, framed in terms of the CI vs. the business MDE --- not
+   just the $p$-value.
+3. Two honest caveats:
+   - Did the **A/A check pass** cleanly, or are there open questions
+     about the infrastructure?
+   - Did the **SRM check pass**? If you did not run SRM (bonus), say
+     so and recommend running it before any production rollout.
+
+The memo must be readable by someone who has never heard the words
+"$p$-value", "pooled SE", or "SRM". You will be graded on whether a
+real product manager could act on it without follow-up questions.
+:::
+
+# Grading {.unnumbered}
+
+| Criterion | Points |
+|---|:---:|
+| Correctness of methodology | 3 |
+| Interpretation of results | 3 |
+| Code quality and organization | 2 |
+| **Total** | **8** |
+
+::: {.callout-tip icon="false"}
+## Grading Details
+
+**Correctness of methodology (3 pts):**
+
+- `my_z_test` implements all three alternatives correctly, uses
+  **pooled SE for the test and unpooled SE for the CI**, and matches
+  `proportions_ztest` to 4 decimals (1 pt).
+- The three CI constructions in @sec-ci-lift are computed correctly
+  and the comparison table is consistent with the reference (0.5 pt).
+- The power calculation in @sec-power matches at least one independent
+  reference (e.g. `statsmodels.stats.proportion.power_proportions_2indep`)
+  to 2 decimals, and the planned $N$ via bisection is the correct
+  minimum (1 pt).
+- A/A simulation produces an empirical FPR whose Wilson CI contains the
+  nominal $\alpha$; the SRM check (if attempted) is correctly built and
+  validated by its own A/A (0.5 pt).
+
+**Interpretation of results (3 pts):**
+
+- The pooled-vs-unpooled paragraph is correct and self-contained ---
+  you can explain *both* which SE to use *and* why.
+- The "CI vs. business MDE" decision rule produces a concrete,
+  product-specific recommendation, not a slogan.
+- A/A failure modes are realistic and product-specific (no generic
+  "wrong data").
+- The SRM scenario (if attempted) names a specific, plausible product
+  failure rather than "the randomiser is bugged".
+
+**Code quality and organization (2 pts):**
+
+- `my_z_test` and `my_two_sample_z_power` are single reusable
+  functions used across all subsequent sections (not re-implemented
+  inline).
+- Plots have axis labels, titles, and legible legends.
+- Narrative text precedes every code block, and each section reads as
+  a coherent argument rather than a dump of outputs.
+:::
+
+# Defense {.unnumbered}
+
+During the defense (5–7 minutes) you will be asked *"What if?"*
+questions that probe whether you understand **why** each piece exists,
+for example:
+
+- *"Your test uses pooled SE but your CI uses unpooled SE. Why is that
+  not inconsistent? What would a single, unified SE buy or break?"*
+- *"The PM says: 'I see a 95% CI of $[+0.001, +0.020]$ for the lift,
+  and our business MDE is $+0.010$. Just tell me yes or no.' Give your
+  one-sentence answer and your one-sentence rationale."*
+- *"Your A/A FPR is $0.062$ instead of $0.050$. Is the difference
+  statistically meaningful, or is it just simulation noise? Show me
+  the Wilson CI on $0.062$ and use it to answer."*
+- *"Switch your test from one-sided 'less' to two-sided in your code
+  right now. By how much does the lower CI bound for the lift move,
+  and does that change your recommendation?"*
+- *"Set the test-group $n$ to half of your planned $N$ and re-run. The
+  $p$-value is still below $\alpha$, but the CI got wider. Which one
+  drives your decision, and why?"*
+- *(Bonus)* *"Your SRM check returned $p = 0.001$ on a 50/50 plan. Do
+  you read the lift, debug the platform, or both? In what order, and
+  why?"*
+
+You may also be asked to **change one parameter live** in your code
+(e.g. flip `alternative`, halve $n_2$, double the MDE) and explain the
+resulting shift.

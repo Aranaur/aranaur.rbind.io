@@ -1,0 +1,1168 @@
+---
+title: "$Z$-test"
+subtitle: "Descriptive Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .02-z-test_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=4049">🔗Applied Statistics</a>
+format:
+  revealjs:
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+jupyter: python3
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy import stats
+
+# Define colors (shared palette across the slides)
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+# Minimal theme defaults — close to ggplot2 theme_minimal()
+plt.rcParams.update({
+    "figure.facecolor": "white",
+    "axes.facecolor":   "white",
+    "axes.edgecolor":   slate,
+    "axes.labelcolor":  slate,
+    "axes.titlesize":   13,
+    "axes.spines.top":   False,
+    "axes.spines.right": False,
+    "axes.grid":        True,
+    "grid.color":       "#dddddd",
+    "grid.alpha":       0.6,
+    "xtick.color":      slate,
+    "ytick.color":      slate,
+    "font.size":        11,
+    "legend.frameon":   False,
+})
+```
+
+# Tests concerning the mean {background-iframe=".02-z-test_files/libs/colored-particles/index.html"}
+
+## Why analyze averages?
+
+1. Revenue growth.
+    - If the total value of $\rightarrow$ grows, the average value grows. Therefore, this task can be reformulated as the growth of the average check, or ARPU.
+2. Increase in the number of purchases.
+3. Reducing the outflow of users.
+
+Next, to derive all the criteria, we need a [normal distribution]{.hi}. *Because this is the distribution that the mean of the samples follows*.
+
+::: {.notes}
+Мотивація лекції: ключові бізнес-метрики (ARPU, виторг, відтік) зводяться до середніх — тому всі критерії далі про порівняння середніх. Підводка: для цього потрібен нормальний розподіл — саме до нього сходиться середнє за ЦГТ.
+:::
+
+## Normal Distribution {.tiny}
+
+[Normal distribution]{.hi} $\xi \sim \mathcal{N}(\mu, \sigma^2)$ is a continuous distribution in which the density decreases with increasing distance from $\mu$ exponentially.
+
+$$
+f(x) = \frac{1}{\sigma\sqrt{2\pi}} \exp^{-\frac{1}{2}\left(\frac{x-\mu}{\sigma}\right)^2}
+$$
+
+where:
+
+- $\mu$ is the offset parameter: how much the center is shifted from 0.
+- $\sigma^2$ --- scale parameter: how "flat" the distribution graph will be.
+
+```{python}
+#| label: normal-distribution-plot-intro
+#| echo: false
+#| fig-align: center
+
+params = [
+    {"mu": 0,  "sigma": 0.2, "color": red_pink},
+    {"mu": 0,  "sigma": 1,   "color": turquoise},
+    {"mu": 0,  "sigma": 5,   "color": orange},
+    {"mu": -2, "sigma": 0.5, "color": purple},
+]
+
+x = np.linspace(-4, 4, 1000)
+
+fig, ax = plt.subplots(figsize=(8, 4))
+for p in params:
+    y = stats.norm.pdf(x, loc=p["mu"], scale=p["sigma"])
+    ax.plot(x, y, color=p["color"], lw=2,
+            label=f"mu={p['mu']}, sigma={p['sigma']}")
+
+ax.set_title("Normal Distributions with Different Parameters")
+ax.set_xlabel("x")
+ax.set_ylabel("Density")
+ax.legend(title="Parameters")
+plt.tight_layout()
+plt.show()
+```
+
+::: {.notes}
+Формула щільності + два параметри. На графіку акцент: чим менше σ — тим вищий і вужчий пік (червона σ=0.2); більше σ — крива 'плескатіша' (оранжева σ=5); зсув μ — лише вліво/вправо без зміни форми (фіолетова μ=-2).
+:::
+
+## Python and the normal distribution {.smaller}
+
+Suppose we want to define the distribution $\mathcal{N}(\mu, \sigma^2)$. In Python we work with `scipy.stats.norm`.
+
+**Parameters**:
+
+- `loc` --- the mean of the distribution ($\mu$).
+- `scale` --- the standard deviation of the distribution. [Not variance!]{.red}
+
+Core methods on `scipy.stats.norm`:
+
+- `norm.pdf(x, loc, scale)` --- density at point `x`.
+- `norm.cdf(x, loc, scale)` --- cumulative distribution function.
+- `norm.ppf(p, loc, scale)` --- quantile function (inverse CDF).
+- `norm.rvs(loc, scale, size)` --- random sample generation.
+
+::: {.notes}
+Найчастіша помилка початківців: `scale` — це σ (standard deviation), а не σ² (variance). Підкреслити це окремо. Чотири методи pdf/cdf/ppf/rvs закривають 95% задач зі scipy.stats.
+:::
+
+## Python and the normal distribution {.smaller}
+
+![](https://aranaur.github.io/applied-statistics/z-test_files/figure-html/fig-normal-distribution-2-output-1.png){fig-align="center"}
+
+::: {.notes}
+Схема-шпаргалка: показано, де на одному графіку pdf (висота кривої), cdf (площа під кривою до точки), ppf (зворотній виклик cdf — від ймовірності до точки), rvs (червоні точки — випадкова вибірка).
+:::
+
+## Python and the normal distribution {.smaller}
+
+```{python}
+#| label: normal-distribution-cumulative
+
+# Cumulative distribution function
+p_x_leq_2 = stats.norm.cdf(2, loc=0, scale=1)
+print(f"P(X <= 2) = {p_x_leq_2:.6f}")
+
+# You can pass a vector of points
+p_values = stats.norm.cdf([2, -1], loc=0, scale=1)
+print(f"[P(X <= 2), P(X <= -1)] = {p_values}")
+```
+
+\
+
+```{python}
+#| label: normal-distribution-percent
+
+# Quantile 0.975
+quantile_0_975 = stats.norm.ppf(0.975, loc=0, scale=1)
+print(f"quantile 0.975 = {quantile_0_975:.6f}")
+```
+
+\
+
+```{python}
+#| label: normal-distribution-probability
+
+# Density at 0
+pdf_0 = stats.norm.pdf(0, loc=0, scale=1)
+print(f"pdf(0) = {pdf_0:.6f}")
+```
+
+::: {.notes}
+Три приклади поряд: cdf для одиничного і векторного аргументу (важливо — scipy векторизовано), ppf для квантиля 0.975 ≈ 1.96 (це число буде всюди в Z-тестах), pdf у точці 0. Запам'ятати 1.96 — критичне значення для α=0.05 двостороннього.
+:::
+
+## Python and the normal distribution
+
+```{python}
+#| label: normal-distribution-plot
+#| fig-align: center
+#| code-fold: true
+
+# Initialization
+np.random.seed(2024)
+
+# Distribution parameters
+mu, sigma = 0, 2
+x = np.linspace(-8, 8, 1000)
+
+# Density, CDF and a sample
+pdf = stats.norm.pdf(x, loc=mu, scale=sigma)
+cdf = stats.norm.cdf(x, loc=mu, scale=sigma)
+sample = stats.norm.rvs(loc=mu, scale=sigma, size=10_000)
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+
+# Density
+axes[0].hist(sample, bins=40, density=True, color=turquoise, alpha=0.6,
+             edgecolor="white")
+axes[0].plot(x, pdf, color=red, lw=2)
+axes[0].set_title("Density visualisation")
+axes[0].set_xlabel("Value")
+axes[0].set_ylabel("Density")
+
+# CDF
+axes[1].plot(x, cdf, color=green, lw=2)
+axes[1].set_title("Cumulative distribution function")
+axes[1].set_xlabel("Value")
+axes[1].set_ylabel("CDF")
+
+plt.tight_layout()
+plt.show()
+```
+
+::: {.notes}
+Демо для N(0, 2): 10 000 точок з rvs, гістограма щільності лягає на теоретичну криву (червона) — це візуальний sanity check. Праворуч — CDF, S-подібна крива від 0 до 1, перетин з 0.5 у точці μ=0.
+:::
+
+## Properties of the normal distribution
+
+1. $\xi_1 \sim \mathcal{N}(\mu_1, \sigma_1^2),\ \xi_2 \sim \mathcal{N}(\mu_2, \sigma_2^2) \Rightarrow \\ \xi_1 + \xi_2 \sim \mathcal{N}(\mu_1 + \mu_2, \sigma_1^2 + \sigma_2^2)$[^1]
+<br><br>
+
+2. $a \xi_1 \sim \mathcal{N}(a\mu_1, a^2\sigma_1^2)$
+
+[^1]: [Proofing](https://en.wikipedia.org/wiki/Sum_of_normally_distributed_random_variables#:~:text=This%20means%20that%20the%20sum,squares%20of%20the%20standard%20deviations)
+
+::: {.notes}
+Дві властивості — фундамент усієї лекції. Лінійність (1) — секретний інгредієнт двовибіркового Z-тесту в кінці лекції: різниця двох нормальних — теж нормальна. Властивість (2) знадобиться для виведення формули Z-статистики.
+:::
+
+## Python and the 1st property of the normal distribution {.smaller}
+
+```{python}
+#| label: normal-distribution-sum
+
+first_mean, first_var   = 3, 4
+second_mean, second_var = -1, 2
+
+first_dist  = {"mean": first_mean,  "sd": np.sqrt(first_var)}
+second_dist = {"mean": second_mean, "sd": np.sqrt(second_var)}
+
+# Important: scale = sqrt(first_var + second_var)
+checking_sum_distr = {
+    "mean": first_mean + second_mean,
+    "sd":   np.sqrt(first_var + second_var),
+}
+```
+
+1. Generate a sample from the 1st and 2nd distributions and sum them.
+2. Plot the empirical density and compare it with the true density.
+
+::: {.notes}
+Setup для емпіричної перевірки властивості (1): N(3,4) + N(-1,2) має дати N(2,6). Звертаю увагу: scale = sqrt(σ₁² + σ₂²), а не sqrt(σ₁)+sqrt(σ₂) — типова помилка.
+:::
+
+## Python and the 1st property of the normal distribution {.smaller}
+
+```{python}
+#| label: normal-distribution-sum-plot
+#| fig-align: center
+#| code-fold: true
+
+np.random.seed(2024)
+
+first_sample  = stats.norm.rvs(loc=first_dist["mean"],  scale=first_dist["sd"],  size=10_000)
+second_sample = stats.norm.rvs(loc=second_dist["mean"], scale=second_dist["sd"], size=10_000)
+sum_sample = first_sample + second_sample
+
+x = np.linspace(-8, 12, 1000)
+checking_sum_pdf = stats.norm.pdf(x,
+                                  loc=checking_sum_distr["mean"],
+                                  scale=checking_sum_distr["sd"])
+
+# Empirical KDE via gaussian_kde
+kde = stats.gaussian_kde(sum_sample)
+
+fig, ax = plt.subplots(figsize=(9, 4.5))
+ax.hist(sum_sample, bins=40, density=True, color=turquoise, alpha=0.6,
+        edgecolor="white", label="Sum sample")
+ax.plot(x, checking_sum_pdf, color=red,  lw=2, label="Theoretical N(mu1+mu2, var1+var2)")
+ax.plot(x, kde(x),           color=blue, lw=2, label="Empirical density")
+ax.set_title("Checking the convolution of normals")
+ax.set_xlabel("X")
+ax.set_ylabel("Density")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+::: {.notes}
+10 000 сум двох вибірок. Три криві мають збігатися: гістограма (емпіричні дані), KDE (синя — згладжена емпірична щільність), теоретична N(2,6) (червона). Якщо синя і червона лягають одна на одну — властивість підтверджено.
+:::
+
+## Central limit theorem {.smaller}
+
+Let $\xi_1, ..., \xi_n$ be **independently** identically distributed random variables with equal expectation and variance:
+
+- $E [\xi_i] = \mu < \infty$
+- $Var[\xi_i] = \sigma^2 < \infty$.
+
+Then $\sqrt{n}\dfrac{\overline \xi - \mu}{\sqrt{\sigma^2}}$ [converges in distribution](https://en.wikipedia.org/wiki/Convergence_in_distribution) to $\mathcal{N}(0, 1)$.
+
+::: {.notes}
+Формальне формулювання ЦГТ. Магія: вихідний розподіл ξᵢ може бути будь-яким (рівномірний, Бернуллі, експоненційний — байдуже), але середнє нормалізоване сходиться до N(0,1). Це й дає універсальність Z-тесту.
+:::
+
+## Central limit theorem {.tiny}
+
+- $\xi$ is a random variable with an unknown distribution.
+- $\mathbb{E}(\xi) = \mu$ --- mathematical expectation.
+- $\text{Var}(\xi) = \sigma^2$ --- variance.
+
+. . .
+
+<br>
+
+- $\sum_{i=1}^n \xi_i \sim \mathcal{N}(n\mu, n\sigma^2)$
+
+. . .
+
+- $\frac{\sum_{i=1}^n \xi_i}{n} = \bar{\xi} \sim \mathcal{N}(\mu, \frac{\sigma^2}{n})$
+
+. . .
+
+Let's reduce this result to the standard normal distribution: subtract the mathematical expectation and divide by $\frac{\sigma}{\sqrt{n}}$.
+
+- $\bar{\xi} - \mu \sim \mathcal{N}(0, \frac{\sigma^2}{n})$
+
+. . .
+
+[$$\sqrt{n} \frac{\bar{\xi} - \mu}{\sigma} \sim \mathcal{N}(0, 1)$$]{.hi}
+
+::: {.callout-note icon=false}
+Random variables can be weakly dependent on each other and slightly differently distributed. The central limit theorem will still be [correct](https://en.wikipedia.org/wiki/Stable_distribution#A_generalized_central_limit_theorem).
+:::
+
+::: {.notes}
+Покрокове виведення з ξᵢ → сума → ділимо на n → стандартизуємо. Кожен крок — застосування властивостей нормального розподілу. Callout наприкінці важливий: ЦГТ працює і для слабко-залежних / неоднаково розподілених величин — реалістичний випадок для A/B тестів.
+:::
+
+## Visualization of the CLT {.tiny .scrollable}
+
+Generate $N$ samples of $M$ elements in each:
+
+- For each sample, calculate the normalized average over $M$ elements.
+- As a result, we get a sample of $N$ elements.
+- It must be from a normal distribution.
+
+```{python}
+#| label: central-limit-theorem-generate
+#| code-fold: true
+
+def visualize_CLT(sample_generator, expected_value, variance):
+    np.random.seed(2024)
+    N = 5000
+    clt_sample = np.empty(N)
+
+    for i in range(N):
+        sample = sample_generator()
+        sample_size = len(sample)
+        statistic = np.sqrt(sample_size) * (np.mean(sample) - expected_value) / np.sqrt(variance)
+        clt_sample[i] = statistic
+
+    x = np.linspace(-4, 4, 1000)
+    normal_pdf = stats.norm.pdf(x, loc=0, scale=1)
+    kde = stats.gaussian_kde(clt_sample)
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.hist(clt_sample, bins=50, density=True, color=turquoise, alpha=0.6,
+            edgecolor="white")
+    ax.plot(x, normal_pdf, color=red,  lw=2, label="N(0, 1)")
+    ax.plot(x, kde(x),     color=blue, lw=2, label="Empirical density")
+    ax.set_title("Distribution of average values")
+    ax.set_xlabel("X")
+    ax.set_ylabel("Density")
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
+```
+
+::: {.notes}
+Допоміжна функція: генерує N=5000 вибірок, для кожної рахує нормалізоване середнє, малює гістограму поряд із теоретичним N(0,1). Будемо застосовувати її до різних вихідних розподілів — це показове візуальне 'обґрунтування' ЦГТ.
+:::
+
+## Visualization of the CLT: binomial distribution {.tiny}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{python}
+#| label: central-limit-theorem-binomial
+#| fig-align: center
+
+def binom_generator(p, n, size):
+    return stats.binom.rvs(n=n, p=p, size=size)
+
+p, n, size = 0.01, 20, 5000
+
+visualize_CLT(
+    sample_generator=lambda: binom_generator(p=p, n=n, size=size),
+    expected_value=p * n,
+    variance=n * p * (1 - p),
+)
+```
+
+<center>😊</center>
+:::
+
+::: {.column width="50%"}
+```{python}
+#| label: central-limit-theorem-binomial-small
+#| fig-align: center
+
+def binom_generator(p, n, size):
+    return stats.binom.rvs(n=n, p=p, size=size)
+
+p, n, size = 0.01, 20, 40
+
+visualize_CLT(
+    sample_generator=lambda: binom_generator(p=p, n=n, size=size),
+    expected_value=p * n,
+    variance=n * p * (1 - p),
+)
+```
+
+<center>🤨</center>
+:::
+
+::::
+
+::: {.notes}
+Дві колонки = два розміри вибірки. Зліва size=5000 — гарне накладання на N(0,1) 😊. Справа size=40 — апроксимація вже не працює, форма гістограми кривувата 🤨. Висновок: ЦГТ вимагає 'достатнього n', і це 'достатнього' залежить від форми вихідного розподілу.
+:::
+
+## Visualization of the CLT: exponential distribution {.tiny}
+
+```{python}
+#| label: central-limit-theorem-exponential
+#| fig-align: center
+#| code-fold: true
+
+def expon_generator(expected_value, size):
+    return stats.expon.rvs(scale=expected_value, size=size)
+
+expected_value = 24
+size = 400
+
+visualize_CLT(
+    sample_generator=lambda: expon_generator(expected_value=expected_value, size=size),
+    expected_value=expected_value,
+    variance=expected_value ** 2,
+)
+```
+
+::: {.notes}
+Експоненційний розподіл дуже скошений (час між замовленнями, час життя сесії — типові метрики продукту). При size=400 нормалізовані середні все одно лягають на N(0,1). Це сила ЦГТ: вихідна форма не має значення, якщо n достатньо велике.
+:::
+
+---
+
+<iframe id="clt-example" src="https://aranaur-lotps-explorer.hf.space/" style="border: none; width: 100%; height: 100%" frameborder="0">
+
+</iframe>
+
+::: footer
+[:hugs: Hugging Face: Lord Of The Probability and Statistics](https://aranaur-lotps-explorer.hf.space/)
+:::
+
+::: {.notes}
+Інтерактивна демо: студенти можуть самі покрутити параметри (вихідний розподіл, n, кількість симуляцій) і побачити, як гістограма середніх 'збирається' в нормальну. Корисно показати наживо 1-2 хвилини.
+:::
+
+## Equivalent wording of the CLT
+
+$$\begin{align}
+\sqrt{n}\dfrac{\overline \xi - \mu}{\sqrt{\sigma^2}} &\sim \mathcal{N}(0, 1) \stackrel{prop. 2}{\Leftrightarrow}\\
+\overline \xi - \mu &\sim \mathcal{N}\left(0, \dfrac{\sigma^2}{n} \right) \Leftrightarrow\\
+\dfrac{\underset{i=1}{\overset{n}{\sum}} \xi_i}{n} &\sim \mathcal{N}\left(\mu, \dfrac{\sigma^2}{n} \right) \Leftrightarrow\\
+\underset{i=1}{\overset{n}{\sum}} \xi_i &\sim \mathcal{N}\left(n \cdot \mu, n \cdot \sigma^2 \right)
+\end{align}$$
+
+::: {.notes}
+Чотири еквівалентні форми ЦГТ. Підкреслити: це не різні теореми, а одна, переписана зручніше для різних задач. У 1-вибірковому Z використаємо першу форму; у двовибірковому — третю (для середніх по групах).
+:::
+
+# Fisher's $Z$-test {background-iframe=".02-z-test_files/libs/colored-particles/index.html"}
+
+## 🚚 Conversion-rate problem {.smaller}
+
+- $T(X^n) = \underset{i=1}{\overset{n}{\sum}} X_i,\ T \overset{H_0}{\sim} \text{Binom} (n, \mu_0)$
+- Let the realisation of $T(X^n) = t$. Definition 19.
+- $\text{p-value} = P_{H_0}(T(X^n) \geq t) = 1 - P_{H_0}(T(X^n) < t)$
+- Or, if we rewrite it in Python: `p_value = 1 - stats.binom.cdf(t - 1, n, mu0)`
+
+```{python}
+#| label: binomial-p-value
+
+def get_pvalue_by_old_logic(n, mu0, t):
+    return 1 - stats.binom.cdf(t - 1, n=n, p=mu0)
+
+n   = 30
+mu0 = 0.5
+t   = 19
+
+old_p_value = get_pvalue_by_old_logic(n, mu0, t)
+print(f"p-value obtained using the old, correct formula: {old_p_value:.6f}")
+```
+
+::: {.notes}
+Та сама постановка з лекції 1: 30 клієнтів, 19 оплатили, H₀: μ=0.5. Точна формула через `binom.cdf` — це наш еталон. Підкреслити `t-1` в індексі: для дискретного розподілу P(T≥t) = 1-P(T≤t-1).
+:::
+
+## Conversion-rate problem: normal approximation {.smaller}
+
+- For a sufficiently large sample size, $\underset{i=1}{\overset{n}{\sum}} X_i \sim \mathcal{N}\left(n \cdot \mu_0, n \cdot \sigma^2 \right)$,
+- $X_i \overset{H_0}{\sim} \text{Bernoulli} (\mu_0)$
+- $\sigma^2 = \mu_0 \cdot (1 - \mu_0)$
+- $\text{p-value} = P_{H_0}(T(X^n) \geq t)$.
+
+Or in Python: `p_value = 1 - stats.norm.cdf(t, loc=sum_mu, scale=sum_std)`
+
+This time, we look at the statistics not at point $t-1$, as we did before, but at point $t$. **Since we have a continuous distribution, we do not need to subtract 1**:
+
+- in the case of normal distribution: $P(T(X^n) \geq t) = P(T(X^n) > t) = 1 - P(T(X^n) \leq t)$;
+- in the case of binomial distribution: $P(T(X^n) \geq t) = 1 - P(T(X^n) \leq t - 1)$.
+
+::: {.notes}
+Ключова відмінність дискретного і неперервного: у нормального P(T=t)=0, тому P(T≥t) = 1-P(T≤t). У біномного P(T=t)>0, тому потрібно `t-1` в індексі. Студенти часто плутають — повторити двічі.
+:::
+
+## Binomial vs. normal distribution {.smaller}
+
+```{python}
+#| label: binomial-vs-normal
+#| fig-align: center
+#| echo: false
+
+n, mu0, t = 30, 0.5, 19
+
+x = np.arange(0, 31)
+binom_pmf = stats.binom.pmf(x, n=n, p=mu0)
+norm_pmf  = stats.norm.pdf(x, loc=n * mu0, scale=np.sqrt(n * mu0 * (1 - mu0)))
+
+fig, ax = plt.subplots(figsize=(9, 4.5))
+ax.bar(x, binom_pmf, color=turquoise, alpha=0.6, edgecolor="white",
+       label="Binomial distribution")
+ax.plot(x, norm_pmf, color=red, lw=2, label="Normal distribution")
+ax.set_title("Binomial vs. normal distribution")
+ax.set_xlabel("X")
+ax.set_ylabel("Density")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+::: {.notes}
+Бар-чарт біномної pmf (бірюзовий) поверх лінії нормальної pdf (червона) для n=30, μ=0.5. Видно: центр і ширина збігаються, але в хвостах є помітна різниця — звідки і виникне потреба у continuity correction.
+:::
+
+## Binomial vs. normal distribution {.smaller}
+
+```{python}
+#| label: normal-p-value
+
+def get_pvalue_by_normal_approx(n, mu0, t):
+    sum_mu       = n * mu0
+    sum_variance = n * mu0 * (1 - mu0)
+    sum_std      = np.sqrt(sum_variance)
+    return 1 - stats.norm.cdf(t, loc=sum_mu, scale=sum_std)
+
+normal_dist_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+print(f"p-value obtained from the normal distribution approximation: {normal_dist_p_value:.6f}")
+```
+
+<br><br>
+
+```{python}
+#| label: normal-p-value-large
+
+n, mu0, t = 3000, 0.5, 1544
+
+old_p_value         = get_pvalue_by_old_logic(n, mu0, t)
+normal_dist_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+
+print(f"p-value obtained using the old, correct formula:               {old_p_value:.6f}")
+print(f"p-value obtained from the normal distribution approximation:   {normal_dist_p_value:.6f}")
+```
+
+::: {.notes}
+Числове порівняння на двох розмірах. n=30: різниця помітна (~0.03). n=3000: майже однакові (4-й знак). Прикладна інтуїція: коли 'апроксимація працює' = коли різниця не впливає на бізнес-рішення.
+:::
+
+## Fisher's $Z$-test {.smaller}
+
+$H_0: \mu = \mu_0\ vs.\ H_1: \mu > \mu_0$
+
+- The statistic $Z(X) = \sqrt{n}\dfrac{\overline X - \mu_0}{\sqrt{\sigma^2}}$
+- For a sufficiently large sample size, $Z(X) \overset{H_0}{\sim} \mathcal{N}(0, 1)$ (according to the CLT)
+- One-sided criterion: $\left\{Z(X) \geq z_{1 - \alpha} \right\}$
+    - p-value = $1 - \Phi(z)$, where $z$ is the realisation of the statistic $Z(X)$, $\Phi(z)$ is the distribution function $\mathcal{N}(0, 1)$
+- Two-sided criterion: $\left\{Z(X) \geq z_{1 - \frac{\alpha}{2}} \right\} \bigcup \left\{Z(X) \leq -z_{1 - \frac{\alpha}{2}} \right\}$
+    - p-value = $2\cdot \min \left[{\Phi(z), 1 - \Phi(z)} \right]$, where $z$ is the realisation of the statistic $Z(X)$
+
+::: {.notes}
+Формальне означення Z-тесту: формула статистики (нормалізоване середнє), розподіл під H₀ (N(0,1) за ЦГТ), правило відхилення для одно- і двостороннього варіанту. Двосторонній отримуємо як 2·min(Φ, 1-Φ) — звідси і подвоєння p-value.
+:::
+
+## Python and Fisher's $Z$ test: small sample size
+
+```{python}
+#| label: z-test-small
+
+def z_criterion_pvalue(sample_mean, sample_size, mu0, variance):
+    Z_statistic = np.sqrt(sample_size) * (sample_mean - mu0) / np.sqrt(variance)
+    return 1 - stats.norm.cdf(Z_statistic)
+
+n        = 30
+t        = 19
+mu0      = 0.5
+variance = mu0 * (1 - mu0)
+
+old_p_value    = get_pvalue_by_old_logic(n, mu0, t)
+normal_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+z_pvalue       = z_criterion_pvalue(t / n, n, mu0, variance)
+
+print(f"p-value obtained using the old, correct formula: {old_p_value:.6f}")
+print(f"p-value obtained from the normal distribution:   {normal_p_value:.6f}")
+print(f"Z-test p-value:                                  {z_pvalue:.6f}")
+```
+
+::: {.notes}
+Три p-value поряд для n=30. Z-тест збігається з нормальною апроксимацією (бо це по суті та сама формула в іншому вигляді), а точна біномна — помітно більша. Висновок: на малих n Z-тест дає false-positive ризик.
+:::
+
+## Python and the Fisher's $Z$ test: a larger sample
+
+```{python}
+#| label: z-test-large
+
+n        = 3000
+t        = 1544
+mu0      = 0.5
+variance = mu0 * (1 - mu0)
+
+old_p_value    = get_pvalue_by_old_logic(n, mu0, t)
+normal_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+z_pvalue       = z_criterion_pvalue(t / n, n, mu0, variance)
+
+print(f"p-value obtained using the old, correct formula: {old_p_value:.6f}")
+print(f"p-value obtained from the normal distribution:   {normal_p_value:.6f}")
+print(f"Z-test p-value:                                  {z_pvalue:.6f}")
+```
+
+::: {.notes}
+Той самий код, але n=3000. Усі три p-value майже однакові — ефект 'достатньо великого n' проявився. Орієнтир для практики: для μ≈0.5 апроксимація працює вже з n у кілька сотень; для дуже малих μ — потрібні тисячі.
+:::
+
+## Continuity correction {.tiny}
+
+> Is it possible to refine the results of the $Z$-test for a binomial distribution with small sample sizes?
+
+- $Z$-test: $p$-value = 0.07
+- Accurate $p$-value = 0.10
+
+First, let's visualise the `p-value(t)` function of the criteria described above:
+
+- the `p-value` of the criterion based on the normal approximation
+    - simple formula: `1 - stats.norm.cdf(t, ...)`
+- the `p-value` of the binomial criterion. Two cases:
+    - `t` is a non-integer number. Example:
+        - Let `t = 19.5`.
+        p-value $= P(T(X) \geq t) = 1 - P(T(X) < 19.5) = |P(T(X) = 19.5) = 0| = 1 - P(T(X) \leq 19.5)$. The last probability is a CDF:
+            - `p_value = 1 - stats.binom.cdf(t, n, mu0)`
+    - `t` is an integer.
+        - Let `t = 19`. p-value $= 1 - P(T(X) \leq 18)$:
+            - `p_value = 1 - stats.binom.cdf(t - 1, n, mu0)`
+            - and `p-value(t) = 1 - binom.cdf(t-a, n, mu0) = p-value(t-a)`, where `0 < a < 1`. For example, `p-value(19) = p-value(18.9)`.
+
+::: {.notes}
+Підводка до корекції: розрахунок p-value(t) для дискретного t і неперервного t відрізняється. Для нормального розподілу p-value — гладка функція t; для біномного — ступінчаста. Це систематична розбіжність, яку можна 'допилити'.
+:::
+
+## Continuity correction {.tiny}
+
+```{python}
+#| label: continuity-correction-def
+#| code-fold: true
+#| fig-align: center
+
+def cmp_pvalue_binom_and_norm(n, mu0, t, add_to_x=0):
+    sum_mu       = n * mu0
+    sum_variance = n * mu0 * (1 - mu0)
+    sum_std      = np.sqrt(sum_variance)
+
+    x_axis       = np.linspace(0, n, 1000)
+    dots_to_show = np.arange(0, n + 1)
+
+    fig, ax = plt.subplots(figsize=(9, 4.5))
+
+    # Binomial p-value
+    ax.scatter(dots_to_show,
+               1 - stats.binom.cdf(dots_to_show - 1, n=n, p=mu0),
+               color=slate, s=30, label="Binomial p-value")
+    ax.scatter([t],
+               [1 - stats.binom.cdf(t - 1, n=n, p=mu0)],
+               color=slate, s=120, edgecolor="white", zorder=5,
+               label=f"Binomial p-value at t={t}")
+
+    # Normal p-value
+    ax.plot(x_axis,
+            1 - stats.norm.cdf(x_axis + add_to_x, loc=sum_mu, scale=sum_std),
+            color=red, alpha=0.6, lw=2, label="Normal p-value")
+    ax.scatter([t],
+               [1 - stats.norm.cdf(t + add_to_x, loc=sum_mu, scale=sum_std)],
+               color=red, s=120, edgecolor="white", zorder=5,
+               label=f"Normal p-value at t={t}")
+
+    ax.set_title("Comparison of p-value: binomial and normal")
+    ax.set_xlabel("t")
+    ax.set_ylabel("p-value")
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
+
+cmp_pvalue_binom_and_norm(30, 0.5, 15)
+```
+
+- $p_{\text{binom}} > p_{\text{norm}}$
+- As the sample size increases, these values coincide.
+
+::: {.notes}
+Графічне порівняння: сірі точки — біномна p-value (ступінчаста), червона лінія — нормальна (плавна). Видно сталий зсув: нормальна систематично нижча → ризик 'хибно знайти' значущість. Чим більше n, тим менший зсув.
+:::
+
+## Continuity correction {.tiny}
+
+```{python}
+#| label: continuity-correction-difference-1
+
+n, t = 20, 10
+
+old_p_value         = get_pvalue_by_old_logic(n, mu0, t)
+normal_dist_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+
+print(f"p-value obtained using the old, correct formula: {old_p_value:.6f}")
+print(f"p-value obtained from the normal distribution:   {normal_dist_p_value:.6f}")
+print(f"Difference:                                      {abs(old_p_value - normal_dist_p_value):.3f}")
+```
+
+<br>
+
+```{python}
+#| label: continuity-correction-difference-2
+
+# With the growth of t
+n, t = 20, 14
+
+old_p_value         = get_pvalue_by_old_logic(n, mu0, t)
+normal_dist_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+
+print(f"p-value obtained using the old, correct formula: {old_p_value:.6f}")
+print(f"p-value obtained from the normal distribution:   {normal_dist_p_value:.6f}")
+print(f"Difference:                                      {abs(old_p_value - normal_dist_p_value):.3f}")
+```
+
+<br>
+
+```{python}
+#| label: continuity-correction-difference-3
+
+# With increasing n
+n, t = 200, 100
+
+old_p_value         = get_pvalue_by_old_logic(n, mu0, t)
+normal_dist_p_value = get_pvalue_by_normal_approx(n, mu0, t)
+
+print(f"p-value obtained using the old, correct formula: {old_p_value:.6f}")
+print(f"p-value obtained from the normal distribution:   {normal_dist_p_value:.6f}")
+print(f"Difference:                                      {abs(old_p_value - normal_dist_p_value):.3f}")
+```
+
+::: {.notes}
+Числова таблиця ефекту: для n=20 різниця 0.04-0.05 (помітно багато на тлі α=0.05!), для n=200 — фактично нуль. Це доказ, що корекція потрібна саме для малих n. Параметр t теж впливає: ближче до центру — менша різниця.
+:::
+
+## Continuity correction
+
+$$F_{\text{new}}(x) = F_{\text{old}}(x - 0.5)$$
+
+```{python}
+#| label: continuity-correction-correction
+#| fig-align: center
+
+cmp_pvalue_binom_and_norm(30, 0.5, 15, add_to_x=-0.5)
+```
+
+::: {.notes}
+Сама ідея корекції: зсуваємо аргумент нормальної на -0.5. Інтуїція: біномна 'живе' на дискретних точках 0, 1, 2..., а нормальна — між ними. Зсувом ми 'центруємо' нормальну на правильні точки. На графіку червона лінія тепер проходить через сірі точки.
+:::
+
+## Continuity correction {.smaller}
+
+```{python}
+#| label: continuity-correction-def-2
+
+def get_pvalue_by_normal_approx_with_addition(n, mu0, t):
+    sum_mu       = n * mu0
+    sum_variance = n * mu0 * (1 - mu0)
+    sum_std      = np.sqrt(sum_variance)
+    return 1 - stats.norm.cdf(t - 0.5, loc=sum_mu, scale=sum_std)
+```
+
+<br>
+
+```{python}
+#| label: continuity-correction-difference-4
+
+n, mu0, t = 30, 0.5, 19
+
+old_p_value              = get_pvalue_by_old_logic(n, mu0, t)
+normal_dist_p_value      = get_pvalue_by_normal_approx(n, mu0, t)
+normal_with_add_p_value  = get_pvalue_by_normal_approx_with_addition(n, mu0, t)
+
+print(f"p-value obtained using the old, correct formula:                                {old_p_value:.6f}")
+print(f"p-value obtained from the normal distribution:                                  {normal_dist_p_value:.6f}")
+print(f"p-value obtained from the normal distribution approximation with a correction:  {normal_with_add_p_value:.6f}")
+```
+
+::: {.notes}
+Три p-value поряд для n=30, t=19. Корекція 'допилила' нормальну майже до точної біномної (0.10 vs 0.07 без корекції → 0.097 з корекцією). Це показовий доказ ефективності — однією маленькою зміною (-0.5) вирішили проблему малих вибірок.
+:::
+
+## Correction and Fisher's test {.smaller}
+
+```{python}
+#| label: z-test-small-cc
+
+def z_criterion_pvalue(sample_mean, sample_size, mu0, variance, use_continuity_correction=False):
+    if use_continuity_correction:
+        sample_mean = (sample_mean * sample_size - 0.5) / sample_size
+    Z_statistic = np.sqrt(sample_size) * (sample_mean - mu0) / np.sqrt(variance)
+    return 1 - stats.norm.cdf(Z_statistic)
+```
+
+Let's look at the results for a small sample:
+
+```{python}
+#| label: z-test-small-cc-results
+
+n        = 30
+t        = 19
+mu0      = 0.5
+variance = mu0 * (1 - mu0)
+
+old_p_value              = get_pvalue_by_old_logic(n, mu0, t)
+z_pvalue                 = z_criterion_pvalue(t / n, n, mu0, variance, use_continuity_correction=True)
+normal_with_add_p_value  = get_pvalue_by_normal_approx_with_addition(n, mu0, t)
+
+print(f"p-value obtained using the old, correct formula:    {old_p_value:.6f}")
+print(f"p-value obtained from the normal distribution (cc): {normal_with_add_p_value:.6f}")
+print(f"Z-test p-value (with continuity correction):        {z_pvalue:.6f}")
+```
+
+::: {.notes}
+Інтеграція корекції в Z-тест через прапор `use_continuity_correction`. Реалізація: зсуваємо `sample_mean` на 0.5/n, а далі — звичайна Z-статистика. Три p-value тепер дуже близькі — Z-тест з корекцією повноцінно замінює точний біномний на практиці.
+:::
+
+# Two-Sample $Z$-test for Proportions {background-iframe=".02-z-test_files/libs/colored-particles/index.html"}
+
+## From one sample to two: a natural extension {.smaller}
+
+Earlier in this lecture we leaned on a key property of the normal distribution:
+
+::: {.fragment}
+- If $\xi_1 \sim \mathcal{N}(\mu_1, \sigma_1^2)$ and $\xi_2 \sim \mathcal{N}(\mu_2, \sigma_2^2)$ are independent, then
+$$
+a_1 \xi_1 + a_2 \xi_2 \sim \mathcal{N}\!\left(a_1 \mu_1 + a_2 \mu_2,\ a_1^2 \sigma_1^2 + a_2^2 \sigma_2^2\right).
+$$
+:::
+
+::: {.fragment}
+In particular, $\xi_1 - \xi_2 \sim \mathcal{N}(\mu_1 - \mu_2,\ \sigma_1^2 + \sigma_2^2)$. **The difference of two normals is again normal.**
+:::
+
+::: {.fragment}
+This is exactly the machinery we need for **A/B testing**:
+
+- 🚚 Control group: old checkout flow on a delivery service.
+- 🚀 Test group: new "1-click reorder" button.
+- Question: did the new button move the **conversion rate**?
+:::
+
+::: {.notes}
+Місток від 1-вибіркового до 2-вибіркового: ми вже вміємо порівнювати одну пропорцію з фіксованим μ₀. Але в реальному A/B-тесті немає 'фіксованого baseline' — є дві живі когорти, обидві з шумом. Математика має враховувати випадковість обох. Бізнес-кейс: кнопка '1-click reorder' у застосунку доставки — типовий продакт-сценарій.
+:::
+
+## Setup: two independent samples {.smaller}
+
+Two independent groups of users:
+
+- Control: $n_1$ users, $x_1$ conversions. Estimator $\hat{p}_1 = x_1 / n_1$.
+- Test:    $n_2$ users, $x_2$ conversions. Estimator $\hat{p}_2 = x_2 / n_2$.
+
+By the CLT, for large enough $n_1, n_2$:
+
+$$
+\hat{p}_1 \sim \mathcal{N}\!\left(p_1,\ \tfrac{p_1(1-p_1)}{n_1}\right),\qquad
+\hat{p}_2 \sim \mathcal{N}\!\left(p_2,\ \tfrac{p_2(1-p_2)}{n_2}\right).
+$$
+
+Apply the linearity property to the **difference**:
+
+$$
+\hat{p}_1 - \hat{p}_2 \sim \mathcal{N}\!\left(p_1 - p_2,\ \tfrac{p_1(1-p_1)}{n_1} + \tfrac{p_2(1-p_2)}{n_2}\right).
+$$
+
+We want to test $H_0: p_1 = p_2$ vs. $H_1: p_1 \ne p_2$ (or one-sided).
+
+::: {.callout-tip icon=false}
+**When is the normal approximation valid?** Rule of thumb: $n_i \hat p_i \geq 5$ and $n_i (1 - \hat p_i) \geq 5$ in each group. For very low conversion rates ($p \lesssim 1\%$) the approximation gets shaky — fall back to exact or bootstrap tests.
+:::
+
+::: {.notes}
+Виведення з ЦГТ для кожної групи окремо → застосування властивості лінійності → отримуємо розподіл різниці. Callout про правило nₚ≥5 — стандартний rule-of-thumb, на нього посилаються всі продуктові команди. Поки що дисперсія різниці залежить від p₁ і p₂ — далі побачимо як її оцінити.
+:::
+
+## The pooled standard error {.smaller}
+
+Under $H_0$ both groups share a common proportion $p$. The most precise estimate of that common $p$ is the **pooled proportion**:
+
+$$
+\hat{p}_{\text{pool}} = \dfrac{x_1 + x_2}{n_1 + n_2}.
+$$
+
+Plugging it into the variance of the difference gives the **pooled standard error**:
+
+$$
+SE_{\text{pool}} = \sqrt{\hat{p}_{\text{pool}}\,(1 - \hat{p}_{\text{pool}}) \left(\dfrac{1}{n_1} + \dfrac{1}{n_2}\right)}.
+$$
+
+The two-sample $Z$-statistic is then
+
+$$
+Z = \dfrac{\hat{p}_1 - \hat{p}_2}{SE_{\text{pool}}} \overset{H_0}{\sim} \mathcal{N}(0, 1).
+$$
+
+- **One-sided** p-value: $1 - \Phi(Z)$ (or $\Phi(Z)$, depending on direction).
+- **Two-sided** p-value: $2 \cdot \left(1 - \Phi(|Z|)\right)$.
+
+::: {.notes}
+Ключовий момент — pooled оцінка p̂_pool: під H₀ обидві групи мають спільне p, найкращу його оцінку дає об'єднана пропорція. Звідси й 'pooled' SE. Двостороннє p-value подвоюємо — стандартна логіка для симетричного нормального розподілу.
+:::
+
+## Manual two-sample Z-test with `scipy.stats` {.tiny}
+
+A/B test on a delivery app — control vs. new reorder button:
+
+```{python}
+#| label: two-sample-z-manual
+
+# Observed conversions
+x1, n1 = 482, 5000   # control: 482 conversions out of 5000
+x2, n2 = 547, 5000   # test:    547 conversions out of 5000
+
+p1_hat = x1 / n1
+p2_hat = x2 / n2
+
+# Pooled proportion and standard error
+p_pool = (x1 + x2) / (n1 + n2)
+se_pool = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
+
+# Z-statistic and two-sided p-value
+z_stat = (p1_hat - p2_hat) / se_pool
+p_value_two_sided = 2 * (1 - stats.norm.cdf(abs(z_stat)))
+
+print(f"p1_hat = {p1_hat:.4f},  p2_hat = {p2_hat:.4f}")
+print(f"absolute lift = {p2_hat - p1_hat:+.4f}")
+print(f"Z = {z_stat:.4f}")
+print(f"two-sided p-value = {p_value_two_sided:.4f}")
+```
+
+::: {.fragment}
+Reading the result the way a PM would:
+
+- Conversion moved from **9.64%** to **10.94%**, a **+1.3 pp** lift.
+- $p$-value $\approx 0.027$ — at $\alpha = 0.05$ we reject $H_0$.
+- The new button **likely** improved conversion. Ship it. 🚀
+:::
+
+::: {.notes}
+Прикладний кейс: 482/5000 vs 547/5000. Конверсія зросла з 9.64% до 10.94% (+1.3 п.п. — типовий розмір ефекту для UX-зміни). Z≈2.21, p≈0.027 — відхиляємо H₀ на α=0.05. PM-інтерпретація: ship it. Підкреслити: 'likely improved' — не 'definitely', бо є 2.7% ризик помилки.
+:::
+
+## Industry-standard call: `statsmodels` {.tiny}
+
+In production code nobody writes the pooled SE by hand. The standard helper is `statsmodels.stats.proportion.proportions_ztest`:
+
+```{python}
+#| label: two-sample-z-statsmodels
+
+from statsmodels.stats.proportion import proportions_ztest
+
+count = np.array([x1, x2])   # successes per group
+nobs  = np.array([n1, n2])   # sample sizes per group
+
+z_stat_sm, p_value_sm = proportions_ztest(count, nobs, alternative="two-sided")
+print(f"two-sided:  Z = {z_stat_sm:.4f},  p = {p_value_sm:.4f}")
+
+# One-sided: did the test variant beat control?
+# Order is [control, test] -> "smaller" tests H1: p_control < p_test
+_, p_one_sided = proportions_ztest(count, nobs, alternative="smaller")
+print(f"one-sided (test > control):  p = {p_one_sided:.4f}")
+```
+
+Numbers match the manual derivation — exactly what we want before trusting any library.
+
+::: {.fragment}
+**Practical checklist for A/B testing infrastructure:**
+
+- Pre-register the alternative (`"two-sided"` / `"larger"` / `"smaller"`) before peeking at data.
+- Decide sample size *before* the experiment from the minimum detectable effect.
+- For very low conversion rates ($p \lesssim 1\%$), the normal approximation gets shaky — fall back to exact or bootstrap tests.
+:::
+
+::: {.notes}
+У продакшні ніхто не пише pooled SE руками — використовують `proportions_ztest`. Числа збігаються до 4-го знака → перевіряти бібліотеку 'ручним' розрахунком корисно, щоб розуміти що вона робить. Одностороннє `alternative="smaller"`: бо `count=[control, test]`, тож `smaller` означає 'control < test' — наш напрямок.
+:::
+
+## Visualising the difference {.smaller}
+
+```{python}
+#| label: two-sample-z-visual
+#| code-fold: true
+#| fig-align: center
+
+x = np.linspace(-4, 4, 1000)
+pdf_null = stats.norm.pdf(x, loc=0, scale=1)
+
+# One-sided critical region at alpha = 0.05 / 2 on each tail
+crit = stats.norm.ppf(1 - 0.05 / 2)
+
+fig, ax = plt.subplots(figsize=(9, 4.5))
+ax.plot(x, pdf_null, color=slate, lw=2, label="Null: N(0, 1)")
+
+# Shade rejection regions
+mask_right = x >  crit
+mask_left  = x < -crit
+ax.fill_between(x[mask_right], 0, pdf_null[mask_right], color=red_pink, alpha=0.4,
+                label=f"Reject H0 (|Z| > {crit:.2f})")
+ax.fill_between(x[mask_left],  0, pdf_null[mask_left],  color=red_pink, alpha=0.4)
+
+# Observed Z
+ax.axvline(z_stat, color=turquoise, lw=2.5, label=f"Observed Z = {z_stat:.2f}")
+ax.scatter([z_stat], [stats.norm.pdf(z_stat)], color=turquoise, s=80, zorder=5)
+
+ax.set_title("Two-sample Z-test: null distribution and observed statistic")
+ax.set_xlabel("Z")
+ax.set_ylabel("Density")
+ax.legend(loc="upper left")
+plt.tight_layout()
+plt.show()
+```
+
+Observed $Z$ falls inside the rejection region — consistent with the small p-value.
+
+::: {.notes}
+Нульовий розподіл N(0,1), рожевим заштриховано двосторонні критичні області (|Z|>1.96). Бірюзова лінія — спостережене Z≈2.21 — потрапляє в правий tail, тому p<0.05. Візуальний еквівалент того, що ми порахували числом на попередньому слайді.
+:::
+
+## Confidence interval for the lift {.tiny}
+
+The hypothesis test gives a yes/no answer. In a real A/B report PMs want a **range** for the lift — that is the confidence interval.
+
+Subtle but important: for the **test** we use the *pooled* SE (we assume $H_0$ is true); for the **CI** we use the *unpooled* SE (we describe the observed difference, not the null).
+
+$$
+(\hat p_1 - \hat p_2) \pm z_{1-\alpha/2}\,\sqrt{\dfrac{\hat p_1(1-\hat p_1)}{n_1} + \dfrac{\hat p_2(1-\hat p_2)}{n_2}}
+$$
+
+```{python}
+#| label: two-sample-z-ci
+
+se_unpooled = np.sqrt(p1_hat * (1 - p1_hat) / n1 +
+                      p2_hat * (1 - p2_hat) / n2)
+z_crit = stats.norm.ppf(1 - 0.05 / 2)
+diff   = p1_hat - p2_hat
+
+ci_low  = diff - z_crit * se_unpooled
+ci_high = diff + z_crit * se_unpooled
+
+print(f"observed lift (p1 - p2) = {diff:+.4f}")
+print(f"95% CI                  = [{ci_low:+.4f}, {ci_high:+.4f}]")
+```
+
+::: {.fragment}
+- The CI is **strictly negative** — every plausible value of $p_1 - p_2$ is below zero.
+- Zero is **not** in the interval, so we reject $H_0$ at $\alpha = 0.05$ — same conclusion as the $Z$-test, but with a magnitude estimate attached.
+:::
+
+::: {.notes}
+Найважливіша тонкість: для тесту — pooled SE (бо припускаємо H₀), для CI — unpooled SE (бо описуємо реальне p̂₁-p̂₂, без припущень). У продакт-репортах PM хоче бачити і p-value, і CI — два числа доповнюють одне одного. CI строго від'ємний → нуль не входить → відхиляємо H₀, той самий висновок іншим шляхом.
+:::
+
+## Summary {.tiny}
+
+In this session, we:
+
+- Recalled what a normal distribution is and what properties it has.
+- Recalled how the Central Limit Theorem is formulated and how it can be used.
+- Learned about Fisher's $Z$-test and solved a conversion problem using it.
+    - We also saw in practice what the continuity correction is and why it is needed.
+- Extended the $Z$-test from one sample to **two**:
+    - Derived the pooled standard error from the linearity property of the normal distribution.
+    - Implemented the two-sample $Z$-test manually with `scipy.stats`.
+    - Reproduced the same answer with `statsmodels.stats.proportion.proportions_ztest`, the industry-standard tool for A/B testing on proportions.
+- For the **two-sample** $Z$-test on proportions we estimate the variance from the data ($\hat p_{\text{pool}}(1 - \hat p_{\text{pool}})$) — there is no "unknown $\sigma^2$" problem here.
+- The variance problem comes back as soon as we move from proportions to **continuous metrics** (ARPU, average check, session length): [$\sigma^2$ is genuinely unknown and cannot be derived from a proportion]{.hi}. That motivates the next step — Student's $t$-test.
+
+::: {.notes}
+Підсумок маршруту лекції: нормальний розподіл → властивості → ЦГТ → 1-вибірковий Z → continuity correction → 2-вибірковий Z + CI. Місток до наступної лекції: для пропорцій дисперсія 'самоописова' через p(1-p), але як тільки ми переходимо до неперервних метрик (ARPU, середній чек, час сесії) — σ² треба оцінювати з даних. Це і є мотивація для t-розподілу.
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe=".02-z-test_files/libs/colored-particles/index.html"}
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=4049)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

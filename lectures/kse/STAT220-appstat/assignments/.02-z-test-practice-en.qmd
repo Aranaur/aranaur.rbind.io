@@ -1,0 +1,914 @@
+---
+title: "Practice 3"
+subtitle: "Building our own `proportions_ztest` for an A/B experiment"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+---
+
+```{python}
+#| label: setup
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import norm, binom
+
+np.random.seed(73)
+
+turquoise = "#20B2AA"
+red       = "#fb6107"
+blue      = "#181485"
+gray      = "#A0A0A0"
+```
+
+# What we are doing today {.unnumbered}
+
+In the lecture we built the Z-test piece by piece: the normal
+distribution, the CLT, the Z-statistic, continuity correction, and
+finally the **two-sample Z-test for proportions** with a confidence
+interval. Today we **assemble all of it into one tool** --- first our
+own `my_z_test()`, then its two-sample sibling
+`my_two_sample_z_test()`, similar in spirit to
+`statsmodels.stats.proportion.proportions_ztest`.
+
+::: {.callout-note icon="false"}
+## Rules of the game
+- We do **not** use the ready-made `proportions_ztest` --- we write
+  everything ourselves via `scipy.stats.norm` (`norm.cdf`, `norm.ppf`).
+- Each version is a small extension of the previous one.
+- Every final step (Final, full cycle) **reuses** previous functions
+  instead of duplicating them.
+- After every version there is a **"Your turn"** block with a small
+  exercise.
+:::
+
+---
+
+# The case: GreenBowl food delivery app
+
+We work on **GreenBowl** --- a healthy-food delivery app. The product
+team added a **"1-click reorder"** button on the home screen: a single
+tap re-creates the previous order. Before rolling the feature out to
+everyone, we want to confirm that it **actually lifts the repeat-order
+metric**.
+
+::: {.border}
+- **Unit of observation:** one user after the first order.
+- **Success metric:** the user placed another order within 7 days (1) or
+  not (0).
+- **Model:** $X_i \sim \text{Bernoulli}(\mu)$, success count
+  $T = \sum X_i \sim \text{Binomial}(n, \mu)$.
+- **Baseline:** $\mu_0 = 0.10$ (3 months of historical data).
+- **Business MDE:** an effect smaller than +1 pp is not worth shipping.
+- **Direction of interest:** only upward → **one-sided test**.
+- **Significance level:** $\alpha = 0.05$.
+:::
+
+::: {.callout-note icon="false"}
+## Why a Z-test, not an exact binomial test?
+GreenBowl has hundreds of thousands of users. At those sample sizes the
+normal approximation is very accurate, and the Z-test is orders of
+magnitude faster than the exact binomial on $n > 10^4$. That speed is
+the reason the Z-test exists at all.
+:::
+
+---
+
+# Version 1 --- Z-statistic and p-value
+
+The simplest version: given $n$, $\mu_0$, and the observed count $q$,
+return the one-sided $p$-value for $H_1: \mu > \mu_0$.
+
+$$
+Z = \sqrt{n}\,\dfrac{\hat{p} - \mu_0}{\sqrt{\mu_0(1-\mu_0)}},\qquad
+p\text{-value} = 1 - \Phi(Z)
+$$
+
+```{python}
+#| label: v1
+
+def my_z_test(q, n, mu0=0.5):
+    """
+    Version 1. One-sided Z-test for a proportion, H1: mu > mu0.
+    """
+    p_hat = q / n
+    se    = np.sqrt(mu0 * (1 - mu0) / n)
+    z     = (p_hat - mu0) / se
+    return 1 - norm.cdf(z)
+```
+
+Let's try it on our case. Marketing brought **2 000 new users** into the
+test cohort, and **226 of them** placed a repeat order within 7 days.
+
+```{python}
+#| label: v1-demo
+
+p_val = my_z_test(q=226, n=2000, mu0=0.10)
+print(f"p-value = {p_val:.4f}")
+```
+
+$p < 0.05$ --- we have evidence in favour of $H_1$. The observed 11.3%
+conversion is statistically higher than the historical 10%. But **do
+not ship yet** --- the effect may sit on the edge of business
+significance.
+
+::: {.callout-tip icon="false"}
+## Your turn 1
+Call `my_z_test` for $q \in \{200, 210, 220, 230, 240\}$ with $n=2000$,
+$\mu_0=0.10$. How does the $p$-value change? Find the smallest $q$ for
+which $p \leq 0.05$.
+:::
+
+---
+
+# Version 2 --- three types of alternative
+
+The anti-fraud team sometimes wants to check whether the metric
+**dropped** (one-sided `less`); the product team occasionally wants
+"did anything change at all" (two-sided). Add an `alternative` parameter.
+
+```{python}
+#| label: v2
+
+def my_z_test(q, n, mu0=0.5, alternative="greater"):
+    """
+    Version 2. Adds an `alternative` parameter.
+
+    alternative : {"greater", "less", "two-sided"}
+    """
+    p_hat = q / n
+    se    = np.sqrt(mu0 * (1 - mu0) / n)
+    z     = (p_hat - mu0) / se
+
+    if alternative == "greater":
+        return 1 - norm.cdf(z)
+    if alternative == "less":
+        return norm.cdf(z)
+    if alternative == "two-sided":
+        return 2 * (1 - norm.cdf(abs(z)))
+
+    raise ValueError(f"Unknown alternative: {alternative!r}")
+```
+
+```{python}
+#| label: v2-demo
+
+for alt in ("greater", "less", "two-sided"):
+    p = my_z_test(q=226, n=2000, mu0=0.10, alternative=alt)
+    print(f"alternative={alt:>10s}  →  p-value = {p:.4f}")
+```
+
+For the same data the **one-sided $p$-value is exactly half** of the
+two-sided one --- because the normal distribution is symmetric. This is
+not a coincidence, it follows from $2 \cdot (1 - \Phi(|z|))$.
+
+::: {.callout-warning icon="false"}
+## When two-sided is mandatory
+If a product has a real risk of causing harm (e.g. a new paywall that
+could either lift or sink conversion) --- use two-sided. In the
+GreenBowl case the risk is one-sided: a worse button we simply do not
+ship.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 2
+For $q=226$, $n=2000$, $\mu_0=0.10$ verify that
+`p_two_sided == 2 * p_greater` **exactly**. Why is it a strict equality
+in the Z-test but only approximate in the binomial test?
+:::
+
+---
+
+# Version 3 --- continuity correction
+
+For small $n$ the Z-test systematically underestimates the $p$-value
+relative to the exact binomial. In the lecture we patched this by
+shifting the normal by $-0.5$. We add a `use_cc` flag.
+
+```{python}
+#| label: v3
+
+def my_z_test(q, n, mu0=0.5, alternative="greater", use_cc=False):
+    """
+    Version 3. Adds continuity correction (recommended for n < ~100).
+    """
+    p_hat = q / n
+    if use_cc:
+        if alternative == "greater":
+            p_hat = (q - 0.5) / n
+        elif alternative == "less":
+            p_hat = (q + 0.5) / n
+        else:
+            p_hat = (q - 0.5) / n if p_hat >= mu0 else (q + 0.5) / n
+
+    se = np.sqrt(mu0 * (1 - mu0) / n)
+    z  = (p_hat - mu0) / se
+
+    if alternative == "greater":
+        return 1 - norm.cdf(z)
+    if alternative == "less":
+        return norm.cdf(z)
+    if alternative == "two-sided":
+        return 2 * (1 - norm.cdf(abs(z)))
+
+    raise ValueError(f"Unknown alternative: {alternative!r}")
+```
+
+**Scenario A.** MVP launch on $n=30$ beta-testers, $q=19$ (the lecture
+example):
+
+```{python}
+#| label: v3-demo-small
+
+p_naive_small = my_z_test(q=19, n=30, mu0=0.5, use_cc=False)
+p_cc_small    = my_z_test(q=19, n=30, mu0=0.5, use_cc=True)
+p_exact_small = 1 - binom.cdf(19 - 1, 30, 0.5)
+
+print("MVP launch, n=30:")
+print(f"  Z-test without cc:  p = {p_naive_small:.4f}")
+print(f"  Z-test with cc:     p = {p_cc_small:.4f}")
+print(f"  Exact binomial:     p = {p_exact_small:.4f}")
+```
+
+The correction pulls the Z-test much closer to the exact result ---
+$p$-value goes from 0.07 to 0.10.
+
+**Scenario B.** Full GreenBowl launch, $n=2000$, $q=226$:
+
+```{python}
+#| label: v3-demo-big
+
+p_naive_big = my_z_test(q=226, n=2000, mu0=0.10, use_cc=False)
+p_cc_big    = my_z_test(q=226, n=2000, mu0=0.10, use_cc=True)
+
+print("GreenBowl scale, n=2000:")
+print(f"  Z-test without cc:  p = {p_naive_big:.6f}")
+print(f"  Z-test with cc:     p = {p_cc_big:.6f}")
+print(f"  Difference:         {abs(p_naive_big - p_cc_big):.6f}")
+```
+
+::: {.callout-note icon="false"}
+## Takeaway
+Continuity correction is a "crutch" for small samples. At GreenBowl
+scale the difference shows up in the 5-6th decimal and does not affect
+any business decision. This is exactly why the Z-test (without
+correction) is the standard tool for large $n$, while small MVP
+launches either use the correction or switch to the exact binomial.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 3
+Find the smallest $n$ for which the difference between Z-test
+with/without correction drops below $0.001$. At what $n$ does the
+correction stop being necessary?
+:::
+
+---
+
+# Version 4 --- confidence interval for $\mu$
+
+Instead of yes/no the business wants a **range** for the true
+conversion. The simplest CI is the Wald one:
+
+$$
+\hat{p} \pm z_{1-\alpha/2}\,\sqrt{\dfrac{\hat{p}(1-\hat{p})}{n}}
+$$
+
+```{python}
+#| label: v4
+
+def my_z_test(q, n, mu0=0.5, alternative="greater",
+              use_cc=False, alpha=0.05, conf_int=False):
+    """
+    Version 4. Adds conf_int=True → returns a dict with p-value and CI.
+    """
+    p_hat_raw = q / n
+
+    p_hat = p_hat_raw
+    if use_cc:
+        if alternative == "greater":
+            p_hat = (q - 0.5) / n
+        elif alternative == "less":
+            p_hat = (q + 0.5) / n
+        else:
+            p_hat = (q - 0.5) / n if p_hat_raw >= mu0 else (q + 0.5) / n
+
+    se_null = np.sqrt(mu0 * (1 - mu0) / n)
+    z       = (p_hat - mu0) / se_null
+
+    if alternative == "greater":
+        p_value = 1 - norm.cdf(z)
+    elif alternative == "less":
+        p_value = norm.cdf(z)
+    elif alternative == "two-sided":
+        p_value = 2 * (1 - norm.cdf(abs(z)))
+    else:
+        raise ValueError(f"Unknown alternative: {alternative!r}")
+
+    if not conf_int:
+        return p_value
+
+    # Wald CI uses SE based on p_hat (not mu0!)
+    se_emp = np.sqrt(p_hat_raw * (1 - p_hat_raw) / n)
+    z_crit = norm.ppf(1 - alpha / 2)
+    ci_low  = p_hat_raw - z_crit * se_emp
+    ci_high = p_hat_raw + z_crit * se_emp
+
+    return {"p_value": p_value, "ci_low": ci_low, "ci_high": ci_high}
+```
+
+::: {.callout-important icon="false"}
+## Subtle but important: SE for the test vs SE for the CI
+For the **test** use $\sqrt{\mu_0(1-\mu_0)/n}$ (we assume $H_0$).
+For the **CI** use $\sqrt{\hat{p}(1-\hat{p})/n}$ (we describe what we
+observed, no assumption). The same pooled-vs-unpooled idea will reappear
+in the two-sample test.
+:::
+
+::: {.callout-note icon="false"}
+## When Wald CI breaks
+The Wald interval can **fall outside $[0, 1]$** for extreme $\hat p$
+(e.g. $\hat p = 0.02$ on $n=50$). For $p \lesssim 5\%$ or
+$p \gtrsim 95\%$ switch to Wilson or Clopper-Pearson:
+`statsmodels.stats.proportion.proportion_confint(q, n, method="wilson")`.
+:::
+
+```{python}
+#| label: v4-demo
+
+result = my_z_test(q=226, n=2000, mu0=0.10,
+                   alternative="two-sided",
+                   alpha=0.05, conf_int=True)
+
+print(f"p-value:        {result['p_value']:.4f}")
+print(f"95% CI for mu:  [{result['ci_low']:.4f}, {result['ci_high']:.4f}]")
+```
+
+::: {.callout-important icon="false"}
+## Interpretation for the PM
+- **Point estimate:** $\hat{\mu} = 226/2000 = 11.3\%$.
+- **CI:** with probability $\geq 95\%$ repeated experiments would
+  produce intervals that cover the true $\mu$.
+- **$\mu_0 = 10\%$ is outside the CI** → reject $H_0$. The baseline does
+  not explain what we observed.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 4
+For $q=226$, $n=2000$ build the one-sided lower bound (`alternative="greater"`).
+Does it cross the business threshold $\mu_0 + \text{MDE} = 11\%$? What
+does that mean for the ship decision?
+:::
+
+---
+
+# From one sample to two {.unnumbered}
+
+`my_z_test` is the right tool when you have a **fixed baseline** ---
+e.g. SLA monitoring ("is the production conversion $\geq 10\%$ this
+week?") or comparing this week against history. But a **proper A/B test**
+runs two cohorts in parallel --- and both contain noise.
+
+We add a sibling function `my_two_sample_z_test`. **The old function
+does not go away** --- it stays useful for baseline-style scenarios:
+SLA monitoring, regression detection, sanity checks against history.
+
+---
+
+# Version 5 --- two-sample Z-test
+
+Instead of a fixed $\mu_0$ we use a **pooled** estimate:
+
+$$
+\hat{p}_{\text{pool}} = \dfrac{x_1 + x_2}{n_1 + n_2},\qquad
+SE_{\text{pool}} = \sqrt{\hat{p}_{\text{pool}}(1-\hat{p}_{\text{pool}})
+\left(\tfrac{1}{n_1} + \tfrac{1}{n_2}\right)}.
+$$
+
+```{python}
+#| label: v5
+
+def my_two_sample_z_test(x1, n1, x2, n2,
+                         alternative="two-sided",
+                         alpha=0.05, conf_int=False):
+    """
+    Two-sample Z-test for the difference in proportions.
+    Convention: alternative is about p1 - p2 (control - test if you pass them in that order).
+    """
+    p1, p2 = x1 / n1, x2 / n2
+
+    # Pooled SE — for the test
+    p_pool  = (x1 + x2) / (n1 + n2)
+    se_pool = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
+    z       = (p1 - p2) / se_pool
+
+    if alternative == "greater":
+        p_value = 1 - norm.cdf(z)
+    elif alternative == "less":
+        p_value = norm.cdf(z)
+    elif alternative == "two-sided":
+        p_value = 2 * (1 - norm.cdf(abs(z)))
+    else:
+        raise ValueError(f"Unknown alternative: {alternative!r}")
+
+    if not conf_int:
+        return p_value
+
+    # Unpooled SE — for the CI
+    se_unp = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+    z_crit = norm.ppf(1 - alpha / 2)
+    diff   = p1 - p2
+
+    return {
+        "z_stat": z,
+        "p_value": p_value,
+        "estimate_diff": diff,
+        "ci_low":  diff - z_crit * se_unp,
+        "ci_high": diff + z_crit * se_unp,
+    }
+```
+
+## Demo: a proper A/B for GreenBowl
+
+We deliberately pick **numbers on the edge of the business MDE** so we
+see a real "ship/no-ship" dilemma rather than an obvious case.
+
+```{python}
+#| label: v5-demo
+
+# Control: old version
+# Test:    new "1-click reorder" button
+x1, n1 = 200, 2000   # control: 10.0%
+x2, n2 = 240, 2000   # test:    12.0%
+
+res = my_two_sample_z_test(x1, n1, x2, n2,
+                           alternative="less",   # H1: control < test
+                           alpha=0.05, conf_int=True)
+
+p1, p2 = x1/n1, x2/n2
+print(f"p1 (control) = {p1:.4f}")
+print(f"p2 (test)    = {p2:.4f}")
+print(f"lift         = {p2-p1:+.4f} ({(p2-p1)*100:+.2f} pp)")
+print(f"Z = {res['z_stat']:.4f},  p-value = {res['p_value']:.4f}")
+print(f"95% CI for p1 - p2 = [{res['ci_low']:+.4f}, {res['ci_high']:+.4f}]")
+print(f"95% CI for lift    = [{-res['ci_high']*100:+.2f}, {-res['ci_low']*100:+.2f}] pp")
+```
+
+::: {.callout-warning icon="false"}
+## Read the result carefully
+- **Test:** $p < 0.05$ → reject $H_0$. The lift is statistically
+  significant.
+- **CI for lift:** approximately $[+0.06,\ +3.94]$ pp. The **lower
+  bound** is only +0.06 pp, well **below the business MDE of +1 pp**.
+- **PM dilemma:** statistically there is a lift, but practical
+  significance is uncertain --- the true lift could be 0.1 pp, not worth
+  the deploy. Options: collect more data, or accept the risk of a
+  "potentially ephemeral" win.
+:::
+
+## Cross-check against the industry standard
+
+```{python}
+#| label: v5-statsmodels
+
+from statsmodels.stats.proportion import proportions_ztest
+
+# statsmodels convention: alternative="smaller" → H1: p1 < p2 (our "less")
+z_sm, p_sm = proportions_ztest([x1, x2], [n1, n2], alternative="smaller")
+print(f"statsmodels:  Z = {z_sm:.4f},  p = {p_sm:.4f}")
+print(f"ours:         Z = {res['z_stat']:.4f},  p = {res['p_value']:.4f}")
+```
+
+The numbers match to 4 decimals --- the implementation is correct.
+
+## Unbalanced groups (90/10 split)
+
+In production new features are often rolled out to a smaller share of
+traffic for safety. The function has to work for unequal $n_1, n_2$.
+
+```{python}
+#| label: v5-unbalanced
+
+x1_u, n1_u = 1820, 18_000   # control 90% of traffic: 10.11%
+x2_u, n2_u =  243,  2_000   # test 10% of traffic:    12.15%
+
+res_u = my_two_sample_z_test(x1_u, n1_u, x2_u, n2_u,
+                             alternative="less", conf_int=True)
+print(f"Unbalanced 90/10: lift = {(x2_u/n2_u - x1_u/n1_u)*100:+.2f} pp")
+print(f"p-value = {res_u['p_value']:.4f}")
+print(f"CI width = {(res_u['ci_high'] - res_u['ci_low'])*100:.2f} pp")
+```
+
+::: {.callout-note icon="false"}
+## Why unbalanced is more expensive
+Total sample $20\,000$ instead of $4\,000$, but the CI is **wider** than
+for a balanced $2\,000 \times 2$. Reason: CI width is dominated by the
+smaller group. For the same precision unbalanced designs need more
+users overall.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 5
+Fix the total sample at $20\,000$ and try control/test ratios of
+50/50, 70/30, 90/10. How does the CI width change? Confirm that 50/50
+is optimal.
+:::
+
+---
+
+# Version 6 --- power and sample-size planning
+
+::: {.callout-note icon="false"}
+## Power formula for the two-sample Z (one-sided)
+$$
+\text{Power}(\text{greater}) = 1 - \Phi\!\left(
+  \dfrac{z_{1-\alpha} \cdot SE_{\text{null}} - (p_1 - p_2)}{SE_{\text{alt}}}
+\right),
+$$
+with $SE_{\text{null}}$ computed at $\bar p = (p_1+p_2)/2$ (pooled under
+$H_0$) and $SE_{\text{alt}}$ at the actual $p_1, p_2$.
+:::
+
+```{python}
+#| label: v6-power
+
+def my_two_sample_z_power(p1, p2, n1, n2,
+                          alpha=0.05, alternative="two-sided"):
+    """
+    Power of the two-sample Z-test on proportions.
+    Convention: Z = (p1 - p2) / SE_pool; alternative is about p1 - p2.
+    """
+    delta   = p1 - p2
+    p_bar   = (p1 + p2) / 2
+    se_null = np.sqrt(p_bar * (1 - p_bar) * (1 / n1 + 1 / n2))
+    se_alt  = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+
+    if alternative == "greater":
+        z_a = norm.ppf(1 - alpha)
+        return 1 - norm.cdf((z_a * se_null - delta) / se_alt)
+    if alternative == "less":
+        z_a = norm.ppf(1 - alpha)
+        return norm.cdf((-z_a * se_null - delta) / se_alt)
+    if alternative == "two-sided":
+        z_a   = norm.ppf(1 - alpha / 2)
+        right = 1 - norm.cdf((z_a * se_null - delta) / se_alt)
+        left  = norm.cdf((-z_a * se_null - delta) / se_alt)
+        return right + left
+
+    raise ValueError(f"Unknown alternative: {alternative!r}")
+```
+
+`plan_ab_experiment` via **bisection** --- faster and more precise than
+a grid:
+
+```{python}
+#| label: v6-plan
+
+def plan_ab_experiment(p1, mde, alpha=0.05, target_power=0.8,
+                       alternative="less", n_lo=10, n_hi=500_000):
+    """
+    How many users per group are needed to detect an effect of size `mde`?
+    Bisection: ~log2(n_hi) steps instead of thousands.
+    """
+    # alternative gives the effect sign: "less" → p2 > p1; "greater" → p2 < p1
+    sign = +1 if alternative != "greater" else -1
+    p2   = p1 + sign * mde
+
+    # Sanity: is n_hi enough?
+    if my_two_sample_z_power(p1, p2, n_hi, n_hi, alpha, alternative) < target_power:
+        return None
+
+    while n_hi - n_lo > 1:
+        n_mid = (n_lo + n_hi) // 2
+        if my_two_sample_z_power(p1, p2, n_mid, n_mid, alpha, alternative) >= target_power:
+            n_hi = n_mid
+        else:
+            n_lo = n_mid
+    return n_hi
+```
+
+Apply to our case. Baseline 10%, business MDE +1 pp.
+
+```{python}
+#| label: v6-demo
+
+# Scenario A: marketing guarantees 2000 users per group. What can we detect?
+for n in (1000, 2000, 5000, 10_000):
+    pw = my_two_sample_z_power(p1=0.10, p2=0.11, n1=n, n2=n,
+                               alpha=0.05, alternative="less")
+    print(f"n = {n:>6d}  →  power(+1 pp) = {pw:.3f}")
+
+# Scenario B: PM wants to reliably detect +1 pp at power = 0.8
+n_needed = plan_ab_experiment(p1=0.10, mde=0.01,
+                              alpha=0.05, target_power=0.8,
+                              alternative="less")
+print(f"\nUsers per group required to detect +1 pp: {n_needed}")
+```
+
+::: {.callout-important icon="false"}
+## Key trade-off
+- Halving the MDE ⇒ the required sample size grows **roughly fourfold**.
+- On a baseline of 10%, detecting +0.5 pp at power 0.8 takes tens of
+  thousands of users per group. In product terms: 2-4 weeks of waiting,
+  or dropping the "small" effect as a business goal.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 6
+Plot a curve: X --- users per group (from 500 to 30 000), Y --- power
+at MDE = +1 pp. Find the minimum $n$ for which power $\geq 0.8$ and
+verify against `plan_ab_experiment`.
+:::
+
+---
+
+# Final --- the complete `my_ab_test`
+
+We collect everything together **by reusing** V5 and V6. No duplicated
+code --- only calls to the ready functions.
+
+```{python}
+#| label: vf
+
+def my_ab_test(x1, n1, x2, n2,
+               alternative="two-sided",
+               alpha=0.05, target_power=0.8):
+    """
+    Full report for an A/B test. Reuses my_two_sample_z_test + my_two_sample_z_power.
+    """
+    # 1) Test + CI (reuse V5)
+    test = my_two_sample_z_test(x1, n1, x2, n2,
+                                alternative=alternative,
+                                alpha=alpha, conf_int=True)
+
+    p1, p2 = x1 / n1, x2 / n2
+    lift   = p2 - p1
+
+    # 2) Power at the observed data (reuse V6)
+    power_obs = my_two_sample_z_power(p1, p2, n1, n2, alpha, alternative)
+
+    # 3) MDE detectable at the current n_avg (bisection)
+    n_avg = (n1 + n2) // 2
+    sign  = +1 if alternative != "greater" else -1
+
+    def has_power(mde):
+        return my_two_sample_z_power(p1, p1 + sign * mde, n_avg, n_avg,
+                                     alpha, alternative) >= target_power
+
+    mde_at_n = None
+    lo, hi = 0.0, min(p1, 1 - p1)
+    if has_power(hi):
+        for _ in range(40):
+            mid = (lo + hi) / 2
+            if has_power(mid):
+                hi = mid
+            else:
+                lo = mid
+        mde_at_n = hi
+
+    decision = "REJECT H0" if test["p_value"] <= alpha else "do not reject H0"
+    summary_lines = [
+        f"n1={n1}, x1={x1} (p1={p1:.4f})  vs  n2={n2}, x2={x2} (p2={p2:.4f})",
+        f"lift = {lift:+.4f} ({lift*100:+.2f} pp)",
+        f"Z = {test['z_stat']:+.3f},  p-value = {test['p_value']:.4f}  →  {decision}",
+        f"{int((1-alpha)*100)}% CI for p1-p2: [{test['ci_low']:+.4f}, {test['ci_high']:+.4f}]",
+        f"power at observed = {power_obs:.3f}",
+    ]
+    if mde_at_n is not None:
+        summary_lines.append(
+            f"MDE at n_avg={n_avg}, power={target_power}: {mde_at_n*100:.2f} pp"
+        )
+
+    return {
+        "p1": p1, "p2": p2, "lift": lift,
+        "z_stat": test["z_stat"],
+        "p_value": test["p_value"],
+        "reject": test["p_value"] <= alpha,
+        "ci_diff": (test["ci_low"], test["ci_high"]),
+        "power_at_observed": power_obs,
+        "mde_at_n": mde_at_n,
+        "summary": "\n".join(summary_lines),
+    }
+```
+
+---
+
+# Sanity check: A/A simulation
+
+Before trusting any A/B conclusions, **stress-test the infrastructure
+with an A/A run** --- the same test applied to two groups with **the
+same** $p$. If everything is wired correctly, the false-positive rate
+must be close to $\alpha$.
+
+```{python}
+#| label: aa-sim
+
+def simulate_AA(p_shared, n_per_group, n_simulations=2000,
+                alpha=0.05, alternative="two-sided"):
+    """
+    A/A simulation: estimates the empirical FPR.
+    """
+    rejections = 0
+    for _ in range(n_simulations):
+        s1 = binom.rvs(1, p_shared, size=n_per_group)
+        s2 = binom.rvs(1, p_shared, size=n_per_group)
+        p_val = my_two_sample_z_test(int(s1.sum()), n_per_group,
+                                     int(s2.sum()), n_per_group,
+                                     alternative=alternative)
+        if p_val <= alpha:
+            rejections += 1
+    return rejections / n_simulations
+
+
+np.random.seed(42)
+fpr_two_sided = simulate_AA(p_shared=0.10, n_per_group=2000,
+                            n_simulations=2000, alternative="two-sided")
+fpr_one_sided = simulate_AA(p_shared=0.10, n_per_group=2000,
+                            n_simulations=2000, alternative="less")
+
+print(f"Two-sided FPR: {fpr_two_sided:.3f}  (target ≈ 0.05)")
+print(f"One-sided FPR: {fpr_one_sided:.3f}  (target ≈ 0.05)")
+```
+
+::: {.callout-important icon="false"}
+## What to do if FPR is far from $\alpha$
+- **FPR clearly above** $\alpha$ → the infrastructure invents effects.
+  Likely causes: peeking, broken randomization, data from the two arms
+  coming from different sources.
+- **FPR clearly below** $\alpha$ → overly conservative test. Possibly a
+  wrong SE formula or continuity correction applied where it shouldn't
+  be.
+- Running A/B on such infrastructure is wasted traffic.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 7
+Run an A/A on a SMALL sample ($n=50$ per group), 2000 simulations. Does
+FPR still hover near $0.05$? Does the normal approximation hold when
+$n \cdot p = 5$?
+:::
+
+---
+
+# The full experiment cycle
+
+Walk through the experiment "the way it happens at work": planning
+first, then a simulated launch, then a report.
+
+## Step 1. Planning
+
+```{python}
+#| label: run-plan
+
+mu0           = 0.10
+business_mde  = 0.01           # +1 pp — the smallest interesting effect
+alpha         = 0.05
+target_power  = 0.80
+
+N = plan_ab_experiment(p1=mu0, mde=business_mde,
+                       alpha=alpha, target_power=target_power,
+                       alternative="less")
+
+print(f"Plan: run the test on N = {N} users PER GROUP")
+print(f"      (min detectable effect = +{business_mde*100:.0f} pp, power = {target_power})")
+```
+
+## Step 2. Simulated launch
+
+We simulate a reality where the new button **truly** lifts conversion to
+11.5% (unknown to the analyst in advance).
+
+```{python}
+#| label: run-sim
+
+np.random.seed(2026)
+
+true_p_control = 0.10
+true_p_test    = 0.115
+
+sample_control = binom.rvs(1, true_p_control, size=N)
+sample_test    = binom.rvs(1, true_p_test,    size=N)
+
+x1 = int(sample_control.sum())
+x2 = int(sample_test.sum())
+
+print(f"Control: {x1} repeat orders out of {N} (p_hat = {x1/N:.4f})")
+print(f"Test:    {x2} repeat orders out of {N} (p_hat = {x2/N:.4f})")
+```
+
+## Step 3. Analysis
+
+```{python}
+#| label: run-test
+
+result = my_ab_test(x1, N, x2, N,
+                    alternative="less",
+                    alpha=alpha,
+                    target_power=target_power)
+
+print(result["summary"])
+```
+
+## Step 4. Stakeholder report
+
+::: {.border}
+**Summary of the "1-click reorder" A/B test**
+
+- Observed repeat-order conversion:
+  control = **`{python} round(result['p1']*100, 2)`%**,
+  test = **`{python} round(result['p2']*100, 2)`%**.
+- Lift: **`{python} f"{result['lift']*100:+.2f}"` pp**.
+- 95% CI for lift:
+  **[`{python} f"{-result['ci_diff'][1]*100:+.2f}"`, `{python} f"{-result['ci_diff'][0]*100:+.2f}"`] pp**.
+- Test at $\alpha=0.05$:
+  **`{python} 'reject H0 - evidence of a lift' if result['reject'] else 'do not reject H0 - not enough evidence'`**
+  ($p = $ `{python} round(result['p_value'], 4)`).
+- Plan power at the observed data:
+  `{python} round(result['power_at_observed'], 3)`.
+
+**Recommendation:** if the lower CI bound for the lift exceeds the
+business MDE (+1 pp) --- ship it. Otherwise --- collect more data or go
+back to the design stage.
+:::
+
+---
+
+# Pitfalls of interpretation
+
+::: {.callout-warning icon="false"}
+## Three sentences a manager should never hear
+
+❌ "$p = 0.03$, so with probability 97% our button is better."
+   Conflates $p$-value with $P(H_1 \mid \text{data})$.
+
+❌ "The test showed no significant effect, so the button does not work."
+   Absence of evidence ≠ evidence of absence. Always ask about **MDE**:
+   did the test even have a chance to detect the effect?
+
+❌ "Let's stop --- we already see $p < 0.05$ at 500 users."
+   Classic *peeking*: it inflates the FPR.
+:::
+
+::: {.callout-important icon="false"}
+## What the CI does **not** mean
+
+❌ "There is a 95% probability that the true $\mu$ lies in this interval."
+
+✅ "If we repeated the experiment many times, 95% of the constructed
+   intervals would cover the true $\mu$."
+
+The interval is random; the parameter is not.
+:::
+
+::: {.callout-warning icon="false"}
+## Pooled vs unpooled SE --- do not mix them up
+- **Test of $H_0: p_1 = p_2$:** pooled SE (assume equal proportions).
+- **CI for $p_1 - p_2$:** unpooled SE (describe the observed difference,
+  no assumption).
+
+A common bug in home-grown A/B calculators.
+:::
+
+::: {.callout-warning icon="false"}
+## Multiple testing
+If you simultaneously test $k$ variants at level $\alpha=0.05$, the
+probability of at least one false positive grows as $1 - (1-\alpha)^k$.
+For $k=3$ that's already $\approx 14\%$. Simple fixes:
+
+- **Bonferroni:** use $\alpha/k$ for each test (conservative).
+- **Holm--Bonferroni** or **Benjamini--Hochberg** (FDR control) ---
+  less conservative. Implementations:
+  `statsmodels.stats.multitest.multipletests`.
+:::
+
+---
+
+# Pre-launch self-check {.unnumbered}
+
+- [ ] Is it clear **which business decision** the test result will drive?
+- [ ] Is the baseline $\mu_0$ known, and **where** does it come from?
+- [ ] One-sided or two-sided test --- and **why**?
+- [ ] What is the **business MDE**?
+- [ ] Is $N$ calculated for that MDE with power $\geq 0.8$?
+- [ ] How will we report results: $p$-value, CI, or both?
+- [ ] **A/A passed** on this infrastructure (FPR $\approx \alpha$)?
+- [ ] Pooled SE for the test, unpooled SE for the CI --- not mixed up?
+- [ ] Is $\alpha$ adjusted for multiple testing if you test several variants?
+- [ ] What do we do if the test is **inconclusive** (no rejection but
+  also not powered enough)?
+
+If any of these is "no" --- it is **too early** to launch.
