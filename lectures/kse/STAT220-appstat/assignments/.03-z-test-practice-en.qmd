@@ -19,6 +19,7 @@ execute:
 
 ```{python}
 #| label: setup
+#| include: false
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -53,7 +54,7 @@ own `my_z_test()`, then its two-sample sibling
 - Every final step (Final, full cycle) **reuses** previous functions
   instead of duplicating them.
 - After every version there is a **"Your turn"** block with a small
-  exercise.
+  exercise plus a collapsible **Solution**.
 :::
 
 ---
@@ -124,13 +125,40 @@ print(f"p-value = {p_val:.4f}")
 $p < 0.05$ --- we have evidence in favour of $H_1$. The observed 11.3%
 conversion is statistically higher than the historical 10%. But **do
 not ship yet** --- the effect may sit on the edge of business
-significance.
+significance. We will add a CI next to see the size.
 
 ::: {.callout-tip icon="false"}
 ## Your turn 1
-Call `my_z_test` for $q \in \{200, 210, 220, 230, 240\}$ with $n=2000$,
-$\mu_0=0.10$. How does the $p$-value change? Find the smallest $q$ for
-which $p \leq 0.05$.
+1. Check $q \in \{200, 210, 220, 230, 240\}$ at $n=2000$, $\mu_0=0.10$. Find the smallest $q$ for which $p \leq 0.05$ --- that is the **critical value** of the test.
+2. Convert the critical $q$ into a conversion rate and into the lift above $\mu_0$. By how many percentage points does the team need to beat the baseline before the test calls the result significant?
+3. **Research extension.** Quadruple $n$: 2000 → 8000. By what factor does the critical lift shrink --- by 2 or by $\sqrt{4}=2$? Why?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 1
+
+```{python}
+#| label: sol1
+
+qs = np.arange(200, 245, 5)
+for q in qs:
+    p = my_z_test(q, n=2000, mu0=0.10)
+    flag = "✓ REJECT" if p <= 0.05 else " "
+    print(f"q={q:>3d}  →  p={p:.4f}  {flag}")
+
+q_crit_2k = next(q for q in range(200, 260) if my_z_test(q, 2000, 0.10) <= 0.05)
+q_crit_8k = next(q for q in range(700, 1000) if my_z_test(q, 8000, 0.10) <= 0.05)
+
+lift_2k = (q_crit_2k/2000 - 0.10) * 100
+lift_8k = (q_crit_8k/8000 - 0.10) * 100
+
+print(f"\nCritical values:")
+print(f"  n=2000:  q_min = {q_crit_2k}  →  lift = {lift_2k:+.2f} pp")
+print(f"  n=8000:  q_min = {q_crit_8k}  →  lift = {lift_8k:+.2f} pp")
+print(f"  Ratio lift_2k / lift_8k = {lift_2k/lift_8k:.2f}")
+```
+
+**Interpretation.** The critical lift scales as $1/\sqrt{n}$ because $SE \propto 1/\sqrt{n}$. So a 4-fold increase in $n$ cuts the critical lift **in half**, not by a factor of 4. This is the fundamental A/B trade-off: detecting an effect half the size takes four times the users.
 :::
 
 ---
@@ -139,7 +167,8 @@ which $p \leq 0.05$.
 
 The anti-fraud team sometimes wants to check whether the metric
 **dropped** (one-sided `less`); the product team occasionally wants
-"did anything change at all" (two-sided). Add an `alternative` parameter.
+"did anything change at all" (two-sided). We add an `alternative`
+parameter.
 
 ```{python}
 #| label: v2
@@ -186,9 +215,37 @@ ship.
 
 ::: {.callout-tip icon="false"}
 ## Your turn 2
-For $q=226$, $n=2000$, $\mu_0=0.10$ verify that
-`p_two_sided == 2 * p_greater` **exactly**. Why is it a strict equality
-in the Z-test but only approximate in the binomial test?
+1. For $q=226$, $n=2000$, $\mu_0=0.10$ verify that `p_two_sided == 2 · p_greater` **exactly**.
+2. **Now the bad news.** Take $q=174$ (so $\hat p < \mu_0$). Does the equality still hold? Try `2 · p_less` --- what comes out?
+3. Derive the **general formula**: for which relation between $\hat p$ and $\mu_0$ do we get $p_{\text{two}} = 2\,p_{\text{greater}}$ vs $2\,p_{\text{less}}$?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 2
+
+```{python}
+#| label: sol2
+
+print("Case A: q=226 (p̂=0.113 > μ₀=0.10)")
+pg = my_z_test(226, 2000, 0.10, "greater")
+pl = my_z_test(226, 2000, 0.10, "less")
+p2 = my_z_test(226, 2000, 0.10, "two-sided")
+print(f"  p_greater = {pg:.4f},  p_less = {pl:.4f},  p_two = {p2:.4f}")
+print(f"  2·p_greater = {2*pg:.4f}  →  {'matches' if abs(p2-2*pg) < 1e-10 else 'DOES NOT match'}")
+print(f"  2·p_less    = {2*pl:.4f}  →  ({'>1, meaningless' if 2*pl > 1 else 'matches'})")
+
+print("\nCase B: q=174 (p̂=0.087 < μ₀=0.10)")
+pg = my_z_test(174, 2000, 0.10, "greater")
+pl = my_z_test(174, 2000, 0.10, "less")
+p2 = my_z_test(174, 2000, 0.10, "two-sided")
+print(f"  p_greater = {pg:.4f},  p_less = {pl:.4f},  p_two = {p2:.4f}")
+print(f"  2·p_greater = {2*pg:.4f}  →  ({'>1, meaningless' if 2*pg > 1 else 'matches'})")
+print(f"  2·p_less    = {2*pl:.4f}  →  {'matches' if abs(p2-2*pl) < 1e-10 else 'DOES NOT match'}")
+```
+
+**General formula:** $p_{\text{two-sided}} = 2 \cdot \min(p_{\text{greater}},\ p_{\text{less}})$. We always take the tail where the observation is "more extreme". When $\hat p > \mu_0$ ($z>0$) --- the right tail is more extreme, so $p_{\text{two}} = 2 \cdot p_{\text{greater}}$. When $\hat p < \mu_0$ ($z<0$) --- the left tail, so $p_{\text{two}} = 2 \cdot p_{\text{less}}$.
+
+**Why is it strict for Z but only approximate for the binomial?** Because the normal distribution is **symmetric** around zero: $P(Z > z) = P(Z < -z)$. The binomial with $\mu_0 \ne 0.5$ is **asymmetric**, so the two tail probabilities are not equal, and doubling one tail gives only an approximate $p_{\text{two}}$.
 :::
 
 ---
@@ -208,11 +265,13 @@ def my_z_test(q, n, mu0=0.5, alternative="greater", use_cc=False):
     """
     p_hat = q / n
     if use_cc:
+        # Shift the observed value by 0.5/n towards mu0 — that is the correction
         if alternative == "greater":
             p_hat = (q - 0.5) / n
         elif alternative == "less":
             p_hat = (q + 0.5) / n
         else:
+            # two-sided: shift towards mu0
             p_hat = (q - 0.5) / n if p_hat >= mu0 else (q + 0.5) / n
 
     se = np.sqrt(mu0 * (1 - mu0) / n)
@@ -245,7 +304,40 @@ print(f"  Exact binomial:     p = {p_exact_small:.4f}")
 ```
 
 The correction pulls the Z-test much closer to the exact result ---
-$p$-value goes from 0.07 to 0.10.
+$p$-value goes from 0.07 to 0.10. In this scenario the decision at
+$\alpha = 0.05$ is the same for all three tests --- "do not reject
+$H_0$". But the correction is not always merely cosmetic.
+
+**Scenario A.2 --- when correction saves you from a false positive.**
+Shrink the sample to $n=20$, $q=14$, $\mu_0 = 0.5$ (a beta cohort where
+the historical baseline is 50%):
+
+```{python}
+#| label: v3-demo-flip
+
+n_d, q_d = 20, 14
+
+p_naive_d = my_z_test(q=q_d, n=n_d, mu0=0.5, use_cc=False)
+p_cc_d    = my_z_test(q=q_d, n=n_d, mu0=0.5, use_cc=True)
+p_exact_d = 1 - binom.cdf(q_d - 1, n_d, 0.5)
+
+def decision(p, alpha=0.05):
+    return "REJECT H0" if p <= alpha else "do not reject"
+
+print(f"Beta launch, n=20, q=14, alpha=0.05:")
+print(f"  Z-test without cc:  p = {p_naive_d:.4f}  →  {decision(p_naive_d)}")
+print(f"  Z-test with cc:     p = {p_cc_d:.4f}  →  {decision(p_cc_d)}")
+print(f"  Exact binomial:     p = {p_exact_d:.4f}  →  {decision(p_exact_d)}")
+```
+
+::: {.callout-warning icon="false"}
+## What just happened
+- **Exact binomial:** $p \approx 0.058$ → do not reject $H_0$. **Not enough** evidence.
+- **Naive Z-test:** $p \approx 0.037$ → **reject** $H_0$. False-positive verdict!
+- **Z-test with cc:** $p \approx 0.058$ → do not reject. Back in line with the gold standard.
+
+On small $n$ the normal approximation **systematically underestimates** the $p$-value in the tails. Without the correction you will "find" effects that are not there --- and ship features on the back of noise. Continuity correction puts the decision back into the safe zone.
+:::
 
 **Scenario B.** Full GreenBowl launch, $n=2000$, $q=226$:
 
@@ -272,9 +364,39 @@ launches either use the correction or switch to the exact binomial.
 
 ::: {.callout-tip icon="false"}
 ## Your turn 3
-Find the smallest $n$ for which the difference between Z-test
-with/without correction drops below $0.001$. At what $n$ does the
-correction stop being necessary?
+1. For $\mu_0 = 0.5$ find the smallest $n$ for which $|p_{\text{naive}} - p_{\text{cc}}| < 0.001$ (take $q$ close to the $\alpha$-boundary, e.g. $q \approx \mu_0 n + 1.645\sqrt{n\mu_0(1-\mu_0)}$).
+2. Repeat for $\mu_0 = 0.10$ and $\mu_0 = 0.01$. Is the threshold the same $n$?
+3. **Research extension.** Build a table of $|p_{\text{naive}} - p_{\text{cc}}|$ across $n$ and $\mu_0$. What better describes "sufficient n" --- raw $n$ or the **expected number of successes** $n\cdot\mu_0$? Does the rule $n\cdot\mu_0 \geq 30$ hold up as a universal boundary?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 3
+
+```{python}
+#| label: sol3
+
+def cc_diff(n, mu0):
+    """|Δp| at q on the α-boundary (z ≈ 1.645)."""
+    q = int(round(mu0 * n + 1.645 * np.sqrt(n * mu0 * (1 - mu0))))
+    p_naive = my_z_test(q, n, mu0, use_cc=False)
+    p_cc    = my_z_test(q, n, mu0, use_cc=True)
+    return abs(p_naive - p_cc)
+
+print(f"{'n':>6s}  {'μ₀':>6s}  {'n·μ₀':>6s}  {'|Δp|':>8s}")
+for mu0 in (0.5, 0.10, 0.01):
+    for n in (30, 100, 300, 1000, 3000, 10_000):
+        if n * mu0 < 1:
+            continue
+        print(f"{n:>6d}  {mu0:>6.2f}  {n*mu0:>6.1f}  {cc_diff(n, mu0):>8.4f}")
+    print()
+```
+
+**Interpretation.** Read the table along the **`n·μ₀`** column (expected successes), not along `n`:
+
+- $n\cdot\mu_0 \approx 10$ gives $|\Delta p| \approx 0.019\text{--}0.020$ both at $n=100,\ \mu_0=0.1$ and at $n=1000,\ \mu_0=0.01$. The $n$ values differ by a factor of 10, but $|\Delta p|$ is the same because the effective sample is the same.
+- $n\cdot\mu_0 \approx 100$ gives $|\Delta p| \approx 0.005\text{--}0.006$ for all three $\mu_0$.
+
+The real boundary is the **effective sample** $\min(n\mu_0,\ n(1-\mu_0))$, not $n$ itself. The classical $n\mu_0 \geq 30$ rule of thumb pins this down precisely: the correction stops mattering when every "class" (success/failure) has enough observations for the smooth approximation.
 :::
 
 ---
@@ -295,6 +417,10 @@ def my_z_test(q, n, mu0=0.5, alternative="greater",
               use_cc=False, alpha=0.05, conf_int=False):
     """
     Version 4. Adds conf_int=True → returns a dict with p-value and CI.
+    The CI type matches the alternative:
+      two-sided → [p̂ - z₁₋α/₂·SE, p̂ + z₁₋α/₂·SE]
+      greater   → one-sided lower bound: [p̂ - z₁₋α·SE, 1]
+      less      → one-sided upper bound: [0, p̂ + z₁₋α·SE]
     """
     p_hat_raw = q / n
 
@@ -322,11 +448,21 @@ def my_z_test(q, n, mu0=0.5, alternative="greater",
     if not conf_int:
         return p_value
 
-    # Wald CI uses SE based on p_hat (not mu0!)
+    # Wald CI uses SE based on p_hat_raw (not mu0!).
     se_emp = np.sqrt(p_hat_raw * (1 - p_hat_raw) / n)
-    z_crit = norm.ppf(1 - alpha / 2)
-    ci_low  = p_hat_raw - z_crit * se_emp
-    ci_high = p_hat_raw + z_crit * se_emp
+
+    if alternative == "two-sided":
+        z_crit  = norm.ppf(1 - alpha / 2)
+        ci_low  = p_hat_raw - z_crit * se_emp
+        ci_high = p_hat_raw + z_crit * se_emp
+    elif alternative == "greater":
+        z_crit  = norm.ppf(1 - alpha)
+        ci_low  = p_hat_raw - z_crit * se_emp
+        ci_high = 1.0
+    else:  # less
+        z_crit  = norm.ppf(1 - alpha)
+        ci_low  = 0.0
+        ci_high = p_hat_raw + z_crit * se_emp
 
     return {"p_value": p_value, "ci_low": ci_low, "ci_high": ci_high}
 ```
@@ -347,31 +483,238 @@ $p \gtrsim 95\%$ switch to Wilson or Clopper-Pearson:
 `statsmodels.stats.proportion.proportion_confint(q, n, method="wilson")`.
 :::
 
+::: {.callout-important icon="false"}
+## Two-sided vs one-sided CI
+The CI should **match the test** --- it uses the same Type I error budget:
+
+- **`two-sided`** → classic $[\hat p - z_{1-\alpha/2}\cdot SE,\ \hat p + z_{1-\alpha/2}\cdot SE]$. For $\alpha = 0.05$ that's $z = 1.96$.
+- **`greater`** (H₁: $\mu > \mu_0$) → only a **lower** bound: $[\hat p - z_{1-\alpha}\cdot SE,\ 1]$. Reads as "$\mu$ is **at least** $L$ with confidence $1-\alpha$".
+- **`less`** (H₁: $\mu < \mu_0$) → only an **upper** bound: $[0,\ \hat p + z_{1-\alpha}\cdot SE]$. Reads as "$\mu$ is **at most** $U$".
+
+Why is this not "the same CI with one bound missing"? Because $z_{1-\alpha} < z_{1-\alpha/2}$ ($1.645 < 1.96$ at $\alpha=0.05$): a one-sided CI is **tighter** but says less --- you trade away information about the other bound for a tighter first one.
+:::
+
 ```{python}
 #| label: v4-demo
 
-result = my_z_test(q=226, n=2000, mu0=0.10,
-                   alternative="two-sided",
-                   alpha=0.05, conf_int=True)
+# Two-sided CI — classic "estimate ± margin of error" report
+res_two = my_z_test(q=226, n=2000, mu0=0.10,
+                    alternative="two-sided",
+                    alpha=0.05, conf_int=True)
 
-print(f"p-value:        {result['p_value']:.4f}")
-print(f"95% CI for mu:  [{result['ci_low']:.4f}, {result['ci_high']:.4f}]")
+# One-sided — aligned with the "is the feature better than baseline?" test
+res_one = my_z_test(q=226, n=2000, mu0=0.10,
+                    alternative="greater",
+                    alpha=0.05, conf_int=True)
+
+print(f"Two-sided 95% CI:           [{res_two['ci_low']:.4f}, {res_two['ci_high']:.4f}]")
+print(f"95% one-sided lower:        μ ≥ {res_one['ci_low']:.4f}")
+print(f"Business threshold μ₀ + MDE = 11%: {'passed' if res_one['ci_low'] >= 0.11 else 'NOT reached'}")
 ```
 
 ::: {.callout-important icon="false"}
 ## Interpretation for the PM
 - **Point estimate:** $\hat{\mu} = 226/2000 = 11.3\%$.
-- **CI:** with probability $\geq 95\%$ repeated experiments would
-  produce intervals that cover the true $\mu$.
-- **$\mu_0 = 10\%$ is outside the CI** → reject $H_0$. The baseline does
-  not explain what we observed.
+- **Two-sided CI** ≈ $[10.0\%,\ 12.7\%]$: wider, but describes possible deviations in both directions. Useful for reporting.
+- **One-sided lower bound** ≈ $10.1\%$: tighter than the two-sided lower bound because all of $\alpha$ goes into one tail. It answers "how bad is the worst case?" --- and the answer is: $\mu$ is essentially not below 10.1%, but **does not reach the business MDE of 11%**.
+- **Decision:** statistically --- yes, business value --- doubtful. Collect more data or accept the risk of an "ephemeral" win.
 :::
 
 ::: {.callout-tip icon="false"}
 ## Your turn 4
-For $q=226$, $n=2000$ build the one-sided lower bound (`alternative="greater"`).
-Does it cross the business threshold $\mu_0 + \text{MDE} = 11\%$? What
-does that mean for the ship decision?
+1. Run `my_z_test(q=226, n=2000, mu0=0.10, alternative="less", alpha=0.05, conf_int=True)`. What does the CI look like? Does it make sense for this data, and why?
+2. How many extra repeat orders $q$ (with the same $n=2000$) are needed for the **one-sided lower bound** to cross the business threshold of 11%?
+3. **Research extension.** Keeping $q=226$ fixed, how does the one-sided lower bound move across $\alpha \in \{0.01,\ 0.05,\ 0.10\}$? Can a "less conservative" PM (higher $\alpha$) justify shipping when the "conservative" one cannot?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 4
+
+```{python}
+#| label: sol4
+
+# (1) alternative="less" — CI with an upper bound, but the data points the other way
+r = my_z_test(226, 2000, 0.10, alternative="less", alpha=0.05, conf_int=True)
+print(f"alt='less': p={r['p_value']:.4f}, CI = [{r['ci_low']:.4f}, {r['ci_high']:.4f}]")
+
+# (2) Find the smallest q at which the one-sided lower bound ≥ 0.11
+for q in range(220, 280):
+    lo = my_z_test(q, 2000, 0.10, "greater", alpha=0.05, conf_int=True)["ci_low"]
+    if lo >= 0.11:
+        print(f"\nq_min = {q}  (p̂ = {q/2000*100:.2f}%, lower bound = {lo:.4f})")
+        extra = q - 226
+        print(f"Extra repeat orders needed beyond the observed 226: {extra}")
+        break
+
+# (3) α trade-off — lower bound at different significance levels
+print(f"\n{'α':>6s}  {'lower':>8s}  {'≥ MDE 11%?':>12s}")
+for alpha in (0.01, 0.05, 0.10):
+    lo = my_z_test(226, 2000, 0.10, "greater", alpha=alpha, conf_int=True)["ci_low"]
+    flag = "yes" if lo >= 0.11 else "no"
+    print(f"{alpha:>6.2f}  {lo:>8.4f}  {flag:>12s}")
+```
+
+**Interpretation.**
+
+1. CI = $[0,\ 0.124]$ at `alt="less"` --- "$\mu \leq 12.4\%$ with 95% confidence". Trivially true (since $\hat p = 11.3\%$), but **not the information you want to rely on**: the data pulls upward while the alternative looks downward. The lesson: lock the alternative **before** seeing the data, otherwise you can pick a convenient result after the fact.
+2. About 19 more orders are needed (q=245 instead of 226) for the lower bound to clear 11%.
+3. **None** of the three $\alpha$ values lets you claim "$\mu \geq 11\%$" with this data --- every lower bound stays below 11%. So even loosening $\alpha$ to 0.10 does not give a business justification for shipping. Conclusion: the real signal is weak, and this is a data problem, not an $\alpha$ problem.
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Deeper dive: Wilson and Clopper-Pearson CIs
+
+The Wald interval relies on the normal approximation **and** plugs in the observed $\hat p$ for $SE$. That breaks it in three situations:
+
+- **Small $n$:** the approximation itself is inaccurate.
+- **Extreme $\hat p$:** $SE = \sqrt{\hat p (1-\hat p)/n} \to 0$ as $\hat p \to 0$ or $\hat p \to 1$, so the CI is artificially narrow.
+- **$\hat p = 0$ or $\hat p = 1$:** the Wald CI collapses to a single point --- "with 95% confidence the probability is exactly zero after 20 failures".
+
+There are two classical fixes.
+
+### Wilson (1927) --- test inversion
+
+Instead of fixing $\hat p$ and computing $SE$ from it, Wilson **inverts the test itself**: which values of $p_0$ are consistent with the data at level $\alpha$?
+
+$$\left|\hat p - p_0\right| \leq z_{1-\alpha/2}\sqrt{\dfrac{p_0(1-p_0)}{n}}.$$
+
+Squaring gives a quadratic in $p_0$. Its two roots are the bounds:
+
+$$\text{CI}_{\text{Wilson}} = \dfrac{1}{1 + z^2/n}\left[\hat p + \dfrac{z^2}{2n} \pm z \sqrt{\dfrac{\hat p(1-\hat p)}{n} + \dfrac{z^2}{4n^2}}\right]$$
+
+The center of the interval --- $(\hat p + z^2/(2n))/(1 + z^2/n)$ --- is shrunk towards $0.5$ (acts as a weak Bayesian prior). The interval is **always in $[0, 1]$**.
+
+### Clopper-Pearson (1934) --- exact
+
+No approximations; the bounds come straight from the binomial distribution:
+
+- $p_L$ --- the smallest $p$ for which $P(X \geq q \mid p) \geq \alpha/2$.
+- $p_U$ --- the largest $p$ for which $P(X \leq q \mid p) \geq \alpha/2$.
+
+Thanks to the Binomial↔Beta relationship these have a closed form via beta-distribution quantiles $B_q$:
+
+$$p_L = B_{\alpha/2}(q,\ n - q + 1),\qquad p_U = B_{1-\alpha/2}(q + 1,\ n - q).$$
+
+Edge cases: $p_L = 0$ when $q = 0$ and $p_U = 1$ when $q = n$. Coverage is **guaranteed $\geq 1 - \alpha$** (the method is conservative).
+
+### Implementation and cross-check
+
+```{python}
+#| label: wilson-cp-impl
+
+from scipy.stats import beta as beta_dist
+from statsmodels.stats.proportion import proportion_confint
+
+def wald_ci(q, n, alpha=0.05):
+    p_hat = q / n
+    se    = np.sqrt(p_hat * (1 - p_hat) / n)
+    z     = norm.ppf(1 - alpha/2)
+    return (p_hat - z*se, p_hat + z*se)
+
+def wilson_ci(q, n, alpha=0.05):
+    p_hat = q / n
+    z     = norm.ppf(1 - alpha/2)
+    denom = 1 + z**2 / n
+    center     = (p_hat + z**2 / (2*n)) / denom
+    half_width = z / denom * np.sqrt(p_hat*(1-p_hat)/n + z**2/(4*n**2))
+    return (center - half_width, center + half_width)
+
+def clopper_pearson_ci(q, n, alpha=0.05):
+    lower = 0.0 if q == 0 else beta_dist.ppf(alpha/2, q, n - q + 1)
+    upper = 1.0 if q == n else beta_dist.ppf(1 - alpha/2, q + 1, n - q)
+    return (lower, upper)
+
+# Cross-check: same thing via statsmodels (q=5, n=50)
+print(f"{'method':<18s}  {'mine':>26s}  {'statsmodels':>26s}")
+for name, fn, sm_method in [
+    ("Wald",            wald_ci,             "normal"),
+    ("Wilson",          wilson_ci,           "wilson"),
+    ("Clopper-Pearson", clopper_pearson_ci,  "beta"),
+]:
+    mine = fn(5, 50)
+    sm   = proportion_confint(5, 50, method=sm_method)
+    print(f"{name:<18s}  [{mine[0]:+.4f}, {mine[1]:+.4f}]   [{sm[0]:+.4f}, {sm[1]:+.4f}]")
+```
+
+### Numerical comparison on "awkward" cases
+
+```{python}
+#| label: wilson-cp-table
+
+scenarios = [
+    (50,    2, "small n, small p̂"),
+    (20,    0, "extreme: q = 0"),
+    (20,   20, "extreme: q = n"),
+    (200,   4, "low-conversion (p̂ = 2%)"),
+    (200, 100, "moderate case (p̂ = 0.5)"),
+]
+
+for n, q, label in scenarios:
+    print(f"\nn={n}, q={q} — {label} (p̂={q/n:.3f}):")
+    for name, fn in [("Wald", wald_ci), ("Wilson", wilson_ci), ("Clopper-Pearson", clopper_pearson_ci)]:
+        lo, hi = fn(q, n)
+        warn = "  ← outside [0,1]!" if lo < 0 or hi > 1 else ""
+        deg  = "  ← degenerate!"   if abs(hi - lo) < 1e-10 else ""
+        print(f"  {name:<18s}  [{lo:+.4f}, {hi:+.4f}]{warn}{deg}")
+```
+
+### Coverage probability --- graphical comparison
+
+The most important property of a CI is how often it **actually** covers the true $p$. For the binomial distribution this can be computed **exactly** (no simulation needed) by enumerating all $n+1$ possible values of $q$:
+
+$$\text{Coverage}(p) = \sum_{q=0}^{n} \mathbb{1}\bigl[p \in \text{CI}(q)\bigr] \cdot \binom{n}{q} p^q (1-p)^{n-q}.$$
+
+```{python}
+#| label: wilson-cp-coverage
+#| fig-align: center
+
+def exact_coverage(n, p_true, method, alpha=0.05):
+    cov = 0.0
+    for q in range(n + 1):
+        lo, hi = method(q, n, alpha)
+        if lo <= p_true <= hi:
+            cov += binom.pmf(q, n, p_true)
+    return cov
+
+n_demo  = 30
+p_grid  = np.linspace(0.005, 0.995, 199)
+cov_w   = [exact_coverage(n_demo, p, wald_ci)            for p in p_grid]
+cov_wi  = [exact_coverage(n_demo, p, wilson_ci)          for p in p_grid]
+cov_cp  = [exact_coverage(n_demo, p, clopper_pearson_ci) for p in p_grid]
+
+fig, ax = plt.subplots(figsize=(9, 4.5))
+ax.plot(p_grid, cov_w,   color=red,       lw=1.2, label="Wald")
+ax.plot(p_grid, cov_wi,  color=turquoise, lw=1.6, label="Wilson")
+ax.plot(p_grid, cov_cp,  color=blue,      lw=1.6, label="Clopper-Pearson")
+ax.axhline(0.95, color=gray, linestyle="--", lw=1, label="Target = 0.95")
+ax.set_xlabel("True p")
+ax.set_ylabel("Coverage probability")
+ax.set_title(f"Exact coverage of 95% CIs at n = {n_demo}")
+ax.set_ylim(0.60, 1.02)
+ax.legend(loc="lower right")
+plt.tight_layout()
+plt.show()
+```
+
+The "jaggedness" on the plot is not simulation noise --- it's the **discreteness of the binomial**: every time crossing $q$ adds or removes a value from the CI, the coverage jumps.
+
+### Conclusions
+
+|  | Wald | Wilson | Clopper-Pearson |
+|---|---|---|---|
+| Always in $[0, 1]$ | **no** | yes | yes |
+| Coverage at extreme $p$ | often 70-90% | $\approx 95\%$ | $\geq 95\%$ |
+| Degenerate at $q=0$ or $q=n$ | yes | no | no |
+| Width at middle $p$ | narrowest | moderate | widest |
+| Formula complexity | simple | algebraic | via beta quantile |
+
+**Practical recommendations:**
+
+- **Default for proportions --- Wilson.** Works well across the whole range of $p$, no surprises.
+- **Clopper-Pearson** --- when under-coverage is **unacceptable** (clinical trials, regulatory reporting, A/A safety monitoring).
+- **Wald** --- only when $n \cdot \hat p \geq 30$ **and** $n \cdot (1 - \hat p) \geq 30$, or as a back-of-envelope estimate. Wald is pedagogically valuable because its formula transparently shows the role of $SE$ --- but in production, take Wilson.
+
+> Brown, Cai, DasGupta (*Statistical Science*, 2001): for proportions, Wald loses to Wilson almost everywhere and they recommend **dropping Wald as the default** in both teaching and practice.
 :::
 
 ---
@@ -428,17 +771,31 @@ def my_two_sample_z_test(x1, n1, x2, n2,
     if not conf_int:
         return p_value
 
-    # Unpooled SE — for the CI
+    # Unpooled SE — for the CI (no H0 assumption)
     se_unp = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
-    z_crit = norm.ppf(1 - alpha / 2)
     diff   = p1 - p2
+
+    # CI matches alternative — same α budget.
+    if alternative == "two-sided":
+        z_crit  = norm.ppf(1 - alpha / 2)
+        ci_low  = diff - z_crit * se_unp
+        ci_high = diff + z_crit * se_unp
+    elif alternative == "greater":
+        # H1: p1 > p2 → one-sided lower bound on (p1 - p2)
+        z_crit  = norm.ppf(1 - alpha)
+        ci_low  = diff - z_crit * se_unp
+        ci_high = 1.0
+    else:  # less — H1: p1 < p2 → one-sided upper bound
+        z_crit  = norm.ppf(1 - alpha)
+        ci_low  = -1.0
+        ci_high = diff + z_crit * se_unp
 
     return {
         "z_stat": z,
         "p_value": p_value,
         "estimate_diff": diff,
-        "ci_low":  diff - z_crit * se_unp,
-        "ci_high": diff + z_crit * se_unp,
+        "ci_low":  ci_low,
+        "ci_high": ci_high,
     }
 ```
 
@@ -455,29 +812,41 @@ see a real "ship/no-ship" dilemma rather than an obvious case.
 x1, n1 = 200, 2000   # control: 10.0%
 x2, n2 = 240, 2000   # test:    12.0%
 
-res = my_two_sample_z_test(x1, n1, x2, n2,
-                           alternative="less",   # H1: control < test
-                           alpha=0.05, conf_int=True)
+# Two-sided — for reporting ("estimate ± margin")
+res_two = my_two_sample_z_test(x1, n1, x2, n2,
+                               alternative="two-sided",
+                               alpha=0.05, conf_int=True)
+
+# One-sided — aligned with the "is the feature better than control?" test
+res_one = my_two_sample_z_test(x1, n1, x2, n2,
+                               alternative="less",   # H1: p1 < p2
+                               alpha=0.05, conf_int=True)
 
 p1, p2 = x1/n1, x2/n2
 print(f"p1 (control) = {p1:.4f}")
 print(f"p2 (test)    = {p2:.4f}")
-print(f"lift         = {p2-p1:+.4f} ({(p2-p1)*100:+.2f} pp)")
-print(f"Z = {res['z_stat']:.4f},  p-value = {res['p_value']:.4f}")
-print(f"95% CI for p1 - p2 = [{res['ci_low']:+.4f}, {res['ci_high']:+.4f}]")
-print(f"95% CI for lift    = [{-res['ci_high']*100:+.2f}, {-res['ci_low']*100:+.2f}] pp")
+print(f"lift = p2 - p1 = {p2-p1:+.4f} ({(p2-p1)*100:+.2f} pp)\n")
+
+print(f"two-sided: Z = {res_two['z_stat']:.4f}, p = {res_two['p_value']:.4f}")
+print(f"  95% CI for lift: [{-res_two['ci_high']*100:+.2f}, {-res_two['ci_low']*100:+.2f}] pp\n")
+
+print(f"one-sided 'less': Z = {res_one['z_stat']:.4f}, p = {res_one['p_value']:.4f}")
+print(f"  95% one-sided LOWER bound for lift: ≥ {-res_one['ci_high']*100:+.2f} pp")
 ```
 
 ::: {.callout-warning icon="false"}
 ## Read the result carefully
-- **Test:** $p < 0.05$ → reject $H_0$. The lift is statistically
-  significant.
-- **CI for lift:** approximately $[+0.06,\ +3.94]$ pp. The **lower
-  bound** is only +0.06 pp, well **below the business MDE of +1 pp**.
-- **PM dilemma:** statistically there is a lift, but practical
-  significance is uncertain --- the true lift could be 0.1 pp, not worth
-  the deploy. Options: collect more data, or accept the risk of a
-  "potentially ephemeral" win.
+- **Test:** $p < 0.05$ → reject $H_0$. The lift is statistically significant.
+- **Two-sided CI for lift** ≈ $[+0.06,\ +3.94]$ pp. The lower bound is only +0.06 pp, well **below the business MDE of +1 pp**.
+- **One-sided lower bound for lift** ≈ $+0.37$ pp --- tighter (all of $\alpha$ goes into one tail), but **still below +1 pp**.
+- **PM dilemma:** statistically there is a lift, but practical significance is uncertain under either interpretation. The true lift could be 0.4 pp, not worth the deploy. Options: collect more data, or accept the risk of an "ephemeral" win.
+:::
+
+::: {.callout-note icon="false"}
+## Which CI to use in an A/B report
+- If the test is **one-sided** (the product asks "better or not?") --- a one-sided lower bound for the lift is **semantically aligned** with the test and answers "what lift can we guarantee".
+- If the test is **two-sided** ("did anything change at all?") --- use a two-sided CI.
+- Do not mix them: a two-sided CI for a one-sided decision wastes $\alpha/2$.
 :::
 
 ## Cross-check against the industry standard
@@ -490,7 +859,7 @@ from statsmodels.stats.proportion import proportions_ztest
 # statsmodels convention: alternative="smaller" → H1: p1 < p2 (our "less")
 z_sm, p_sm = proportions_ztest([x1, x2], [n1, n2], alternative="smaller")
 print(f"statsmodels:  Z = {z_sm:.4f},  p = {p_sm:.4f}")
-print(f"ours:         Z = {res['z_stat']:.4f},  p = {res['p_value']:.4f}")
+print(f"ours:         Z = {res_one['z_stat']:.4f},  p = {res_one['p_value']:.4f}")
 ```
 
 The numbers match to 4 decimals --- the implementation is correct.
@@ -503,29 +872,89 @@ traffic for safety. The function has to work for unequal $n_1, n_2$.
 ```{python}
 #| label: v5-unbalanced
 
-x1_u, n1_u = 1820, 18_000   # control 90% of traffic: 10.11%
-x2_u, n2_u =  243,  2_000   # test 10% of traffic:    12.15%
+# Use two-sided for a fair CI-width comparison.
+def ci_width_pp(x1, n1, x2, n2, alpha=0.05):
+    r = my_two_sample_z_test(x1, n1, x2, n2,
+                             alternative="two-sided",
+                             alpha=alpha, conf_int=True)
+    return (r["ci_high"] - r["ci_low"]) * 100   # in percentage points
 
-res_u = my_two_sample_z_test(x1_u, n1_u, x2_u, n2_u,
-                             alternative="less", conf_int=True)
-print(f"Unbalanced 90/10: lift = {(x2_u/n2_u - x1_u/n1_u)*100:+.2f} pp")
-print(f"p-value = {res_u['p_value']:.4f}")
-print(f"CI width = {(res_u['ci_high'] - res_u['ci_low'])*100:.2f} pp")
+# Unbalanced 90/10, total 20 000
+x1_u, n1_u = 1820, 18_000
+x2_u, n2_u =  243,  2_000
+w_unbal = ci_width_pp(x1_u, n1_u, x2_u, n2_u)
+
+# Balanced 50/50, total 4 000 (our base A/B from the demo)
+w_bal_small = ci_width_pp(200, 2_000, 240, 2_000)
+
+# Balanced 50/50, total 20 000 (same total as the unbalanced run)
+w_bal_big   = ci_width_pp(1000, 10_000, 1200, 10_000)
+
+print(f"Unbalanced 90/10, total 20 000: CI width = {w_unbal:.2f} pp")
+print(f"Balanced 50/50,   total  4 000: CI width = {w_bal_small:.2f} pp")
+print(f"Balanced 50/50,   total 20 000: CI width = {w_bal_big:.2f} pp")
 ```
 
 ::: {.callout-note icon="false"}
 ## Why unbalanced is more expensive
-Total sample $20\,000$ instead of $4\,000$, but the CI is **wider** than
-for a balanced $2\,000 \times 2$. Reason: CI width is dominated by the
-smaller group. For the same precision unbalanced designs need more
-users overall.
+The same total sample ($20\,000$) split 90/10 gives a **wider** CI than
+the 50/50 split. The reason: precision is dominated by the **smaller**
+group --- 2 000 users versus 10 000. So the 18 000 users "saved" on
+control barely improve the lift estimate. For the same precision, an
+unbalanced design needs substantially more users overall.
 :::
 
 ::: {.callout-tip icon="false"}
 ## Your turn 5
-Fix the total sample at $20\,000$ and try control/test ratios of
-50/50, 70/30, 90/10. How does the CI width change? Confirm that 50/50
-is optimal.
+1. At a total sample of 20 000 compare $50/50,\ 70/30,\ 90/10$ by **CI width**. Does 50/50 win?
+2. **Research extension.** What if the variances in the two groups are **very different**? Consider $p_1=0.05,\ p_2=0.50$ (exotic, but it happens with experiments on specific segments). Check splits $30/70,\ 40/60,\ 50/50,\ 60/40,\ 70/30$. Which now gives the narrowest CI?
+3. Check: does your optimal split match the Neyman formula --- $n_1/N = \sigma_1 / (\sigma_1 + \sigma_2)$, where $\sigma_i = \sqrt{p_i(1-p_i)}$?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 5
+
+```{python}
+#| label: sol5
+
+N_total = 20_000
+
+def width_pp(x1, n1, x2, n2):
+    r = my_two_sample_z_test(x1, n1, x2, n2, "two-sided", 0.05, conf_int=True)
+    return (r["ci_high"] - r["ci_low"]) * 100
+
+print("Equal variances: p1=0.10, p2=0.11")
+print(f"{'split':>8s}  {'CI width':>10s}")
+for r1, r2 in [(0.5, 0.5), (0.7, 0.3), (0.9, 0.1)]:
+    n1, n2 = int(N_total * r1), int(N_total * r2)
+    w = width_pp(int(0.10 * n1), n1, int(0.11 * n2), n2)
+    print(f"{int(r1*100):>3d}/{int(r2*100):<3d}  {w:>10.3f}")
+
+print("\nVery different variances: p1=0.05, p2=0.50")
+print(f"{'split':>8s}  {'CI width':>10s}")
+best = (None, np.inf)
+for r1 in (0.30, 0.40, 0.50, 0.60, 0.70):
+    r2 = 1 - r1
+    n1, n2 = int(N_total * r1), int(N_total * r2)
+    w = width_pp(int(0.05 * n1), n1, int(0.50 * n2), n2)
+    print(f"{int(r1*100):>3d}/{int(r2*100):<3d}  {w:>10.3f}")
+    if w < best[1]:
+        best = (r1, w)
+
+s1 = np.sqrt(0.05 * 0.95)
+s2 = np.sqrt(0.50 * 0.50)
+r1_opt = s1 / (s1 + s2)
+print(f"\nEmpirically narrowest CI at split: control = {best[0]:.2f}")
+print(f"Neyman optimal:                    control = {r1_opt:.3f}  →  test = {1-r1_opt:.3f}")
+```
+
+**Interpretation.**
+
+1. With equal variances 50/50 gives the narrowest CI. Every step away from a balanced split widens it (precision is dominated by the smaller group).
+2. With very different variances 50/50 is **no longer optimal**: it pays to give more traffic to the group with **larger variance** ($p_2=0.50$ has the maximum variance $0.25$). In our example the optimum is around 30/70.
+3. Neyman formula: $n_1/N = \sigma_1/(\sigma_1+\sigma_2) \approx 0.303$ --- matches the empirical minimum exactly. **Intuition:** $SE = \sqrt{\sigma_1^2/n_1 + \sigma_2^2/n_2}$ at fixed $n_1 + n_2 = N$ is minimized when $n_i \propto \sigma_i$.
+
+**Why is 50/50 still the default in real A/B tests?** Because the variances are unknown before the experiment (often $p_2$ is what the test estimates). 50/50 is a safe default that only loses a little at the extremes. Neyman makes sense when the variances are very asymmetric **and** known in advance --- e.g. in clinical trials.
 :::
 
 ---
@@ -629,9 +1058,59 @@ print(f"\nUsers per group required to detect +1 pp: {n_needed}")
 
 ::: {.callout-tip icon="false"}
 ## Your turn 6
-Plot a curve: X --- users per group (from 500 to 30 000), Y --- power
-at MDE = +1 pp. Find the minimum $n$ for which power $\geq 0.8$ and
-verify against `plan_ab_experiment`.
+1. Plot power vs $n$ (500 to 30 000 per group) for MDE = +1 pp. Find the smallest $n$ where power $\geq 0.8$ and cross-check against `plan_ab_experiment`.
+2. **Research extension.** There is a closed-form **approximation** for the one-sided Z:
+   $$n \approx \dfrac{(z_{1-\alpha} + z_{1-\beta})^2 \cdot 2\bar p (1-\bar p)}{\text{MDE}^2},$$
+   where $\bar p = (p_1 + p_2)/2$. Compute it and compare to bisection. Do we even need bisection, or is it just a numerical wrapper around this formula?
+3. What changes if you halve the MDE (from +1 to +0.5 pp)? Does $n$ grow by 2, 4 or 8?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 6
+
+```{python}
+#| label: sol6
+#| fig-align: center
+
+ns = np.arange(500, 30_001, 500)
+powers = [my_two_sample_z_power(0.10, 0.11, n, n, 0.05, "less") for n in ns]
+
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.plot(ns, powers, color=turquoise, lw=2)
+ax.axhline(0.80, color=red, linestyle="--", lw=1, label="target power = 0.8")
+ax.set_xlabel("n per group")
+ax.set_ylabel("Power")
+ax.set_title("Power vs sample size (MDE = +1 pp, baseline = 10%)")
+ax.legend()
+plt.tight_layout()
+plt.show()
+
+# Bisection vs formula
+n_bisect = plan_ab_experiment(p1=0.10, mde=0.01, alpha=0.05,
+                              target_power=0.8, alternative="less")
+
+p_bar    = (0.10 + 0.11) / 2
+z_alpha  = norm.ppf(1 - 0.05)
+z_beta   = norm.ppf(0.80)
+n_formula = ((z_alpha + z_beta)**2 * 2 * p_bar * (1 - p_bar)) / (0.01**2)
+
+print(f"Bisection:  n = {n_bisect}")
+print(f"Formula:    n ≈ {n_formula:.0f}")
+print(f"Discrepancy: {abs(n_bisect - n_formula) / n_bisect * 100:.1f}%")
+
+# Halved MDE
+n_half = plan_ab_experiment(p1=0.10, mde=0.005, alpha=0.05,
+                            target_power=0.8, alternative="less")
+print(f"\nMDE = +1.0 pp:  n = {n_bisect}")
+print(f"MDE = +0.5 pp:  n = {n_half}")
+print(f"Growth factor:  x{n_half/n_bisect:.1f}")
+```
+
+**Interpretation.**
+
+1. Bisection and the formula agree within ~1% --- bisection is not needed "mathematically", just as a convenient tool that automatically handles the pooled-vs-unpooled SE and the alternative.
+2. Halving the MDE increases $n$ **fourfold** (from $\sim 11.6$k to $\sim 46.4$k per group). Direct consequence of $\text{MDE}^2$ in the denominator. In product terms: "detect +0.5 pp instead of +1 pp" means 4 weeks instead of 1 --- often that means **dropping** the MDE as a business target.
+3. The formula also explains the $\sqrt{n}$ rule from Your turn 1: the critical lift $\sim 1/\sqrt{n}$, because at fixed $z_{1-\alpha}+z_{1-\beta}$ and $\bar p$ we get $\text{MDE} \propto 1/\sqrt{n}$.
 :::
 
 ---
@@ -681,11 +1160,24 @@ def my_ab_test(x1, n1, x2, n2,
         mde_at_n = hi
 
     decision = "REJECT H0" if test["p_value"] <= alpha else "do not reject H0"
+    conf_pct = int((1 - alpha) * 100)
+
+    # CI format matches alternative (same as V4/V5).
+    if alternative == "two-sided":
+        ci_line = (f"{conf_pct}% CI for lift = p2-p1: "
+                   f"[{-test['ci_high']*100:+.2f}, {-test['ci_low']*100:+.2f}] pp")
+    elif alternative == "less":   # H1: p1 < p2 → lift > -ci_high
+        ci_line = (f"{conf_pct}% one-sided lower bound for lift: "
+                   f"≥ {-test['ci_high']*100:+.2f} pp")
+    else:                         # greater — H1: p1 > p2 → lift < -ci_low
+        ci_line = (f"{conf_pct}% one-sided upper bound for lift: "
+                   f"≤ {-test['ci_low']*100:+.2f} pp")
+
     summary_lines = [
         f"n1={n1}, x1={x1} (p1={p1:.4f})  vs  n2={n2}, x2={x2} (p2={p2:.4f})",
         f"lift = {lift:+.4f} ({lift*100:+.2f} pp)",
         f"Z = {test['z_stat']:+.3f},  p-value = {test['p_value']:.4f}  →  {decision}",
-        f"{int((1-alpha)*100)}% CI for p1-p2: [{test['ci_low']:+.4f}, {test['ci_high']:+.4f}]",
+        ci_line,
         f"power at observed = {power_obs:.3f}",
     ]
     if mde_at_n is not None:
@@ -757,9 +1249,39 @@ print(f"One-sided FPR: {fpr_one_sided:.3f}  (target ≈ 0.05)")
 
 ::: {.callout-tip icon="false"}
 ## Your turn 7
-Run an A/A on a SMALL sample ($n=50$ per group), 2000 simulations. Does
-FPR still hover near $0.05$? Does the normal approximation hold when
-$n \cdot p = 5$?
+1. Run A/A at $n=50$ with $p=0.10$ (so $n\cdot p = 5$, right at the rule-of-thumb boundary). 2000 simulations. Is FPR $\approx 0.05$?
+2. Gradually increase $n$: 100, 200, 500, 1000, 2000. Where does FPR stabilize around $0.05$?
+3. **Research extension.** Do the same at a very small $p = 0.01$. Does the $n\cdot p \geq 5$ rule ($n \geq 500$) hold here, or do you need more? How does this connect to Your turn 3?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 7
+
+```{python}
+#| label: sol7
+
+np.random.seed(2026)
+
+print(f"p = 0.10 (moderate baseline):")
+print(f"{'n':>5s}  {'n·p':>5s}  {'FPR':>8s}")
+for n in (50, 100, 200, 500, 1000, 2000):
+    fpr = simulate_AA(p_shared=0.10, n_per_group=n,
+                      n_simulations=2000, alternative="two-sided")
+    print(f"{n:>5d}  {n*0.10:>5.1f}  {fpr:>8.3f}")
+
+print(f"\np = 0.01 (low-conversion metric, like ad-driven purchase):")
+print(f"{'n':>5s}  {'n·p':>5s}  {'FPR':>8s}")
+for n in (200, 500, 1000, 3000, 10_000):
+    fpr = simulate_AA(p_shared=0.01, n_per_group=n,
+                      n_simulations=2000, alternative="two-sided")
+    print(f"{n:>5d}  {n*0.01:>5.1f}  {fpr:>8.3f}")
+```
+
+**Interpretation.** Simulation precision (2000 reps) gives $SE \approx \sqrt{0.05\cdot 0.95/2000} \approx 0.005$, so the true FPR should sit within $0.05 \pm 0.010$.
+
+1. At $p=0.10$ and $n=50$ ($n\cdot p = 5$) FPR $\approx 0.046$ --- within noise, the rule of thumb holds.
+2. **Interesting:** at $p=0.01$ the same $n\cdot p = 5$ is reached at $n=500$, but FPR $\approx 0.038$ --- **clearly below** 0.05. The test is too conservative because of **discreteness** (at $n=500,\ p=0.01$ there are only ~15 possible values of the sum in the relevant range, so the p-value "jumps" and rarely lands just under 0.05). It stabilizes once $n\cdot p \geq 10$.
+3. **Connection to Your turn 3.** Same "effective sample" principle: the $n\cdot p \geq 5$ rule works when $p$ is far from 0 and 1, but for very small $p$ you need $n\cdot p \geq 10\text{--}30$. Always run A/A before launch, **especially** for low-conversion metrics like paid subscriptions or ad-driven purchases.
 :::
 
 ---
@@ -825,22 +1347,31 @@ print(result["summary"])
 
 ## Step 4. Stakeholder report
 
+```{python}
+#| label: run-report-prep
+#| echo: false
+
+# One-sided lower bound for lift (alternative="less" → CI on (p1-p2) has an upper bound;
+# mirrored to lift = p2-p1 this becomes a lower bound).
+lift_lower = -result["ci_diff"][1]
+```
+
 ::: {.border}
 **Summary of the "1-click reorder" A/B test**
 
 - Observed repeat-order conversion:
-  control = **`{python} round(result['p1']*100, 2)`%**,
-  test = **`{python} round(result['p2']*100, 2)`%**.
+  control = **`{python} f"{result['p1']*100:.2f}"`%**,
+  test = **`{python} f"{result['p2']*100:.2f}"`%**.
 - Lift: **`{python} f"{result['lift']*100:+.2f}"` pp**.
-- 95% CI for lift:
-  **[`{python} f"{-result['ci_diff'][1]*100:+.2f}"`, `{python} f"{-result['ci_diff'][0]*100:+.2f}"`] pp**.
+- 95% **one-sided lower bound** for lift (aligned with the `"less"` test):
+  **lift ≥ `{python} f"{lift_lower*100:+.2f}"` pp**.
 - Test at $\alpha=0.05$:
-  **`{python} 'reject H0 - evidence of a lift' if result['reject'] else 'do not reject H0 - not enough evidence'`**
-  ($p = $ `{python} round(result['p_value'], 4)`).
+  **`{python} 'reject H0 — evidence of a lift' if result['reject'] else 'do not reject H0 — not enough evidence'`**
+  ($p$ = `{python} f"{result['p_value']:.4f}"`).
 - Plan power at the observed data:
-  `{python} round(result['power_at_observed'], 3)`.
+  `{python} f"{result['power_at_observed']:.3f}"`.
 
-**Recommendation:** if the lower CI bound for the lift exceeds the
+**Recommendation:** if the one-sided lower bound on the lift exceeds the
 business MDE (+1 pp) --- ship it. Otherwise --- collect more data or go
 back to the design stage.
 :::

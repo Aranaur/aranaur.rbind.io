@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Ihor Miroshnychenko">
+<meta name="dcterms.date" content="2026-05-27">
+
+<title>Lab 3</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src=".03-z-test-lab_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".03-z-test-lab_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src=".03-z-test-lab_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src=".03-z-test-lab_files/libs/quarto-html/popper.min.js"></script>
+<script src=".03-z-test-lab_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src=".03-z-test-lab_files/libs/quarto-html/anchor.min.js"></script>
+<link href=".03-z-test-lab_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".03-z-test-lab_files/libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".03-z-test-lab_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href=".03-z-test-lab_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href=".03-z-test-lab_files/libs/bootstrap/bootstrap-09e35026b45fe6f219ffef6ea8e22102.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul class="collapse">
+  <li><a href="#objective" id="toc-objective" class="nav-link active" data-scroll-target="#objective"><span class="header-section-number">1</span> Objective</a></li>
+  <li><a href="#general-requirements" id="toc-general-requirements" class="nav-link" data-scroll-target="#general-requirements"><span class="header-section-number">2</span> General Requirements</a></li>
+  <li><a href="#tasks" id="toc-tasks" class="nav-link" data-scroll-target="#tasks"><span class="header-section-number">3</span> Tasks</a>
+  <ul class="collapse">
+  <li><a href="#sec-recap" id="toc-sec-recap" class="nav-link" data-scroll-target="#sec-recap"><span class="header-section-number">3.1</span> Recap of the Lab 2 Case</a></li>
+  <li><a href="#sec-design" id="toc-sec-design" class="nav-link" data-scroll-target="#sec-design"><span class="header-section-number">3.2</span> From One Sample to Two: Design the A/B</a></li>
+  <li><a href="#sec-myztest" id="toc-sec-myztest" class="nav-link" data-scroll-target="#sec-myztest"><span class="header-section-number">3.3</span> A Reusable <code>my_z_test()</code> Function</a></li>
+  <li><a href="#sec-ci-lift" id="toc-sec-ci-lift" class="nav-link" data-scroll-target="#sec-ci-lift"><span class="header-section-number">3.4</span> Confidence Interval for the Lift</a></li>
+  <li><a href="#sec-power" id="toc-sec-power" class="nav-link" data-scroll-target="#sec-power"><span class="header-section-number">3.5</span> Power and Sample-Size Planning</a></li>
+  <li><a href="#sec-aa" id="toc-sec-aa" class="nav-link" data-scroll-target="#sec-aa"><span class="header-section-number">3.6</span> A/A Simulation (Two-Sample)</a></li>
+  <li><a href="#sec-srm" id="toc-sec-srm" class="nav-link" data-scroll-target="#sec-srm"><span class="header-section-number">3.7</span> Sample Ratio Mismatch (SRM)</a></li>
+  <li><a href="#sec-final" id="toc-sec-final" class="nav-link" data-scroll-target="#sec-final"><span class="header-section-number">3.8</span> Final Recommendation</a></li>
+  </ul></li>
+  <li><a href="#grading" id="toc-grading" class="nav-link" data-scroll-target="#grading">Grading</a></li>
+  <li><a href="#defense" id="toc-defense" class="nav-link" data-scroll-target="#defense">Defense</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Lab 3</h1>
+<p class="subtitle lead">Two-Sample Z-test, Power, and A/A Validation for a Real A/B Experiment</p>
+</div>
+
+
+<div class="quarto-title-meta-author">
+  <div class="quarto-title-meta-heading">Author</div>
+  <div class="quarto-title-meta-heading">Affiliation</div>
+  
+    <div class="quarto-title-meta-contents">
+    <p class="author">Ihor Miroshnychenko </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            Kyiv School of Economics
+          </p>
+      </div>
+  </div>
+
+<div class="quarto-title-meta">
+
+      
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">May 27, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="objective" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Objective</h1>
+<p>In <strong>Lab 1</strong> you designed a one-sample test for your own business case (comparing the observed metric against a fixed historical baseline <span class="math inline">\(\mu_0\)</span>).</p>
+<p>In <strong>Lab 2</strong> you went beyond accept/reject and built confidence intervals, ran an A/A on your one-sample infrastructure, and wrote a PM-readable memo.</p>
+<p><strong>Lab 3</strong> takes the next, more realistic step: you switch from “observed vs.&nbsp;historical baseline” to a <strong>proper two-sample A/B test</strong> — two cohorts running in parallel, both with their own noise. The historical baseline becomes a sanity reference, not a parameter of the test.</p>
+<p>You will:</p>
+<ol type="1">
+<li>Convert your one-sample framing into a proper two-sample A/B design, stating the hypotheses in terms of <span class="math inline">\(p_1\)</span> and <span class="math inline">\(p_2\)</span>.</li>
+<li>Wrap your test logic into a reusable <code>my_z_test()</code> function for the <strong>two-sample</strong> case, with the pooled-vs-unpooled SE distinction correctly implemented.</li>
+<li>Build the confidence interval <strong>for the lift</strong> and compare it with the reference implementation.</li>
+<li>Plan the experiment: compute power, MDE, and the required sample size, and contrast the answer with your one-sample plan from Lab 1.</li>
+<li>Validate the infrastructure with a <strong>two-sample A/A simulation</strong>, and (bonus) check for <strong>Sample Ratio Mismatch (SRM)</strong>.</li>
+<li>Write a stakeholder-ready recommendation memo.</li>
+</ol>
+</section>
+<section id="general-requirements" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> General Requirements</h1>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Continuity with Labs 1–2
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>You must reuse the <strong>same business case</strong> from Labs 1–2 (same product, same metric, same baseline <span class="math inline">\(\mu_0\)</span>). Inventing a brand-new case is not allowed.</li>
+<li>If your Lab 2 case had methodological issues, fix them in <a href="#sec-recap" class="quarto-xref">Section&nbsp;3.1</a> and explain what you changed.</li>
+<li>Copying another student’s case is prohibited.</li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Report Format
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Submit the report in <strong>one</strong> of the following formats:</p>
+<ul>
+<li><strong>Quarto → PDF</strong> (<code>.qmd</code> → <code>.pdf</code>)</li>
+<li><strong>Quarto → HTML</strong> (<code>.qmd</code> → <code>.html</code>, hosted separately, e.g.&nbsp;on <a href="https://quartopub.com/">Quarto Pub</a>, <a href="https://connect.posit.cloud/">Posit Connect Cloud</a>, etc.)</li>
+<li><strong>Jupyter Notebook</strong> (<code>.ipynb</code>)</li>
+<li><strong>Google Colab</strong> (share the link with viewing permissions)</li>
+</ul>
+<p>The report must contain both code <strong>and</strong> narrative text. Every section begins with a written explanation, not code.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Restrictions on libraries
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>You may use <code>numpy</code>, <code>pandas</code>, <code>matplotlib</code>, <code>scipy.stats.norm</code>, <code>scipy.stats.binom</code>, <code>scipy.stats.chi2</code>, <code>statsmodels.stats.proportion.proportion_confint</code>, and <code>statsmodels.stats.proportion.confint_proportions_2indep</code>.</p>
+<p>You <strong>may not</strong> use <code>statsmodels.stats.proportion.proportions_ztest</code> or <code>scipy.stats.fisher_exact</code> as the <strong>primary</strong> test — only as a <strong>verification step</strong>. The core machinery must be your own code.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Deadline
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>📅 <strong>June 03, 2026, 23:59</strong></p>
+</div>
+</div>
+</section>
+<section id="tasks" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Tasks</h1>
+<section id="sec-recap" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="sec-recap"><span class="header-section-number">3.1</span> Recap of the Lab 2 Case</h2>
+<div class="border">
+<ol type="1">
+<li>In one paragraph, restate the business problem, the success metric, and the historical baseline <span class="math inline">\(\mu_0\)</span>.</li>
+<li>State the <strong>business MDE</strong> with its monetary justification.</li>
+<li>Briefly summarise what you found in Lab 2: the planned <span class="math inline">\(N\)</span>, the observed <span class="math inline">\(q\)</span>, the one-sample <span class="math inline">\(p\)</span>-value, the chosen confidence interval, and your decision.</li>
+<li>If you discovered a methodological issue, state the fix here and use the corrected setup throughout Lab 3.</li>
+</ol>
+</div>
+</section>
+<section id="sec-design" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="sec-design"><span class="header-section-number">3.2</span> From One Sample to Two: Design the A/B</h2>
+<p>In a real A/B experiment we <strong>do not compare against a frozen historical</strong> <span class="math inline">\(\mu_0\)</span>. We split incoming users into two cohorts — <strong>control</strong> (current product) and <strong>test</strong> (new variant) — and we test whether their <strong>true conversion rates differ</strong>.</p>
+<div class="border">
+<ol type="1">
+<li>Define the two cohorts in product terms (who sees what, how users are assigned, what the randomisation unit is). Make it specific to your product.</li>
+<li>Restate the hypotheses in two-sample form: <span class="math display">\[H_0: p_1 = p_2 \quad\text{vs.}\quad H_1: p_1 \, \square \, p_2,\]</span> where <span class="math inline">\(\square\)</span> is <span class="math inline">\(&lt;\)</span>, <span class="math inline">\(&gt;\)</span>, or <span class="math inline">\(\neq\)</span>. <strong>Choose the alternative</strong> and justify it in one sentence (e.g.&nbsp;“we only want to ship if the new variant is better, so one-sided ‘less’ for <span class="math inline">\(p_1 &lt; p_2\)</span>”).</li>
+<li>State the <strong>same</strong> <span class="math inline">\(\alpha\)</span> and business MDE you used in Lab 2. The MDE is now the smallest interesting <strong>difference</strong> <span class="math inline">\(|p_2 - p_1|\)</span>, not a deviation from a fixed baseline.</li>
+<li>Briefly explain (one paragraph) why the historical <span class="math inline">\(\mu_0\)</span> is no longer a parameter of the test. What role does it still play in <em>planning</em> the experiment?</li>
+</ol>
+</div>
+</section>
+<section id="sec-myztest" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="sec-myztest"><span class="header-section-number">3.3</span> A Reusable <code>my_z_test()</code> Function</h2>
+<div class="border">
+<ol type="1">
+<li>Implement a function <code>my_z_test(x1, n1, x2, n2, alternative, alpha, conf_int)</code> with the following contract:
+<ul>
+<li>Convention: <span class="math inline">\(Z = (\hat p_1 - \hat p_2) / SE_{\text{pool}}\)</span>; <code>alternative</code> is about <span class="math inline">\(p_1 - p_2\)</span>.</li>
+<li>Supports <code>alternative</code> <span class="math inline">\(\in\)</span> <code>{"greater", "less", "two-sided"}</code>.</li>
+<li>Uses the <strong>pooled</strong> standard error <span class="math inline">\(SE_{\text{pool}} = \sqrt{\hat p_{\text{pool}}(1-\hat p_{\text{pool}})(1/n_1 + 1/n_2)}\)</span> for the <span class="math inline">\(p\)</span>-value.</li>
+<li>When <code>conf_int=True</code>, also returns a CI for the lift <span class="math inline">\(p_1 - p_2\)</span> built with the <strong>unpooled</strong> SE <span class="math inline">\(SE_{\text{unp}} = \sqrt{\hat p_1(1-\hat p_1)/n_1 + \hat p_2(1-\hat p_2)/n_2}\)</span>.</li>
+<li>Returns a <strong>dict</strong> with at least: <code>p1</code>, <code>p2</code>, <code>lift</code>, <code>z_stat</code>, <code>p_value</code>, <code>reject</code>, <code>ci_low</code>, <code>ci_high</code>.</li>
+</ul></li>
+<li><strong>Explain in one paragraph why the two SEs are different</strong> — when each one is the “right” SE, and what bug would result from using <code>SE_pool</code> for the CI (or <code>SE_unp</code> for the test).</li>
+<li>Apply the function to a small synthetic A/B based on your business case (you may invent realistic <span class="math inline">\(x_1, n_1, x_2, n_2\)</span> at this point; the planned <span class="math inline">\(N\)</span> comes in <a href="#sec-power" class="quarto-xref">Section&nbsp;3.5</a>). Print the full result.</li>
+<li><strong>Verify your implementation</strong> against <code>statsmodels.stats.proportion.proportions_ztest</code> — this is the only legitimate use of the built-in function. Show that the <span class="math inline">\(Z\)</span>-statistic and <span class="math inline">\(p\)</span>-value match to at least 4 decimal places. Be careful with the <code>alternative</code> mapping: <code>statsmodels</code>’s <code>"smaller"</code>/<code>"larger"</code> is in terms of <code>prop1 - prop2</code>.</li>
+</ol>
+</div>
+</section>
+<section id="sec-ci-lift" class="level2" data-number="3.4">
+<h2 data-number="3.4" class="anchored" data-anchor-id="sec-ci-lift"><span class="header-section-number">3.4</span> Confidence Interval for the Lift</h2>
+<div class="border">
+<ol type="1">
+<li>For your synthetic A/B from <a href="#sec-myztest" class="quarto-xref">Section&nbsp;3.3</a>, compute a <span class="math inline">\(95\%\)</span> CI for the lift <span class="math inline">\(p_2 - p_1\)</span> using <strong>three</strong> different constructions:
+<ul>
+<li><strong>Wald (unpooled)</strong> via your own <code>my_z_test</code>.</li>
+<li>The reference implementation <code>confint_proportions_2indep(x2, n2, x1, n1, method="wald")</code> (note the argument order: this function reports a CI for <span class="math inline">\(p_2 - p_1\)</span>).</li>
+<li>One <strong>better</strong> method via <code>confint_proportions_2indep(method=...)</code> (your choice: <code>"newcomb"</code>, <code>"agresti-caffo"</code>, or <code>"score"</code>). Briefly state, in one sentence, why this method exists — what does it fix relative to plain Wald?</li>
+</ul></li>
+<li>Put all three intervals into a table with columns <code>method | lower | upper | width</code>. Comment on:
+<ul>
+<li>Which interval is the <strong>narrowest</strong>, and why is that not a decisive reason to prefer it?</li>
+<li>For which kinds of observed <span class="math inline">\((\hat p_1, \hat p_2)\)</span> would the unpooled Wald interval cross zero in a way the better methods would not?</li>
+</ul></li>
+<li><strong>Two business decisions read from the same CI.</strong> Translate the CI you computed into product language. Specifically, given the business MDE from <a href="#sec-design" class="quarto-xref">Section&nbsp;3.2</a>:
+<ul>
+<li>If the CI for the lift is <strong>entirely above</strong> the MDE → ship.</li>
+<li>If the CI <strong>straddles zero</strong> → no evidence of a difference.</li>
+<li>If the CI is <strong>entirely above zero but its lower bound is below the MDE</strong> → there is a real lift, but it may not be worth shipping. State exactly what you would do in this case for your product.</li>
+</ul></li>
+</ol>
+</div>
+</section>
+<section id="sec-power" class="level2" data-number="3.5">
+<h2 data-number="3.5" class="anchored" data-anchor-id="sec-power"><span class="header-section-number">3.5</span> Power and Sample-Size Planning</h2>
+<div class="border">
+<ol type="1">
+<li>Implement (or reuse from Practice 3) a function <code>my_two_sample_z_power(p1, p2, n1, n2, alpha, alternative)</code> based on the formula: <span class="math display">\[
+\text{Power}(\text{less}) =
+\Phi\!\left(\dfrac{-z_{1-\alpha} \cdot SE_{\text{null}} - (p_1 - p_2)}{SE_{\text{alt}}}\right),
+\]</span> with the symmetric expression for <code>"greater"</code> and the two-tailed sum for <code>"two-sided"</code>. <span class="math inline">\(SE_{\text{null}}\)</span> uses <span class="math inline">\(\bar p = (p_1 + p_2)/2\)</span>; <span class="math inline">\(SE_{\text{alt}}\)</span> uses the actual <span class="math inline">\(p_1, p_2\)</span>.</li>
+<li><strong>Power vs.&nbsp;<span class="math inline">\(n\)</span> curve.</strong> Plot power as a function of <span class="math inline">\(n_1 = n_2 = n\)</span> for <span class="math inline">\(n\)</span> from a small value up to a value where power is clearly above <span class="math inline">\(0.9\)</span>. Use <span class="math inline">\(p_1 = \mu_0\)</span> (your baseline) and <span class="math inline">\(p_2 = \mu_0 + \text{business MDE}\)</span>. Mark on the plot:
+<ul>
+<li>The horizontal line at power <span class="math inline">\(= 0.8\)</span>.</li>
+<li>The minimum <span class="math inline">\(n\)</span> at which the curve crosses it.</li>
+</ul></li>
+<li><strong>Plan the experiment.</strong> Compute the required <span class="math inline">\(N\)</span> per group via bisection. Compare with your Lab 1/Lab 2 plan:
+<ul>
+<li>How many users do you need now per group?</li>
+<li>How does that compare to your one-sample plan (which only needed one group of <span class="math inline">\(N_{\text{plan}}\)</span>)? Two-sample roughly doubles the total user requirement — but the math is more subtle than just “<span class="math inline">\(\times 2\)</span>”. Explain in one paragraph why <code>(two-sample N per group)</code> is <strong>not</strong> simply equal to <code>(one-sample N from Lab 1)</code>.</li>
+</ul></li>
+<li><strong>MDE vs.&nbsp;<span class="math inline">\(n\)</span> trade-off.</strong> Hold power at <span class="math inline">\(0.8\)</span> and produce a table or plot of the MDE you can reliably detect as a function of <span class="math inline">\(n\)</span> (per group). Pick three or four <span class="math inline">\(n\)</span> values that are realistic for your product (e.g.&nbsp;one week / one month / one quarter of traffic). Translate each MDE into product language: “with one week of traffic we can only detect lifts of at least X pp, which means we are blind to anything smaller, which means …”</li>
+</ol>
+</div>
+</section>
+<section id="sec-aa" class="level2" data-number="3.6">
+<h2 data-number="3.6" class="anchored" data-anchor-id="sec-aa"><span class="header-section-number">3.6</span> A/A Simulation (Two-Sample)</h2>
+<div class="border">
+<ol type="1">
+<li>Run <strong><span class="math inline">\(\geq 5\,000\)</span></strong> simulated two-sample A/A experiments under <span class="math inline">\(H_0\)</span> with your planned <span class="math inline">\(N\)</span> per group and <span class="math inline">\(p_1 = p_2 = \mu_0\)</span>. For each one, compute the <span class="math inline">\(p\)</span>-value using your <code>my_z_test</code>.</li>
+<li><strong>Plot the histogram of <span class="math inline">\(p\)</span>-values.</strong> Comment on its shape:
+<ul>
+<li>Why is it expected to be approximately uniform on <span class="math inline">\([0, 1]\)</span>?</li>
+<li>The two-sample Z-statistic is continuous, unlike the binomial — so the steps you saw in Lab 2 should be much smaller. Why?</li>
+</ul></li>
+<li><strong>Report the empirical FPR</strong> (fraction of <span class="math inline">\(p \leq \alpha\)</span>). Compute a <span class="math inline">\(95\%\)</span> Wilson CI around the empirical FPR via <code>proportion_confint(method="wilson")</code>. Is the nominal <span class="math inline">\(\alpha\)</span> inside it? Use this to argue, with simulation evidence, that the test is correctly calibrated.</li>
+<li><strong>Two product-specific failure modes.</strong> Describe two realistic ways your A/A could fail <em>for your specific product</em> (not generic “the data are wrong”). Examples of the right level of specificity: “same-device cookie collisions between groups”, “treatment assignment leaks via cached static assets”, “weekend traffic is exclusively routed to group A”. For each failure mode, predict what the <span class="math inline">\(p\)</span>-value histogram would look like and which direction the FPR would move.</li>
+</ol>
+</div>
+</section>
+<section id="sec-srm" class="level2" data-number="3.7">
+<h2 data-number="3.7" class="anchored" data-anchor-id="sec-srm"><span class="header-section-number">3.7</span> Sample Ratio Mismatch (SRM)</h2>
+<p>In real A/B platforms users are supposed to be split between control and test in a known ratio (most often 50/50, sometimes 90/10). A <strong>Sample Ratio Mismatch (SRM)</strong> — where the observed split differs significantly from the planned one — is one of the strongest signals that something is broken in the assignment pipeline, and it <strong>invalidates the experiment</strong> <em>before</em> you even look at the lift.</p>
+<div class="border">
+<ol type="1">
+<li>Implement an SRM check using <span class="math inline">\(\chi^2\)</span> on a single <span class="math inline">\(1 \times 2\)</span> table: <span class="math display">\[
+\chi^2 = \sum_{i=1,2} \dfrac{(n_i^{\text{obs}} - n_i^{\text{exp}})^2}{n_i^{\text{exp}}},\qquad
+\text{df} = 1.
+\]</span> Compute the <span class="math inline">\(p\)</span>-value via <code>scipy.stats.chi2.sf(chi2, df=1)</code>.</li>
+<li>Apply your check to:
+<ul>
+<li>The synthetic A/B from <a href="#sec-myztest" class="quarto-xref">Section&nbsp;3.3</a> (it should <em>pass</em> if you set <span class="math inline">\(n_1 = n_2\)</span>).</li>
+<li>A clearly broken split (e.g.&nbsp;<span class="math inline">\(n_1 = 2100, n_2 = 1900\)</span> when the plan was 50/50). Confirm that the check rejects.</li>
+</ul></li>
+<li>Run <strong><span class="math inline">\(\geq 1\,000\)</span></strong> A/A simulations where each user is assigned to a group with probability <span class="math inline">\(0.5\)</span>. Plot the histogram of SRM <span class="math inline">\(p\)</span>-values and confirm that the empirical FPR of the SRM check is close to <span class="math inline">\(\alpha\)</span>.</li>
+<li><strong>One concrete failure scenario.</strong> Describe one realistic way your product could end up with SRM that has nothing to do with the randomiser (e.g.&nbsp;one variant is heavier and times out for slow connections, so those users never make it into the data → the broken group has fewer users). What would you do in production if the SRM check fails: roll back, debug, or both? In what order?</li>
+</ol>
+</div>
+</section>
+<section id="sec-final" class="level2" data-number="3.8">
+<h2 data-number="3.8" class="anchored" data-anchor-id="sec-final"><span class="header-section-number">3.8</span> Final Recommendation</h2>
+<div class="border">
+<p>Putting all of the above together, write a <strong>single-page recommendation memo</strong> (≤ 400 words) addressed to a non-technical stakeholder. It must contain:</p>
+<ol type="1">
+<li>The observed point estimates for control and test, the <strong>lift</strong>, and the <span class="math inline">\(95\%\)</span> CI for the lift (state which construction and why).</li>
+<li>The decision (<strong>ship / iterate / extend the test</strong>) and the <strong>reason</strong>, framed in terms of the CI vs.&nbsp;the business MDE — not just the <span class="math inline">\(p\)</span>-value.</li>
+<li>Two honest caveats:
+<ul>
+<li>Did the <strong>A/A check pass</strong> cleanly, or are there open questions about the infrastructure?</li>
+<li>Did the <strong>SRM check pass</strong>? If you did not run SRM (bonus), say so and recommend running it before any production rollout.</li>
+</ul></li>
+</ol>
+<p>The memo must be readable by someone who has never heard the words “<span class="math inline">\(p\)</span>-value”, “pooled SE”, or “SRM”. You will be graded on whether a real product manager could act on it without follow-up questions.</p>
+</div>
+</section>
+</section>
+<section id="grading" class="level1 unnumbered">
+<h1 class="unnumbered">Grading</h1>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Criterion</th>
+<th style="text-align: center;">Points</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Correctness of methodology</td>
+<td style="text-align: center;">3</td>
+</tr>
+<tr class="even">
+<td>Interpretation of results</td>
+<td style="text-align: center;">3</td>
+</tr>
+<tr class="odd">
+<td>Code quality and organization</td>
+<td style="text-align: center;">2</td>
+</tr>
+<tr class="even">
+<td><strong>Total</strong></td>
+<td style="text-align: center;"><strong>8</strong></td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Grading Details
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Correctness of methodology (3 pts):</strong></p>
+<ul>
+<li><code>my_z_test</code> implements all three alternatives correctly, uses <strong>pooled SE for the test and unpooled SE for the CI</strong>, and matches <code>proportions_ztest</code> to 4 decimals (1 pt).</li>
+<li>The three CI constructions in <a href="#sec-ci-lift" class="quarto-xref">Section&nbsp;3.4</a> are computed correctly and the comparison table is consistent with the reference (0.5 pt).</li>
+<li>The power calculation in <a href="#sec-power" class="quarto-xref">Section&nbsp;3.5</a> matches at least one independent reference (e.g.&nbsp;<code>statsmodels.stats.proportion.power_proportions_2indep</code>) to 2 decimals, and the planned <span class="math inline">\(N\)</span> via bisection is the correct minimum (1 pt).</li>
+<li>A/A simulation produces an empirical FPR whose Wilson CI contains the nominal <span class="math inline">\(\alpha\)</span>; the SRM check (if attempted) is correctly built and validated by its own A/A (0.5 pt).</li>
+</ul>
+<p><strong>Interpretation of results (3 pts):</strong></p>
+<ul>
+<li>The pooled-vs-unpooled paragraph is correct and self-contained — you can explain <em>both</em> which SE to use <em>and</em> why.</li>
+<li>The “CI vs.&nbsp;business MDE” decision rule produces a concrete, product-specific recommendation, not a slogan.</li>
+<li>A/A failure modes are realistic and product-specific (no generic “wrong data”).</li>
+<li>The SRM scenario (if attempted) names a specific, plausible product failure rather than “the randomiser is bugged”.</li>
+</ul>
+<p><strong>Code quality and organization (2 pts):</strong></p>
+<ul>
+<li><code>my_z_test</code> and <code>my_two_sample_z_power</code> are single reusable functions used across all subsequent sections (not re-implemented inline).</li>
+<li>Plots have axis labels, titles, and legible legends.</li>
+<li>Narrative text precedes every code block, and each section reads as a coherent argument rather than a dump of outputs.</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="defense" class="level1 unnumbered">
+<h1 class="unnumbered">Defense</h1>
+<p>During the defense (5–7 minutes) you will be asked <em>“What if?”</em> questions that probe whether you understand <strong>why</strong> each piece exists, for example:</p>
+<ul>
+<li><em>“Your test uses pooled SE but your CI uses unpooled SE. Why is that not inconsistent? What would a single, unified SE buy or break?”</em></li>
+<li><em>“The PM says: ‘I see a 95% CI of <span class="math inline">\([+0.001, +0.020]\)</span> for the lift, and our business MDE is <span class="math inline">\(+0.010\)</span>. Just tell me yes or no.’ Give your one-sentence answer and your one-sentence rationale.”</em></li>
+<li><em>“Your A/A FPR is <span class="math inline">\(0.062\)</span> instead of <span class="math inline">\(0.050\)</span>. Is the difference statistically meaningful, or is it just simulation noise? Show me the Wilson CI on <span class="math inline">\(0.062\)</span> and use it to answer.”</em></li>
+<li><em>“Switch your test from one-sided ‘less’ to two-sided in your code right now. By how much does the lower CI bound for the lift move, and does that change your recommendation?”</em></li>
+<li><em>“Set the test-group <span class="math inline">\(n\)</span> to half of your planned <span class="math inline">\(N\)</span> and re-run. The <span class="math inline">\(p\)</span>-value is still below <span class="math inline">\(\alpha\)</span>, but the CI got wider. Which one drives your decision, and why?”</em></li>
+<li><em>(Bonus)</em> <em>“Your SRM check returned <span class="math inline">\(p = 0.001\)</span> on a 50/50 plan. Do you read the lift, debug the platform, or both? In what order, and why?”</em></li>
+</ul>
+<p>You may also be asked to <strong>change one parameter live</strong> in your code (e.g.&nbsp;flip <code>alternative</code>, halve <span class="math inline">\(n_2\)</span>, double the MDE) and explain the resulting shift.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
