@@ -1,0 +1,937 @@
+---
+title: "Мідтерм 2 — розбір"
+subtitle: "STAT250: Теорія ймовірностей та статистика"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: uk
+from: markdown+emoji
+format:
+  revealjs:
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: default
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(tidyverse)
+library(scales)
+
+theme_set(theme_minimal(base_size = 14))
+
+blue   <- "#2C7FB8"
+red    <- "#D7301F"
+green  <- "#41AB5D"
+grey_d <- "grey30"
+grey_l <- "grey80"
+```
+
+# Як побудовано розбір {.unnumbered}
+
+::: {.callout-tip}
+## Структура слайдів
+1. **🧩 Завдання** — формулювання, як у білеті.
+2. **✅ Розв'язання** — крок за кроком: чому саме це правильно.
+3. **📊 R / ggplot** — за потреби, перевірка чи візуалізація.
+:::
+
+- Частина I (40 балів): Multiple Choice, T/F, Validity Check, R-output.
+- Частина II (60 балів): дві сюжетні задачі — *Pugs Scandal* і *Loto-Zabava*.
+
+# Section A. Multiple Choice
+
+## 🧩 Q1 — означення умовної ймовірності
+
+> $P(A \mid B) = ?$
+>
+> **(A)** $P(A)\cdot P(B)$ &nbsp;&nbsp; **(B)** $\dfrac{P(A\cap B)}{P(B)}$
+>
+> **(C)** $\dfrac{P(B\mid A)}{P(A)}$ &nbsp;&nbsp; **(D)** $1 - P(A^c\mid B)$
+
+::: aside
+2 бали, без часткового заліку.
+:::
+
+## ✅ Q1 — розв'язання {.smaller}
+
+**Це означення:** для $P(B) > 0$
+
+$$
+P(A \mid B) = \frac{P(A \cap B)}{P(B)}.
+$$
+
+**Чому інші — ні:**
+
+- (A) $P(A) P(B) = P(A\cap B)$ **лише за незалежності**.
+- (C) — переплутаний порядок (формула Баєса для $P(B\mid A)$).
+- (D) хоч і дорівнює $P(A\mid B)$ (бо $P(A\mid B)+P(A^c\mid B)=1$), але це **наслідок**, а не означення.
+
+::: {.fragment .callout-tip}
+**Відповідь: (B).**
+:::
+
+## 🧩 Q2 — дисперсія Exp(λ = 0.5)
+
+> $X \sim \mathrm{Exp}(\lambda = 0.5)$. Знайти $\operatorname{Var}(X)$.
+>
+> **(A)** 0.5 &nbsp;&nbsp; **(B)** 2 &nbsp;&nbsp; **(C)** 4 &nbsp;&nbsp; **(D)** 0.25
+
+## ✅ Q2 — розв'язання
+
+З довідника: для $\mathrm{Exp}(\lambda)$ виконується $\operatorname{Var}(X) = \dfrac{1}{\lambda^2}$.
+
+$$
+\operatorname{Var}(X) = \frac{1}{0.5^{\,2}} = \frac{1}{0.25} = 4.
+$$
+
+::: {.fragment .callout-tip}
+**Відповідь: (C) 4.**
+
+⚠️ Типова пастка: $1/\lambda = 2$ — це **середнє**, а не дисперсія.
+:::
+
+## 📊 Q2 — у R
+
+```{r}
+#| fig-width: 8
+#| fig-height: 3.6
+lambda <- 0.5
+tibble(x = seq(0, 18, length.out = 400),
+       density = dexp(x, rate = lambda)) |>
+  ggplot(aes(x, density)) +
+  geom_area(fill = blue, alpha = 0.4) +
+  geom_line(color = blue, linewidth = 1) +
+  geom_vline(xintercept = 1/lambda, color = red, linetype = "dashed") +
+  annotate("text", x = 1/lambda + 0.3, y = dexp(1/lambda, lambda),
+           label = "E[X] = 2", hjust = 0, color = red) +
+  labs(title = "Exp(λ = 0.5):  E[X] = 2,  Var(X) = 4",
+       x = "x", y = "f(x)")
+```
+
+## 🧩 Q3 — лінійність сподівання
+
+> Для будь-якої $X$ зі $E[X] = \mu$ і констант $a, b \in \mathbb{R}$:
+>
+> **(A)** $E[aX+b] = aE[X]$
+>
+> **(B)** $E[aX+b] = E[X] + b$
+>
+> **(C)** $E[aX+b] = a\mu + b$
+>
+> **(D)** $E[aX+b] = a^2\mu + b$
+
+## ✅ Q3 — розв'язання
+
+**Лінійність математичного сподівання:**
+
+$$
+E[aX + b] = aE[X] + b = a\mu + b.
+$$
+
+- (A) ігнорує константу $b$.
+- (B) забуває множник $a$.
+- (D) — це формула для **дисперсії** $\operatorname{Var}(aX+b) = a^2\operatorname{Var}(X)$, а не для $E$.
+
+::: {.fragment .callout-tip}
+**Відповідь: (C).**
+:::
+
+## 🧩 Q4 — незалежність
+
+> $A$ і $B$ незалежні. Що **обов'язково** вірно?
+>
+> **(A)** $P(A\cap B) = P(A) + P(B)$
+>
+> **(B)** $P(A\cup B) = 1$
+>
+> **(C)** $P(A\mid B) = P(A)$
+>
+> **(D)** $P(A\cap B) = 0$
+
+## ✅ Q4 — розв'язання
+
+Незалежність: $P(A\cap B) = P(A) P(B)$. Підставляємо в означення $P(A\mid B)$:
+
+$$
+P(A \mid B) = \frac{P(A\cap B)}{P(B)} = \frac{P(A)P(B)}{P(B)} = P(A).
+$$
+
+- (A) і (B) — загалом хибні.
+- (D) описує **взаємну несумісність**, а не незалежність — а вони, до речі, протилежні поняття (див. B1).
+
+::: {.fragment .callout-tip}
+**Відповідь: (C).**
+:::
+
+## 🧩 Q5 — кореляція $\rho$
+
+> Яке твердження про $\rho$ ВІРНЕ?
+>
+> **(A)** $\rho > 0$ означає, що $X$ **спричиняє** зростання $Y$.
+>
+> **(B)** $\rho = 0$ ⇒ $X$ і $Y$ незалежні.
+>
+> **(C)** $|\rho|$ вимірює силу **лінійного** зв'язку.
+>
+> **(D)** $\rho$ може перевищувати 1.
+
+## ✅ Q5 — розв'язання
+
+$\rho \in [-1, 1]$; $|\rho|$ — це саме **сила лінійного** зв'язку.
+
+- (A) кореляція $\neq$ причинність — золоте правило статистики.
+- (B) $\rho = 0$ виключає **лінійний** зв'язок, але **не** залежність. Контрприклад: $X \sim \mathcal{N}(0,1)$, $Y = X^2$ — залежні, але $\rho = 0$.
+- (D) Завжди $|\rho| \le 1$ за нерівністю Коші–Шварца.
+
+::: {.fragment .callout-tip}
+**Відповідь: (C).**
+:::
+
+## 📊 $\rho = 0$ ≠ незалежність
+
+```{r}
+#| fig-width: 8
+#| fig-height: 3.5
+set.seed(1)
+df <- tibble(x = rnorm(500)) |> mutate(y = x^2 + rnorm(500, 0, 0.2))
+rho <- cor(df$x, df$y)
+
+df |>
+  ggplot(aes(x, y)) +
+  geom_point(alpha = 0.5, color = blue) +
+  labs(title = paste0("Y = X²: видимо залежні,  cor(X, Y) = ",
+                      round(rho, 3))) +
+  theme(plot.title = element_text(size = 14))
+```
+
+# Section B. True / False
+
+## 🧩 B1 — несумісні і незалежні
+
+> Якщо $A$ і $B$ **несумісні** з $P(A), P(B) > 0$, то $A$ і $B$ **не можуть** бути незалежними.
+
+## ✅ B1 — **TRUE**
+
+Несумісні: $A \cap B = \varnothing \Rightarrow P(A\cap B) = 0$.
+
+Незалежні: $P(A\cap B) = P(A)P(B) > 0$ (бо обидві ймовірності додатні).
+
+$$
+0 = P(A\cap B) \neq P(A)P(B) > 0
+\;\;\Longrightarrow\;\; \text{не можуть бути одночасно.}
+$$
+
+::: aside
+Несумісність і незалежність — **різні** поняття: перше про теорію множин, друге про ймовірність.
+:::
+
+## 🧩 B2 — $E[X+Y]$
+
+> $E[X+Y] = E[X] + E[Y]$ **завжди**, незалежно від залежності.
+
+## ✅ B2 — **TRUE**
+
+**Лінійність сподівання** не вимагає незалежності — це властивість інтеграла:
+
+$$
+E[X+Y] = \int(x+y)\,f_{X,Y}(x,y)\,dxdy = E[X] + E[Y].
+$$
+
+⚠️ Не плутати з дисперсією: $\operatorname{Var}(X+Y) = \operatorname{Var}(X) + \operatorname{Var}(Y)$ **тільки** за незалежності (або нульової коваріації).
+
+## 🧩 B3 — Пуассон
+
+> Розподіл Пуассона моделює к-сть подій у фіксованому інтервалі за умов **сталої інтенсивності** і **незалежності**.
+
+## ✅ B3 — **TRUE**
+
+Це класичні постулати процесу Пуассона:
+
+1. незалежність подій у непересічних інтервалах,
+2. стала інтенсивність $\lambda$,
+3. події «по одній» (без одночасних).
+
+Тоді к-сть подій за час $t$ — $N(t) \sim \mathrm{Poisson}(\lambda t)$.
+
+## 🧩 B4 — умовна = безумовна
+
+> Якщо $P(A\mid B) = P(A)$, то $A$ і $B$ — **залежні**.
+
+## ✅ B4 — **FALSE**
+
+Це і є **означення незалежності**:
+
+$$
+P(A\mid B) = P(A) \iff P(A\cap B) = P(A)\,P(B).
+$$
+
+::: {.fragment .callout-warning}
+**Виправлення:** «Якщо $P(A\mid B) = P(A)$, то $A$ і $B$ — **незалежні**.»
+:::
+
+## 🧩 B5 — PDF > 1?
+
+> Для неперервної $X$ значення PDF $f(x)$ може **перевищувати 1** для деяких $x$.
+
+## ✅ B5 — **TRUE**
+
+PDF — це **щільність**, а не ймовірність. Обмежена має бути площа під кривою (інтеграл), а не висота.
+
+**Приклад:** $X \sim \mathrm{Unif}(0, 0.5)$:
+
+$$
+f(x) = \frac{1}{0.5 - 0} = 2 \;\text{ на } [0, 0.5].
+$$
+
+## 📊 B5 — PDF > 1 у R
+
+```{r}
+#| fig-width: 8
+#| fig-height: 3.5
+tibble(x = seq(-0.1, 0.6, length.out = 400),
+       density = dunif(x, 0, 0.5)) |>
+  ggplot(aes(x, density)) +
+  geom_area(fill = green, alpha = 0.4) +
+  geom_line(color = green, linewidth = 1) +
+  geom_hline(yintercept = 1, color = red, linetype = "dashed") +
+  annotate("text", x = 0.25, y = 1.4, label = "f(x) = 2 > 1", size = 5) +
+  labs(title = "Unif(0, 0.5): PDF = 2 на [0, 0.5]",
+       x = "x", y = "f(x)")
+```
+
+# Section C. Validity Check
+
+## 🧩 C1 — чи валідна PDF?
+
+> $f(x) = 6x(1 - x), \quad 0 \le x \le 1, \quad f(x) = 0$ інакше.
+
+Треба перевірити **дві умови**:
+
+1. невід'ємність: $f(x) \ge 0$,
+2. нормування: $\int f = 1$.
+
+## ✅ C1 — крок 1: невід'ємність
+
+На $[0, 1]$:
+
+- $x \ge 0$,
+- $1 - x \ge 0$,
+- $6 > 0$.
+
+Отже $f(x) = 6 x (1-x) \ge 0$ ✓
+
+## ✅ C1 — крок 2: інтеграл
+
+$$
+\int_0^1 6x(1-x)\,dx
+= 6 \int_0^1 (x - x^2)\,dx
+$$
+
+$$
+= 6 \left[\frac{x^2}{2} - \frac{x^3}{3}\right]_0^1
+= 6\left(\frac{1}{2} - \frac{1}{3}\right)
+= 6 \cdot \frac{1}{6} = 1 \;\checkmark
+$$
+
+::: {.fragment .callout-tip}
+**Висновок:** $f(x)$ — валідна PDF. Це частковий випадок $\mathrm{Beta}(2,2)$.
+:::
+
+## 📊 C1 — перевірка в R
+
+```{r}
+#| fig-width: 8
+#| fig-height: 3.5
+f <- function(x) 6 * x * (1 - x)
+integrate(f, 0, 1)
+
+tibble(x = seq(0, 1, length.out = 400), y = f(x)) |>
+  ggplot(aes(x, y)) +
+  geom_area(fill = blue, alpha = 0.4) +
+  geom_line(color = blue, linewidth = 1) +
+  annotate("text", x = 0.5, y = 1.7, label = "∫₀¹ 6x(1−x) dx = 1") +
+  labs(title = "f(x) = 6x(1 − x) — Beta(2, 2)", x = "x", y = "f(x)")
+```
+
+## 🧩 C2 (бонус) — знайти $k$
+
+> $f(x) = k\,e^{-3x}, \; x \ge 0$ — знайти $k > 0$, щоб PDF була валідною.
+
+## ✅ C2 — розв'язання
+
+$$
+\int_0^{\infty} k\,e^{-3x}\,dx
+= k \left[-\tfrac{1}{3} e^{-3x}\right]_0^{\infty}
+= \frac{k}{3} \stackrel{!}{=} 1
+$$
+
+$$
+\Longrightarrow \;\boxed{k = 3}.
+$$
+
+**Перевірка:** $f(x) = 3 e^{-3x}$ — це $\mathrm{Exp}(\lambda = 3)$ із $E[X] = 1/3, \operatorname{Var}(X) = 1/9$.
+
+```{r}
+integrate(function(x) 3 * exp(-3 * x), 0, Inf)
+```
+
+# Section D. R Output Interpretation
+
+## Контекст
+
+$X \sim \mathcal{N}(\mu = 65, \sigma = 15)$ — розподіл балів за мідтерм.
+
+```{r}
+mu <- 65; sigma <- 15
+pnorm(80, mu, sigma)                         # 0.8413
+pnorm(50, mu, sigma)                         # 0.1587
+qnorm(0.90, mu, sigma)                       # 84.22
+qnorm(0.10, mu, sigma)                       # 45.78
+```
+
+## 📊 Розподіл і ключові точки
+
+```{r}
+#| fig-width: 10
+#| fig-height: 4.5
+#| echo: false
+xs <- seq(mu - 4*sigma, mu + 4*sigma, length.out = 600)
+band <- tibble(x = xs, y = dnorm(xs, mu, sigma)) |>
+  mutate(region = if_else(x >= mu - sigma & x <= mu + sigma, "in", "out"))
+ggplot(band, aes(x, y)) +
+  geom_area(data = filter(band, region == "in"), fill = blue, alpha = 0.35) +
+  geom_line(color = grey_d, linewidth = 0.8) +
+  geom_vline(xintercept = c(mu - sigma, mu, mu + sigma),
+             linetype = "dashed", color = grey_d) +
+  geom_vline(xintercept = c(45.78, 84.22),
+             linetype = "dotted", color = red, linewidth = 0.9) +
+  annotate("text", x = mu, y = 0.012, label = "≈ 68%", size = 5) +
+  annotate("text", x = c(45.78, 84.22), y = 0.0285,
+           label = c("45.78  (10%)", "84.22  (90%)"),
+           color = red, size = 4) +
+  labs(title = "X ~ N(65, 15²): правило 68–95–99.7",
+       x = "Бал", y = "Щільність")
+```
+
+## 🧩 D(a) — `pnorm(80) = 0.8413`
+
+> Студент набрав **80**. Яка частка когорти набрала **менше**? Це типовий чи високий бал?
+
+## ✅ D(a) — розв'язання
+
+$$
+P(X < 80) = 0.8413 = 84.13\%.
+$$
+
+- 80 = $\mu + \sigma$.
+- Рівно $z = +1$ — це **84-й перцентиль**.
+- **Високий**, але не екстремальний бал: ≈ 1 з 6 студентів набрав ще більше.
+
+## 🧩 D(b) — `pnorm(50) = 0.1587`
+
+> Поріг здачі — **50 балів**. Яка частка завалила?
+
+## ✅ D(b) — розв'язання
+
+$$
+P(X < 50) = 0.1587 \approx 15.87\%.
+$$
+
+Поріг **50 = $\mu - \sigma$**: стандартизовано $z = -1$, тому $\Phi(-1) = 1 - 0.8413 = 0.1587$ — за симетрією нормального розподілу.
+
+## 🧩 D(c) — `P(50 < X < 80) = 0.6826`
+
+> Як це обчислюється з двох `pnorm` і яке це **σ-правило**?
+
+## ✅ D(c) — розв'язання
+
+$$
+P(50 < X < 80) = \Phi(80) - \Phi(50) = 0.8413 - 0.1587 = 0.6826.
+$$
+
+Це **правило 68–95–99.7** (empirical rule):
+
+| Інтервал | Маса |
+|:---|---:|
+| $\mu \pm \sigma$ | 68.3% |
+| $\mu \pm 2\sigma$ | 95.4% |
+| $\mu \pm 3\sigma$ | 99.7% |
+
+## 🧩 D(d) — `qnorm(0.90) = 84.22`
+
+> Стипендія — топ-10%. Який мінімальний бал? Чи цей поріг **лівіше** чи **правіше** $\mu + \sigma$?
+
+## ✅ D(d) — розв'язання
+
+Мінімальний бал для стипендії: **84.22**.
+
+$84.22 > 80 = \mu + \sigma$ — поріг **правіше** від $\mu + \sigma$, бо:
+
+- $\mu + \sigma = 80$ відсікає 84.13% знизу,
+- 90% (нам треба) > 84.13% ⇒ поріг має бути ще правіше.
+
+Стандартизовано: $z_{0.9} = 1.282 > 1$.
+
+## 🧩 D(e) — `qnorm(0.10) = 45.78`
+
+> Тьюторинг для нижніх 10%. Який поріг? Чому 45.78 нижче, ніж $\mu - \sigma = 50$?
+
+## ✅ D(e) — розв'язання
+
+Поріг для тьюторингу: **45.78**.
+
+За симетрією: $z_{0.1} = -1.282 < -1$. Тобто щоб «зрізати» рівно 10% (а не 15.87%), треба піти **далі лівіше**, ніж $\mu - \sigma$.
+
+$$
+45.78 = 65 - 1.282 \cdot 15.
+$$
+
+## 🧩 D(f) (бонус) — $P(45.78 < X < 84.22)$
+
+> Лише через симетрію, без нових обчислень.
+
+## ✅ D(f) — розв'язання
+
+45.78 і 84.22 — це **10-й і 90-й перцентилі**. Маса між ними:
+
+$$
+P(45.78 < X < 84.22) = 0.90 - 0.10 = 0.80.
+$$
+
+Інтервал симетричний навколо $\mu = 65$ (відхилення $\pm 19.22$), бо $z_{0.9} = -z_{0.1}$ — це наслідок симетрії стандартного нормального.
+
+# Problem 1 — The Pugs Scandal
+
+## 🧩 Сюжет
+
+Київський конкурс собак перевіряє породистість мопсів через ДНК-тест.
+
+| Подія | Позначення | Значення |
+|:------|:----------:|---------:|
+| Частка справжніх мопсів | $P(\text{Pug})$ | 0.20 |
+| Чутливість тесту | $P(+\mid\text{Pug})$ | 0.85 |
+| Хибнопозитивний рівень | $P(+\mid\overline{\text{Pug}})$ | 0.10 |
+
+```{r}
+prior_pug <- 0.20; prior_npug <- 0.80
+sens <- 0.85;     fpr <- 0.10;     spec <- 0.90
+```
+
+## 🧩 P1(a) — $P(+)$?
+
+> За **законом повної ймовірності** знайдіть загальну ймовірність позитивного тесту.
+
+## ✅ P1(a) — розв'язання
+
+$$
+P(+) = P(+\mid\text{Pug})P(\text{Pug}) + P(+\mid\overline{\text{Pug}})P(\overline{\text{Pug}})
+$$
+
+$$
+= 0.85 \cdot 0.20 + 0.10 \cdot 0.80 = 0.17 + 0.08 = \boxed{0.25}.
+$$
+
+```{r}
+p_pos <- sens * prior_pug + fpr * prior_npug
+p_pos
+```
+
+## 🧩 P1(b) — $P(\text{Pug}\mid +)$?
+
+> Собака отримав «+». Яка ймовірність, що він **дійсно** мопс?
+
+## ✅ P1(b) — Баєс
+
+$$
+P(\text{Pug}\mid +)
+= \frac{P(+\mid\text{Pug})\,P(\text{Pug})}{P(+)}
+= \frac{0.85 \cdot 0.20}{0.25}
+= \frac{0.17}{0.25}
+$$
+
+$$
+= \boxed{0.68}.
+$$
+
+```{r}
+sens * prior_pug / p_pos
+```
+
+## 📊 P1(b) — інтуїція через 100 собак
+
+```{r}
+#| echo: false
+#| fig-width: 9
+#| fig-height: 4
+bayes_grid <- expand_grid(pug = c("Pug", "not Pug"),
+                          result = c("+", "−")) |>
+  mutate(prior = if_else(pug == "Pug", prior_pug, prior_npug),
+         cond  = case_when(
+           pug == "Pug"     & result == "+" ~ sens,
+           pug == "Pug"     & result == "−" ~ 1 - sens,
+           pug == "not Pug" & result == "+" ~ fpr,
+           pug == "not Pug" & result == "−" ~ 1 - fpr),
+         joint = prior * cond * 100)
+
+bayes_grid |>
+  ggplot(aes(result, joint, fill = pug)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = round(joint, 0)),
+            position = position_stack(vjust = 0.5), color = "white", size = 5) +
+  scale_fill_manual(values = c("Pug" = blue, "not Pug" = red)) +
+  labs(title = "Серед 100 собак: 25 «+», з них тільки 17 — мопси (17/25 = 68%)",
+       x = "Результат тесту", y = "Кількість собак", fill = NULL)
+```
+
+## 🧩 P1(c) — $P(\overline{\text{Pug}}\mid -)$?
+
+> Якщо тест «−», яка ймовірність, що собака **дійсно НЕ** мопс?
+
+## ✅ P1(c) — Баєс для «−»
+
+$$
+P(-\mid\overline{\text{Pug}}) = 1 - 0.10 = 0.90, \quad P(-) = 1 - 0.25 = 0.75.
+$$
+
+$$
+P(\overline{\text{Pug}}\mid -)
+= \frac{0.90 \cdot 0.80}{0.75}
+= \frac{0.72}{0.75}
+= \boxed{0.96}.
+$$
+
+```{r}
+spec * prior_npug / (1 - p_pos)
+```
+
+::: aside
+Negative predictive value тут **набагато вищий** за positive predictive value (96% vs 68%) — типово, коли поширеність низька.
+:::
+
+## 🧩 P1(d) — фальш організатора
+
+> Організатор каже: «Тест 85% точний, отже **+** означає 85% впевненості, що це мопс».
+
+## ✅ P1(d) — base-rate fallacy
+
+Плутанина двох напрямів умовної ймовірності:
+
+$$
+P(+\mid\text{Pug}) = 0.85 \;\;\;\not\equiv\;\;\; P(\text{Pug}\mid +) = 0.68.
+$$
+
+**Назва:** *base-rate fallacy* (помилка ігнорування базової частоти).
+
+**Чому виникає:** мала частка справжніх мопсів (20%) → велика популяція не-мопсів «постачає» багато false-positive, які **розбавляють** пул позитивних.
+
+::: {.fragment}
+17 справжніх «+» проти 8 хибних → 17/25 = 68%, а не 85%.
+:::
+
+## 🧩 P1(e) — біном
+
+> Розплідник прислав 5 незалежних собак. Кожен має $p = P(+) = 0.25$. Яка ймовірність, що **рівно 2** дадуть «+»?
+
+## ✅ P1(e) — Binom(5, 0.25)
+
+$$
+P(K = 2) = \binom{5}{2}(0.25)^2(0.75)^3
+= 10 \cdot 0.0625 \cdot 0.421875
+$$
+
+$$
+\approx \boxed{0.2637}.
+$$
+
+```{r}
+dbinom(2, size = 5, prob = 0.25)
+```
+
+## 📊 P1(e) — повний розподіл
+
+```{r}
+#| echo: false
+#| fig-width: 9
+#| fig-height: 3.8
+tibble(k = 0:5, p = dbinom(0:5, 5, 0.25), hl = k == 2) |>
+  ggplot(aes(k, p, fill = hl)) +
+  geom_col(width = 0.7) +
+  geom_text(aes(label = scales::number(p, 0.001)), vjust = -0.3, size = 4) +
+  scale_fill_manual(values = c("TRUE" = red, "FALSE" = grey_l), guide = "none") +
+  scale_x_continuous(breaks = 0:5) +
+  labs(title = "K ~ Binom(5, 0.25)", x = "k", y = "P(K = k)") +
+  coord_cartesian(ylim = c(0, 0.42))
+```
+
+## 🧩 P1(f) (бонус) — два тести
+
+> Дискваліфікація лише за **двома** незалежними «+». Знайти $P(\text{Pug}\mid ++)$ і порівняти з (b).
+
+## ✅ P1(f) — два тести
+
+$$
+P(++\mid\text{Pug}) = 0.85^2 = 0.7225, \quad P(++\mid\overline{\text{Pug}}) = 0.10^2 = 0.01.
+$$
+
+$$
+P(++) = 0.7225 \cdot 0.20 + 0.01 \cdot 0.80 = 0.1525.
+$$
+
+$$
+P(\text{Pug}\mid ++) = \frac{0.7225 \cdot 0.20}{0.1525}
+\approx \boxed{0.9475}.
+$$
+
+## 📊 P1(f) — стрибок надійності
+
+```{r}
+#| echo: false
+#| fig-width: 8
+#| fig-height: 3.8
+sens2 <- sens^2; fpr2 <- fpr^2
+p_both <- sens2 * prior_pug + fpr2 * prior_npug
+p_pug_given_both <- sens2 * prior_pug / p_both
+
+tibble(Stage = factor(c("1 тест", "2 тести"), levels = c("1 тест", "2 тести")),
+       posterior = c(0.68, p_pug_given_both)) |>
+  ggplot(aes(Stage, posterior, fill = Stage)) +
+  geom_col(width = 0.55) +
+  geom_text(aes(label = percent(posterior, 0.1)), vjust = -0.4, size = 6) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_fill_manual(values = c(blue, green), guide = "none") +
+  labs(title = "P(Pug | +)  →  P(Pug | ++)", x = NULL, y = NULL)
+```
+
+Другий тест **різко** покращує: false-positive rate множиться ($0.1 \times 0.1 = 0.01$), а sensitivity падає лише до $0.85^2 \approx 0.72$.
+
+# Problem 2 — Loto-Zabava
+
+## 🧩 Сюжет
+
+Білет — 10 UAH. Чистий виграш $X_i$:
+
+$$
+X_i = \begin{cases}
++80, & p = 0.10 \\
+-10, & p = 0.90
+\end{cases}
+$$
+
+5 підпунктів про **одну ставку**, **100 ставок** і про **гру в довгу**.
+
+## 🧩 P2(a) — $E[X_i]$, $\operatorname{Var}(X_i)$?
+
+> Чи вигідно купувати **один** квиток?
+
+## ✅ P2(a) — розв'язання
+
+$$
+E[X_i] = 80\cdot 0.10 + (-10)\cdot 0.90 = 8 - 9 = -1.
+$$
+
+$$
+E[X_i^2] = 80^2\cdot 0.10 + (-10)^2 \cdot 0.90 = 640 + 90 = 730.
+$$
+
+$$
+\operatorname{Var}(X_i) = 730 - (-1)^2 = 729, \quad \operatorname{SD}(X_i) = 27.
+$$
+
+::: {.fragment .callout-warning}
+Очікуваний збиток **−1 UAH** на квиток → **не вигідно** в середньому.
+:::
+
+## 🧩 P2(b) — $S_{100}$
+
+> $S_{100} = \sum_{i=1}^{100} X_i$.
+>
+> 1. $E[S_{100}], \operatorname{Var}(S_{100})$.
+> 2. Назвати теорему, яка дає нормальну апроксимацію.
+> 3. Записати наближений розподіл.
+
+## ✅ P2(b) — розв'язання
+
+Через незалежність:
+
+$$
+E[S_{100}] = 100 \cdot (-1) = -100,
+$$
+
+$$
+\operatorname{Var}(S_{100}) = 100 \cdot 729 = 72\,900, \;\; \operatorname{SD} = 270.
+$$
+
+**Теорема:** Центральна гранична теорема (CLT).
+
+$$
+\boxed{\,S_{100} \overset{\text{прибл.}}{\sim} \mathcal{N}(-100,\; 270^2)\,}.
+$$
+
+## 🧩 P2(c) — $P(S_{100} > 0)$?
+
+> Скористатися CLT (SD = 270).
+
+## ✅ P2(c) — стандартизація
+
+$$
+P(S_{100} > 0) = P\!\left(Z > \frac{0 - (-100)}{270}\right)
+= P\!\left(Z > 0.370\right)
+$$
+
+$$
+= 1 - \Phi(0.37) \approx 1 - 0.6443 = \boxed{0.3557}.
+$$
+
+```{r}
+1 - pnorm(0, mean = -100, sd = 270)
+```
+
+Шанс «у плюс» за рік: ≈ **35.6%**.
+
+## 📊 P2(c) — симуляція vs CLT
+
+```{r}
+#| echo: false
+#| fig-width: 9
+#| fig-height: 3.8
+set.seed(2026)
+sim <- replicate(20000, sum(sample(c(80, -10), 100,
+                                    replace = TRUE, prob = c(0.1, 0.9))))
+tibble(s = sim) |>
+  ggplot(aes(s)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 50,
+                 fill = blue, alpha = 0.5, color = "white") +
+  stat_function(fun = dnorm, args = list(mean = -100, sd = 270),
+                color = red, linewidth = 1) +
+  geom_vline(xintercept = 0, color = green, linetype = "dashed", linewidth = 1) +
+  annotate("text", x = 100, y = 0.0012,
+           label = paste0("симул. P(S>0) ≈ ", percent(mean(sim > 0), 0.1)),
+           color = green, hjust = 0, size = 5) +
+  labs(title = "S₁₀₀: симуляція проти N(−100, 270²)",
+       x = "Сумарний виграш, UAH", y = "Щільність")
+```
+
+## 🧩 P2(d) — закон великих чисел
+
+> Гравець: «Якщо грати **дуже довго**, я обов'язково вийду в плюс».
+>
+> 1. Сформулювати LLN: до чого збігається $\bar{X}_n$?
+> 2. Чому оптимізм гравця математично безпідставний?
+
+## ✅ P2(d) — LLN
+
+$$
+\bar{X}_n = \frac{1}{n}\sum_{i=1}^n X_i \xrightarrow[n\to\infty]{}\ E[X] = -1.
+$$
+
+**Інтерпретація.** Чим **більше** квитків, тим **точніше** середній виграш дорівнює **−1 UAH**, а не нулю чи додатному. Тобто:
+
+- $E[S_n] = -n$ — лінійно зростає **вниз**.
+- Розкид $\sigma\sqrt{n}$ зростає **повільніше**.
+- Шанс «прорватися в плюс» $\to 0$ при $n \to \infty$.
+
+::: {.fragment .callout-warning}
+LLN — це **не «право на реванш»**, а навпаки: казино **гарантовано** виграває в довгу.
+:::
+
+## 📊 P2(d) — збіжність $\bar{X}_n \to -1$
+
+```{r}
+#| echo: false
+#| fig-width: 9
+#| fig-height: 3.8
+set.seed(7)
+draws <- sample(c(80, -10), 5000, replace = TRUE, prob = c(0.1, 0.9))
+tibble(n = seq_along(draws),
+       cum_mean = cumsum(draws) / seq_along(draws)) |>
+  ggplot(aes(n, cum_mean)) +
+  geom_line(color = blue) +
+  geom_hline(yintercept = -1, color = red, linetype = "dashed", linewidth = 1) +
+  annotate("text", x = 4500, y = -0.3, label = "E[X] = −1", color = red, size = 5) +
+  labs(title = "Закон великих чисел у дії",
+       x = "n", y = expression(bar(X)[n]))
+```
+
+## 🧩 P2(e) (бонус) — мін. $n$ для $P(S_n > 0) \le 0.25$?
+
+> $E[X_i] = -1$, $\operatorname{Var}(X_i) = 729$, $z_{0.75} \approx 0.674$.
+
+## ✅ P2(e) — налаштування нерівності
+
+$$
+P(S_n > 0) = P\!\left(Z > \frac{0 - (-n)}{27\sqrt{n}}\right) = P\!\left(Z > \frac{\sqrt{n}}{27}\right).
+$$
+
+Умова $P(S_n > 0) \le 0.25$ ⇔ $P(Z \le \sqrt{n}/27) \ge 0.75$:
+
+$$
+\frac{\sqrt{n}}{27} \ge 0.674 \;\Longrightarrow\; \sqrt{n} \ge 18.20.
+$$
+
+## ✅ P2(e) — відповідь
+
+$$
+n \ge 18.20^2 \approx 331.16 \;\Longrightarrow\; \boxed{n_{\min} = 332}.
+$$
+
+```{r}
+n_min <- ceiling((27 * 0.674)^2)
+n_min
+prob_profit <- function(n) 1 - pnorm(0, mean = -n, sd = 27 * sqrt(n))
+c(`n = 331` = prob_profit(331), `n = 332` = prob_profit(332))
+```
+
+**Інтерпретація.** Уже після ≈ **332 квитків** шанс гравця опинитися «в плюсі» падає **нижче 25%**. Кожен наступний квиток робить цей шанс лише меншим.
+
+## 📊 P2(e) — динаміка шансів
+
+```{r}
+#| echo: false
+#| fig-width: 9
+#| fig-height: 3.8
+tibble(n = c(10, 50, 100, 200, 332, 500, 1000)) |>
+  mutate(p = prob_profit(n)) |>
+  ggplot(aes(n, p)) +
+  geom_line(color = blue, linewidth = 1) +
+  geom_point(color = blue, size = 3) +
+  geom_hline(yintercept = 0.25, color = red, linetype = "dashed") +
+  geom_vline(xintercept = 332, color = green, linetype = "dotted", linewidth = 1) +
+  annotate("text", x = 360, y = 0.30,
+           label = "n = 332 → 25%", color = green, hjust = 0, size = 5) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 0.5)) +
+  labs(title = "P(Sₙ > 0) як функція n",
+       x = "Кількість квитків n", y = NULL)
+```
+
+# Підсумок {.unnumbered}
+
+::: {.callout-tip}
+## Ключові ідеї мідтерму
+- **Умовна ймовірність ≠ незалежність** (Section A, B1, B4).
+- **PDF — щільність, а не ймовірність** (B5, C1).
+- **σ-правило 68–95–99.7** (Section D).
+- **Base-rate fallacy** — $P(+\mid\text{Pug}) \neq P(\text{Pug}\mid +)$ (P1).
+- **CLT + LLN** проти інтуїції азартних ігор (P2).
+:::
+
+::: {.fragment}
+**Питання?** 🐾🎰
+:::

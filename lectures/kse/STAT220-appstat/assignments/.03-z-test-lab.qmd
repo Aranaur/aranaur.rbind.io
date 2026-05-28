@@ -43,8 +43,7 @@ You will:
    the reference implementation.
 4. Plan the experiment: compute power, MDE, and the required sample
    size, and contrast the answer with your one-sample plan from Lab 1.
-5. Validate the infrastructure with a **two-sample A/A simulation**,
-   and (bonus) check for **Sample Ratio Mismatch (SRM)**.
+5. Validate the infrastructure with a **two-sample A/A simulation**.
 6. Write a stakeholder-ready recommendation memo.
 
 # General Requirements
@@ -257,39 +256,6 @@ test whether their **true conversion rates differ**.
    histogram would look like and which direction the FPR would move.
 :::
 
-## Sample Ratio Mismatch (SRM) {#sec-srm}
-
-In real A/B platforms users are supposed to be split between control
-and test in a known ratio (most often 50/50, sometimes 90/10).
-A **Sample Ratio Mismatch (SRM)** --- where the observed split differs
-significantly from the planned one --- is one of the strongest signals
-that something is broken in the assignment pipeline, and it
-**invalidates the experiment** *before* you even look at the lift.
-
-::: {.border}
-1. Implement an SRM check using $\chi^2$ on a single $1 \times 2$ table:
-   $$
-   \chi^2 = \sum_{i=1,2} \dfrac{(n_i^{\text{obs}} - n_i^{\text{exp}})^2}{n_i^{\text{exp}}},\qquad
-   \text{df} = 1.
-   $$
-   Compute the $p$-value via `scipy.stats.chi2.sf(chi2, df=1)`.
-2. Apply your check to:
-   - The synthetic A/B from @sec-myztest (it should *pass* if you set
-     $n_1 = n_2$).
-   - A clearly broken split (e.g. $n_1 = 2100, n_2 = 1900$ when the
-     plan was 50/50). Confirm that the check rejects.
-3. Run **$\geq 1\,000$** A/A simulations where each user is assigned
-   to a group with probability $0.5$. Plot the histogram of SRM
-   $p$-values and confirm that the empirical FPR of the SRM check is
-   close to $\alpha$.
-4. **One concrete failure scenario.** Describe one realistic way your
-   product could end up with SRM that has nothing to do with the
-   randomiser (e.g. one variant is heavier and times out for slow
-   connections, so those users never make it into the data → the
-   broken group has fewer users). What would you do in production if
-   the SRM check fails: roll back, debug, or both? In what order?
-:::
-
 ## Final Recommendation {#sec-final}
 
 ::: {.border}
@@ -305,11 +271,9 @@ contain:
 3. Two honest caveats:
    - Did the **A/A check pass** cleanly, or are there open questions
      about the infrastructure?
-   - Did the **SRM check pass**? If you did not run SRM (bonus), say
-     so and recommend running it before any production rollout.
 
 The memo must be readable by someone who has never heard the words
-"$p$-value", "pooled SE", or "SRM". You will be graded on whether a
+"$p$-value", "pooled SE". You will be graded on whether a
 real product manager could act on it without follow-up questions.
 :::
 
@@ -336,9 +300,6 @@ real product manager could act on it without follow-up questions.
   reference (e.g. `statsmodels.stats.proportion.power_proportions_2indep`)
   to 2 decimals, and the planned $N$ via bisection is the correct
   minimum (1 pt).
-- A/A simulation produces an empirical FPR whose Wilson CI contains the
-  nominal $\alpha$; the SRM check (if attempted) is correctly built and
-  validated by its own A/A (0.5 pt).
 
 **Interpretation of results (3 pts):**
 
@@ -348,8 +309,6 @@ real product manager could act on it without follow-up questions.
   product-specific recommendation, not a slogan.
 - A/A failure modes are realistic and product-specific (no generic
   "wrong data").
-- The SRM scenario (if attempted) names a specific, plausible product
-  failure rather than "the randomiser is bugged".
 
 **Code quality and organization (2 pts):**
 
@@ -381,9 +340,6 @@ for example:
 - *"Set the test-group $n$ to half of your planned $N$ and re-run. The
   $p$-value is still below $\alpha$, but the CI got wider. Which one
   drives your decision, and why?"*
-- *(Bonus)* *"Your SRM check returned $p = 0.001$ on a 50/50 plan. Do
-  you read the lift, debug the platform, or both? In what order, and
-  why?"*
 
 You may also be asked to **change one parameter live** in your code
 (e.g. flip `alternative`, halve $n_2$, double the MDE) and explain the

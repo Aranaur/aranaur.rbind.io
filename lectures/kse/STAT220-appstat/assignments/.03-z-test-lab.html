@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Ihor Miroshnychenko">
-<meta name="dcterms.date" content="2026-05-27">
+<meta name="dcterms.date" content="2026-05-28">
 
 <title>Lab 3</title>
 <style>
@@ -90,8 +90,7 @@ window.Quarto = {
   <li><a href="#sec-ci-lift" id="toc-sec-ci-lift" class="nav-link" data-scroll-target="#sec-ci-lift"><span class="header-section-number">3.4</span> Confidence Interval for the Lift</a></li>
   <li><a href="#sec-power" id="toc-sec-power" class="nav-link" data-scroll-target="#sec-power"><span class="header-section-number">3.5</span> Power and Sample-Size Planning</a></li>
   <li><a href="#sec-aa" id="toc-sec-aa" class="nav-link" data-scroll-target="#sec-aa"><span class="header-section-number">3.6</span> A/A Simulation (Two-Sample)</a></li>
-  <li><a href="#sec-srm" id="toc-sec-srm" class="nav-link" data-scroll-target="#sec-srm"><span class="header-section-number">3.7</span> Sample Ratio Mismatch (SRM)</a></li>
-  <li><a href="#sec-final" id="toc-sec-final" class="nav-link" data-scroll-target="#sec-final"><span class="header-section-number">3.8</span> Final Recommendation</a></li>
+  <li><a href="#sec-final" id="toc-sec-final" class="nav-link" data-scroll-target="#sec-final"><span class="header-section-number">3.7</span> Final Recommendation</a></li>
   </ul></li>
   <li><a href="#grading" id="toc-grading" class="nav-link" data-scroll-target="#grading">Grading</a></li>
   <li><a href="#defense" id="toc-defense" class="nav-link" data-scroll-target="#defense">Defense</a></li>
@@ -127,7 +126,7 @@ window.Quarto = {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">May 27, 2026</p>
+      <p class="date">May 28, 2026</p>
     </div>
   </div>
   
@@ -150,7 +149,7 @@ window.Quarto = {
 <li>Wrap your test logic into a reusable <code>my_z_test()</code> function for the <strong>two-sample</strong> case, with the pooled-vs-unpooled SE distinction correctly implemented.</li>
 <li>Build the confidence interval <strong>for the lift</strong> and compare it with the reference implementation.</li>
 <li>Plan the experiment: compute power, MDE, and the required sample size, and contrast the answer with your one-sample plan from Lab 1.</li>
-<li>Validate the infrastructure with a <strong>two-sample A/A simulation</strong>, and (bonus) check for <strong>Sample Ratio Mismatch (SRM)</strong>.</li>
+<li>Validate the infrastructure with a <strong>two-sample A/A simulation</strong>.</li>
 <li>Write a stakeholder-ready recommendation memo.</li>
 </ol>
 </section>
@@ -325,27 +324,8 @@ window.Quarto = {
 </ol>
 </div>
 </section>
-<section id="sec-srm" class="level2" data-number="3.7">
-<h2 data-number="3.7" class="anchored" data-anchor-id="sec-srm"><span class="header-section-number">3.7</span> Sample Ratio Mismatch (SRM)</h2>
-<p>In real A/B platforms users are supposed to be split between control and test in a known ratio (most often 50/50, sometimes 90/10). A <strong>Sample Ratio Mismatch (SRM)</strong> — where the observed split differs significantly from the planned one — is one of the strongest signals that something is broken in the assignment pipeline, and it <strong>invalidates the experiment</strong> <em>before</em> you even look at the lift.</p>
-<div class="border">
-<ol type="1">
-<li>Implement an SRM check using <span class="math inline">\(\chi^2\)</span> on a single <span class="math inline">\(1 \times 2\)</span> table: <span class="math display">\[
-\chi^2 = \sum_{i=1,2} \dfrac{(n_i^{\text{obs}} - n_i^{\text{exp}})^2}{n_i^{\text{exp}}},\qquad
-\text{df} = 1.
-\]</span> Compute the <span class="math inline">\(p\)</span>-value via <code>scipy.stats.chi2.sf(chi2, df=1)</code>.</li>
-<li>Apply your check to:
-<ul>
-<li>The synthetic A/B from <a href="#sec-myztest" class="quarto-xref">Section&nbsp;3.3</a> (it should <em>pass</em> if you set <span class="math inline">\(n_1 = n_2\)</span>).</li>
-<li>A clearly broken split (e.g.&nbsp;<span class="math inline">\(n_1 = 2100, n_2 = 1900\)</span> when the plan was 50/50). Confirm that the check rejects.</li>
-</ul></li>
-<li>Run <strong><span class="math inline">\(\geq 1\,000\)</span></strong> A/A simulations where each user is assigned to a group with probability <span class="math inline">\(0.5\)</span>. Plot the histogram of SRM <span class="math inline">\(p\)</span>-values and confirm that the empirical FPR of the SRM check is close to <span class="math inline">\(\alpha\)</span>.</li>
-<li><strong>One concrete failure scenario.</strong> Describe one realistic way your product could end up with SRM that has nothing to do with the randomiser (e.g.&nbsp;one variant is heavier and times out for slow connections, so those users never make it into the data → the broken group has fewer users). What would you do in production if the SRM check fails: roll back, debug, or both? In what order?</li>
-</ol>
-</div>
-</section>
-<section id="sec-final" class="level2" data-number="3.8">
-<h2 data-number="3.8" class="anchored" data-anchor-id="sec-final"><span class="header-section-number">3.8</span> Final Recommendation</h2>
+<section id="sec-final" class="level2" data-number="3.7">
+<h2 data-number="3.7" class="anchored" data-anchor-id="sec-final"><span class="header-section-number">3.7</span> Final Recommendation</h2>
 <div class="border">
 <p>Putting all of the above together, write a <strong>single-page recommendation memo</strong> (≤ 400 words) addressed to a non-technical stakeholder. It must contain:</p>
 <ol type="1">
@@ -354,10 +334,9 @@ window.Quarto = {
 <li>Two honest caveats:
 <ul>
 <li>Did the <strong>A/A check pass</strong> cleanly, or are there open questions about the infrastructure?</li>
-<li>Did the <strong>SRM check pass</strong>? If you did not run SRM (bonus), say so and recommend running it before any production rollout.</li>
 </ul></li>
 </ol>
-<p>The memo must be readable by someone who has never heard the words “<span class="math inline">\(p\)</span>-value”, “pooled SE”, or “SRM”. You will be graded on whether a real product manager could act on it without follow-up questions.</p>
+<p>The memo must be readable by someone who has never heard the words “<span class="math inline">\(p\)</span>-value”, “pooled SE”. You will be graded on whether a real product manager could act on it without follow-up questions.</p>
 </div>
 </section>
 </section>
@@ -404,14 +383,12 @@ window.Quarto = {
 <li><code>my_z_test</code> implements all three alternatives correctly, uses <strong>pooled SE for the test and unpooled SE for the CI</strong>, and matches <code>proportions_ztest</code> to 4 decimals (1 pt).</li>
 <li>The three CI constructions in <a href="#sec-ci-lift" class="quarto-xref">Section&nbsp;3.4</a> are computed correctly and the comparison table is consistent with the reference (0.5 pt).</li>
 <li>The power calculation in <a href="#sec-power" class="quarto-xref">Section&nbsp;3.5</a> matches at least one independent reference (e.g.&nbsp;<code>statsmodels.stats.proportion.power_proportions_2indep</code>) to 2 decimals, and the planned <span class="math inline">\(N\)</span> via bisection is the correct minimum (1 pt).</li>
-<li>A/A simulation produces an empirical FPR whose Wilson CI contains the nominal <span class="math inline">\(\alpha\)</span>; the SRM check (if attempted) is correctly built and validated by its own A/A (0.5 pt).</li>
 </ul>
 <p><strong>Interpretation of results (3 pts):</strong></p>
 <ul>
 <li>The pooled-vs-unpooled paragraph is correct and self-contained — you can explain <em>both</em> which SE to use <em>and</em> why.</li>
 <li>The “CI vs.&nbsp;business MDE” decision rule produces a concrete, product-specific recommendation, not a slogan.</li>
 <li>A/A failure modes are realistic and product-specific (no generic “wrong data”).</li>
-<li>The SRM scenario (if attempted) names a specific, plausible product failure rather than “the randomiser is bugged”.</li>
 </ul>
 <p><strong>Code quality and organization (2 pts):</strong></p>
 <ul>
@@ -431,7 +408,6 @@ window.Quarto = {
 <li><em>“Your A/A FPR is <span class="math inline">\(0.062\)</span> instead of <span class="math inline">\(0.050\)</span>. Is the difference statistically meaningful, or is it just simulation noise? Show me the Wilson CI on <span class="math inline">\(0.062\)</span> and use it to answer.”</em></li>
 <li><em>“Switch your test from one-sided ‘less’ to two-sided in your code right now. By how much does the lower CI bound for the lift move, and does that change your recommendation?”</em></li>
 <li><em>“Set the test-group <span class="math inline">\(n\)</span> to half of your planned <span class="math inline">\(N\)</span> and re-run. The <span class="math inline">\(p\)</span>-value is still below <span class="math inline">\(\alpha\)</span>, but the CI got wider. Which one drives your decision, and why?”</em></li>
-<li><em>(Bonus)</em> <em>“Your SRM check returned <span class="math inline">\(p = 0.001\)</span> on a 50/50 plan. Do you read the lift, debug the platform, or both? In what order, and why?”</em></li>
 </ul>
 <p>You may also be asked to <strong>change one parameter live</strong> in your code (e.g.&nbsp;flip <code>alternative</code>, halve <span class="math inline">\(n_2\)</span>, double the MDE) and explain the resulting shift.</p>
 </section>
