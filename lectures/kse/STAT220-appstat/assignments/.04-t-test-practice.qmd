@@ -1,0 +1,1069 @@
+---
+title: "Практика 4"
+subtitle: "Будуємо власний `t.test` для неперервної метрики"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: ua
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+
+np.random.seed(73)
+
+turquoise = "#20B2AA"
+red       = "#fb6107"
+blue      = "#181485"
+green     = "#8bb174"
+gray      = "#A0A0A0"
+red_pink  = "#e64173"
+```
+
+# Що ми робимо сьогодні {.unnumbered}
+
+На лекції ми по черзі побудували $t$-тест: побачили проблему **невідомої
+$\sigma^2$**, замінили її оцінкою $S^2$, з'ясували, що тоді статистика
+$T(X)$ має не нормальний, а **розподіл Стьюдента** $t_{n-1}$; розібрали
+$t'$-тест проти $t$-тесту, довірчий інтервал, велику вибірку через
+ЦГТ + теорему Слуцького, двовибірковий $t$-тест і MDE.
+
+Сьогодні **збираємо все в один інструмент** --- власну функцію
+`my_t_test()`, а потім її «двовибіркового близнюка»
+`my_two_sample_t_test()`, схожого за духом на `scipy.stats.ttest_ind`.
+
+::: {.callout-note icon="false"}
+## Правила гри
+- Не використовуємо готові `ttest_1samp` / `ttest_ind` --- пишемо все
+  самі через `scipy.stats.t` (`t.cdf`, `t.sf`, `t.ppf`). Готова функція
+  --- лише для **перевірки**.
+- Кожна версія --- це маленьке розширення попередньої.
+- Кожен фінальний крок (Final, повний цикл) **перевикористовує**
+  попередні функції, а не дублює їх.
+- Після кожної версії --- блок **«Ваша черга»** з мінізадачею.
+:::
+
+---
+
+# Кейс: ARPU застосунку доставки GreenBowl
+
+Працюємо над тим самим **GreenBowl**, що й у Практиці 3, але тепер
+метрика **неперервна**. Продуктова команда оновила меню (додала
+комбо-набори) і хоче зрозуміти, чи зріс **середній виторг на користувача
+за тиждень (ARPU)**.
+
+::: {.border}
+- **Одиниця спостереження:** один користувач за тиждень.
+- **Метрика успіху:** виторг користувача в гривнях --- **неперервна**,
+  додатна, **сильно скошена** (більшість користувачів роблять невеликі
+  замовлення, мало «китів» дають довгий правий хвіст).
+- **Базовий рівень:** $\mu_0 = 250$ ₴ (3 місяці історичних даних).
+- **Бізнес-MDE:** ефект < +15 ₴ не вартий перебудови меню та логістики.
+- **Напрям:** нас цікавить лише ефект «вгору» → **однобічний тест**.
+- **Рівень значущості:** $\alpha = 0{,}05$.
+:::
+
+::: {.callout-note icon="false"}
+## Чому $t$-тест, а не $Z$-тест?
+У Практиці 3 метрика була **пропорцією**, і дисперсія була
+«самоописова»: $\sigma^2 = \mu_0(1-\mu_0)$. Тут метрика --- гроші, і
+дисперсію **нізвідки взяти** наперед: її доводиться оцінювати з даних
+як $S^2$. Саме ця заміна $\sigma^2 \to S^2$ і перетворює $Z$-тест на
+$t$-тест.
+:::
+
+Згенеруємо реалістичний скошений ARPU. Розподіл --- логнормальний
+(класична модель для «грошей на користувача»):
+
+```{python}
+#| label: data-gen
+#| fig-align: center
+
+def arpu_sample(true_mean, n, sigma=0.6):
+    """Логнормальна вибірка ARPU із заданим середнім true_mean."""
+    mu = np.log(true_mean) - sigma**2 / 2
+    return np.random.lognormal(mean=mu, sigma=sigma, size=n)
+
+np.random.seed(73)
+pilot = arpu_sample(true_mean=268, n=1500)   # пілот після оновлення меню
+
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.hist(pilot, bins=50, color=turquoise, alpha=0.7, edgecolor="white")
+ax.axvline(250, color=red, lw=2, label="baseline μ₀ = 250 ₴")
+ax.axvline(pilot.mean(), color=blue, lw=2, label=f"вибіркове середнє = {pilot.mean():.0f} ₴")
+ax.set_xlabel("Виторг на користувача, ₴")
+ax.set_ylabel("Частота")
+ax.set_title("Розподіл ARPU у пілотній групі (n = 1500)")
+ax.legend()
+plt.tight_layout()
+plt.show()
+
+print(f"Середнє = {pilot.mean():.1f} ₴,  S = {pilot.std(ddof=1):.1f} ₴,  n = {len(pilot)}")
+```
+
+Розподіл явно **не нормальний** --- скошений праворуч. Тримаймо це в
+голові: воно стане критичним у Версії 3.
+
+---
+
+# Версія 1 --- $t$-статистика і p-value
+
+Найпростіша версія: дано вибірку та $\mu_0$. Повертаємо однобічний
+$p$-value для $H_1: \mu > \mu_0$.
+
+$$
+T = \sqrt{n}\,\dfrac{\overline X - \mu_0}{S},\qquad
+T \overset{H_0}{\sim} t_{n-1},\qquad
+p\text{-value} = 1 - F_{t_{n-1}}(T)
+$$
+
+```{python}
+#| label: v1
+
+def my_t_test(sample, mu0):
+    """Версія 1. Однобічний t-тест, H1: mu > mu0."""
+    sample = np.asarray(sample, dtype=float)
+    n      = len(sample)
+    se     = sample.std(ddof=1) / np.sqrt(n)
+    t_stat = (sample.mean() - mu0) / se
+    return stats.t.sf(t_stat, df=n - 1)   # sf(x) = 1 - cdf(x)
+```
+
+Перевіримо на пілоті: оновлене меню розкотили на 1500 користувачів.
+
+```{python}
+#| label: v1-demo
+
+p_val = my_t_test(pilot, mu0=250)
+print(f"p-value = {p_val:.5f}")
+```
+
+$p \ll 0{,}05$ --- є вагомі докази, що ARPU зріс понад історичні 250 ₴.
+Але **не поспішаймо радіти** --- спершу подивимось на *розмір* ефекту
+(Версія 4) і чи він вартий грошей (бізнес-MDE = +15 ₴).
+
+::: {.callout-tip icon="false"}
+## Ваша черга 1
+1. Згенеруйте серію пілотів зі справжнім середнім рівно $\mu_0 = 250$
+   (тобто **ефекту немає**) і подивіться, які $p$-value виходять. Чи
+   часто $p \leq 0{,}05$?
+2. Зафіксуйте `np.random.seed(1)` і знайдіть, при якому **вибірковому
+   середньому** (на $n=1500$, $S \approx 165$) $p$ перетинає $0{,}05$.
+   Переведіть це у lift над $\mu_0$.
+3. **Дослідницьке.** Збільште $n$ учетверо (1500 → 6000). У скільки разів
+   зменшується критичний lift --- учетверо чи у $\sqrt 4 = 2$? Чому?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 1
+
+```{python}
+#| label: sol1
+
+# (1) ефекту немає — p має бути приблизно рівномірним; p<=0.05 ~ у 5% випадків
+np.random.seed(1)
+ps = [my_t_test(arpu_sample(250, 1500), 250) for _ in range(2000)]
+print(f"Частка p <= 0.05 при відсутності ефекту: {np.mean(np.array(ps) <= 0.05):.3f}")
+
+# (2) критичний lift: T = z* => mean = mu0 + t_crit * S/sqrt(n)
+n, S = 1500, 165
+t_crit = stats.t.ppf(0.95, df=n - 1)
+crit_mean = 250 + t_crit * S / np.sqrt(n)
+print(f"Критичне середнє ≈ {crit_mean:.2f} ₴  →  lift ≈ {crit_mean - 250:+.2f} ₴")
+
+# (3) учетверо більший n
+crit_mean_4n = 250 + t_crit * S / np.sqrt(4 * n)
+print(f"При n=6000: критичний lift ≈ {crit_mean_4n - 250:+.2f} ₴  "
+      f"(зменшився у {(crit_mean-250)/(crit_mean_4n-250):.1f} рази)")
+```
+
+**Інтерпретація.** Критичний lift масштабується як $1/\sqrt{n}$, бо
+$SE = S/\sqrt{n}$. Тому при збільшенні $n$ у 4 рази критичний lift падає
+**у 2 рази**, а не в 4. Це той самий компроміс точності й вартості, що й
+у Практиці 3.
+:::
+
+---
+
+# Версія 2 --- три варіанти альтернативи
+
+Маркетинг хоче ловити **падіння** ARPU (одне-бічний `less`), фінансовий
+відділ іноді хоче «чи змінилось узагалі» (двобічний). Додаємо параметр
+`alternative`.
+
+```{python}
+#| label: v2
+
+def my_t_test(sample, mu0, alternative="greater"):
+    """Версія 2. Додає параметр alternative ∈ {greater, less, two-sided}."""
+    sample = np.asarray(sample, dtype=float)
+    n      = len(sample)
+    df     = n - 1
+    se     = sample.std(ddof=1) / np.sqrt(n)
+    t_stat = (sample.mean() - mu0) / se
+
+    if alternative == "greater":
+        return stats.t.sf(t_stat, df=df)
+    if alternative == "less":
+        return stats.t.cdf(t_stat, df=df)
+    if alternative == "two-sided":
+        return 2 * stats.t.sf(abs(t_stat), df=df)
+
+    raise ValueError(f"Невідома альтернатива: {alternative!r}")
+```
+
+```{python}
+#| label: v2-demo
+
+for alt in ("greater", "less", "two-sided"):
+    p = my_t_test(pilot, mu0=250, alternative=alt)
+    print(f"alternative={alt:>10s}  →  p-value = {p:.5f}")
+```
+
+Як і для $Z$-тесту: **однобічний $p$-value дорівнює половині
+двобічного** --- бо розподіл Стьюдента симетричний навколо нуля. Це
+наслідок формули $2\cdot(1 - F_t(|T|))$.
+
+::: {.callout-tip icon="false"}
+## Ваша черга 2
+1. Переконайтесь, що на пілоті `p_two_sided == 2 · p_greater` **точно**.
+2. Згенеруйте вибірку, де $\overline X < \mu_0$ (наприклад,
+   `arpu_sample(235, 1500)`). Чи зберігається рівність із `p_greater`?
+   Спробуйте `2 · p_less`.
+3. Виведіть **загальну формулу** $p_{\text{two}}$ через $p_{\text{greater}}$
+   і $p_{\text{less}}$.
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 2
+
+```{python}
+#| label: sol2
+
+pg = my_t_test(pilot, 250, "greater")
+p2 = my_t_test(pilot, 250, "two-sided")
+print(f"X̄ > μ₀:  2·p_greater = {2*pg:.5f},  p_two = {p2:.5f}  →  "
+      f"{'збігається' if abs(p2 - 2*pg) < 1e-12 else 'НІ'}")
+
+np.random.seed(5)
+down = arpu_sample(235, 1500)
+pg_d = my_t_test(down, 250, "greater")
+pl_d = my_t_test(down, 250, "less")
+p2_d = my_t_test(down, 250, "two-sided")
+print(f"X̄ < μ₀:  2·p_less = {2*pl_d:.5f},  p_two = {p2_d:.5f}  →  "
+      f"{'збігається' if abs(p2_d - 2*pl_d) < 1e-12 else 'НІ'}")
+```
+
+**Загальна формула:** $p_{\text{two-sided}} = 2 \cdot \min(p_{\text{greater}},\ p_{\text{less}})$.
+Беремо завжди той хвіст, у якому спостереження «більш екстремальне». На
+відміну від біномного у Практиці 3, тут рівність **точна** для будь-якого
+напрямку --- розподіл $t$ симетричний.
+:::
+
+---
+
+# Версія 3 --- $t'$-тест проти $t$-тесту (`use_normal`)
+
+На лекції ми побачили: якщо замість $t_{n-1}$ взяти $\mathcal{N}(0,1)$
+(це й є **$t'$-тест**), то на **малій вибірці** результат спотворюється.
+Додаємо прапор `use_normal` і перевіряємо симуляцією.
+
+```{python}
+#| label: v3
+
+def my_t_test(sample, mu0, alternative="greater", use_normal=False):
+    """Версія 3. use_normal=True → t'-тест (квантилі N(0,1) замість t)."""
+    sample = np.asarray(sample, dtype=float)
+    n      = len(sample)
+    df     = n - 1
+    se     = sample.std(ddof=1) / np.sqrt(n)
+    t_stat = (sample.mean() - mu0) / se
+
+    dist = stats.norm if use_normal else stats.t
+    kw   = {} if use_normal else {"df": df}
+
+    if alternative == "greater":
+        return dist.sf(t_stat, **kw)
+    if alternative == "less":
+        return dist.cdf(t_stat, **kw)
+    if alternative == "two-sided":
+        return 2 * dist.sf(abs(t_stat), **kw)
+
+    raise ValueError(f"Невідома альтернатива: {alternative!r}")
+```
+
+Головне питання: наскільки часто кожен критерій **хибно** відхиляє $H_0$,
+коли ефекту насправді немає (FPR). Симулюємо під $H_0$ (справжнє середнє
+$= \mu_0$) для різних розподілів і розмірів вибірки.
+
+```{python}
+#| label: v3-sim
+
+def fpr(generator, n, M=20000, alpha=0.05):
+    """Емпіричний FPR t-тесту і t'-тесту під H0 (одна-бічний greater)."""
+    np.random.seed(7)
+    rej_t = rej_tprime = 0
+    for _ in range(M):
+        s = generator(n)
+        if my_t_test(s, 250, "greater", use_normal=False) <= alpha:
+            rej_t += 1
+        if my_t_test(s, 250, "greater", use_normal=True) <= alpha:
+            rej_tprime += 1
+    return rej_t / M, rej_tprime / M
+
+normal_gen = lambda n: np.random.normal(250, 160, n)   # нормальні дані
+skew_gen   = lambda n: arpu_sample(250, n)             # скошені дані (наш ARPU)
+
+print(f"{'дані':>10s}  {'n':>5s}  {'t-FPR':>7s}  {'t′-FPR':>7s}")
+print(f"{'нормальні':>10s}  {15:>5d}  {fpr(normal_gen, 15)[0]:>7.3f}  {fpr(normal_gen, 15)[1]:>7.3f}")
+print(f"{'скошені':>10s}  {15:>5d}  {fpr(skew_gen, 15)[0]:>7.3f}  {fpr(skew_gen, 15)[1]:>7.3f}")
+print(f"{'скошені':>10s}  {200:>5d}  {fpr(skew_gen, 200)[0]:>7.3f}  {fpr(skew_gen, 200)[1]:>7.3f}")
+print(f"{'скошені':>10s}  {1000:>5d}  {fpr(skew_gen, 1000)[0]:>7.3f}  {fpr(skew_gen, 1000)[1]:>7.3f}")
+```
+
+::: {.callout-warning icon="false"}
+## Що показує таблиця
+- **Нормальні дані, $n=15$:** $t$-тест б'є рівно $0{,}05$ (точний!),
+  а $t'$-тест роздуває FPR до $\approx 0{,}06$ --- «знаходить» ефекти
+  частіше, ніж дозволено. Це і є причина, чому $t$-тест безпечніший на
+  малих вибірках.
+- **Скошені дані, $n=15$:** **обидва** критерії збиті (тут навпаки ---
+  надто консервативні в правому хвості). Малий $n$ + ненормальність =
+  тесту вірити не можна, який би квантиль ви не взяли.
+- **Скошені дані, $n \uparrow$:** FPR обох наближається до $0{,}05$.
+  Це **ЦГТ + теорема Слуцького** в дії: на великій вибірці $T(X)$ стає
+  нормальним навіть для скошених даних, і різниця $t$ vs $t'$ зникає.
+:::
+
+::: {.callout-note icon="false"}
+## Висновок (як на лекції)
+$t$-тест **ніколи не «оптимістичніший»** за $t'$-тест: важчі хвости
+$t_{n-1}$ дають більший $p$-value → менший FPR. Тому дефолт --- завжди
+$t$-тест. Але **жоден** із них не рятує від *ненормальності на малій
+вибірці* --- там потрібен або великий $n$, або непараметричні методи
+(бутстреп, тест Манна–Вітні).
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 3
+1. Для **нормальних** даних знайдіть мінімальне $n$, при якому
+   $|t\text{-FPR} - t'\text{-FPR}| < 0{,}005$. Із якого $n$ вибір
+   $t$ vs $t'$ перестає мати значення?
+2. Повторіть симуляцію для двобічного тесту. Чи зберігається ефект
+   «$t'$ роздуває FPR» на нормальних даних?
+3. **Дослідницьке.** Підсильте скошеність (`sigma=1.0` у `arpu_sample`).
+   Скільки тепер треба $n$, щоб скошений FPR дотягнувся до $0{,}05$?
+   Як це пов'язано з «достатнім $n$» для ЦГТ із лекції про $Z$-тест?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 3
+
+```{python}
+#| label: sol3
+
+# (1) на нормальних даних різниця t vs t' зникає зі зростанням n
+print("Нормальні дані, |t-FPR − t′-FPR|:")
+for n in (15, 30, 60, 120, 250):
+    a, b = fpr(normal_gen, n, M=20000)
+    print(f"  n={n:>4d}  t={a:.3f}  t′={b:.3f}  |Δ|={abs(a-b):.3f}")
+```
+
+**Інтерпретація.**
+
+1. Уже з $n \approx 60$ різниця падає нижче $0{,}005$: $t_{59} \approx
+   \mathcal{N}(0,1)$, тож на нормальних даних вибір квантиля стає
+   косметикою (як і казали на лекції).
+2. Двобічний веде себе так само --- $t'$ систематично трохи
+   ліберальніший на малих $n$.
+3. Що скошеніший розподіл, то **більший** $n$ потрібен ЦГТ. При
+   `sigma=1.0` навіть $n=1000$ може не дотягнути FPR до $0{,}05$ --- це
+   та сама ідея «достатнього $n$» з лекції про $Z$-тест: чим важчий
+   хвіст, то повільніша збіжність до нормальності.
+:::
+
+---
+
+# Версія 4 --- довірчий інтервал для $\mu$
+
+Замість «так/ні» бізнес хоче **діапазон** для справжнього ARPU.
+Використовуємо $t$-квантиль:
+
+$$
+\overline X \pm t_{n-1,\,1-\alpha/2}\,\dfrac{S}{\sqrt n}
+$$
+
+```{python}
+#| label: v4
+
+def my_t_test(sample, mu0, alternative="greater",
+              use_normal=False, alpha=0.05, conf_int=False):
+    """
+    Версія 4. conf_int=True → повертає dict із p-value і CI.
+    Тип CI узгоджується з alternative (той самий бюджет α):
+      two-sided → [X̄ − t·SE, X̄ + t·SE]
+      greater   → одностороння нижня межа: [X̄ − t·SE, +∞)
+      less      → одностороння верхня межа: (−∞, X̄ + t·SE]
+    """
+    sample = np.asarray(sample, dtype=float)
+    n      = len(sample)
+    df     = n - 1
+    mean   = sample.mean()
+    se     = sample.std(ddof=1) / np.sqrt(n)
+    t_stat = (mean - mu0) / se
+
+    dist = stats.norm if use_normal else stats.t
+    kw   = {} if use_normal else {"df": df}
+
+    if alternative == "greater":
+        p_value = dist.sf(t_stat, **kw)
+    elif alternative == "less":
+        p_value = dist.cdf(t_stat, **kw)
+    elif alternative == "two-sided":
+        p_value = 2 * dist.sf(abs(t_stat), **kw)
+    else:
+        raise ValueError(f"Невідома альтернатива: {alternative!r}")
+
+    if not conf_int:
+        return p_value
+
+    if alternative == "two-sided":
+        crit    = dist.ppf(1 - alpha / 2, **kw)
+        ci_low  = mean - crit * se
+        ci_high = mean + crit * se
+    elif alternative == "greater":
+        crit    = dist.ppf(1 - alpha, **kw)
+        ci_low  = mean - crit * se
+        ci_high = np.inf
+    else:  # less
+        crit    = dist.ppf(1 - alpha, **kw)
+        ci_low  = -np.inf
+        ci_high = mean + crit * se
+
+    return {"mean": mean, "t_stat": t_stat, "df": df,
+            "p_value": p_value, "ci_low": ci_low, "ci_high": ci_high}
+```
+
+```{python}
+#| label: v4-demo
+
+res_two = my_t_test(pilot, 250, "two-sided", alpha=0.05, conf_int=True)
+res_one = my_t_test(pilot, 250, "greater",   alpha=0.05, conf_int=True)
+
+print(f"Двосторонній 95% CI:     [{res_two['ci_low']:.1f}, {res_two['ci_high']:.1f}] ₴")
+print(f"95% одностороння нижня:  μ ≥ {res_one['ci_low']:.1f} ₴")
+print(f"Бізнес-поріг μ₀ + MDE = 265 ₴:  "
+      f"{'досягнуто' if res_one['ci_low'] >= 265 else 'НЕ досягнуто'}")
+```
+
+::: {.callout-important icon="false"}
+## Інтерпретація для PM
+- **Точкова оцінка** ARPU ≈ 266 ₴ (lift ≈ +16 ₴).
+- **Двосторонній CI** описує невизначеність в обидва боки --- для звіту.
+- **Одностороння нижня межа** каже: «ARPU **щонайменше** стільки з
+  упевненістю 95%». Питання, чи перетнула вона бізнес-поріг
+  $\mu_0 + \text{MDE} = 265$ ₴, --- і є відповіддю «варто чи ні».
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 4
+1. Запустіть `my_t_test(pilot, 250, "less", conf_int=True)`. Як виглядає
+   CI і чи має він сенс для цих даних?
+2. Порівняйте ширину **одностороннього** та **двостороннього** 95% CI.
+   Який тісніший і чому?
+3. **Дослідницьке.** Порівняйте $t$-CI (`use_normal=False`) із $t'$-CI
+   (`use_normal=True`) на пілоті ($n=1500$) і на підвибірці $n=12$. Де
+   різниця помітна, а де ні?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 4
+
+```{python}
+#| label: sol4
+
+# (1)+(2)
+r_less = my_t_test(pilot, 250, "less", conf_int=True)
+print(f"alt='less':  μ ≤ {r_less['ci_high']:.1f} ₴  (дані тягнуть угору — межа малоінформативна)")
+
+w_two = res_two['ci_high'] - res_two['ci_low']
+w_one = res_two['ci_high'] - res_one['ci_low']   # для порівняння нижніх меж
+print(f"Двостороння нижня межа = {res_two['ci_low']:.1f},  одностороння = {res_one['ci_low']:.1f}")
+print("Одностороння тісніша: весь α=0.05 йде в один хвіст (t_{0.95} < t_{0.975}).")
+
+# (3) t-CI vs t'-CI
+for n in (1500, 12):
+    sub = pilot[:n]
+    a = my_t_test(sub, 250, "two-sided", use_normal=False, conf_int=True)
+    b = my_t_test(sub, 250, "two-sided", use_normal=True,  conf_int=True)
+    print(f"n={n:>4d}:  t-CI ширина={a['ci_high']-a['ci_low']:6.1f},  "
+          f"t′-CI ширина={b['ci_high']-b['ci_low']:6.1f}")
+```
+
+**Інтерпретація.** При $n=1500$ $t$- і $t'$-інтервали майже однакові
+($t_{1499}\approx\mathcal N(0,1)$). При $n=12$ $t'$-інтервал помітно
+**вужчий** --- але це хибна впевненість: він ігнорує невизначеність
+оцінки $S$, тому реальне покриття нижче за заявлені 95%.
+:::
+
+---
+
+# Від однієї вибірки до двох {.unnumbered}
+
+`my_t_test` працює, коли є **фіксований baseline** --- наприклад,
+порівняння поточного тижня з історичним ARPU. Але **чесний A/B-тест**
+запускає дві когорти одночасно, і **обидві** мають шум та свою дисперсію.
+
+Створюємо паралельну функцію `my_two_sample_t_test`. Стара функція не
+зникає --- вона лишається для baseline-моніторингу.
+
+---
+
+# Версія 5 --- двовибірковий $t$-тест (Welch + pooled)
+
+На лекції було дві формули залежно від рівності дисперсій. **Welch**
+(не припускає $\sigma^2_A = \sigma^2_B$) --- безпечний дефолт:
+
+$$
+T = \dfrac{\overline A - \overline B}{\sqrt{S^2_A/n_A + S^2_B/n_B}},\qquad
+\nu = \dfrac{\left(S^2_A/n_A + S^2_B/n_B\right)^2}
+            {\dfrac{(S^2_A/n_A)^2}{n_A-1} + \dfrac{(S^2_B/n_B)^2}{n_B-1}}
+$$
+
+```{python}
+#| label: v5
+
+def my_two_sample_t_test(a, b, alternative="two-sided",
+                         equal_var=False, alpha=0.05, conf_int=False):
+    """
+    Двовибірковий t-тест на різницю середніх.
+    Конвенція: T = (Ā − B̄)/SE; alternative щодо a − b.
+    equal_var=False → Welch (дефолт); True → pooled (рівні дисперсії).
+    """
+    a = np.asarray(a, dtype=float)
+    b = np.asarray(b, dtype=float)
+    na, nb = len(a), len(b)
+    ma, mb = a.mean(), b.mean()
+    va, vb = a.var(ddof=1), b.var(ddof=1)
+    diff   = ma - mb
+
+    if equal_var:
+        sp2 = ((na - 1) * va + (nb - 1) * vb) / (na + nb - 2)
+        se  = np.sqrt(sp2 * (1 / na + 1 / nb))
+        df  = na + nb - 2
+    else:
+        se  = np.sqrt(va / na + vb / nb)
+        df  = (va / na + vb / nb) ** 2 / (
+              (va / na) ** 2 / (na - 1) + (vb / nb) ** 2 / (nb - 1))
+
+    t_stat = diff / se
+
+    if alternative == "greater":
+        p_value = stats.t.sf(t_stat, df=df)
+    elif alternative == "less":
+        p_value = stats.t.cdf(t_stat, df=df)
+    elif alternative == "two-sided":
+        p_value = 2 * stats.t.sf(abs(t_stat), df=df)
+    else:
+        raise ValueError(f"Невідома альтернатива: {alternative!r}")
+
+    if not conf_int:
+        return p_value
+
+    if alternative == "two-sided":
+        crit    = stats.t.ppf(1 - alpha / 2, df=df)
+        ci_low, ci_high = diff - crit * se, diff + crit * se
+    elif alternative == "greater":
+        crit    = stats.t.ppf(1 - alpha, df=df)
+        ci_low, ci_high = diff - crit * se, np.inf
+    else:  # less
+        crit    = stats.t.ppf(1 - alpha, df=df)
+        ci_low, ci_high = -np.inf, diff + crit * se
+
+    return {"diff": diff, "t_stat": t_stat, "df": df,
+            "p_value": p_value, "ci_low": ci_low, "ci_high": ci_high}
+```
+
+## Демо: чесний A/B GreenBowl
+
+Control --- старе меню, Test --- нове. Свідомо беремо ефект **на межі
+бізнес-MDE**, щоб отримати реальну дилему ship/no-ship.
+
+```{python}
+#| label: v5-demo
+
+np.random.seed(2026)
+control = arpu_sample(250, 2500)   # старе меню
+test    = arpu_sample(264, 2500)   # нове меню
+
+# Конвенція: a = test, b = control → "greater" означає test > control
+res = my_two_sample_t_test(test, control, alternative="greater",
+                           equal_var=False, conf_int=True)
+
+print(f"ARPU control = {control.mean():.1f} ₴")
+print(f"ARPU test    = {test.mean():.1f} ₴")
+print(f"lift = {res['diff']:+.1f} ₴   (Welch df = {res['df']:.0f})")
+print(f"t = {res['t_stat']:.3f},  p-value = {res['p_value']:.5f}")
+print(f"95% одностороння нижня межа для lift: ≥ {res['ci_low']:+.2f} ₴")
+```
+
+::: {.callout-warning icon="false"}
+## Прочитайте результат уважно
+- **Тест:** $p < 0{,}05$ → відхиляємо $H_0$. Lift статистично значущий.
+- **Lift** ≈ +12 ₴, а нижня межа ≈ +3 ₴ --- **обидва нижче бізнес-MDE
+  +15 ₴**.
+- **PM-дилема:** статистично ефект є, але бізнес-значущість під сумнівом.
+  Істинний lift може виявитися +4 ₴, що не вартий перебудови меню.
+  Рішення: зібрати більше даних або погодитись на ризик «дрібної»
+  перемоги.
+:::
+
+## Cross-check з `scipy`
+
+```{python}
+#| label: v5-scipy
+
+ref = stats.ttest_ind(test, control, alternative="greater", equal_var=False)
+print(f"scipy:   t = {ref.statistic:.4f},  p = {ref.pvalue:.5f}")
+print(f"мій код: t = {res['t_stat']:.4f},  p = {res['p_value']:.5f}")
+```
+
+Числа збігаються --- реалізація коректна.
+
+## Welch проти pooled
+
+```{python}
+#| label: v5-welch-vs-pooled
+
+# Штучно: маленька група з великою дисперсією + велика з малою
+np.random.seed(11)
+small_hi_var = arpu_sample(260, 60,  sigma=0.9)   # n=60,  розкид великий
+big_lo_var   = arpu_sample(250, 3000, sigma=0.3)  # n=3000, розкид малий
+
+p_welch  = my_two_sample_t_test(small_hi_var, big_lo_var, "two-sided", equal_var=False)
+p_pooled = my_two_sample_t_test(small_hi_var, big_lo_var, "two-sided", equal_var=True)
+df_welch = my_two_sample_t_test(small_hi_var, big_lo_var, "two-sided",
+                                equal_var=False, conf_int=True)["df"]
+print(f"Welch:   p = {p_welch:.4f}  (df ≈ {df_welch:.0f})")
+print(f"pooled:  p = {p_pooled:.4f}  (df = {len(small_hi_var)+len(big_lo_var)-2})")
+```
+
+::: {.callout-note icon="false"}
+## Чому дефолт --- Welch
+Коли дисперсії та розміри груп різні, pooled-формула **занижує** $SE$ і
+дає завищену впевненість (менший $p$). Welch автоматично «штрафує»
+ступені свободи (тут $df$ падає з ~3058 до кількох десятків) і захищає
+від хибно-позитивного. Pooled виправданий лише коли є **вагомі підстави**
+вважати дисперсії рівними.
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 5
+1. На демо-A/B порівняйте Welch і pooled. Тут розміри груп рівні
+   ($n_A = n_B = 2500$) --- наскільки близькі $p$-value? Чому при рівних
+   $n$ різниця мала навіть за нерівних дисперсій?
+2. Зменшіть тестову групу до $n=200$ при тому самому lift. Як змінюються
+   $p$-value і Welch-$df$?
+3. **Дослідницьке.** Побудуйте Welch-$df$ як функцію відношення дисперсій
+   $S^2_A/S^2_B \in [0{,}1,\ 10]$ при фіксованих $n_A=n_B=500$. Коли
+   $df$ мінімальний?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 5
+
+```{python}
+#| label: sol5
+
+# (1) рівні n: Welch ≈ pooled
+pw = my_two_sample_t_test(test, control, "greater", equal_var=False)
+pp = my_two_sample_t_test(test, control, "greater", equal_var=True)
+print(f"Рівні n=2500:  Welch p={pw:.5f},  pooled p={pp:.5f}  →  майже однакові")
+
+# (2) маленька тестова група
+np.random.seed(99)
+test_small = arpu_sample(264, 200)
+r = my_two_sample_t_test(test_small, control, "greater", equal_var=False, conf_int=True)
+print(f"n_test=200:  lift={r['diff']:+.1f}, p={r['p_value']:.4f}, Welch df={r['df']:.0f}")
+
+# (3) Welch df vs відношення дисперсій
+print("\nS²_A/S²_B  →  Welch df (n_A=n_B=500):")
+for ratio in (0.1, 0.5, 1, 2, 10):
+    va, vb, n = ratio, 1.0, 500
+    df = (va/n + vb/n)**2 / ((va/n)**2/(n-1) + (vb/n)**2/(n-1))
+    print(f"  {ratio:>4}     →  df ≈ {df:.0f}")
+```
+
+**Інтерпретація.**
+
+1. При **рівних** $n$ Welch і pooled майже збігаються: розбіжність
+   формул проявляється переважно за **нерівних розмірів** груп. Тому в
+   класичному 50/50 A/B різниця мінімальна.
+2. Менша тестова група → ширший $SE$, більший $p$, менший Welch-$df$
+   (точність визначає менша група --- як і unbalanced-ефект у Практиці 3).
+3. Welch-$df$ **максимальний** при рівних дисперсіях ($\approx n_A+n_B-2$)
+   і падає, коли одна дисперсія домінує. Це і є «штраф» за гетероскедастичність.
+:::
+
+---
+
+# Версія 6 --- потужність і планування вибірки
+
+Для планування використовуємо нормальне наближення (як на лекції ---
+велика вибірка). Для двовибіркового тесту з рівними $n$ і близькими
+дисперсіями $SE_{\text{diff}} \approx S\sqrt{2/n}$.
+
+::: {.callout-note icon="false"}
+## Формули
+$$
+\text{MDE} = (z_{1-\alpha} + z_{1-\beta})\, S\sqrt{\tfrac{2}{n}},\qquad
+n = \dfrac{(z_{1-\alpha} + z_{1-\beta})^2 \cdot 2S^2}{\text{MDE}^2}
+$$
+:::
+
+```{python}
+#| label: v6
+
+def my_two_sample_t_power(mean_diff, sd, n, alpha=0.05, alternative="greater"):
+    """Потужність двовибіркового t-тесту (нормальне наближення, рівні n)."""
+    se = sd * np.sqrt(2 / n)
+    if alternative in ("greater", "less"):
+        z_a = stats.norm.ppf(1 - alpha)
+        return stats.norm.cdf(abs(mean_diff) / se - z_a)
+    if alternative == "two-sided":
+        z_a = stats.norm.ppf(1 - alpha / 2)
+        return (stats.norm.cdf(mean_diff / se - z_a) +
+                stats.norm.cdf(-mean_diff / se - z_a))
+    raise ValueError(f"Невідома альтернатива: {alternative!r}")
+
+
+def plan_t_experiment(sd, mde, alpha=0.05, target_power=0.8,
+                      alternative="greater", n_lo=5, n_hi=1_000_000):
+    """Скільки користувачів на групу треба для детекції ефекту mde. Bisection."""
+    if my_two_sample_t_power(mde, sd, n_hi, alpha, alternative) < target_power:
+        return None
+    while n_hi - n_lo > 1:
+        n_mid = (n_lo + n_hi) // 2
+        if my_two_sample_t_power(mde, sd, n_mid, alpha, alternative) >= target_power:
+            n_hi = n_mid
+        else:
+            n_lo = n_mid
+    return n_hi
+```
+
+```{python}
+#| label: v6-demo
+
+# Оцінку S беремо з зібраних даних A/B
+sd_hat = np.concatenate([control, test]).std(ddof=1)
+print(f"S ≈ {sd_hat:.1f} ₴\n")
+
+# Сценарій A: маркетинг гарантує N на групу. Що задетектимо?
+for n in (500, 1000, 2500, 5000):
+    pw  = my_two_sample_t_power(15, sd_hat, n, alternative="greater")
+    print(f"n = {n:>5d}  →  power(MDE=+15 ₴) = {pw:.3f}")
+
+# Сценарій B: скільки треба, щоб задетектити +15 ₴ з power=0.8
+N = plan_t_experiment(sd_hat, mde=15, target_power=0.8, alternative="greater")
+print(f"\nДля детекції +15 ₴ з power=0.8 потрібно: {N} користувачів на групу")
+```
+
+::: {.callout-important icon="false"}
+## Ключовий trade-off
+Із формули видно: $\text{MDE} \propto 1/\sqrt{n}$, тож $n \propto
+1/\text{MDE}^2$. Захотіти вдвічі менший ефект --- це **вчетверо** більше
+користувачів і час очікування.
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 6
+1. Побудуйте графік power vs $n$ (від 200 до 5000 на групу) для
+   MDE = +15 ₴. Знайдіть мінімальне $n$, де power $\geq 0{,}8$, і звірте
+   з `plan_t_experiment`.
+2. Звірте `plan_t_experiment` із закритою формулою для $n$. Чи bisection
+   взагалі потрібен?
+3. **Дослідницьке.** Як зміниться $N$, якщо MDE зменшити удвічі (15 → 7,5
+   ₴)? У 2, 4 чи 8 разів?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 6
+
+```{python}
+#| label: sol6
+#| fig-align: center
+
+ns = np.arange(200, 5001, 100)
+powers = [my_two_sample_t_power(15, sd_hat, n, alternative="greater") for n in ns]
+
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.plot(ns, powers, color=turquoise, lw=2)
+ax.axhline(0.80, color=red, linestyle="--", lw=1, label="target power = 0.8")
+ax.set_xlabel("n на групу")
+ax.set_ylabel("Power")
+ax.set_title("Power vs sample size (MDE = +15 ₴)")
+ax.legend()
+plt.tight_layout()
+plt.show()
+
+n_bisect = plan_t_experiment(sd_hat, mde=15, target_power=0.8, alternative="greater")
+z = stats.norm.ppf(0.95) + stats.norm.ppf(0.80)
+n_formula = z**2 * 2 * sd_hat**2 / 15**2
+print(f"Bisection: n = {n_bisect}")
+print(f"Формула:   n ≈ {n_formula:.0f}")
+
+n_half = plan_t_experiment(sd_hat, mde=7.5, target_power=0.8, alternative="greater")
+print(f"\nMDE=+15 ₴: n={n_bisect};  MDE=+7.5 ₴: n={n_half}  →  x{n_half/n_bisect:.1f}")
+```
+
+**Інтерпретація.** Bisection і формула збігаються --- bisection потрібен
+лише як зручний інструмент (автоматично враховує `alternative`).
+Зменшення MDE удвічі збільшує $n$ **учетверо** ($\text{MDE}^2$ у
+знаменнику).
+:::
+
+---
+
+# Фінал --- повний `my_ab_report`
+
+Збираємо все **через перевикористання** V5 і V6.
+
+```{python}
+#| label: vf
+
+def my_ab_report(test, control, alternative="greater",
+                 alpha=0.05, target_power=0.8, business_mde=None):
+    """Повний звіт A/B. Reuses my_two_sample_t_test + my_two_sample_t_power."""
+    r = my_two_sample_t_test(test, control, alternative=alternative,
+                             equal_var=False, alpha=alpha, conf_int=True)
+    sd_pooled = np.concatenate([test, control]).std(ddof=1)
+    n_avg     = (len(test) + len(control)) // 2
+    power_obs = my_two_sample_t_power(r["diff"], sd_pooled, n_avg, alpha, alternative)
+
+    decision = "REJECT H0" if r["p_value"] <= alpha else "не відхиляємо H0"
+    lines = [
+        f"ARPU: test={test.mean():.1f} ₴  vs  control={control.mean():.1f} ₴",
+        f"lift = {r['diff']:+.1f} ₴   (Welch df = {r['df']:.0f})",
+        f"t = {r['t_stat']:+.3f},  p = {r['p_value']:.4f}  →  {decision}",
+        f"95% нижня межа для lift: ≥ {r['ci_low']:+.2f} ₴",
+        f"power при спостереженому ефекті = {power_obs:.3f}",
+    ]
+    if business_mde is not None:
+        ship = r["ci_low"] >= business_mde
+        lines.append(f"бізнес-MDE = +{business_mde} ₴  →  "
+                     f"{'SHIP ✅' if ship else 'поки НЕ ship ⛔'}")
+
+    return {"lift": r["diff"], "p_value": r["p_value"],
+            "ci_low": r["ci_low"], "ci_high": r["ci_high"],
+            "power": power_obs, "summary": "\n".join(lines)}
+
+print(my_ab_report(test, control, "greater", business_mde=15)["summary"])
+```
+
+---
+
+# Sanity check: A/A-симуляція
+
+Перш ніж довіряти A/B-висновкам, перевірте інфраструктуру на **A/A** ---
+дві групи з **однаковим** розподілом. Частка хибно-позитивних має бути
+$\approx \alpha$.
+
+```{python}
+#| label: aa-sim
+
+def simulate_AA(true_mean, n_per_group, M=5000, alpha=0.05, alternative="two-sided"):
+    np.random.seed(42)
+    rej = 0
+    for _ in range(M):
+        a = arpu_sample(true_mean, n_per_group)
+        b = arpu_sample(true_mean, n_per_group)
+        if my_two_sample_t_test(a, b, alternative=alternative) <= alpha:
+            rej += 1
+    return rej / M
+
+print(f"A/A FPR, n=2500:  {simulate_AA(250, 2500):.3f}  (target ≈ 0.05)")
+print(f"A/A FPR, n=30:    {simulate_AA(250, 30):.3f}  (target ≈ 0.05)")
+```
+
+::: {.callout-note icon="false"}
+## Чому двовибірковий A/A стійкіший за одновибірковий
+У Версії 3 одновибірковий тест на скошених даних «їхав» навіть при
+помірних $n$. У двовибірковому **різниця двох середніх** значно
+симетричніша (скошеність частково скорочується), тому FPR тримається
+біля $0{,}05$ вже на малих $n$. Це ще одна причина любити чесний A/B.
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 7
+1. Побудуйте гістограму $p$-value для 5000 A/A при $n=2500$. Чи вона
+   приблизно рівномірна на $[0,1]$?
+2. Порахуйте 95% Wilson-CI навколо емпіричного FPR
+   (`statsmodels...proportion_confint(method="wilson")`). Чи входить
+   $\alpha=0{,}05$ всередину?
+3. **Дослідницьке.** Зробіть A/A, де групи **різного розміру** (90/10).
+   Чи лишається FPR коректним? А якщо ще й дисперсії різні?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 7
+
+```{python}
+#| label: sol7
+#| fig-align: center
+
+np.random.seed(2026)
+pvals = []
+for _ in range(5000):
+    a = arpu_sample(250, 2500); b = arpu_sample(250, 2500)
+    pvals.append(my_two_sample_t_test(a, b, alternative="two-sided"))
+pvals = np.array(pvals)
+
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.hist(pvals, bins=20, color=turquoise, alpha=0.7, edgecolor="white")
+ax.axhline(5000 / 20, color=red, linestyle="--", label="рівномірний рівень")
+ax.set_xlabel("p-value"); ax.set_ylabel("Частота")
+ax.set_title("Розподіл p-value під H0 (двовибіркова A/A)")
+ax.legend(); plt.tight_layout(); plt.show()
+
+from statsmodels.stats.proportion import proportion_confint
+fpr = np.mean(pvals <= 0.05)
+lo, hi = proportion_confint(int(fpr * 5000), 5000, method="wilson")
+print(f"Емпіричний FPR = {fpr:.3f},  95% Wilson CI = [{lo:.3f}, {hi:.3f}]")
+print(f"α=0.05 {'входить' if lo <= 0.05 <= hi else 'НЕ входить'} в інтервал → тест відкалібрований")
+```
+
+**Інтерпретація.** Гістограма приблизно рівномірна (на відміну від
+біномної у Практиці 3, тут немає «сходинок» --- статистика неперервна).
+FPR ≈ 0.05, $\alpha$ всередині Wilson-CI → інфраструктура коректна.
+Запускати A/B можна.
+:::
+
+---
+
+# Повний цикл A/B-експерименту
+
+«Як це відбувається на роботі»: план → запуск → аналіз → звіт.
+
+## Крок 1. Планування
+
+```{python}
+#| label: run-plan
+
+mu0          = 250
+business_mde = 15
+alpha        = 0.05
+target_power = 0.80
+sd_prior     = 165          # оцінка S із пілота / історії
+
+N = plan_t_experiment(sd_prior, mde=business_mde,
+                      target_power=target_power, alternative="greater")
+print(f"План: N = {N} користувачів НА ГРУПУ (MDE=+{business_mde} ₴, power={target_power})")
+```
+
+## Крок 2. Симульований запуск
+
+Симулюємо реальність, де нове меню **справді** піднімає ARPU до 267 ₴.
+
+```{python}
+#| label: run-sim
+
+np.random.seed(2026)
+control_run = arpu_sample(250, N)
+test_run    = arpu_sample(267, N)
+print(f"Control: ARPU = {control_run.mean():.1f} ₴ (n={N})")
+print(f"Test:    ARPU = {test_run.mean():.1f} ₴ (n={N})")
+```
+
+## Крок 3. Аналіз і звіт
+
+```{python}
+#| label: run-report
+
+report = my_ab_report(test_run, control_run, "greater",
+                      alpha=alpha, target_power=target_power, business_mde=business_mde)
+print(report["summary"])
+```
+
+::: {.border}
+**Підсумок A/B-тесту нового меню GreenBowl**
+
+- Спостережений ARPU: control = **`{python} f"{control_run.mean():.0f}"`₴**,
+  test = **`{python} f"{test_run.mean():.0f}"`₴**.
+- Lift: **`{python} f"{report['lift']:+.1f}"` ₴**;
+  95% одностороння нижня межа: **≥ `{python} f"{report['ci_low']:+.1f}"` ₴**.
+- Рішення: **`{python} 'SHIP — lift надійно вище бізнес-MDE' if report['ci_low'] >= business_mde else 'поки НЕ ship — нижня межа нижче MDE'`**
+  ($p$ = `{python} f"{report['p_value']:.4f}"`).
+:::
+
+---
+
+# Пастки інтерпретації
+
+::: {.callout-warning icon="false"}
+## $t$ проти $t'$
+На малій вибірці беріть **$t$-тест** (квантилі $t_{n-1}$): $t'$-тест
+($\mathcal N(0,1)$) роздуває FPR. На $n \gtrsim 60$ різниця зникає.
+:::
+
+::: {.callout-warning icon="false"}
+## Велике $n$ рятує, а не нормальність
+$t$-тест на **скошених** даних коректний завдяки ЦГТ + Слуцького ---
+**лише за великого $n$**. На малій вибірці з ненормальних даних помиляється
+будь-який варіант; там --- бутстреп або непараметрика.
+:::
+
+::: {.callout-warning icon="false"}
+## Pooled vs Welch
+Дефолт --- **Welch** (`equal_var=False`). Pooled занижує $SE$ за нерівних
+дисперсій/розмірів і дає хибно-позитивні. Pooled лише коли дисперсії
+справді рівні.
+:::
+
+::: {.callout-important icon="false"}
+## Статистична значущість ≠ бізнес-значущість
+$p < 0{,}05$ при lift +12 ₴ і MDE +15 ₴ --- ефект **є**, але **не вартий**
+впровадження. Завжди порівнюйте **CI з бізнес-MDE**, а не лише $p$ з
+$\alpha$.
+:::
+
+::: {.callout-important icon="false"}
+## Чого CI не означає
+❌ «З імовірністю 95% істинне $\mu$ в цьому інтервалі».
+✅ «Якщо повторити експеримент багато разів, 95% інтервалів накриють
+$\mu$». Інтервал випадковий; параметр --- ні.
+:::
+
+---
+
+# Чек-лист перед запуском {.unnumbered}
+
+- [ ] Яке **бізнес-рішення** буде прийнято за результатом?
+- [ ] Метрика неперервна → $t$-тест; відома $\sigma^2$? (майже ніколи)
+- [ ] Однобічний чи двобічний --- і **чому**?
+- [ ] Який **бізнес-MDE** у гривнях?
+- [ ] Розрахований $N$ під цей MDE з power $\geq 0{,}8$?
+- [ ] Welch чи pooled --- і чи є підстави для pooled?
+- [ ] Вибірка достатньо велика для ЦГТ, якщо дані скошені?
+- [ ] **Пройдено A/A** (FPR $\approx \alpha$)?
+- [ ] Звіт: $p$-value **і** CI vs бізнес-MDE, а не лише $p$?
+
+Якщо хоч на одне «ні» --- **зарано** запускати.
