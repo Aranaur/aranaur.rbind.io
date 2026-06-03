@@ -77,10 +77,32 @@ deals) and wants to know whether the **average revenue per user per week
   positive, **heavily skewed** (most users place small orders, a few
   "whales" form a long right tail).
 - **Baseline:** $\mu_0 = 250$ UAH (3 months of historical data).
-- **Business MDE:** an effect < +15 UAH is not worth rebuilding the menu
-  and logistics.
+- **Break-even point:** **+5 UAH**. Below this, the extra revenue does
+  not cover the cost of rebuilding the menu and logistics --- the feature
+  runs "in the red". This is the **decision threshold** for ship/no-ship.
+- **Design MDE:** **+15 UAH**. The smallest effect we consider a "clear
+  win" and plan the sample size around (we want a $\geq 80\%$ chance of
+  catching it). This is the **planning threshold**, not the decision one.
 - **Direction:** we only care about an effect "up" → **one-sided test**.
 - **Significance level:** $\alpha = 0.05$.
+:::
+
+::: {.callout-important icon="false"}
+## Why these are TWO different numbers (not one)
+The temptation is to take a single number "15" and use it both to plan
+the sample **and** to make the decision. That is a trap: **planning** and
+**decision** answer different questions and cost differently.
+
+- **break-even (+5)** says *when the feature pays off* --- this is
+  economics (rebuild cost ÷ user base). The ship decision is made
+  relative to it.
+- **design MDE (+15)** says *which effect we want to confidently catch*
+  --- we size $N$ for it. Catching a smaller effect is more expensive
+  ($n \propto 1/\text{effect}^2$), so we spend resources on a "clear win".
+
+If you mix the roles --- e.g. require the **CI lower bound to cross +15**
+--- you will reject features that are in fact profitable (effect between
++5 and +15). We will come back to this mistake in the Final.
 :::
 
 ::: {.callout-note icon="false"}
@@ -476,8 +498,8 @@ res_one = my_t_test(pilot, 250, "greater",   alpha=0.05, conf_int=True)
 
 print(f"Two-sided 95% CI:        [{res_two['ci_low']:.1f}, {res_two['ci_high']:.1f}] UAH")
 print(f"95% one-sided lower:     μ ≥ {res_one['ci_low']:.1f} UAH")
-print(f"Business threshold μ₀ + MDE = 265 UAH:  "
-      f"{'reached' if res_one['ci_low'] >= 265 else 'NOT reached'}")
+print(f"Break-even threshold μ₀ + breakeven = 255 UAH:  "
+      f"{'lower bound above' if res_one['ci_low'] >= 255 else 'lower bound below'}")
 ```
 
 ::: {.callout-important icon="false"}
@@ -486,8 +508,11 @@ print(f"Business threshold μ₀ + MDE = 265 UAH:  "
 - The **two-sided CI** describes uncertainty in both directions --- for
   reporting.
 - The **one-sided lower bound** says: "ARPU is **at least** this much
-  with 95% confidence". Whether it crossed the business threshold
-  $\mu_0 + \text{MDE} = 265$ UAH is the answer to "is it worth it".
+  with 95% confidence". If it is above the break-even threshold
+  $\mu_0 + \text{breakeven} = 255$ UAH, that is a **signal in favour** of
+  shipping, but on its own only a **necessary, not sufficient** condition.
+  The full ship/no-ship decision (three-zone rule + expected value) we
+  assemble in the Final.
 :::
 
 ::: {.callout-tip icon="false"}
@@ -606,7 +631,7 @@ def my_two_sample_t_test(a, b, alternative="two-sided",
         crit    = stats.t.ppf(1 - alpha, df=df)
         ci_low, ci_high = -np.inf, diff + crit * se
 
-    return {"diff": diff, "t_stat": t_stat, "df": df,
+    return {"diff": diff, "se": se, "t_stat": t_stat, "df": df,
             "p_value": p_value, "ci_low": ci_low, "ci_high": ci_high}
 ```
 
@@ -638,12 +663,16 @@ print(f"95% one-sided lower bound for the lift: ≥ {res['ci_low']:+.2f} UAH")
 ## Read the result carefully
 - **Test:** $p < 0.05$ → we reject $H_0$. The lift is statistically
   significant.
-- **Lift** ≈ +12 UAH, and the lower bound ≈ +3 UAH --- **both below the
-  business MDE +15 UAH**.
-- **PM dilemma:** statistically there is an effect, but its business
-  significance is in doubt. The true lift might turn out to be +4 UAH,
-  which is not worth rebuilding the menu. Decision: collect more data or
-  accept the risk of a "tiny" win.
+- **Lift** ≈ +12 UAH --- **above** the break-even point +5 UAH; but the
+  one-sided lower bound ≈ +3 UAH --- **below** break-even.
+- **PM dilemma (grey zone):** the point estimate is profitable, yet we
+  are not sure --- the true lift might be just +3 UAH, below break-even.
+  We compare against **break-even +5**, not against design-MDE +15: so
+  this is not "the effect is too small", but an honest "probably
+  profitable, but the CI still covers break-even". Decision: collect more
+  data (`my_ab_report` will say how much) or knowingly take the risk. The
+  quantitative answer "how likely it is profitable" we give in the Final
+  via $P(\text{effect} \geq \text{break-even})$.
 :::
 
 ## Cross-check with `scipy`
@@ -856,39 +885,108 @@ MDE increases $n$ **fourfold** ($\text{MDE}^2$ in the denominator).
 
 # Final --- the complete `my_ab_report`
 
-We assemble everything **by reuse** of V5 and V6.
+We assemble everything **by reuse** of V5. The key part here is the
+**decision layer**, and it deserves separate attention.
+
+::: {.callout-important icon="false"}
+## How to turn statistics into a decision (and how NOT to)
+**Antipattern:** "ship if the CI lower bound $\geq$ design-MDE (+15)".
+This requires *proving* that the effect is $\geq 15$, although the
+experiment is designed only to prove the effect is $> 0$ under an assumed
+size of 15. The consequence is systematic **false negatives**: features
+that are actually profitable get rejected.
+
+**The right way** --- decide relative to **break-even (+5)**, in two
+complementary forms:
+
+1. **Three-zone rule based on the CI:**
+   - `ship` if the **lower** bound $>$ break-even (confidently profitable);
+   - `kill` if the **upper** bound $<$ break-even (confidently unprofitable);
+   - otherwise **inconclusive** --- and we immediately estimate *how much
+     more data* is needed for the bound to cross break-even.
+2. **Expected-value decision:** treat the effect as a distribution
+   $\text{effect} \mid \text{data} \sim \mathcal N(\hat\Delta, SE)$ and
+   compute $P(\text{effect} \geq \text{break-even})$ and the expected net
+   value $\hat\Delta - \text{break-even}$. This gives a **probability of
+   profitability**, not just a "yes/no".
+
+Note: the design-MDE is **not used at all** in the report --- it did its
+job at the sample-size planning stage.
+:::
 
 ```{python}
 #| label: vf
 
 def my_ab_report(test, control, alternative="greater",
-                 alpha=0.05, target_power=0.8, business_mde=None):
-    """Full A/B report. Reuses my_two_sample_t_test + my_two_sample_t_power."""
+                 alpha=0.05, breakeven=None):
+    """Full A/B report. Reuses my_two_sample_t_test.
+
+    The ship/no-ship decision is made relative to the BREAK-EVEN point,
+    not the design-MDE: the design-MDE was only needed to plan N.
+    """
     r = my_two_sample_t_test(test, control, alternative=alternative,
                              equal_var=False, alpha=alpha, conf_int=True)
-    sd_pooled = np.concatenate([test, control]).std(ddof=1)
-    n_avg     = (len(test) + len(control)) // 2
-    power_obs = my_two_sample_t_power(r["diff"], sd_pooled, n_avg, alpha, alternative)
+    est, se, df = r["diff"], r["se"], r["df"]
 
-    decision = "REJECT H0" if r["p_value"] <= alpha else "do not reject H0"
+    decision_h0 = "REJECT H0" if r["p_value"] <= alpha else "do not reject H0"
     lines = [
         f"ARPU: test={test.mean():.1f} UAH  vs  control={control.mean():.1f} UAH",
-        f"lift = {r['diff']:+.1f} UAH   (Welch df = {r['df']:.0f})",
-        f"t = {r['t_stat']:+.3f},  p = {r['p_value']:.4f}  →  {decision}",
-        f"95% lower bound for the lift: ≥ {r['ci_low']:+.2f} UAH",
-        f"power at the observed effect = {power_obs:.3f}",
+        f"lift = {est:+.1f} UAH   (Welch df = {df:.0f},  SE = {se:.2f})",
+        f"t = {r['t_stat']:+.3f},  p = {r['p_value']:.4f}  →  H0: {decision_h0}",
     ]
-    if business_mde is not None:
-        ship = r["ci_low"] >= business_mde
-        lines.append(f"business MDE = +{business_mde} UAH  →  "
-                     f"{'SHIP ✅' if ship else 'not yet ⛔'}")
+    out = {"lift": est, "se": se, "p_value": r["p_value"],
+           "ci_low": r["ci_low"], "ci_high": r["ci_high"]}
 
-    return {"lift": r["diff"], "p_value": r["p_value"],
-            "ci_low": r["ci_low"], "ci_high": r["ci_high"],
-            "power": power_obs, "summary": "\n".join(lines)}
+    if breakeven is not None:
+        # --- DECISION LAYER: everything relative to the break-even point ---
+        z      = stats.t.ppf(1 - alpha, df=df)
+        lo, hi = est - z * se, est + z * se          # one-sided 95% bounds
 
-print(my_ab_report(test, control, "greater", business_mde=15)["summary"])
+        # (1) Three-zone rule based on the confidence interval
+        if lo > breakeven:
+            zone = "SHIP ✅ — even the pessimistic bound is profitable"
+        elif hi < breakeven:
+            zone = "KILL ⛔ — even the optimistic bound is below break-even"
+        else:
+            zone = "INCONCLUSIVE ❓ — break-even is inside the CI"
+
+        # (2) Expected-value decision: effect | data ~ N(est, se)
+        p_profit = stats.norm.sf((breakeven - est) / se)  # P(effect ≥ breakeven)
+        exp_net  = est - breakeven                         # expected net value
+
+        lines += [
+            f"break-even = +{breakeven} UAH",
+            f"95% lower bound for the lift: ≥ {lo:+.2f} UAH",
+            f"P(effect ≥ break-even) = {p_profit:.1%}",
+            f"expected net value = {exp_net:+.1f} UAH/user",
+            f"DECISION: {zone}",
+        ]
+        out.update(zone=zone, p_profit=p_profit, exp_net=exp_net)
+
+        # (3) If inconclusive — how much more data for the bound to cross break-even
+        if lo <= breakeven <= hi and est > breakeven:
+            n_now     = (len(test) + len(control)) // 2
+            se_target = (est - breakeven) / z
+            n_needed  = int(np.ceil(n_now * (se / se_target) ** 2))
+            lines.append(f"   to push the lower bound past break-even at the "
+                         f"current estimate: ≈ {n_needed} per group")
+            out["n_needed"] = n_needed
+
+    out["summary"] = "\n".join(lines)
+    return out
+
+print(my_ab_report(test, control, "greater", breakeven=5)["summary"])
 ```
+
+::: {.callout-warning icon="false"}
+## Why there is no "power at the observed effect" in the report
+The tempting metric `power(observed lift)` --- **post-hoc power** --- is a
+deterministic function of the $p$-value (for one-sided:
+$\Phi(z_p - z_\alpha)$), so it carries **not a single bit** of new
+information beyond $p$ itself. Meaningful power is only **a priori** ---
+at the planning stage (Step 1). That is why `my_ab_report` deliberately
+omits it.
+:::
 
 ---
 
@@ -980,26 +1078,39 @@ correct. The A/B can be launched.
 #| label: run-plan
 
 mu0          = 250
-business_mde = 15
+breakeven    = 5            # break-even point → DECISION threshold
+mde_design   = 15           # smallest "interesting" effect → PLANNING threshold
 alpha        = 0.05
 target_power = 0.80
-sd_prior     = 165          # estimate of S from the pilot / history
+sd_prior     = 180          # pilot gave S≈167; we round UP for safety
 
-N = plan_t_experiment(sd_prior, mde=business_mde,
+N = plan_t_experiment(sd_prior, mde=mde_design,
                       target_power=target_power, alternative="greater")
-print(f"Plan: N = {N} users PER GROUP (MDE=+{business_mde} UAH, power={target_power})")
+print(f"Plan: N = {N} users PER GROUP (design-MDE=+{mde_design} UAH, power={target_power})")
 ```
+
+::: {.callout-note icon="false"}
+## Why we round `sd_prior` up
+$N$ depends on a **guess about the variance**. If $S$ turns out larger
+than assumed, you are underpowered (real power $< 0.8$). So the variance
+prior is taken **conservatively**: better to overpay a little on sample
+size than to fall short on power. The pilot gave $S \approx 167$ --- we
+take 180 with a margin.
+:::
 
 ## Step 2. Simulated launch
 
-We simulate a reality where the new menu **really** lifts ARPU to 267 UAH.
+We simulate a reality where the new menu **really** lifts ARPU to 270 UAH
+--- i.e. a true effect of **+20 UAH**, above both break-even (+5) and the
+design-MDE (+15). From the "oracle" standpoint the correct decision is
+unambiguously **ship**.
 
 ```{python}
 #| label: run-sim
 
 np.random.seed(2026)
 control_run = arpu_sample(250, N)
-test_run    = arpu_sample(267, N)
+test_run    = arpu_sample(270, N)
 print(f"Control: ARPU = {control_run.mean():.1f} UAH (n={N})")
 print(f"Test:    ARPU = {test_run.mean():.1f} UAH (n={N})")
 ```
@@ -1010,9 +1121,28 @@ print(f"Test:    ARPU = {test_run.mean():.1f} UAH (n={N})")
 #| label: run-report
 
 report = my_ab_report(test_run, control_run, "greater",
-                      alpha=alpha, target_power=target_power, business_mde=business_mde)
+                      alpha=alpha, breakeven=breakeven)
 print(report["summary"])
 ```
+
+::: {.callout-important icon="false"}
+## Compare with what the **naive** gate would say
+Let's try the naive gate (ship only if the lower bound $\geq$ design-MDE
++15) against the correct rule (decision relative to break-even +5):
+
+```{python}
+#| label: run-report-gates
+naive_ship = report["ci_low"] >= mde_design
+print(f"Naive gate (lower bound ≥ design-MDE +15):  {'SHIP' if naive_ship else 'NOT ship ⛔'}")
+print(f"Correct rule (decision vs break-even +5):   {report['zone']}")
+```
+
+The true effect here is **+20 UAH** --- the feature is objectively
+valuable, the oracle says ship. **The naive gate kills it** (the lower
+bound does not reach 15), because it demands proving the effect $\geq 15$
+on a sample planned only for "$> 0$". The correct rule ships it properly:
+the lower bound is above break-even, $P(\text{profitable}) \approx 96\%$.
+:::
 
 ::: {.border}
 **Summary of the GreenBowl new-menu A/B test**
@@ -1021,8 +1151,9 @@ print(report["summary"])
   test = **`{python} f"{test_run.mean():.0f}"`UAH**.
 - Lift: **`{python} f"{report['lift']:+.1f}"` UAH**;
   95% one-sided lower bound: **≥ `{python} f"{report['ci_low']:+.1f}"` UAH**.
-- Decision: **`{python} 'SHIP — lift reliably above the business MDE' if report['ci_low'] >= business_mde else 'not yet — lower bound below the MDE'`**
-  ($p$ = `{python} f"{report['p_value']:.4f}"`).
+- $P(\text{effect} \geq \text{break-even}) =$ **`{python} f"{report['p_profit']:.0%}"`**;
+  expected net value **`{python} f"{report['exp_net']:+.1f}"` UAH/user**.
+- Decision: **`{python} report['zone']`** ($p$ = `{python} f"{report['p_value']:.4f}"`).
 :::
 
 ---
@@ -1052,9 +1183,24 @@ only when the variances are genuinely equal.
 
 ::: {.callout-important icon="false"}
 ## Statistical significance ≠ business significance
-$p < 0.05$ with a lift of +12 UAH and an MDE of +15 UAH --- the effect
-**exists** but is **not worth** shipping. Always compare the **CI with
-the business MDE**, not just $p$ with $\alpha$.
+$p < 0.05$ with a lift of +12 UAH does not yet mean "ship". Compare the
+effect with the **break-even point**, not just $p$ with $\alpha$.
+:::
+
+::: {.callout-important icon="false"}
+## DECISION threshold ≠ PLANNING threshold
+**design-MDE** (+15) is for computing $N$. **break-even** (+5) is for the
+ship/no-ship decision. Requiring the CI lower bound to cross the
+design-MDE is a classic mistake: you reject profitable features (effect
+between break-even and MDE). Decide relative to **break-even**, not the
+MDE.
+:::
+
+::: {.callout-warning icon="false"}
+## Post-hoc power is not a diagnostic
+"Power at the observed effect" is a deterministic function of $p$
+($\Phi(z_p - z_\alpha)$ for one-sided); it adds nothing to $p$. Meaningful
+power is only **a priori**, at the planning stage.
 :::
 
 ::: {.callout-important icon="false"}
@@ -1071,11 +1217,13 @@ cover $\mu$." The interval is random; the parameter is not.
 - [ ] What **business decision** will be made based on the result?
 - [ ] Continuous metric → $t$-test; is $\sigma^2$ known? (almost never)
 - [ ] One-sided or two-sided --- and **why**?
-- [ ] What is the **business MDE** in money?
-- [ ] Is $N$ computed for this MDE with power $\geq 0.8$?
+- [ ] What is the **break-even point** in money --- the decision threshold?
+- [ ] What is the **design-MDE** --- and is it a different number than break-even?
+- [ ] Is $N$ computed for the **design-MDE** with power $\geq 0.8$?
 - [ ] Welch or pooled --- and is there a reason for pooled?
 - [ ] Is the sample large enough for the CLT if the data are skewed?
 - [ ] Did the **A/A pass** (FPR $\approx \alpha$)?
-- [ ] Report: $p$-value **and** CI vs business MDE, not just $p$?
+- [ ] Report: $p$-value **and** CI vs **break-even** (+ $P(\text{profitable})$),
+  not just $p$ and not vs design-MDE?
 
 If the answer to any is "no" --- it is **too early** to launch.

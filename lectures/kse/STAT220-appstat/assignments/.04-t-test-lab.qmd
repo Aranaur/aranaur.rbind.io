@@ -1,0 +1,400 @@
+---
+title: "Lab 4"
+subtitle: "Two-Sample t-test on a Live A/B Simulation: ARPU of the GreenBowl App"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+execute:
+  echo: true
+  warning: false
+---
+
+# Objective
+
+In **Lab 3** you ran a proper two-sample A/B test on a **proportion** with
+the $Z$-test, where the variance was "self-describing" ($\sigma^2 = p(1-p)$).
+
+**Lab 4** moves to a **continuous** metric — **ARPU** (average revenue per
+user per week, in UAH) — where the variance is **unknown** and must be
+estimated from the data as $S^2$. That single change ($\sigma^2 \to S^2$) is
+what turns a $Z$-test into a **$t$-test**, with all the consequences you saw
+in the lecture and in Practice 4: Student's distribution on small samples,
+Welch vs. pooled, the CLT + Slutsky rescue on large samples, the MDE.
+
+The twist: **you do not get to invent your numbers.** You will pull a
+**live A/B dataset from the GreenBowl simulation platform**, keyed to your
+own student id. The true data-generating parameters — the effect size, the
+two variances, the group sizes, even *whether there is any effect at all* —
+are **hidden from you**. Your job is to recover the correct business decision
+from the data alone, exactly as a real product analyst must.
+
+::: {.callout-important icon="false"}
+## Everyone's data is different — on purpose
+
+Your dataset is unique to your id. It might contain a large effect, a tiny
+one, or none. The variances of the two groups might be equal or wildly
+different. The sample might be plenty or far too small for the conclusions
+you want to draw. **There is no single "right answer" shared across the
+class** — there is only the answer your data supports. Copying another
+student's conclusions will be obviously wrong for your dataset.
+:::
+
+You will:
+
+1. Pull your A/B dataset and **diagnose** it (shape, variance, sample size).
+2. Wrap your test logic into a reusable `my_two_sample_t_test()` (Welch +
+   pooled), verified against `scipy`.
+3. Choose Welch vs. pooled **from your diagnostics**, run the test, and
+   build a confidence interval **for the lift**.
+4. Plan: compute power and the MDE you could realistically detect at your
+   own sample size — and decide whether your experiment was even adequately
+   powered.
+5. Validate the infrastructure with a **two-sample A/A** tuned to *your*
+   variance and sample size, and stress-test it if your data are skewed.
+6. Write a stakeholder-ready recommendation memo.
+
+# General Requirements
+
+::: {.callout-important icon="false"}
+## The fixed business context (same for everyone)
+
+- **Metric:** weekly **ARPU** per user, in UAH — continuous, positive,
+  right-skewed.
+- **Baseline:** $\mu_0 = 250$ UAH (3 months of history for the old menu).
+- **Cohorts:** `control` = old menu, `test` = new menu (combo deals).
+- **Break-even = +15 UAH** — the **decision threshold**. Below this lift the
+  extra revenue does not cover rebuilding the menu and logistics, so the
+  feature is not worth shipping.
+- **Design-MDE = +25 UAH** — the **planning threshold**. This is the "clear
+  win" the team sizes the experiment to detect (power $0.8$). It is a
+  *different* number from break-even and is used **only** for power/sample
+  planning, never as the ship rule.
+- **Direction:** we only ship if the new menu is *better* → one-sided test,
+  $H_1: \mu_{\text{test}} > \mu_{\text{control}}$.
+- **Significance level:** $\alpha = 0.05$.
+:::
+
+::: {.callout-note icon="false"}
+## Two thresholds, two jobs — do not collapse them into one
+**Planning** and **deciding** answer different questions and cost
+differently, so they get different numbers:
+
+- **break-even (+15)** answers *"is the effect worth shipping?"* → the ship
+  decision is made relative to it.
+- **design-MDE (+25)** answers *"which effect did we size the experiment to
+  catch?"* → it feeds the power/$N$ calculation only.
+
+The classic mistake is to require the **CI lower bound to clear the
+design-MDE**. That demands *proving* a +25 effect, while the experiment was
+only built to prove "$> 0$" — so it rejects genuinely profitable features
+(lift between +15 and +25). Decide relative to **break-even**; use the
+**design-MDE** only to judge whether your $n$ was adequate.
+:::
+
+::: {.callout-note icon="false"}
+## Report Format
+
+Submit the report in **one** of the following formats:
+
+- **Quarto → PDF** (`.qmd` → `.pdf`)
+- **Quarto → HTML** (`.qmd` → `.html`, hosted separately, e.g. on
+  [Quarto Pub](https://quartopub.com/),
+  [Posit Connect Cloud](https://connect.posit.cloud/), etc.)
+- **Jupyter Notebook** (`.ipynb`)
+- **Google Colab** (share the link with viewing permissions)
+
+The report must contain both code **and** narrative text. Every section
+begins with a written explanation, not code.
+:::
+
+::: {.callout-warning icon="false"}
+## Restrictions on libraries
+
+You may use `numpy`, `pandas`, `matplotlib`, `scipy.stats.t`,
+`scipy.stats.norm`, and
+`statsmodels.stats.weightstats` / `proportion_confint` for
+**verification only**.
+
+You **may not** use `scipy.stats.ttest_1samp` / `scipy.stats.ttest_ind` as
+the **primary** test — only as a **verification step**. The core machinery
+(statistic, degrees of freedom, $p$-value, CI, power) must be **your own
+code**, built on `scipy.stats.t` (`t.cdf`, `t.sf`, `t.ppf`) and
+`scipy.stats.norm`.
+:::
+
+::: {.callout-warning icon="false"}
+## Honour rule on the data platform
+
+The file `greenbowl_ab.py` contains the hidden truth in its source. **Do not
+read past the `# === instructor section ===` line, and do not call
+`_reveal`.** The point of the lab is to decide *without* knowing the answer.
+Any report that quotes the hidden parameters instead of estimating them
+scores **zero** for interpretation.
+:::
+
+::: {.callout-warning icon="false"}
+## Deadline
+
+📅 **June 10, 2026, 23:59**
+:::
+
+# Tasks
+
+## Get Your Data {#sec-data}
+
+Download `greenbowl_ab.py` (provided with the lab) into your working folder
+and load **your** A/B experiment. Use **one** id consistently — your KSE
+email is recommended.
+
+```{python}
+#| label: load
+#| eval: false
+
+from greenbowl_ab import load_my_ab, BASELINE, BREAKEVEN, DESIGN_MDE, ALPHA
+
+STUDENT_ID = "your.email@kse.org.ua"   # <-- put YOUR id here
+control, test = load_my_ab(STUDENT_ID)
+
+print(f"control (old menu): n = {len(control)}")
+print(f"test    (new menu): n = {len(test)}")
+print(f"baseline mu0 = {BASELINE} UAH,  break-even = +{BREAKEVEN} UAH,  "
+      f"design-MDE = +{DESIGN_MDE} UAH,  alpha = {ALPHA}")
+```
+
+::: {.border}
+1. State your `STUDENT_ID` and report $n_{\text{control}}$, $n_{\text{test}}$,
+   the two sample means, and the observed **lift**
+   $\overline{\text{test}} - \overline{\text{control}}$.
+2. Confirm in one sentence that you understand the **true parameters are
+   hidden** and that your entire analysis is an *estimation* problem.
+:::
+
+## Diagnose Your Dataset {#sec-eda}
+
+Before choosing any test, look at what you were handed. This section drives
+every methodological choice you make later — do not skip it.
+
+::: {.border}
+1. **Plot** both groups: overlaid histograms (or KDEs) of `control` and
+   `test` on the same axes, with vertical lines at the baseline
+   $\mu_0 = 250$ and at each sample mean.
+2. Report a small **diagnostic table** with, for each group: $n$, mean,
+   $S$ (sample SD, `ddof=1`), and the **sample skewness**
+   (`scipy.stats.skew`).
+3. Answer, **with evidence from your numbers/plots**, the three questions
+   that decide your method:
+   - **Normality / skew:** how skewed is each group? Is it close to normal,
+     or heavy-tailed?
+   - **Equal variances?** Compute the ratio $S^2_{\text{test}}/S^2_{\text{control}}$.
+     Is it near 1, or far from it?
+   - **Sample size vs. the CLT:** given the skew you observe, is your $n$
+     *large enough* for the $t$-statistic to be approximately normal
+     (recall Practice 4: small $n$ + skew breaks the test)?
+4. In one sentence each, write down the **consequence** of each answer for
+   the rest of the lab (e.g. "test SD is 3× control SD and the groups are
+   unbalanced → I must use Welch, not pooled").
+:::
+
+## A Reusable `my_two_sample_t_test()` {#sec-fn}
+
+::: {.border}
+1. Implement
+   `my_two_sample_t_test(a, b, alternative, equal_var, alpha, conf_int)`
+   with this contract (mirror Practice 4):
+   - Convention: $T = (\bar a - \bar b)/SE$; `alternative` is about
+     $a - b$. Pass `a = test`, `b = control` so `"greater"` means
+     *test beats control*.
+   - Supports `alternative` $\in$ `{"greater", "less", "two-sided"}`.
+   - `equal_var=False` → **Welch** SE and Welch–Satterthwaite $df$
+     (the default); `equal_var=True` → **pooled** SE with $df = n_a+n_b-2$.
+   - When `conf_int=True`, returns a **dict** with at least: `diff`,
+     `t_stat`, `df`, `p_value`, `ci_low`, `ci_high`. The CI must match the
+     `alternative` (two-sided → two bounds; one-sided → one finite bound and
+     $\pm\infty$).
+2. **Verify** your implementation against
+   `scipy.stats.ttest_ind(test, control, alternative=..., equal_var=...)`
+   for **both** `equal_var=True` and `equal_var=False`. Show that the
+   $t$-statistic and $p$-value match to at least **4 decimal places**. This
+   is the only legitimate use of the built-in function.
+:::
+
+## Welch vs. Pooled, Test, and CI for the Lift {#sec-test}
+
+::: {.border}
+1. **Choose** `equal_var` based on @sec-eda, and **justify it in one
+   sentence** using your variance ratio and group sizes.
+2. Run `my_two_sample_t_test(test, control, alternative="greater",
+   equal_var=<your choice>, conf_int=True)`. Report the lift, $t$, $df$,
+   $p$-value, and the **one-sided 95% lower bound** for the lift.
+3. **Show what the wrong choice would have done.** Run the *other*
+   `equal_var` setting too and put both in a table
+   (`method | df | p_value | ci_low`). In one paragraph, explain *which*
+   direction the pooled SE is biased for **your** data and why — and whether
+   the choice changes your conclusion.
+4. **Two-sided sanity line.** Report the two-sided $p$-value as well and
+   confirm $p_{\text{two}} = 2\cdot\min(p_{\text{greater}}, p_{\text{less}})$
+   for your data.
+:::
+
+## Power and Sample-Size Planning {#sec-power}
+
+::: {.border}
+1. Implement `my_two_sample_t_power(mean_diff, sd, n, alpha, alternative)`
+   (normal approximation, equal $n$, $SE_{\text{diff}} \approx S\sqrt{2/n}$,
+   as in Practice 4) and a `plan_t_experiment(sd, mde, ...)` that returns
+   the $N$ **per group** needed for power $0.8$ (bisection or the closed
+   form).
+2. Using $S$ estimated from your **pooled** data, judge adequacy against the
+   **design-MDE = +25 UAH** (the planning threshold, *not* the break-even):
+   - **Was your experiment adequately powered?** Compute the power your
+     actual sample size had to detect the **design-MDE = +25 UAH**.
+   - **Plan it properly.** How many users **per group** would you have
+     needed for power $0.8$ at the design-MDE? Compare with the $n$ you
+     actually got.
+3. **The decision layer (the heart of the lab).** The ship decision is made
+   relative to the **break-even = +15 UAH**, *not* the design-MDE. First
+   quantify how profitable your effect is, treating it as
+   $\text{effect}\mid\text{data} \sim \mathcal N(\hat\Delta, SE)$:
+   - report $P(\text{effect} \geq \text{break-even}) =
+     \Phi\!\big((\hat\Delta - 15)/SE\big)$ and the **expected net value**
+     $\hat\Delta - 15$ UAH/user.
+
+   Then classify *your* result into exactly one of:
+   - **the lower bound clears the break-even (+15)** → confidently
+     profitable → a real, shippable win;
+   - **significant ($p<\alpha$) but the lower bound is below break-even** →
+     a real positive effect whose business value is uncertain → lean on
+     $P(\text{profitable})$ and expected value before shipping;
+   - **not significant, and well powered for the design-MDE (+25)** →
+     genuine evidence of *no* clear win → do not ship;
+   - **not significant *and* underpowered for the design-MDE** → you simply
+     do not have enough data to conclude — extend the test (state the $N$
+     needed).
+
+   State which case you are in **and the evidence that rules out the
+   others**. (This is the crux: a non-significant $p$-value means very
+   different things in the third vs. the fourth case; and being *below the
+   design-MDE* is **not** a reason to kill a feature that clears
+   break-even.)
+:::
+
+## A/A Validation (Tuned to Your Data) {#sec-aa}
+
+::: {.border}
+1. Run **$\geq 5\,000$** two-sample A/A simulations under $H_0$, generating
+   both groups from a lognormal with **your** estimated mean $S$ and **your**
+   group sizes (use `np.random.lognormal`; pick $\mu,\sigma$ so the mean
+   matches $\mu_0$ and the SD matches your $S$). For each, compute the
+   $p$-value with **your** `my_two_sample_t_test`.
+2. **Plot the histogram** of the $p$-values and report the empirical **FPR**
+   (fraction $\le \alpha$) with a 95% **Wilson** CI
+   (`proportion_confint(method="wilson")`). Is $\alpha = 0.05$ inside it?
+3. **Stress test for your situation.** If @sec-eda showed your data are
+   **heavily skewed and your $n$ is small**, the $t$-test may *not* be
+   calibrated. Re-run the A/A at your actual (small) $n$ **and** at a large
+   $n$ and compare the FPRs. Does the CLT rescue you at your sample size, or
+   not? If your $n$ is large, instead briefly explain *why* you expect the
+   FPR to be on target regardless of skew (CLT + Slutsky).
+4. **One product-specific failure mode.** Describe one realistic way an A/A
+   could fail **for GreenBowl specifically** (not generic "wrong data") —
+   e.g. "whales who order for a whole office are hashed into the same cohort
+   by phone number". Predict what the $p$-value histogram and the FPR would
+   look like.
+:::
+
+## Final Recommendation {#sec-final}
+
+::: {.border}
+Write a **single-page memo** (≤ 400 words) to a **non-technical** GreenBowl
+PM. It must contain:
+
+1. Observed ARPU for control and test, the **lift**, and the **95% CI for
+   the lift** (state Welch or pooled, and why).
+2. The decision — **ship / iterate / extend the test** — and the reason,
+   framed as the **CI vs. the +15 UAH break-even** (and, in plain words, how
+   likely the lift is worth it), *not* just the $p$-value. Do **not** judge
+   the feature against the +25 design-MDE — that number was only for sizing
+   the experiment.
+3. Two honest caveats grounded in your own analysis, e.g. whether the A/A
+   passed, whether the experiment was underpowered for the design-MDE, or
+   whether skew on a small sample makes the $t$-test untrustworthy.
+
+It must be readable by someone who has never heard the words "$p$-value" or
+"Welch". You are graded on whether a real PM could act on it without
+follow-up questions.
+:::
+
+# Grading {.unnumbered}
+
+| Criterion | Points |
+|---|:---:|
+| Correctness of methodology | 3 |
+| Interpretation of results | 3 |
+| Code quality and organization | 2 |
+| **Total** | **8** |
+
+::: {.callout-tip icon="false"}
+## Grading Details
+
+**Correctness of methodology (3 pts):**
+
+- `my_two_sample_t_test` implements all three alternatives, **both** Welch
+  and pooled correctly, and matches `scipy.stats.ttest_ind` to 4 decimals
+  for both `equal_var` settings (1 pt).
+- The Welch/pooled choice in @sec-test is justified by the data and the
+  one-sided CI for the lift is correct (1 pt).
+- The power calculation and planned $N$ in @sec-power are correct, and the
+  A/A FPR with its Wilson CI is computed correctly (1 pt).
+
+**Interpretation of results (3 pts):**
+
+- @sec-eda correctly diagnoses skew, variance (in)equality, and
+  sample-size adequacy from the data — and each diagnosis is *used* later.
+- @sec-power places the result in the **correct one of the four cases**
+  (decision vs. break-even, adequacy vs. design-MDE) and rules out the
+  others with evidence, including $P(\text{effect} \geq \text{break-even})$
+  — this is the key deliverable.
+- The memo gives a concrete, product-specific decision based on **CI vs. the
+  break-even** (not the design-MDE), with honest caveats — not a slogan.
+
+**Code quality and organization (2 pts):**
+
+- `my_two_sample_t_test`, `my_two_sample_t_power`, and `plan_t_experiment`
+  are single reusable functions used across all sections (not
+  re-implemented inline).
+- Plots have axis labels, titles, and legible legends.
+- Narrative text precedes every code block; each section reads as an
+  argument, not a dump of outputs.
+:::
+
+# Defense {.unnumbered}
+
+During the defense (5–7 minutes) you will be asked *"What if?"* questions
+that probe whether you understand **why** each piece exists, for example:
+
+- *"Your $p$-value is above $0.05$. Convince me this means 'no effect' and
+  not 'not enough data'. What number settles it?"*
+- *"You chose Welch. Show me — live — what the pooled $p$-value would have
+  been on your data, and explain which way it is biased and why."*
+- *"Your 95% lower bound for the lift is, say, $+6$ UAH and the break-even
+  is $+15$. The PM says 'but $p < 0.05$, ship it'. Give your one-sentence
+  answer."*
+- *"Why do we size the experiment for the +25 design-MDE but decide at the
+  +15 break-even? What goes wrong if you instead require the lower bound to
+  clear +25?"*
+- *"Your data are skewed and $n$ is small. Your A/A FPR came out at, say,
+  $0.071$. Is the $t$-test miscalibrated here, or is that simulation noise?
+  Show me the Wilson CI and decide."*
+- *"Switch your `alternative` to two-sided right now. By how much does the
+  lower CI bound move, and does your recommendation change?"*
+
+You may also be asked to **change one parameter live** (flip `alternative`,
+toggle `equal_var`, halve $n$, double the MDE) and explain the resulting
+shift.

@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Ihor Miroshnychenko">
+<meta name="dcterms.date" content="2026-06-03">
+
+<title>Lab 4</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src=".04-t-test-lab_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".04-t-test-lab_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src=".04-t-test-lab_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src=".04-t-test-lab_files/libs/quarto-html/popper.min.js"></script>
+<script src=".04-t-test-lab_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src=".04-t-test-lab_files/libs/quarto-html/anchor.min.js"></script>
+<link href=".04-t-test-lab_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".04-t-test-lab_files/libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".04-t-test-lab_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href=".04-t-test-lab_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href=".04-t-test-lab_files/libs/bootstrap/bootstrap-09e35026b45fe6f219ffef6ea8e22102.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul class="collapse">
+  <li><a href="#objective" id="toc-objective" class="nav-link active" data-scroll-target="#objective"><span class="header-section-number">1</span> Objective</a></li>
+  <li><a href="#general-requirements" id="toc-general-requirements" class="nav-link" data-scroll-target="#general-requirements"><span class="header-section-number">2</span> General Requirements</a></li>
+  <li><a href="#tasks" id="toc-tasks" class="nav-link" data-scroll-target="#tasks"><span class="header-section-number">3</span> Tasks</a>
+  <ul class="collapse">
+  <li><a href="#sec-data" id="toc-sec-data" class="nav-link" data-scroll-target="#sec-data"><span class="header-section-number">3.1</span> Get Your Data</a></li>
+  <li><a href="#sec-eda" id="toc-sec-eda" class="nav-link" data-scroll-target="#sec-eda"><span class="header-section-number">3.2</span> Diagnose Your Dataset</a></li>
+  <li><a href="#sec-fn" id="toc-sec-fn" class="nav-link" data-scroll-target="#sec-fn"><span class="header-section-number">3.3</span> A Reusable <code>my_two_sample_t_test()</code></a></li>
+  <li><a href="#sec-test" id="toc-sec-test" class="nav-link" data-scroll-target="#sec-test"><span class="header-section-number">3.4</span> Welch vs.&nbsp;Pooled, Test, and CI for the Lift</a></li>
+  <li><a href="#sec-power" id="toc-sec-power" class="nav-link" data-scroll-target="#sec-power"><span class="header-section-number">3.5</span> Power and Sample-Size Planning</a></li>
+  <li><a href="#sec-aa" id="toc-sec-aa" class="nav-link" data-scroll-target="#sec-aa"><span class="header-section-number">3.6</span> A/A Validation (Tuned to Your Data)</a></li>
+  <li><a href="#sec-final" id="toc-sec-final" class="nav-link" data-scroll-target="#sec-final"><span class="header-section-number">3.7</span> Final Recommendation</a></li>
+  </ul></li>
+  <li><a href="#grading" id="toc-grading" class="nav-link" data-scroll-target="#grading">Grading</a></li>
+  <li><a href="#defense" id="toc-defense" class="nav-link" data-scroll-target="#defense">Defense</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Lab 4</h1>
+<p class="subtitle lead">Two-Sample t-test on a Live A/B Simulation: ARPU of the GreenBowl App</p>
+</div>
+
+
+<div class="quarto-title-meta-author">
+  <div class="quarto-title-meta-heading">Author</div>
+  <div class="quarto-title-meta-heading">Affiliation</div>
+  
+    <div class="quarto-title-meta-contents">
+    <p class="author">Ihor Miroshnychenko </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            Kyiv School of Economics
+          </p>
+      </div>
+  </div>
+
+<div class="quarto-title-meta">
+
+      
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">June 3, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="objective" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Objective</h1>
+<p>In <strong>Lab 3</strong> you ran a proper two-sample A/B test on a <strong>proportion</strong> with the <span class="math inline">\(Z\)</span>-test, where the variance was “self-describing” (<span class="math inline">\(\sigma^2 = p(1-p)\)</span>).</p>
+<p><strong>Lab 4</strong> moves to a <strong>continuous</strong> metric — <strong>ARPU</strong> (average revenue per user per week, in UAH) — where the variance is <strong>unknown</strong> and must be estimated from the data as <span class="math inline">\(S^2\)</span>. That single change (<span class="math inline">\(\sigma^2 \to S^2\)</span>) is what turns a <span class="math inline">\(Z\)</span>-test into a <strong><span class="math inline">\(t\)</span>-test</strong>, with all the consequences you saw in the lecture and in Practice 4: Student’s distribution on small samples, Welch vs.&nbsp;pooled, the CLT + Slutsky rescue on large samples, the MDE.</p>
+<p>The twist: <strong>you do not get to invent your numbers.</strong> You will pull a <strong>live A/B dataset from the GreenBowl simulation platform</strong>, keyed to your own student id. The true data-generating parameters — the effect size, the two variances, the group sizes, even <em>whether there is any effect at all</em> — are <strong>hidden from you</strong>. Your job is to recover the correct business decision from the data alone, exactly as a real product analyst must.</p>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Everyone’s data is different — on purpose
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Your dataset is unique to your id. It might contain a large effect, a tiny one, or none. The variances of the two groups might be equal or wildly different. The sample might be plenty or far too small for the conclusions you want to draw. <strong>There is no single “right answer” shared across the class</strong> — there is only the answer your data supports. Copying another student’s conclusions will be obviously wrong for your dataset.</p>
+</div>
+</div>
+<p>You will:</p>
+<ol type="1">
+<li>Pull your A/B dataset and <strong>diagnose</strong> it (shape, variance, sample size).</li>
+<li>Wrap your test logic into a reusable <code>my_two_sample_t_test()</code> (Welch + pooled), verified against <code>scipy</code>.</li>
+<li>Choose Welch vs.&nbsp;pooled <strong>from your diagnostics</strong>, run the test, and build a confidence interval <strong>for the lift</strong>.</li>
+<li>Plan: compute power and the MDE you could realistically detect at your own sample size — and decide whether your experiment was even adequately powered.</li>
+<li>Validate the infrastructure with a <strong>two-sample A/A</strong> tuned to <em>your</em> variance and sample size, and stress-test it if your data are skewed.</li>
+<li>Write a stakeholder-ready recommendation memo.</li>
+</ol>
+</section>
+<section id="general-requirements" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> General Requirements</h1>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>The fixed business context (same for everyone)
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong>Metric:</strong> weekly <strong>ARPU</strong> per user, in UAH — continuous, positive, right-skewed.</li>
+<li><strong>Baseline:</strong> <span class="math inline">\(\mu_0 = 250\)</span> UAH (3 months of history for the old menu).</li>
+<li><strong>Cohorts:</strong> <code>control</code> = old menu, <code>test</code> = new menu (combo deals).</li>
+<li><strong>Break-even = +15 UAH</strong> — the <strong>decision threshold</strong>. Below this lift the extra revenue does not cover rebuilding the menu and logistics, so the feature is not worth shipping.</li>
+<li><strong>Design-MDE = +25 UAH</strong> — the <strong>planning threshold</strong>. This is the “clear win” the team sizes the experiment to detect (power <span class="math inline">\(0.8\)</span>). It is a <em>different</em> number from break-even and is used <strong>only</strong> for power/sample planning, never as the ship rule.</li>
+<li><strong>Direction:</strong> we only ship if the new menu is <em>better</em> → one-sided test, <span class="math inline">\(H_1: \mu_{\text{test}} &gt; \mu_{\text{control}}\)</span>.</li>
+<li><strong>Significance level:</strong> <span class="math inline">\(\alpha = 0.05\)</span>.</li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Two thresholds, two jobs — do not collapse them into one
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Planning</strong> and <strong>deciding</strong> answer different questions and cost differently, so they get different numbers:</p>
+<ul>
+<li><strong>break-even (+15)</strong> answers <em>“is the effect worth shipping?”</em> → the ship decision is made relative to it.</li>
+<li><strong>design-MDE (+25)</strong> answers <em>“which effect did we size the experiment to catch?”</em> → it feeds the power/<span class="math inline">\(N\)</span> calculation only.</li>
+</ul>
+<p>The classic mistake is to require the <strong>CI lower bound to clear the design-MDE</strong>. That demands <em>proving</em> a +25 effect, while the experiment was only built to prove “<span class="math inline">\(&gt; 0\)</span>” — so it rejects genuinely profitable features (lift between +15 and +25). Decide relative to <strong>break-even</strong>; use the <strong>design-MDE</strong> only to judge whether your <span class="math inline">\(n\)</span> was adequate.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Report Format
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Submit the report in <strong>one</strong> of the following formats:</p>
+<ul>
+<li><strong>Quarto → PDF</strong> (<code>.qmd</code> → <code>.pdf</code>)</li>
+<li><strong>Quarto → HTML</strong> (<code>.qmd</code> → <code>.html</code>, hosted separately, e.g.&nbsp;on <a href="https://quartopub.com/">Quarto Pub</a>, <a href="https://connect.posit.cloud/">Posit Connect Cloud</a>, etc.)</li>
+<li><strong>Jupyter Notebook</strong> (<code>.ipynb</code>)</li>
+<li><strong>Google Colab</strong> (share the link with viewing permissions)</li>
+</ul>
+<p>The report must contain both code <strong>and</strong> narrative text. Every section begins with a written explanation, not code.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Restrictions on libraries
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>You may use <code>numpy</code>, <code>pandas</code>, <code>matplotlib</code>, <code>scipy.stats.t</code>, <code>scipy.stats.norm</code>, and <code>statsmodels.stats.weightstats</code> / <code>proportion_confint</code> for <strong>verification only</strong>.</p>
+<p>You <strong>may not</strong> use <code>scipy.stats.ttest_1samp</code> / <code>scipy.stats.ttest_ind</code> as the <strong>primary</strong> test — only as a <strong>verification step</strong>. The core machinery (statistic, degrees of freedom, <span class="math inline">\(p\)</span>-value, CI, power) must be <strong>your own code</strong>, built on <code>scipy.stats.t</code> (<code>t.cdf</code>, <code>t.sf</code>, <code>t.ppf</code>) and <code>scipy.stats.norm</code>.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Honour rule on the data platform
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The file <code>greenbowl_ab.py</code> contains the hidden truth in its source. <strong>Do not read past the <code># === instructor section ===</code> line, and do not call <code>_reveal</code>.</strong> The point of the lab is to decide <em>without</em> knowing the answer. Any report that quotes the hidden parameters instead of estimating them scores <strong>zero</strong> for interpretation.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Deadline
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>📅 <strong>June 10, 2026, 23:59</strong></p>
+</div>
+</div>
+</section>
+<section id="tasks" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Tasks</h1>
+<section id="sec-data" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="sec-data"><span class="header-section-number">3.1</span> Get Your Data</h2>
+<p>Download <code>greenbowl_ab.py</code> (provided with the lab) into your working folder and load <strong>your</strong> A/B experiment. Use <strong>one</strong> id consistently — your KSE email is recommended.</p>
+<div id="load" class="cell" data-execution_count="1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> greenbowl_ab <span class="im">import</span> load_my_ab, BASELINE, BREAKEVEN, DESIGN_MDE, ALPHA</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>STUDENT_ID <span class="op">=</span> <span class="st">"your.email@kse.org.ua"</span>   <span class="co"># &lt;-- put YOUR id here</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>control, test <span class="op">=</span> load_my_ab(STUDENT_ID)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"control (old menu): n = </span><span class="sc">{</span><span class="bu">len</span>(control)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"test    (new menu): n = </span><span class="sc">{</span><span class="bu">len</span>(test)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"baseline mu0 = </span><span class="sc">{</span>BASELINE<span class="sc">}</span><span class="ss"> UAH,  break-even = +</span><span class="sc">{</span>BREAKEVEN<span class="sc">}</span><span class="ss"> UAH,  "</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"design-MDE = +</span><span class="sc">{</span>DESIGN_MDE<span class="sc">}</span><span class="ss"> UAH,  alpha = </span><span class="sc">{</span>ALPHA<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="border">
+<ol type="1">
+<li>State your <code>STUDENT_ID</code> and report <span class="math inline">\(n_{\text{control}}\)</span>, <span class="math inline">\(n_{\text{test}}\)</span>, the two sample means, and the observed <strong>lift</strong> <span class="math inline">\(\overline{\text{test}} - \overline{\text{control}}\)</span>.</li>
+<li>Confirm in one sentence that you understand the <strong>true parameters are hidden</strong> and that your entire analysis is an <em>estimation</em> problem.</li>
+</ol>
+</div>
+</section>
+<section id="sec-eda" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="sec-eda"><span class="header-section-number">3.2</span> Diagnose Your Dataset</h2>
+<p>Before choosing any test, look at what you were handed. This section drives every methodological choice you make later — do not skip it.</p>
+<div class="border">
+<ol type="1">
+<li><strong>Plot</strong> both groups: overlaid histograms (or KDEs) of <code>control</code> and <code>test</code> on the same axes, with vertical lines at the baseline <span class="math inline">\(\mu_0 = 250\)</span> and at each sample mean.</li>
+<li>Report a small <strong>diagnostic table</strong> with, for each group: <span class="math inline">\(n\)</span>, mean, <span class="math inline">\(S\)</span> (sample SD, <code>ddof=1</code>), and the <strong>sample skewness</strong> (<code>scipy.stats.skew</code>).</li>
+<li>Answer, <strong>with evidence from your numbers/plots</strong>, the three questions that decide your method:
+<ul>
+<li><strong>Normality / skew:</strong> how skewed is each group? Is it close to normal, or heavy-tailed?</li>
+<li><strong>Equal variances?</strong> Compute the ratio <span class="math inline">\(S^2_{\text{test}}/S^2_{\text{control}}\)</span>. Is it near 1, or far from it?</li>
+<li><strong>Sample size vs.&nbsp;the CLT:</strong> given the skew you observe, is your <span class="math inline">\(n\)</span> <em>large enough</em> for the <span class="math inline">\(t\)</span>-statistic to be approximately normal (recall Practice 4: small <span class="math inline">\(n\)</span> + skew breaks the test)?</li>
+</ul></li>
+<li>In one sentence each, write down the <strong>consequence</strong> of each answer for the rest of the lab (e.g.&nbsp;“test SD is 3× control SD and the groups are unbalanced → I must use Welch, not pooled”).</li>
+</ol>
+</div>
+</section>
+<section id="sec-fn" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="sec-fn"><span class="header-section-number">3.3</span> A Reusable <code>my_two_sample_t_test()</code></h2>
+<div class="border">
+<ol type="1">
+<li>Implement <code>my_two_sample_t_test(a, b, alternative, equal_var, alpha, conf_int)</code> with this contract (mirror Practice 4):
+<ul>
+<li>Convention: <span class="math inline">\(T = (\bar a - \bar b)/SE\)</span>; <code>alternative</code> is about <span class="math inline">\(a - b\)</span>. Pass <code>a = test</code>, <code>b = control</code> so <code>"greater"</code> means <em>test beats control</em>.</li>
+<li>Supports <code>alternative</code> <span class="math inline">\(\in\)</span> <code>{"greater", "less", "two-sided"}</code>.</li>
+<li><code>equal_var=False</code> → <strong>Welch</strong> SE and Welch–Satterthwaite <span class="math inline">\(df\)</span> (the default); <code>equal_var=True</code> → <strong>pooled</strong> SE with <span class="math inline">\(df = n_a+n_b-2\)</span>.</li>
+<li>When <code>conf_int=True</code>, returns a <strong>dict</strong> with at least: <code>diff</code>, <code>t_stat</code>, <code>df</code>, <code>p_value</code>, <code>ci_low</code>, <code>ci_high</code>. The CI must match the <code>alternative</code> (two-sided → two bounds; one-sided → one finite bound and <span class="math inline">\(\pm\infty\)</span>).</li>
+</ul></li>
+<li><strong>Verify</strong> your implementation against <code>scipy.stats.ttest_ind(test, control, alternative=..., equal_var=...)</code> for <strong>both</strong> <code>equal_var=True</code> and <code>equal_var=False</code>. Show that the <span class="math inline">\(t\)</span>-statistic and <span class="math inline">\(p\)</span>-value match to at least <strong>4 decimal places</strong>. This is the only legitimate use of the built-in function.</li>
+</ol>
+</div>
+</section>
+<section id="sec-test" class="level2" data-number="3.4">
+<h2 data-number="3.4" class="anchored" data-anchor-id="sec-test"><span class="header-section-number">3.4</span> Welch vs.&nbsp;Pooled, Test, and CI for the Lift</h2>
+<div class="border">
+<ol type="1">
+<li><strong>Choose</strong> <code>equal_var</code> based on <a href="#sec-eda" class="quarto-xref">Section&nbsp;3.2</a>, and <strong>justify it in one sentence</strong> using your variance ratio and group sizes.</li>
+<li>Run <code>my_two_sample_t_test(test, control, alternative="greater", equal_var=&lt;your choice&gt;, conf_int=True)</code>. Report the lift, <span class="math inline">\(t\)</span>, <span class="math inline">\(df\)</span>, <span class="math inline">\(p\)</span>-value, and the <strong>one-sided 95% lower bound</strong> for the lift.</li>
+<li><strong>Show what the wrong choice would have done.</strong> Run the <em>other</em> <code>equal_var</code> setting too and put both in a table (<code>method | df | p_value | ci_low</code>). In one paragraph, explain <em>which</em> direction the pooled SE is biased for <strong>your</strong> data and why — and whether the choice changes your conclusion.</li>
+<li><strong>Two-sided sanity line.</strong> Report the two-sided <span class="math inline">\(p\)</span>-value as well and confirm <span class="math inline">\(p_{\text{two}} = 2\cdot\min(p_{\text{greater}}, p_{\text{less}})\)</span> for your data.</li>
+</ol>
+</div>
+</section>
+<section id="sec-power" class="level2" data-number="3.5">
+<h2 data-number="3.5" class="anchored" data-anchor-id="sec-power"><span class="header-section-number">3.5</span> Power and Sample-Size Planning</h2>
+<div class="border">
+<ol type="1">
+<li>Implement <code>my_two_sample_t_power(mean_diff, sd, n, alpha, alternative)</code> (normal approximation, equal <span class="math inline">\(n\)</span>, <span class="math inline">\(SE_{\text{diff}} \approx S\sqrt{2/n}\)</span>, as in Practice 4) and a <code>plan_t_experiment(sd, mde, ...)</code> that returns the <span class="math inline">\(N\)</span> <strong>per group</strong> needed for power <span class="math inline">\(0.8\)</span> (bisection or the closed form).</li>
+<li>Using <span class="math inline">\(S\)</span> estimated from your <strong>pooled</strong> data, judge adequacy against the <strong>design-MDE = +25 UAH</strong> (the planning threshold, <em>not</em> the break-even):
+<ul>
+<li><strong>Was your experiment adequately powered?</strong> Compute the power your actual sample size had to detect the <strong>design-MDE = +25 UAH</strong>.</li>
+<li><strong>Plan it properly.</strong> How many users <strong>per group</strong> would you have needed for power <span class="math inline">\(0.8\)</span> at the design-MDE? Compare with the <span class="math inline">\(n\)</span> you actually got.</li>
+</ul></li>
+<li><strong>The decision layer (the heart of the lab).</strong> The ship decision is made relative to the <strong>break-even = +15 UAH</strong>, <em>not</em> the design-MDE. First quantify how profitable your effect is, treating it as <span class="math inline">\(\text{effect}\mid\text{data} \sim \mathcal N(\hat\Delta, SE)\)</span>:
+<ul>
+<li>report <span class="math inline">\(P(\text{effect} \geq \text{break-even}) =
+\Phi\!\big((\hat\Delta - 15)/SE\big)\)</span> and the <strong>expected net value</strong> <span class="math inline">\(\hat\Delta - 15\)</span> UAH/user.</li>
+</ul>
+Then classify <em>your</em> result into exactly one of:
+<ul>
+<li><strong>the lower bound clears the break-even (+15)</strong> → confidently profitable → a real, shippable win;</li>
+<li><strong>significant (<span class="math inline">\(p&lt;\alpha\)</span>) but the lower bound is below break-even</strong> → a real positive effect whose business value is uncertain → lean on <span class="math inline">\(P(\text{profitable})\)</span> and expected value before shipping;</li>
+<li><strong>not significant, and well powered for the design-MDE (+25)</strong> → genuine evidence of <em>no</em> clear win → do not ship;</li>
+<li><strong>not significant <em>and</em> underpowered for the design-MDE</strong> → you simply do not have enough data to conclude — extend the test (state the <span class="math inline">\(N\)</span> needed).</li>
+</ul>
+State which case you are in <strong>and the evidence that rules out the others</strong>. (This is the crux: a non-significant <span class="math inline">\(p\)</span>-value means very different things in the third vs.&nbsp;the fourth case; and being <em>below the design-MDE</em> is <strong>not</strong> a reason to kill a feature that clears break-even.)</li>
+</ol>
+</div>
+</section>
+<section id="sec-aa" class="level2" data-number="3.6">
+<h2 data-number="3.6" class="anchored" data-anchor-id="sec-aa"><span class="header-section-number">3.6</span> A/A Validation (Tuned to Your Data)</h2>
+<div class="border">
+<ol type="1">
+<li>Run <strong><span class="math inline">\(\geq 5\,000\)</span></strong> two-sample A/A simulations under <span class="math inline">\(H_0\)</span>, generating both groups from a lognormal with <strong>your</strong> estimated mean <span class="math inline">\(S\)</span> and <strong>your</strong> group sizes (use <code>np.random.lognormal</code>; pick <span class="math inline">\(\mu,\sigma\)</span> so the mean matches <span class="math inline">\(\mu_0\)</span> and the SD matches your <span class="math inline">\(S\)</span>). For each, compute the <span class="math inline">\(p\)</span>-value with <strong>your</strong> <code>my_two_sample_t_test</code>.</li>
+<li><strong>Plot the histogram</strong> of the <span class="math inline">\(p\)</span>-values and report the empirical <strong>FPR</strong> (fraction <span class="math inline">\(\le \alpha\)</span>) with a 95% <strong>Wilson</strong> CI (<code>proportion_confint(method="wilson")</code>). Is <span class="math inline">\(\alpha = 0.05\)</span> inside it?</li>
+<li><strong>Stress test for your situation.</strong> If <a href="#sec-eda" class="quarto-xref">Section&nbsp;3.2</a> showed your data are <strong>heavily skewed and your <span class="math inline">\(n\)</span> is small</strong>, the <span class="math inline">\(t\)</span>-test may <em>not</em> be calibrated. Re-run the A/A at your actual (small) <span class="math inline">\(n\)</span> <strong>and</strong> at a large <span class="math inline">\(n\)</span> and compare the FPRs. Does the CLT rescue you at your sample size, or not? If your <span class="math inline">\(n\)</span> is large, instead briefly explain <em>why</em> you expect the FPR to be on target regardless of skew (CLT + Slutsky).</li>
+<li><strong>One product-specific failure mode.</strong> Describe one realistic way an A/A could fail <strong>for GreenBowl specifically</strong> (not generic “wrong data”) — e.g.&nbsp;“whales who order for a whole office are hashed into the same cohort by phone number”. Predict what the <span class="math inline">\(p\)</span>-value histogram and the FPR would look like.</li>
+</ol>
+</div>
+</section>
+<section id="sec-final" class="level2" data-number="3.7">
+<h2 data-number="3.7" class="anchored" data-anchor-id="sec-final"><span class="header-section-number">3.7</span> Final Recommendation</h2>
+<div class="border">
+<p>Write a <strong>single-page memo</strong> (≤ 400 words) to a <strong>non-technical</strong> GreenBowl PM. It must contain:</p>
+<ol type="1">
+<li>Observed ARPU for control and test, the <strong>lift</strong>, and the <strong>95% CI for the lift</strong> (state Welch or pooled, and why).</li>
+<li>The decision — <strong>ship / iterate / extend the test</strong> — and the reason, framed as the <strong>CI vs.&nbsp;the +15 UAH break-even</strong> (and, in plain words, how likely the lift is worth it), <em>not</em> just the <span class="math inline">\(p\)</span>-value. Do <strong>not</strong> judge the feature against the +25 design-MDE — that number was only for sizing the experiment.</li>
+<li>Two honest caveats grounded in your own analysis, e.g.&nbsp;whether the A/A passed, whether the experiment was underpowered for the design-MDE, or whether skew on a small sample makes the <span class="math inline">\(t\)</span>-test untrustworthy.</li>
+</ol>
+<p>It must be readable by someone who has never heard the words “<span class="math inline">\(p\)</span>-value” or “Welch”. You are graded on whether a real PM could act on it without follow-up questions.</p>
+</div>
+</section>
+</section>
+<section id="grading" class="level1 unnumbered">
+<h1 class="unnumbered">Grading</h1>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Criterion</th>
+<th style="text-align: center;">Points</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Correctness of methodology</td>
+<td style="text-align: center;">3</td>
+</tr>
+<tr class="even">
+<td>Interpretation of results</td>
+<td style="text-align: center;">3</td>
+</tr>
+<tr class="odd">
+<td>Code quality and organization</td>
+<td style="text-align: center;">2</td>
+</tr>
+<tr class="even">
+<td><strong>Total</strong></td>
+<td style="text-align: center;"><strong>8</strong></td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Grading Details
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Correctness of methodology (3 pts):</strong></p>
+<ul>
+<li><code>my_two_sample_t_test</code> implements all three alternatives, <strong>both</strong> Welch and pooled correctly, and matches <code>scipy.stats.ttest_ind</code> to 4 decimals for both <code>equal_var</code> settings (1 pt).</li>
+<li>The Welch/pooled choice in <a href="#sec-test" class="quarto-xref">Section&nbsp;3.4</a> is justified by the data and the one-sided CI for the lift is correct (1 pt).</li>
+<li>The power calculation and planned <span class="math inline">\(N\)</span> in <a href="#sec-power" class="quarto-xref">Section&nbsp;3.5</a> are correct, and the A/A FPR with its Wilson CI is computed correctly (1 pt).</li>
+</ul>
+<p><strong>Interpretation of results (3 pts):</strong></p>
+<ul>
+<li><a href="#sec-eda" class="quarto-xref">Section&nbsp;3.2</a> correctly diagnoses skew, variance (in)equality, and sample-size adequacy from the data — and each diagnosis is <em>used</em> later.</li>
+<li><a href="#sec-power" class="quarto-xref">Section&nbsp;3.5</a> places the result in the <strong>correct one of the four cases</strong> (decision vs.&nbsp;break-even, adequacy vs.&nbsp;design-MDE) and rules out the others with evidence, including <span class="math inline">\(P(\text{effect} \geq \text{break-even})\)</span> — this is the key deliverable.</li>
+<li>The memo gives a concrete, product-specific decision based on <strong>CI vs.&nbsp;the break-even</strong> (not the design-MDE), with honest caveats — not a slogan.</li>
+</ul>
+<p><strong>Code quality and organization (2 pts):</strong></p>
+<ul>
+<li><code>my_two_sample_t_test</code>, <code>my_two_sample_t_power</code>, and <code>plan_t_experiment</code> are single reusable functions used across all sections (not re-implemented inline).</li>
+<li>Plots have axis labels, titles, and legible legends.</li>
+<li>Narrative text precedes every code block; each section reads as an argument, not a dump of outputs.</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="defense" class="level1 unnumbered">
+<h1 class="unnumbered">Defense</h1>
+<p>During the defense (5–7 minutes) you will be asked <em>“What if?”</em> questions that probe whether you understand <strong>why</strong> each piece exists, for example:</p>
+<ul>
+<li><em>“Your <span class="math inline">\(p\)</span>-value is above <span class="math inline">\(0.05\)</span>. Convince me this means ‘no effect’ and not ‘not enough data’. What number settles it?”</em></li>
+<li><em>“You chose Welch. Show me — live — what the pooled <span class="math inline">\(p\)</span>-value would have been on your data, and explain which way it is biased and why.”</em></li>
+<li><em>“Your 95% lower bound for the lift is, say, <span class="math inline">\(+6\)</span> UAH and the break-even is <span class="math inline">\(+15\)</span>. The PM says ‘but <span class="math inline">\(p &lt; 0.05\)</span>, ship it’. Give your one-sentence answer.”</em></li>
+<li><em>“Why do we size the experiment for the +25 design-MDE but decide at the +15 break-even? What goes wrong if you instead require the lower bound to clear +25?”</em></li>
+<li><em>“Your data are skewed and <span class="math inline">\(n\)</span> is small. Your A/A FPR came out at, say, <span class="math inline">\(0.071\)</span>. Is the <span class="math inline">\(t\)</span>-test miscalibrated here, or is that simulation noise? Show me the Wilson CI and decide.”</em></li>
+<li><em>“Switch your <code>alternative</code> to two-sided right now. By how much does the lower CI bound move, and does your recommendation change?”</em></li>
+</ul>
+<p>You may also be asked to <strong>change one parameter live</strong> (flip <code>alternative</code>, toggle <code>equal_var</code>, halve <span class="math inline">\(n\)</span>, double the MDE) and explain the resulting shift.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
