@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Ihor Miroshnychenko">
+<meta name="dcterms.date" content="2026-06-08">
+
+<title>Practice 5</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src=".05-monte-carlo-en_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".05-monte-carlo-en_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src=".05-monte-carlo-en_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src=".05-monte-carlo-en_files/libs/quarto-html/popper.min.js"></script>
+<script src=".05-monte-carlo-en_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src=".05-monte-carlo-en_files/libs/quarto-html/anchor.min.js"></script>
+<link href=".05-monte-carlo-en_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".05-monte-carlo-en_files/libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".05-monte-carlo-en_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href=".05-monte-carlo-en_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href=".05-monte-carlo-en_files/libs/bootstrap/bootstrap-09e35026b45fe6f219ffef6ea8e22102.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#what-we-are-doing-today" id="toc-what-we-are-doing-today" class="nav-link active" data-scroll-target="#what-we-are-doing-today">What we are doing today</a></li>
+  <li><a href="#case-study-can-we-trust-the-t-test-on-greenbowl-arpu" id="toc-case-study-can-we-trust-the-t-test-on-greenbowl-arpu" class="nav-link" data-scroll-target="#case-study-can-we-trust-the-t-test-on-greenbowl-arpu"><span class="header-section-number">1</span> Case study: can we trust the <span class="math inline">\(t\)</span>-test on GreenBowl ARPU?</a></li>
+  <li><a href="#version-1-fpr-point-estimate" id="toc-version-1-fpr-point-estimate" class="nav-link" data-scroll-target="#version-1-fpr-point-estimate"><span class="header-section-number">2</span> Version 1 — FPR (point estimate)</a></li>
+  <li><a href="#version-2-a-confidence-interval-for-the-fpr" id="toc-version-2-a-confidence-interval-for-the-fpr" class="nav-link" data-scroll-target="#version-2-a-confidence-interval-for-the-fpr"><span class="header-section-number">3</span> Version 2 — a confidence interval for the FPR</a></li>
+  <li><a href="#version-3-the-universal-simulate_rejections" id="toc-version-3-the-universal-simulate_rejections" class="nav-link" data-scroll-target="#version-3-the-universal-simulate_rejections"><span class="header-section-number">4</span> Version 3 — the universal <code>simulate_rejections</code></a>
+  <ul class="collapse">
+  <li><a href="#a-tricky-case-same-mean-different-shape" id="toc-a-tricky-case-same-mean-different-shape" class="nav-link" data-scroll-target="#a-tricky-case-same-mean-different-shape"><span class="header-section-number">4.1</span> A tricky case: same mean, different shape</a></li>
+  </ul></li>
+  <li><a href="#version-4-the-minimum-sample-size" id="toc-version-4-the-minimum-sample-size" class="nav-link" data-scroll-target="#version-4-the-minimum-sample-size"><span class="header-section-number">5</span> Version 4 — the minimum sample size</a></li>
+  <li><a href="#version-5-power-tpr-and-comparing-criteria" id="toc-version-5-power-tpr-and-comparing-criteria" class="nav-link" data-scroll-target="#version-5-power-tpr-and-comparing-criteria"><span class="header-section-number">6</span> Version 5 — power (TPR) and comparing criteria</a>
+  <ul class="collapse">
+  <li><a href="#which-criterion-is-better-students-or-welch" id="toc-which-criterion-is-better-students-or-welch" class="nav-link" data-scroll-target="#which-criterion-is-better-students-or-welch"><span class="header-section-number">6.1</span> Which criterion is better: Student’s or Welch?</a></li>
+  </ul></li>
+  <li><a href="#final-validation-on-historical-data-1000-aa" id="toc-final-validation-on-historical-data-1000-aa" class="nav-link" data-scroll-target="#final-validation-on-historical-data-1000-aa"><span class="header-section-number">7</span> Final — validation on historical data (1000 A/A)</a></li>
+  <li><a href="#interpretation-traps" id="toc-interpretation-traps" class="nav-link" data-scroll-target="#interpretation-traps"><span class="header-section-number">8</span> Interpretation traps</a></li>
+  <li><a href="#criterion-validation-checklist" id="toc-criterion-validation-checklist" class="nav-link" data-scroll-target="#criterion-validation-checklist">Criterion-validation checklist</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Practice 5</h1>
+<p class="subtitle lead">The Monte Carlo method: validating statistical criteria</p>
+</div>
+
+
+<div class="quarto-title-meta-author">
+  <div class="quarto-title-meta-heading">Author</div>
+  <div class="quarto-title-meta-heading">Affiliation</div>
+  
+    <div class="quarto-title-meta-contents">
+    <p class="author">Ihor Miroshnychenko </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            Kyiv School of Economics
+          </p>
+      </div>
+  </div>
+
+<div class="quarto-title-meta">
+
+      
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">June 8, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="what-we-are-doing-today" class="level1 unnumbered">
+<h1 class="unnumbered">What we are doing today</h1>
+<p>In the lecture we saw the core idea of the <strong>Monte Carlo method</strong>: to check any statistical criterion, you <strong>repeat the same experiment with a known answer many times</strong> and count how often the criterion is wrong. That is how we answered three questions: <em>is the criterion correct?</em>, <em>which criterion is better?</em>, <em>from what sample size can we trust the <span class="math inline">\(t\)</span>-test?</em></p>
+<p>Today we <strong>assemble this into a single tool</strong> — our own <code>simulate_rejections()</code> function, which we grow step by step (FPR → confidence interval → two samples → power), and at the end we build its “historical twin” <code>thousand_aa_tests()</code> to validate on real logs.</p>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Ground rules
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>The tool we <strong>build</strong> today is the <strong>Monte Carlo validator</strong>, not the <span class="math inline">\(t\)</span>-test itself. The criterion (the thing we are <em>testing</em>) is taken ready-made: <code>scipy.stats.ttest_ind</code> — or your own <code>my_two_sample_t_test</code> from Practice 4.</li>
+<li>Each version is a small extension of the previous one.</li>
+<li>Every final step <strong>reuses</strong> earlier functions rather than duplicating them.</li>
+<li>After each version there is a <strong>“Your turn”</strong> mini-task.</li>
+<li>We always generate <span class="math inline">\(H_0\)</span>/<span class="math inline">\(H_1\)</span> <strong>ourselves</strong> (the “omniscient god” role): only then do we know the right answer and can count the errors.</li>
+</ul>
+</div>
+</div>
+<hr>
+</section>
+<section id="case-study-can-we-trust-the-t-test-on-greenbowl-arpu" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Case study: can we trust the <span class="math inline">\(t\)</span>-test on GreenBowl ARPU?</h1>
+<p>We work with the same <strong>GreenBowl</strong> delivery app as in Practice 4. The experimentation team runs <strong>many</strong> small A/B tests: separately per city and per cuisine category. In big cities the samples are large, in new ones they are <strong>small</strong> (a few dozen users per week). The metric — <strong>ARPU</strong> (revenue per user) — is heavily <strong>skewed</strong>.</p>
+<div class="border">
+<ul>
+<li><strong>Unit of observation:</strong> one user per week.</li>
+<li><strong>Metric:</strong> ARPU in UAH — continuous, positive, <strong>skewed</strong> (lognormal: a mass of small orders + a long right tail of “whales”).</li>
+<li><strong>Criterion under test:</strong> the two-sample <span class="math inline">\(t\)</span>-test (Welch by default).</li>
+<li><strong>Significance level:</strong> <span class="math inline">\(\alpha = 0.05\)</span>.</li>
+</ul>
+</div>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Questions Monte Carlo will answer today
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li><strong>Is the <span class="math inline">\(t\)</span>-test correct</strong> on our skewed ARPU? (does it keep the promised 5% false positives or not?)</li>
+<li><strong>From what sample size</strong> can we trust it in small cities?</li>
+<li><strong>Which variant is better</strong> — Student’s or Welch — when the groups differ in size and spread?</li>
+<li><strong>How much power</strong> does the test have on a realistic effect — and is it enough to catch the effect of a promotion?</li>
+</ol>
+<p>None of these can be honestly closed with a “textbook theorem” — only by simulating on <em>our</em> data.</p>
+</div>
+</div>
+<p>We generate skewed ARPU exactly as in Practice 4 (a lognormal distribution with a given <strong>mean</strong>; the <code>sigma</code> parameter controls the spread / tail heaviness without shifting the mean):</p>
+<div id="cell-data-gen" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> arpu_sample(true_mean, n, sigma<span class="op">=</span><span class="fl">0.6</span>):</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""A lognormal ARPU sample with a given mean true_mean."""</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    mu <span class="op">=</span> np.log(true_mean) <span class="op">-</span> sigma<span class="op">**</span><span class="dv">2</span> <span class="op">/</span> <span class="dv">2</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.random.lognormal(mean<span class="op">=</span>mu, sigma<span class="op">=</span>sigma, size<span class="op">=</span>n)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>np.random.seed(<span class="dv">73</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>demo <span class="op">=</span> arpu_sample(<span class="dv">250</span>, <span class="dv">3000</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">4</span>))</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>ax.hist(demo, bins<span class="op">=</span><span class="dv">60</span>, color<span class="op">=</span>turquoise, alpha<span class="op">=</span><span class="fl">0.7</span>, edgecolor<span class="op">=</span><span class="st">"white"</span>)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>ax.axvline(<span class="dv">250</span>, color<span class="op">=</span>red, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"true mean = 250 ₴"</span>)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"User ARPU, ₴"</span>)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"Frequency"</span>)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"ARPU distribution — right-skewed (n = 3000)"</span>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Mean = </span><span class="sc">{</span>demo<span class="sc">.</span>mean()<span class="sc">:.1f}</span><span class="ss"> ₴,  median = </span><span class="sc">{</span>np<span class="sc">.</span>median(demo)<span class="sc">:.1f}</span><span class="ss"> ₴  "</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"→  skewness is obvious (mean &gt; median)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src=".05-monte-carlo-en_files/figure-html/data-gen-output-1.png" id="data-gen" class="quarto-figure quarto-figure-center anchored figure-img" width="758" height="374"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Mean = 250.8 ₴,  median = 212.6 ₴  →  skewness is obvious (mean &gt; median)</code></pre>
+</div>
+</div>
+<p>The distribution is clearly <strong>not normal</strong>. The lecture’s question: does the CLT save the <span class="math inline">\(t\)</span>-test — and <strong>from what <span class="math inline">\(n\)</span></strong>? Let’s check it by simulation, not on faith.</p>
+<hr>
+</section>
+<section id="version-1-fpr-point-estimate" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Version 1 — FPR (point estimate)</h1>
+<p>The simplest check: run an <strong>A/A test</strong> (two groups from the <strong>same</strong> distribution, so <span class="math inline">\(H_0\)</span> is guaranteed true) many times and count the fraction of cases where the criterion <strong>wrongly</strong> rejected <span class="math inline">\(H_0\)</span>. That is the <strong>FPR</strong> (false positive rate) — the rate of type I errors.</p>
+<div id="v1" class="cell" data-execution_count="3">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> simulate_fpr(gen, n, n_exps<span class="op">=</span><span class="dv">10_000</span>, alpha<span class="op">=</span><span class="fl">0.05</span>, seed<span class="op">=</span><span class="dv">73</span>):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Version 1. Empirical FPR of the two-sample t-test under H0.</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">    gen(n) -&gt; a sample of size n. Both groups come from gen → H0 is true.</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    np.random.seed(seed)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    bad_cnt <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(n_exps):</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>        test    <span class="op">=</span> gen(n)   <span class="co"># H0 is true:</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>        control <span class="op">=</span> gen(n)   <span class="co"># both groups from the same distribution</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>        pvalue  <span class="op">=</span> stats.ttest_ind(test, control).pvalue</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>        bad_cnt <span class="op">+=</span> pvalue <span class="op">&lt;</span> alpha</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> bad_cnt <span class="op">/</span> n_exps</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Let’s check on skewed ARPU. First, a “large enough” sample (<span class="math inline">\(n = 200\)</span> users per group):</p>
+<div id="v1-demo" class="cell" data-execution_count="4">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>arpu_aa <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n)   <span class="co"># A/A generator: mean 250</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>fpr_200 <span class="op">=</span> simulate_fpr(arpu_aa, n<span class="op">=</span><span class="dv">200</span>)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>fpr_30  <span class="op">=</span> simulate_fpr(arpu_aa, n<span class="op">=</span><span class="dv">30</span>)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR at n=200:  </span><span class="sc">{</span>fpr_200<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR at n=30:   </span><span class="sc">{</span>fpr_30<span class="sc">:.4f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>FPR at n=200:  0.0496
+FPR at n=30:   0.0445</code></pre>
+</div>
+</div>
+<p>At <span class="math inline">\(n=200\)</span> the FPR is <span class="math inline">\(\approx 0.05\)</span> — looks great. At <span class="math inline">\(n=30\)</span> it comes out a bit lower. But a point estimate <strong>wobbles</strong> from run to run: is this “fine” or is the criterion genuinely biased? We cannot tell yet — we need a <strong>confidence interval</strong> (Version 2).</p>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Your turn 1
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Run <code>simulate_fpr</code> with different <code>seed</code> values (e.g.&nbsp;1, 2, 3) at a fixed <span class="math inline">\(n=200\)</span>. How much does the point estimate “jump”? This is exactly the noise we will tame with an interval.</li>
+<li>Increase <code>n_exps</code> from 10,000 to 50,000 at <span class="math inline">\(n=200\)</span>. Does the estimate become more stable? Why?</li>
+<li><strong>Applied.</strong> In a new city only <span class="math inline">\(n=15\)</span> users per group accumulated over a week. Estimate the FPR. Is the test already “off”?</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-4-contents" aria-controls="callout-4" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Solution 1
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-4" class="callout-4-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div id="sol1" class="cell" data-execution_count="5">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) noise of the point estimate</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>ests <span class="op">=</span> [simulate_fpr(arpu_aa, <span class="dv">200</span>, n_exps<span class="op">=</span><span class="dv">10_000</span>, seed<span class="op">=</span>s) <span class="cf">for</span> s <span class="kw">in</span> (<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>)]</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR across seeds: </span><span class="sc">{</span>[<span class="ss">f'</span><span class="sc">{</span>e<span class="sc">:.4f}</span><span class="ss">'</span> <span class="cf">for</span> e <span class="kw">in</span> ests]<span class="sc">}</span><span class="ss">  "</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"→ spread ≈ </span><span class="sc">{</span><span class="bu">max</span>(ests)<span class="op">-</span><span class="bu">min</span>(ests)<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) more experiments → a more stable estimate</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"n_exps=10k:  </span><span class="sc">{</span>simulate_fpr(arpu_aa, <span class="dv">200</span>, n_exps<span class="op">=</span><span class="dv">10_000</span>)<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"n_exps=50k:  </span><span class="sc">{</span>simulate_fpr(arpu_aa, <span class="dv">200</span>, n_exps<span class="op">=</span><span class="dv">50_000</span>)<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="co"># (3) a very small sample</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR at n=15: </span><span class="sc">{</span>simulate_fpr(arpu_aa, <span class="dv">15</span>)<span class="sc">:.4f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>FPR across seeds: ['0.0487', '0.0491', '0.0457']  → spread ≈ 0.0034
+n_exps=10k:  0.0496
+n_exps=50k:  0.0494
+FPR at n=15: 0.0465</code></pre>
+</div>
+</div>
+<p><strong>Interpretation.</strong> The point estimate of the FPR is itself a random variable with standard error <span class="math inline">\(\sqrt{\alpha(1-\alpha)/n_{\text{exps}}}\)</span>. More experiments → narrower spread (like the SEM in Practice 4). At <span class="math inline">\(n=15\)</span> the skewness pulls the FPR even below 5% — the test becomes <strong>conservative</strong> (it errs less often than promised). That is safe, but it costs power. We can only pin down the exact threshold with a confidence interval.</p>
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="version-2-a-confidence-interval-for-the-fpr" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Version 2 — a confidence interval for the FPR</h1>
+<p>A point estimate without an interval is the trap from the lecture. An A/A outcome is a Bernoulli variable (erred / did not), so we take the ready-made <a href="https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval#Wilson_score_interval">Wilson interval</a> and form an <strong>honest verdict</strong>: does <span class="math inline">\(\alpha\)</span> lie inside?</p>
+<div id="v2" class="cell" data-execution_count="6">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> simulate_fpr(gen, n, n_exps<span class="op">=</span><span class="dv">10_000</span>, alpha<span class="op">=</span><span class="fl">0.05</span>, seed<span class="op">=</span><span class="dv">73</span>):</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Version 2. Returns a dict: FPR + 95% Wilson CI + verdict."""</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    np.random.seed(seed)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    bad_cnt <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(n_exps):</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>        bad_cnt <span class="op">+=</span> stats.ttest_ind(gen(n), gen(n)).pvalue <span class="op">&lt;</span> alpha</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    fpr    <span class="op">=</span> bad_cnt <span class="op">/</span> n_exps</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> proportion_confint(bad_cnt, n_exps, alpha<span class="op">=</span><span class="fl">0.05</span>, method<span class="op">=</span><span class="st">"wilson"</span>)</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> lo <span class="op">&lt;=</span> alpha <span class="op">&lt;=</span> hi:</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>        verdict <span class="op">=</span> <span class="st">"✅ valid (α inside the CI)"</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> hi <span class="op">&lt;</span> alpha:</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>        verdict <span class="op">=</span> <span class="st">"🟡 conservative (FPR &lt; α: safe, but less powerful)"</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>        verdict <span class="op">=</span> <span class="st">"⛔ INVALID (FPR &gt; α: type I error too large)"</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"fpr"</span>: fpr, <span class="st">"ci"</span>: (lo, hi), <span class="st">"verdict"</span>: verdict}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="v2-demo" class="cell" data-execution_count="7">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> (<span class="dv">200</span>, <span class="dv">30</span>):</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> simulate_fpr(arpu_aa, n)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"n=</span><span class="sc">{</span>n<span class="sc">:&gt;3d}</span><span class="ss">:  FPR=</span><span class="sc">{</span>r[<span class="st">'fpr'</span>]<span class="sc">:.4f}</span><span class="ss">  "</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"CI=(</span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.4f}</span><span class="ss">, </span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.4f}</span><span class="ss">)  →  </span><span class="sc">{</span>r[<span class="st">'verdict'</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>n=200:  FPR=0.0496  CI=(0.0455, 0.0540)  →  ✅ valid (α inside the CI)
+n= 30:  FPR=0.0445  CI=(0.0406, 0.0487)  →  🟡 conservative (FPR &lt; α: safe, but less powerful)</code></pre>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>What the verdict showed
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong><span class="math inline">\(n=200\)</span>:</strong> <span class="math inline">\(\alpha = 0.05\)</span> is <strong>inside</strong> the CI → on skewed ARPU the <span class="math inline">\(t\)</span>-test is <strong>correct</strong> as soon as the sample is of decent size. This is the CLT + Slutsky from the <span class="math inline">\(t\)</span>-test lecture in action.</li>
+<li><strong><span class="math inline">\(n=30\)</span>:</strong> the upper CI bound is <strong>below</strong> 5% → the test is <strong>conservative</strong>. It errs less often than promised — not scary (fewer false roll-outs), but the power is lower than it could be.</li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Your turn 2
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Find roughly the minimum <span class="math inline">\(n\)</span> at which the verdict for <code>arpu_aa</code> becomes “✅ valid” (sweep over a few values).</li>
+<li>Increase the skewness (<code>sigma=1.1</code> in the generator). How does the threshold at which the test becomes valid shift? Link this to the “sufficient <span class="math inline">\(n\)</span>” for the CLT.</li>
+<li><strong>Applied.</strong> The metric “share of users who made ≥2 orders” is a Bernoulli one. Generate an A/A for it (<code>lambda n: (np.random.rand(n) &lt; 0.3).astype(float)</code>) and check the <span class="math inline">\(t\)</span>-test at <span class="math inline">\(n=30\)</span>. Is it valid?</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-7-contents" aria-controls="callout-7" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Solution 2
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-7" class="callout-7-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div id="sol2" class="cell" data-execution_count="8">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) validity threshold for moderate skewness</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Moderate skewness (sigma=0.6):"</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> (<span class="dv">30</span>, <span class="dv">60</span>, <span class="dv">100</span>, <span class="dv">150</span>, <span class="dv">200</span>):</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> simulate_fpr(arpu_aa, n)</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  n=</span><span class="sc">{</span>n<span class="sc">:&gt;3d}</span><span class="ss">: FPR=</span><span class="sc">{</span>r[<span class="st">'fpr'</span>]<span class="sc">:.4f}</span><span class="ss"> → </span><span class="sc">{</span>r[<span class="st">'verdict'</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) stronger skewness — the threshold shifts to the right</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>heavy_aa <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">1.1</span>)</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Strong skewness (sigma=1.1):"</span>)</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> (<span class="dv">100</span>, <span class="dv">200</span>, <span class="dv">400</span>):</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> simulate_fpr(heavy_aa, n)</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  n=</span><span class="sc">{</span>n<span class="sc">:&gt;3d}</span><span class="ss">: FPR=</span><span class="sc">{</span>r[<span class="st">'fpr'</span>]<span class="sc">:.4f}</span><span class="ss"> → </span><span class="sc">{</span>r[<span class="st">'verdict'</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a><span class="co"># (3) a Bernoulli metric</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>binom_aa <span class="op">=</span> <span class="kw">lambda</span> n: (np.random.rand(n) <span class="op">&lt;</span> <span class="fl">0.3</span>).astype(<span class="bu">float</span>)</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> simulate_fpr(binom_aa, <span class="dv">30</span>)</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Bernoulli p=0.3, n=30: FPR=</span><span class="sc">{</span>r[<span class="st">'fpr'</span>]<span class="sc">:.4f}</span><span class="ss"> → </span><span class="sc">{</span>r[<span class="st">'verdict'</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Moderate skewness (sigma=0.6):
+  n= 30: FPR=0.0445 → 🟡 conservative (FPR &lt; α: safe, but less powerful)
+  n= 60: FPR=0.0452 → 🟡 conservative (FPR &lt; α: safe, but less powerful)
+  n=100: FPR=0.0444 → 🟡 conservative (FPR &lt; α: safe, but less powerful)
+  n=150: FPR=0.0461 → ✅ valid (α inside the CI)
+  n=200: FPR=0.0496 → ✅ valid (α inside the CI)
+
+Strong skewness (sigma=1.1):
+  n=100: FPR=0.0411 → 🟡 conservative (FPR &lt; α: safe, but less powerful)
+  n=200: FPR=0.0484 → ✅ valid (α inside the CI)
+  n=400: FPR=0.0453 → 🟡 conservative (FPR &lt; α: safe, but less powerful)
+
+Bernoulli p=0.3, n=30: FPR=0.0504 → ✅ valid (α inside the CI)</code></pre>
+</div>
+</div>
+<p><strong>Interpretation.</strong> The heavier the tail, the <strong>larger the <span class="math inline">\(n\)</span></strong> the CLT needs — strongly skewed ARPU requires noticeably more observations than moderately skewed. For a binary metric with a not-too-small <span class="math inline">\(p\)</span>, the <span class="math inline">\(t\)</span>-test is usually valid already at modest <span class="math inline">\(n\)</span>. The lesson is universal: <strong>the “sufficient <span class="math inline">\(n\)</span>” depends on the shape of the data</strong>, and you can only learn it by simulation.</p>
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="version-3-the-universal-simulate_rejections" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Version 3 — the universal <code>simulate_rejections</code></h1>
+<p>So far we generated <strong>both</strong> groups from a single generator. Reality is more complex: test and control can be of <strong>different shape</strong>, <strong>different size</strong>, and we also care about different <code>alternative</code> values and the Student/Welch choice. We generalize <code>simulate_fpr</code> into a single tool — <code>simulate_rejections</code>.</p>
+<div id="v3" class="cell" data-execution_count="9">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> simulate_rejections(test_gen, control_gen, n_test, n_control<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>                        n_exps<span class="op">=</span><span class="dv">10_000</span>, alpha<span class="op">=</span><span class="fl">0.05</span>, equal_var<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>                        alternative<span class="op">=</span><span class="st">"two-sided"</span>, seed<span class="op">=</span><span class="dv">73</span>):</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""A universal Monte Carlo validator.</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="co">    Counts the share of H0 rejections + a 95% Wilson CI.</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="co">      • test_gen ≡ control_gen, equal means  → share = FPR</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="co">      • means differ (there is an effect)    → share = power (TPR)</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a><span class="co">    equal_var=False → Welch (default); True → Student's t-test.</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> n_control <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>        n_control <span class="op">=</span> n_test</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>    np.random.seed(seed)</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    rej <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(n_exps):</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>        test    <span class="op">=</span> test_gen(n_test)</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>        control <span class="op">=</span> control_gen(n_control)</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>        pvalue  <span class="op">=</span> stats.ttest_ind(test, control, equal_var<span class="op">=</span>equal_var,</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>                                  alternative<span class="op">=</span>alternative).pvalue</span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>        rej <span class="op">+=</span> pvalue <span class="op">&lt;</span> alpha</span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>    rate   <span class="op">=</span> rej <span class="op">/</span> n_exps</span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> proportion_confint(rej, n_exps, alpha<span class="op">=</span><span class="fl">0.05</span>, method<span class="op">=</span><span class="st">"wilson"</span>)</span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"rate"</span>: rate, <span class="st">"ci"</span>: (lo, hi)}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<section id="a-tricky-case-same-mean-different-shape" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="a-tricky-case-same-mean-different-shape"><span class="header-section-number">4.1</span> A tricky case: same mean, different shape</h2>
+<p>Now <span class="math inline">\(H_0\)</span> is <strong>still true</strong> (both means = 250 ₴), but the groups differ in spread. Business analogy: the promotion did not change the average check, but made the test group <strong>more heterogeneous</strong> (some started ordering more, some less). In a new city both groups are small — <span class="math inline">\(n = 30\)</span>.</p>
+<div id="v3-demo" class="cell" data-execution_count="10">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>test_wide  <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.8</span>)   <span class="co"># wider spread</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>ctrl_tight <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.4</span>)   <span class="co"># narrower spread</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> simulate_rejections(test_wide, ctrl_tight, n_test<span class="op">=</span><span class="dv">30</span>)</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR = </span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss">   CI = (</span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.4f}</span><span class="ss">, </span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.4f}</span><span class="ss">)"</span>)</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"5% inside the CI? </span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">0</span>] <span class="op">&lt;=</span> <span class="fl">0.05</span> <span class="op">&lt;=</span> r[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>FPR = 0.0727   CI = (0.0678, 0.0780)
+5% inside the CI? False</code></pre>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>The test is <strong>not valid</strong> here
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The FPR is noticeably <strong>above</strong> 5%, and <span class="math inline">\(\alpha\)</span> is <strong>outside</strong> the CI. On small heterogeneous groups the <span class="math inline">\(t\)</span>-test “sees an effect” more often than allowed — each such error is a <strong>false roll-out of a feature</strong> that actually did nothing. The question: from what <span class="math inline">\(n\)</span> does it correct itself? (Version 4.)</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Your turn 3
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Make the group spreads <strong>equal</strong> (<code>sigma=0.6</code> for both) at <span class="math inline">\(n=30\)</span>. Does the FPR return to 5%? That is, the problem is precisely the <strong>unequal spread</strong> at small <span class="math inline">\(n\)</span>.</li>
+<li>Switch <code>alternative</code> to <code>"greater"</code>/<code>"less"</code>. How does this affect the FPR in this A/A?</li>
+<li><strong>Applied.</strong> Imagine a “whale outlier”: mix into the test group 1% of huge orders (<code>np.where(np.random.rand(n)&lt;0.01, 50000, base)</code>). What happens to the FPR?</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-10-contents" aria-controls="callout-10" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Solution 3
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-10" class="callout-10-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div id="sol3" class="cell" data-execution_count="11">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) equal spread fixes it</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>same <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.6</span>)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> simulate_rejections(same, same, n_test<span class="op">=</span><span class="dv">30</span>)</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Equal spread, n=30: FPR=</span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss"> "</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"(</span><span class="sc">{</span><span class="st">'✅'</span> <span class="cf">if</span> r[<span class="st">'ci'</span>][<span class="dv">0</span>] <span class="op">&lt;=</span> <span class="fl">0.05</span> <span class="op">&lt;=</span> r[<span class="st">'ci'</span>][<span class="dv">1</span>] <span class="cf">else</span> <span class="st">'⛔'</span><span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) one-sided alternatives</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> alt <span class="kw">in</span> (<span class="st">"greater"</span>, <span class="st">"less"</span>, <span class="st">"two-sided"</span>):</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> simulate_rejections(test_wide, ctrl_tight, <span class="dv">30</span>, alternative<span class="op">=</span>alt)</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  alt=</span><span class="sc">{</span>alt<span class="sc">:&gt;9s}</span><span class="ss">: FPR=</span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a><span class="co"># (3) a whale outlier in the test group</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> whale(n):</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>    base <span class="op">=</span> arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.where(np.random.rand(n) <span class="op">&lt;</span> <span class="fl">0.01</span>, <span class="fl">50000.0</span>, base)</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> simulate_rejections(whale, <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.5</span>), n_test<span class="op">=</span><span class="dv">200</span>)</span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Whale outlier in the test, n=200: FPR=</span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss"> "</span></span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"(</span><span class="sc">{</span><span class="st">'✅'</span> <span class="cf">if</span> r[<span class="st">'ci'</span>][<span class="dv">0</span>] <span class="op">&lt;=</span> <span class="fl">0.05</span> <span class="op">&lt;=</span> r[<span class="st">'ci'</span>][<span class="dv">1</span>] <span class="cf">else</span> <span class="st">'⛔'</span><span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Equal spread, n=30: FPR=0.0436 (⛔)
+  alt=  greater: FPR=0.0202
+  alt=     less: FPR=0.1005
+  alt=two-sided: FPR=0.0727
+Whale outlier in the test, n=200: FPR=0.1463 (⛔)</code></pre>
+</div>
+</div>
+<p><strong>Interpretation.</strong> You can break the <span class="math inline">\(t\)</span>-test at small <span class="math inline">\(n\)</span> with <strong>unequal spread</strong> (item 1 shows: equal variances → FPR returns to 5%). The one-sided versions redistribute the error across the tails but do not remove the overall problem. A “whale outlier” is the mean’s worst enemy: a single giant at 50,000 ₴ inflates the test group’s variance and skews the FPR even at <span class="math inline">\(n=200\)</span>. In practice such whales are <strong>winsorized</strong> or you switch to robust metrics.</p>
+</div>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="version-4-the-minimum-sample-size" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Version 4 — the minimum sample size</h1>
+<p>We have the tool — let’s use it as in the lecture: run the check for growing <span class="math inline">\(n\)</span> and stop as soon as <span class="math inline">\(\alpha\)</span> <strong>first</strong> lands inside the confidence interval. The function <strong>reuses</strong> <code>simulate_rejections</code>.</p>
+<div id="v4" class="cell" data-execution_count="12">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> min_sample_size(test_gen, control_gen, grid, alpha<span class="op">=</span><span class="fl">0.05</span>, <span class="op">**</span>kw):</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Smallest n in grid for which α lies in the FPR's CI. Reuses V3."""</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> n <span class="kw">in</span> grid:</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>        r <span class="op">=</span> simulate_rejections(test_gen, control_gen, n_test<span class="op">=</span>n, alpha<span class="op">=</span>alpha, <span class="op">**</span>kw)</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>        lo, hi <span class="op">=</span> r[<span class="st">"ci"</span>]</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>        ok <span class="op">=</span> lo <span class="op">&lt;=</span> alpha <span class="op">&lt;=</span> hi</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"  n=</span><span class="sc">{</span>n<span class="sc">:&gt;4d}</span><span class="ss">:  FPR=</span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss">  "</span></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>              <span class="ss">f"CI=(</span><span class="sc">{</span>lo<span class="sc">:.4f}</span><span class="ss">, </span><span class="sc">{</span>hi<span class="sc">:.4f}</span><span class="ss">)  </span><span class="sc">{</span><span class="st">'✅'</span> <span class="cf">if</span> ok <span class="cf">else</span> <span class="st">'⛔'</span><span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> ok:</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> n</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="va">None</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="v4-demo" class="cell" data-execution_count="13">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>n_min <span class="op">=</span> min_sample_size(test_wide, ctrl_tight, grid<span class="op">=</span><span class="bu">range</span>(<span class="dv">50</span>, <span class="dv">401</span>, <span class="dv">50</span>))</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Minimum sample size: ~</span><span class="sc">{</span>n_min<span class="sc">}</span><span class="ss"> per group"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  n=  50:  FPR=0.0665  CI=(0.0618, 0.0716)  ⛔
+  n= 100:  FPR=0.0555  CI=(0.0512, 0.0602)  ⛔
+  n= 150:  FPR=0.0516  CI=(0.0474, 0.0561)  ✅
+
+Minimum sample size: ~150 per group</code></pre>
+</div>
+</div>
+<p>For these heterogeneous ARPU groups the <span class="math inline">\(t\)</span>-test needs <strong>about 150</strong> users per group before it can be trusted. In big cities this is no problem; in new ones it is a signal to <strong>hold off on conclusions</strong> or aggregate the data.</p>
+<div id="cell-v4-plot" class="cell" data-execution_count="14">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>grid <span class="op">=</span> np.arange(<span class="dv">25</span>, <span class="dv">401</span>, <span class="dv">25</span>)</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>fprs, los, his <span class="op">=</span> [], [], []</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> grid:</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> simulate_rejections(test_wide, ctrl_tight, n_test<span class="op">=</span>n, n_exps<span class="op">=</span><span class="dv">5000</span>)</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>    fprs.append(r[<span class="st">"rate"</span>])<span class="op">;</span> los.append(r[<span class="st">"ci"</span>][<span class="dv">0</span>])<span class="op">;</span> his.append(r[<span class="st">"ci"</span>][<span class="dv">1</span>])</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">4</span>))</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>ax.plot(grid, fprs, color<span class="op">=</span>blue, lw<span class="op">=</span><span class="dv">2</span>, marker<span class="op">=</span><span class="st">"o"</span>, ms<span class="op">=</span><span class="dv">3</span>, label<span class="op">=</span><span class="st">"empirical FPR"</span>)</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>ax.fill_between(grid, los, his, color<span class="op">=</span>blue, alpha<span class="op">=</span><span class="fl">0.15</span>, label<span class="op">=</span><span class="st">"95% Wilson CI"</span>)</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>ax.axhline(<span class="fl">0.05</span>, color<span class="op">=</span>red, ls<span class="op">=</span><span class="st">"--"</span>, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"promised α = 0.05"</span>)</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"n per group"</span>)</span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"FPR"</span>)</span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"The t-test's FPR decays to 0.05 as n grows"</span>)</span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src=".05-monte-carlo-en_files/figure-html/v4-plot-output-1.png" id="v4-plot" class="quarto-figure quarto-figure-center anchored figure-img" width="758" height="374"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Your turn 4
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Run <code>min_sample_size</code> for <strong>equal</strong> variances (both <code>sigma=0.6</code>). Is the threshold much smaller?</li>
+<li>Pass <code>alternative="greater"</code> into <code>min_sample_size</code> (via <code>**kw</code>). Does the threshold change for the one-sided test?</li>
+<li><strong>Applied.</strong> Reduce <code>n_exps</code> to 2000 in <code>simulate_rejections</code> inside the search. Why does the search then become <strong>unreliable</strong> (the CI widens)? What is the “precision ↔︎ time” trade-off?</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-12-contents" aria-controls="callout-12" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Solution 4
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-12" class="callout-12-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div id="sol4" class="cell" data-execution_count="15">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Equal variances (sigma=0.6 for both):"</span>)</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>same <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.6</span>)</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>n_eq <span class="op">=</span> min_sample_size(same, same, grid<span class="op">=</span><span class="bu">range</span>(<span class="dv">20</span>, <span class="dv">201</span>, <span class="dv">20</span>))</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"→ threshold ~</span><span class="sc">{</span>n_eq<span class="sc">}</span><span class="ss"> (much smaller)</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"One-sided greater (unequal variances):"</span>)</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>n_gr <span class="op">=</span> min_sample_size(test_wide, ctrl_tight, grid<span class="op">=</span><span class="bu">range</span>(<span class="dv">50</span>, <span class="dv">401</span>, <span class="dv">50</span>),</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>                       alternative<span class="op">=</span><span class="st">"greater"</span>)</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"→ threshold ~</span><span class="sc">{</span>n_gr<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Equal variances (sigma=0.6 for both):
+  n=  20:  FPR=0.0399  CI=(0.0362, 0.0439)  ⛔
+  n=  40:  FPR=0.0473  CI=(0.0433, 0.0516)  ✅
+→ threshold ~40 (much smaller)
+
+One-sided greater (unequal variances):
+  n=  50:  FPR=0.0231  CI=(0.0203, 0.0262)  ⛔
+  n= 100:  FPR=0.0243  CI=(0.0215, 0.0275)  ⛔
+  n= 150:  FPR=0.0331  CI=(0.0298, 0.0368)  ⛔
+  n= 200:  FPR=0.0304  CI=(0.0272, 0.0339)  ⛔
+  n= 250:  FPR=0.0342  CI=(0.0308, 0.0379)  ⛔
+  n= 300:  FPR=0.0351  CI=(0.0317, 0.0389)  ⛔
+  n= 350:  FPR=0.0335  CI=(0.0301, 0.0372)  ⛔
+  n= 400:  FPR=0.0358  CI=(0.0323, 0.0396)  ⛔
+→ threshold ~None</code></pre>
+</div>
+</div>
+<p><strong>Interpretation.</strong> With <strong>equal</strong> variances the <span class="math inline">\(t\)</span>-test is valid already at modest <span class="math inline">\(n\)</span> — the problem is precisely the <strong>combination</strong> of skewness and unequal spread. A smaller <code>n_exps</code> speeds up the search but widens the CI, and the “α inside” verdict becomes fragile: you may accidentally “declare” the test valid too early. The classic precision/time trade-off from the lecture: <code>n_exps → ∞</code> gives precision but costs time.</p>
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="version-5-power-tpr-and-comparing-criteria" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Version 5 — power (TPR) and comparing criteria</h1>
+<p>The same tool measures <strong>power</strong>: you just have to generate data where the <strong>alternative</strong> is true (the test group has higher ARPU). Then rejecting <span class="math inline">\(H_0\)</span> is a <strong>correct</strong> firing, and its share = TPR.</p>
+<div id="v5-power" class="cell" data-execution_count="16">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>control <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n)        <span class="co"># the old menu</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> lift, n <span class="kw">in</span> [(<span class="dv">15</span>, <span class="dv">500</span>), (<span class="dv">15</span>, <span class="dv">2000</span>), (<span class="dv">30</span>, <span class="dv">500</span>), (<span class="dv">30</span>, <span class="dv">2000</span>)]:</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>    test <span class="op">=</span> <span class="kw">lambda</span> n, L<span class="op">=</span>lift: arpu_sample(<span class="dv">250</span> <span class="op">+</span> L, n)   <span class="co"># effect +L ₴</span></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> simulate_rejections(test, control, n_test<span class="op">=</span>n, alternative<span class="op">=</span><span class="st">"greater"</span>)</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"lift=+</span><span class="sc">{</span>lift<span class="sc">}</span><span class="ss"> ₴, n=</span><span class="sc">{</span>n<span class="sc">:&gt;4d}</span><span class="ss">:  power = </span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.3f}</span><span class="ss">  "</span></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"CI=(</span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>lift=+15 ₴, n= 500:  power = 0.401  CI=(0.391, 0.411)
+lift=+15 ₴, n=2000:  power = 0.877  CI=(0.871, 0.883)
+lift=+30 ₴, n= 500:  power = 0.858  CI=(0.851, 0.865)
+lift=+30 ₴, n=2000:  power = 1.000  CI=(1.000, 1.000)</code></pre>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>How to read the table
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Power grows both with the <strong>effect size</strong> and with the <strong>sample size</strong>. A small effect (+15 ₴) at <span class="math inline">\(n=500\)</span> is caught only in ~40% of cases — <strong>insufficient</strong> (the gold standard is 80%); so either a larger <span class="math inline">\(n\)</span>, or wait for a larger effect. This is the same <span class="math inline">\(n \leftrightarrow\)</span> MDE relationship as in Practice 4, but now measured <strong>by simulation</strong>, without formulas.</p>
+</div>
+</div>
+<section id="which-criterion-is-better-students-or-welch" class="level2" data-number="6.1">
+<h2 data-number="6.1" class="anchored" data-anchor-id="which-criterion-is-better-students-or-welch"><span class="header-section-number">6.1</span> Which criterion is better: Student’s or Welch?</h2>
+<p>We know both from Practice 4. In the lecture we saw that they are <strong>not</strong> interchangeable. A realistic A/B: the feature was rolled out to <strong>20%</strong> of users, so the test group is smaller; and it is also <strong>more heterogeneous</strong> (the promotion added spread). <span class="math inline">\(H_0\)</span> is true (equal means).</p>
+<div id="v5-criteria" class="cell" data-execution_count="17">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>test_small <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.6</span>)   <span class="co"># 20%, wider spread</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>ctrl_big   <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.4</span>)   <span class="co"># 80%, narrower spread</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>student <span class="op">=</span> simulate_rejections(test_small, ctrl_big, n_test<span class="op">=</span><span class="dv">200</span>, n_control<span class="op">=</span><span class="dv">800</span>,</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>                              equal_var<span class="op">=</span><span class="va">True</span>)            <span class="co"># Student</span></span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>welch   <span class="op">=</span> simulate_rejections(test_small, ctrl_big, n_test<span class="op">=</span><span class="dv">200</span>, n_control<span class="op">=</span><span class="dv">800</span>,</span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>                              equal_var<span class="op">=</span><span class="va">False</span>)           <span class="co"># Welch</span></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Student: FPR = </span><span class="sc">{</span>student[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss">  "</span></span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"CI=(</span><span class="sc">{</span>student[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>student[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Welch:   FPR = </span><span class="sc">{</span>welch[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss">  "</span></span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"CI=(</span><span class="sc">{</span>welch[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>welch[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Student: FPR = 0.1280  CI=(0.122, 0.135)
+Welch:   FPR = 0.0543  CI=(0.050, 0.059)</code></pre>
+</div>
+</div>
+<div id="cell-v5-criteria-plot" class="cell" data-execution_count="18">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>names <span class="op">=</span> [<span class="st">"Student</span><span class="ch">\n</span><span class="st">(equal_var=True)"</span>, <span class="st">"Welch</span><span class="ch">\n</span><span class="st">(equal_var=False)"</span>]</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>vals  <span class="op">=</span> [student[<span class="st">"rate"</span>], welch[<span class="st">"rate"</span>]]</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>errs  <span class="op">=</span> np.array([[v <span class="op">-</span> r[<span class="st">"ci"</span>][<span class="dv">0</span>], r[<span class="st">"ci"</span>][<span class="dv">1</span>] <span class="op">-</span> v]</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>                  <span class="cf">for</span> v, r <span class="kw">in</span> <span class="bu">zip</span>(vals, (student, welch))]).T</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="fl">7.5</span>, <span class="dv">4</span>))</span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>ax.bar(names, vals, color<span class="op">=</span>[red_pink, turquoise], width<span class="op">=</span><span class="fl">0.5</span>,</span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>       yerr<span class="op">=</span>errs, capsize<span class="op">=</span><span class="dv">6</span>, error_kw<span class="op">=</span>{<span class="st">"ecolor"</span>: gray})</span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>ax.axhline(<span class="fl">0.05</span>, color<span class="op">=</span>red, ls<span class="op">=</span><span class="st">"--"</span>, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"promised α = 5%"</span>)</span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"FPR (H0 is true)"</span>)</span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Unequal groups (200 vs 800) + unequal spread"</span>)</span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src=".05-monte-carlo-en_files/figure-html/v5-criteria-plot-output-1.png" id="v5-criteria-plot" class="quarto-figure quarto-figure-center anchored figure-img" width="710" height="374"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Verdict
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>With <strong>unequal group sizes and unequal variances</strong> Student’s test inflates the FPR by <strong>2–3×</strong> (here ~13% instead of 5%) — it underestimates the standard error and yields false positives. <strong>Welch keeps it at ~5%.</strong> That is exactly why <code>equal_var=False</code> was the default in Practice 4. Monte Carlo visibly proved what we took on faith.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Your turn 5
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Make the groups <strong>equal</strong> (<span class="math inline">\(n=500\)</span> each), keeping the unequal spread. Does Welch’s advantage disappear? (hint from Practice 4: with equal <span class="math inline">\(n\)</span> the difference is small).</li>
+<li>Measure the <strong>power</strong> of Student’s and Welch on a +20 ₴ effect at the same 200/800. Does Welch pay for its correctness with a noticeable loss of power?</li>
+<li><strong>Applied.</strong> The team wants to “catch +15 ₴ with power ≥ 0.8” on equal groups. Sweep <span class="math inline">\(n \in \{1000, 2000, 4000\}\)</span> and find a sufficient one.</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-16-contents" aria-controls="callout-16" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Solution 5
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-16" class="callout-16-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div id="sol5" class="cell" data-execution_count="19">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) equal groups — Welch's advantage disappears</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>s <span class="op">=</span> simulate_rejections(test_small, ctrl_big, <span class="dv">500</span>, <span class="dv">500</span>, equal_var<span class="op">=</span><span class="va">True</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>w <span class="op">=</span> simulate_rejections(test_small, ctrl_big, <span class="dv">500</span>, <span class="dv">500</span>, equal_var<span class="op">=</span><span class="va">False</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Equal n=500:  Student=</span><span class="sc">{</span>s<span class="sc">:.4f}</span><span class="ss">  Welch=</span><span class="sc">{</span>w<span class="sc">:.4f}</span><span class="ss">  → almost identical"</span>)</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) power — the price of correctness</span></span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>test20 <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">270</span>, n, sigma<span class="op">=</span><span class="fl">0.6</span>)</span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> simulate_rejections(test20, ctrl_big, <span class="dv">200</span>, <span class="dv">800</span>, equal_var<span class="op">=</span><span class="va">True</span>,  alternative<span class="op">=</span><span class="st">"greater"</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>pw <span class="op">=</span> simulate_rejections(test20, ctrl_big, <span class="dv">200</span>, <span class="dv">800</span>, equal_var<span class="op">=</span><span class="va">False</span>, alternative<span class="op">=</span><span class="st">"greater"</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Power(+20 ₴): Student=</span><span class="sc">{</span>ps<span class="sc">:.3f}</span><span class="ss">  Welch=</span><span class="sc">{</span>pw<span class="sc">:.3f}</span><span class="ss">  "</span></span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"(but Student is INVALID here → its power is misleading)"</span>)</span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a><span class="co"># (3) how much is needed for +15 ₴</span></span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>control <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n)</span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Searching n for power≥0.8 on +15 ₴ (equal groups):"</span>)</span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> (<span class="dv">1000</span>, <span class="dv">2000</span>, <span class="dv">4000</span>):</span>
+<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a>    test15 <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">265</span>, n)</span>
+<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a>    p <span class="op">=</span> simulate_rejections(test15, control, n_test<span class="op">=</span>n, alternative<span class="op">=</span><span class="st">"greater"</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  n=</span><span class="sc">{</span>n<span class="sc">:&gt;4d}</span><span class="ss">: power=</span><span class="sc">{</span>p<span class="sc">:.3f}</span><span class="ss"> </span><span class="sc">{</span><span class="st">'✅'</span> <span class="cf">if</span> p<span class="op">&gt;=</span><span class="fl">0.8</span> <span class="cf">else</span> <span class="st">''</span><span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Equal n=500:  Student=0.0497  Welch=0.0495  → almost identical
+Power(+20 ₴): Student=0.615  Welch=0.445  (but Student is INVALID here → its power is misleading)
+
+Searching n for power≥0.8 on +15 ₴ (equal groups):
+  n=1000: power=0.631 
+  n=2000: power=0.877 ✅
+  n=4000: power=0.990 ✅</code></pre>
+</div>
+</div>
+<p><strong>Interpretation.</strong> With <strong>equal</strong> groups Student’s and Welch almost coincide — the trouble is only with unequal <span class="math inline">\(n\)</span>. You can compare power <strong>only among valid</strong> criteria: Student’s higher “power” is a consequence of its inflated FPR, not a real advantage. For +15 ₴ with power ≥ 0.8 on equal groups you need several thousand users per group — a small effect is expensive (just like the MDE trade-off in Practice 4).</p>
+</div>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="final-validation-on-historical-data-1000-aa" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Final — validation on historical data (1000 A/A)</h1>
+<p>Synthetic generators are convenient, but “what if my real data are different?”. The lecture’s answer: the <strong>thousand A/A tests</strong> method. Take historical logs, slice them (city × cuisine), and on <strong>each</strong> slice run an A/A: randomly split the users in half (no treatment → <span class="math inline">\(H_0\)</span> is true) and run the criterion. The share of firings across all slices = the FPR on <strong>real</strong> data.</p>
+<div id="final-log" class="cell" data-execution_count="20">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Simulate a "historical" ARPU log: 50 cities × 8 cuisines = 400 slices</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>np.random.seed(<span class="dv">2026</span>)                  <span class="co"># reproducibility: arpu_sample uses the global RNG</span></span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">2026</span>)</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>cities   <span class="op">=</span> [<span class="ss">f"city_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">50</span>)]</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>cuisines <span class="op">=</span> [<span class="st">"pizza"</span>, <span class="st">"sushi"</span>, <span class="st">"burger"</span>, <span class="st">"vegan"</span>, <span class="st">"asian"</span>, <span class="st">"bbq"</span>, <span class="st">"dessert"</span>, <span class="st">"salad"</span>]</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> city <span class="kw">in</span> cities:</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>    base <span class="op">=</span> rng.uniform(<span class="dv">150</span>, <span class="dv">400</span>)                  <span class="co"># its own average ARPU</span></span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> cuisine <span class="kw">in</span> cuisines:</span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>        n   <span class="op">=</span> rng.integers(<span class="dv">150</span>, <span class="dv">500</span>)</span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a>        sig <span class="op">=</span> rng.uniform(<span class="fl">0.5</span>, <span class="fl">0.9</span>)               <span class="co"># its own skewness</span></span>
+<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a>        arpu <span class="op">=</span> arpu_sample(base, n, sigma<span class="op">=</span>sig)</span>
+<span id="cb31-14"><a href="#cb31-14" aria-hidden="true" tabindex="-1"></a>        rows.append(pd.DataFrame({<span class="st">"city"</span>: city, <span class="st">"cuisine"</span>: cuisine, <span class="st">"arpu"</span>: arpu}))</span>
+<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-16"><a href="#cb31-16" aria-hidden="true" tabindex="-1"></a>log <span class="op">=</span> pd.concat(rows, ignore_index<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"users: </span><span class="sc">{</span><span class="bu">len</span>(log)<span class="sc">:,}</span><span class="ss">   slices (datasets): "</span></span>
+<span id="cb31-18"><a href="#cb31-18" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"</span><span class="sc">{</span>log<span class="sc">.</span>groupby([<span class="st">'city'</span>,<span class="st">'cuisine'</span>])<span class="sc">.</span>ngroups<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>users: 127,228   slices (datasets): 400</code></pre>
+</div>
+</div>
+<div id="final-fn" class="cell" data-execution_count="21">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> thousand_aa_tests(log, alpha<span class="op">=</span><span class="fl">0.05</span>, lift<span class="op">=</span><span class="fl">0.0</span>, equal_var<span class="op">=</span><span class="va">False</span>, seed<span class="op">=</span><span class="dv">1</span>):</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""A thousand A/A (or A/B) tests on historical slices. Reuses ttest_ind.</span></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a><span class="co">    lift=0   → A/A → share = FPR on real data.</span></span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a><span class="co">    lift&gt;0   → A/B with a simulated effect → share = power.</span></span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a><span class="co">    Split the users in each slice INDEPENDENTLY (otherwise tests are dependent).</span></span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>    rng, rej, k <span class="op">=</span> np.random.default_rng(seed), <span class="dv">0</span>, <span class="dv">0</span></span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _, g <span class="kw">in</span> log.groupby([<span class="st">"city"</span>, <span class="st">"cuisine"</span>]):</span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>        arpu <span class="op">=</span> g[<span class="st">"arpu"</span>].to_numpy()</span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>        idx  <span class="op">=</span> rng.permutation(<span class="bu">len</span>(arpu))          <span class="co"># independent split</span></span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>        half <span class="op">=</span> <span class="bu">len</span>(arpu) <span class="op">//</span> <span class="dv">2</span></span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>        control <span class="op">=</span> arpu[idx[:half]]</span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>        test    <span class="op">=</span> arpu[idx[half:<span class="dv">2</span> <span class="op">*</span> half]] <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> lift)</span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>        rej <span class="op">+=</span> stats.ttest_ind(test, control, equal_var<span class="op">=</span>equal_var).pvalue <span class="op">&lt;</span> alpha</span>
+<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a>        k   <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> proportion_confint(rej, k, alpha<span class="op">=</span><span class="fl">0.05</span>, method<span class="op">=</span><span class="st">"wilson"</span>)</span>
+<span id="cb33-18"><a href="#cb33-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"rate"</span>: rej <span class="op">/</span> k, <span class="st">"ci"</span>: (lo, hi), <span class="st">"k"</span>: k}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="final-demo" class="cell" data-execution_count="22">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>aa <span class="op">=</span> thousand_aa_tests(log)</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"A/A FPR over </span><span class="sc">{</span>aa[<span class="st">'k'</span>]<span class="sc">}</span><span class="ss"> slices: </span><span class="sc">{</span>aa[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss">  "</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"CI=(</span><span class="sc">{</span>aa[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.4f}</span><span class="ss">, </span><span class="sc">{</span>aa[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.4f}</span><span class="ss">)  "</span></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"→ </span><span class="sc">{</span><span class="st">'✅ valid'</span> <span class="cf">if</span> aa[<span class="st">'ci'</span>][<span class="dv">0</span>] <span class="op">&lt;=</span> <span class="fl">0.05</span> <span class="op">&lt;=</span> aa[<span class="st">'ci'</span>][<span class="dv">1</span>] <span class="cf">else</span> <span class="st">'⛔'</span><span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Power on a simulated effect (lift as </span><span class="sc">% o</span><span class="st">f ARPU):"</span>)</span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> lift <span class="kw">in</span> (<span class="fl">0.03</span>, <span class="fl">0.05</span>, <span class="fl">0.10</span>):</span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> thousand_aa_tests(log, lift<span class="op">=</span>lift)</span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  lift=+</span><span class="sc">{</span>lift<span class="sc">:.0%}</span><span class="ss">:  power = </span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.3f}</span><span class="ss">  "</span></span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"CI=(</span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>A/A FPR over 400 slices: 0.0500  CI=(0.0326, 0.0760)  → ✅ valid
+
+Power on a simulated effect (lift as % of ARPU):
+  lift=+3%:  power = 0.080  CI=(0.057, 0.111)
+  lift=+5%:  power = 0.102  CI=(0.076, 0.136)
+  lift=+10%:  power = 0.203  CI=(0.166, 0.245)</code></pre>
+</div>
+</div>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Why this is more convincing than synthetic data
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>On the slices we have the <strong>real</strong> GreenBowl ARPU distribution, with all its real whales and skewness. <span class="math inline">\(\alpha = 0.05\)</span> is inside the CI → the A/A infrastructure can be trusted. For power there is no effect, so we <strong>simulated</strong> it (multiply the test by <span class="math inline">\(1+\text{lift}\)</span>): the exact size is not critical, especially when <strong>comparing</strong> two criteria. The CI is wider than on synthetic data because there are only 400 slices — more logs would give a tighter estimate.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Your turn 6
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Compare Student’s (<code>equal_var=True</code>) and Welch on the historical slices. The split here is 50/50 (equal groups) — is the difference noticeable?</li>
+<li>Add a third slicing dimension — the <strong>month</strong> (add a random <code>month</code> to the log). How many slices are there now and how does this affect the CI width?</li>
+<li><strong>Applied.</strong> One slice = one A/A. Show that <strong>a single</strong> A/A test proves nothing: take any slice and compute its FPR over 2000 repeated splits. Why does only the <strong>collection</strong> of slices give a conclusion?</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-19-contents" aria-controls="callout-19" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Solution 6
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-19" class="callout-19-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div id="sol6" class="cell" data-execution_count="23">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) Student vs Welch on equal 50/50 slices</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>st <span class="op">=</span> thousand_aa_tests(log, equal_var<span class="op">=</span><span class="va">True</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>we <span class="op">=</span> thousand_aa_tests(log, equal_var<span class="op">=</span><span class="va">False</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Historical slices (50/50): Student=</span><span class="sc">{</span>st<span class="sc">:.4f}</span><span class="ss">  Welch=</span><span class="sc">{</span>we<span class="sc">:.4f}</span><span class="ss">  → close"</span>)</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a><span class="co"># (3) a single slice proves nothing</span></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>one <span class="op">=</span> log.groupby([<span class="st">"city"</span>, <span class="st">"cuisine"</span>]).get_group((<span class="st">"city_0"</span>, <span class="st">"pizza"</span>))[<span class="st">"arpu"</span>].to_numpy()</span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">0</span>)<span class="op">;</span> rej <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">2000</span>):</span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> rng.permutation(<span class="bu">len</span>(one))<span class="op">;</span> h <span class="op">=</span> <span class="bu">len</span>(one) <span class="op">//</span> <span class="dv">2</span></span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a>    rej <span class="op">+=</span> stats.ttest_ind(one[idx[h:<span class="dv">2</span><span class="op">*</span>h]], one[idx[:h]], equal_var<span class="op">=</span><span class="va">False</span>).pvalue <span class="op">&lt;</span> <span class="fl">0.05</span></span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR on a SINGLE slice (2000 splits): </span><span class="sc">{</span>rej<span class="op">/</span><span class="dv">2000</span><span class="sc">:.4f}</span><span class="ss"> "</span></span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"— an estimate from one slice, with wide noise"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Historical slices (50/50): Student=0.0500  Welch=0.0500  → close
+FPR on a SINGLE slice (2000 splits): 0.0520 — an estimate from one slice, with wide noise</code></pre>
+</div>
+</div>
+<p><strong>Interpretation.</strong> On <strong>equal</strong> 50/50 slices Student’s and Welch almost coincide (unequal <span class="math inline">\(n\)</span> is the main trigger of divergence). A single A/A test gives just one “yes/no” and says nothing about the FPR — you need a <strong>thousand</strong> slices to estimate the error rate precisely (which is why the method is called “a thousand A/A”). Adding a “month” dimension multiplies the number of slices and <strong>narrows</strong> the CI — more independent experiments = a more precise estimate.</p>
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="interpretation-traps" class="level1" data-number="8">
+<h1 data-number="8"><span class="header-section-number">8</span> Interpretation traps</h1>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>A point estimate without a CI
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>FPR <span class="math inline">\(= 0.047\)</span> does <strong>not</strong> yet mean “valid”, nor does <span class="math inline">\(0.053\)</span> mean “broken”. Always check whether <span class="math inline">\(\alpha\)</span> is <strong>inside the confidence interval</strong>. Without the interval you are reading noise.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Large <span class="math inline">\(n\)</span> saves you, not “data normalization”
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <span class="math inline">\(t\)</span>-test on skewed ARPU becomes correct thanks to the <strong>CLT + Slutsky — only at a sufficient <span class="math inline">\(n\)</span></strong>. On small heterogeneous groups any variant errs; there you need more data, winsorization of whales, or robust metrics.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>The default is Welch
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>With unequal group sizes/variances Student’s test inflates the FPR. <code>equal_var=False</code> (Welch) is the safe default. Pooled Student’s — only when there are <strong>strong grounds</strong> to believe the variances are equal.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Power is compared only among VALID criteria
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The “higher power” of a broken criterion is an illusion: it simply rejects <span class="math inline">\(H_0\)</span> more often, including <strong>falsely</strong>. First check the FPR, and only then compare the TPR.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>A single A/A test proves nothing
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>One run gives one “yes/no”. The infrastructure’s correctness is shown only by the <strong>collection</strong> (≈1000) of independent A/A tests. And the users must be split <strong>independently</strong> in each — otherwise the tests become dependent.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Simulate a realistic effect
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Power depends on <strong>which</strong> effect you assume. Take an effect similar to the one you expect in practice (or compare criteria — then the exact effect size matters less).</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="criterion-validation-checklist" class="level1 unnumbered">
+<h1 class="unnumbered">Criterion-validation checklist</h1>
+<ul class="task-list">
+<li><label><input type="checkbox">Which <strong>criterion</strong> and on <strong>what data</strong> are we testing?</label></li>
+<li><label><input type="checkbox">How do we generate <span class="math inline">\(H_0\)</span> so that it is <strong>guaranteed true</strong> (A/A)?</label></li>
+<li><label><input type="checkbox">Computed the <strong>FPR with a confidence interval</strong> — and is <span class="math inline">\(\alpha\)</span> inside?</label></li>
+<li><label><input type="checkbox">If the data are skewed — have we checked the <strong>minimum <span class="math inline">\(n\)</span></strong> from which the test is valid?</label></li>
+<li><label><input type="checkbox">Groups of different size/spread → did we use <strong>Welch</strong>, not pooled?</label></li>
+<li><label><input type="checkbox">To choose between criteria — did we compare the <strong>power</strong> (only among valid ones)?</label></li>
+<li><label><input type="checkbox">If there are historical logs — did we run <strong>≈1000 A/A</strong> with an <strong>independent</strong> split?</label></li>
+<li><label><input type="checkbox">For power — is the effect simulated <strong>realistically</strong>?</label></li>
+</ul>
+<p>If even one answer is “no” — it is <strong>too early</strong> to trust the criterion. ```</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

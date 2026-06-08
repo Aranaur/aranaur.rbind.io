@@ -1,0 +1,734 @@
+---
+title: "Monte Carlo methods for testing hypotheses"
+subtitle: "Applied Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .04-monte-carlo_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=4049">🔗Applied Statistics</a>
+format:
+  revealjs:
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+jupyter: python3
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy import stats
+from statsmodels.stats.proportion import proportion_confint
+
+# Define colors (shared palette across the slides)
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+# Minimal theme defaults — close to ggplot2 theme_minimal()
+plt.rcParams.update({
+    "figure.facecolor": "white",
+    "axes.facecolor":   "white",
+    "axes.edgecolor":   slate,
+    "axes.labelcolor":  slate,
+    "axes.titlesize":   13,
+    "axes.spines.top":   False,
+    "axes.spines.right": False,
+    "axes.grid":        True,
+    "grid.color":       "#dddddd",
+    "grid.alpha":       0.6,
+    "xtick.color":      slate,
+    "ytick.color":      slate,
+    "font.size":        11,
+    "legend.frameon":   False,
+})
+```
+
+# Why validate criteria? {background-iframe=".04-monte-carlo_files/libs/colored-particles/index.html"}
+
+## 🎯 The most important tool of the course {.smaller}
+
+Today we learn the [Monte Carlo method]{.hi} --- a way to **validate** any statistical criterion on real or simulated data.
+
+With it we will answer three practical questions:
+
+- **Is my criterion correct?** Does it really keep the promised error rate? (e.g. does the $t$-test work on small samples?)
+- **I have two valid criteria. Which one is better** for my task?
+- **How small a sample is "too small"** for the $t$-test?
+
+. . .
+
+::: {.callout-tip icon=false}
+You no longer have to *trust* the textbook or the lecturer. Monte Carlo is a fishing rod: you can check every claim yourself.
+:::
+
+::: {.notes}
+Це найважливіша лекція курсу — результати будемо перевикористовувати далі. Головна ідея: не вірте авторитету, перевіряйте. У реальній роботі ми застосовуємо складні критерії (зменшення варіації, ML, хитрі гіпотези), а де складно — там легко припуститися помилки в коді чи в математиці, яку сам не помітиш. Монте-Карло — універсальна «вудка» для валідації. Але демонструвати будемо на простому й знайомому t-тесті.
+:::
+
+## 🧩 Recall the $t$-test map {.smaller}
+
+From the previous lecture we promised: the $t$-test works **everywhere except small non-normal samples**.
+
+|                          | small sample | large sample |
+|--------------------------|:------------:|:------------:|
+| **normal** distribution  | $t$-test     | $t$-test     |
+| **any** distribution     | **?**        | $t$-test     |
+
+. . .
+
+Two honest questions remain:
+
+- Can we *prove on data* (not just trust the math) that the $t$-test really works in the green cells?
+- What do we put in the empty cell **?**
+
+::: {.notes}
+Повертаємось до таблиці з лекції про t-тест. Велика вибірка — рятує ЦГТ (працює для будь-якого розподілу). Мала + нормальна — працює точний t-розподіл. Порожня клітинка — мала + ненормальна — це інтрига лекції. Монте-Карло дасть відповідь і заразом дозволить *перевірити на даних* те, що ми досі брали на віру з математики.
+:::
+
+## 🎲 What is the Monte Carlo method? {.smaller}
+
+The idea: **put on the hat of an omniscient god**. We *decide* how the data are distributed, then simulate the experiment a huge number of times and count a statistic.
+
+To check an **error rate** we must generate experiments where we *know the truth*:
+
+- to measure false positives → generate data where $H_0$ is **true**;
+- to measure power → generate data where $H_1$ is **true**.
+
+. . .
+
+::: {.callout-note icon=false}
+**Monte Carlo in one sentence:** generate many experiments with a known answer, run the criterion on each, and see how often it is right.
+:::
+
+::: {.notes}
+Суть методу: ми вдаємо всезнаючого бога — самі задаємо «істинний» розподіл даних, тож знаємо правильну відповідь наперед. Якщо хочемо виміряти частоту хибних спрацювань — генеруємо дані, де H0 заведомо вірна. Якщо потужність — де вірна альтернатива. Далі тисячі разів повторюємо експеримент і рахуємо статистику. Уся лекція — варіації цієї однієї ідеї.
+:::
+
+# Is the criterion correct? (FPR) {background-iframe=".04-monte-carlo_files/libs/colored-particles/index.html"}
+
+## ✅ What does "correct" mean? {.smaller}
+
+Back to the definition. A criterion of significance level $\alpha$ means:
+
+> the probability of **wrongly** rejecting a true $H_0$ is $\le \alpha$.
+
+This is the [false positive rate (FPR)]{.hi}, a.k.a. error of the first kind.
+
+. . .
+
+In plain words: if we repeat the **same** experiment infinitely many times, **regenerating** the data so that $H_0$ is true, the share of false rejections must be $\approx \alpha$ (say, 5%).
+
+::: {.callout-important icon=false}
+A correct criterion run at $\alpha = 5\%$ should be wrong in **about 5 of every 100** experiments --- no more.
+:::
+
+::: {.notes}
+Означення коректності через FPR. α — це контракт: «помиляйся хибно-позитивно не частіше ніж у 5% випадків». Бізнес-сенс: якщо за рік запустили критерій 100 разів з α=5%, то приблизно 5 разів зробите хибне відкриття (побачите ефект там, де його нема — наприклад, розкатаєте зміну, яка насправді нічого не дала). Звідси вибір α: не подобається 5 помилок зі 100 — беріть α менше.
+:::
+
+## 🔁 The validation procedure {.smaller}
+
+To check FPR we literally re-enact the definition:
+
+0. Code up the criterion to be checked.
+1. Pick a distribution that describes the data (Bernoulli for conversion, exponential for revenue, ...).
+2. Set a counter `bad_cnt = 0`.
+3. Repeat `N` times (the bigger `N`, the better):
+   - simulate **test** and **control** so that $H_0$ is true;
+   - run the criterion, get its `p-value`;
+   - if `p-value < alpha` → `bad_cnt += 1` (a false positive).
+4. The estimate of FPR is `bad_cnt / N`.
+
+. . .
+
+If FPR $\approx \alpha$ → fine. If FPR $> \alpha$ → the criterion is **invalid** (you lose money more often than promised).
+
+::: {.notes}
+Алгоритм буквально повторює означення. Ключове — на кроці 1 правильно обрати розподіл, на кроці 3 згенерувати так, щоб H0 була вірна (для AB-тесту — дві вибірки з однаковим середнім). bad — бо хибне відхилення в A/A це погано. Якщо FPR більший за α — критерієм користуватися не можна. Якщо менший — критерій валідний, але, як побачимо, менш потужний.
+:::
+
+## 🧪 Example: $t$-test on small normal samples {.smaller}
+
+Our running case: an **A/B test** comparing two groups. Start in the "safe" cell --- small **normal** samples, $H_0$ true ($\mathbb{E}A = \mathbb{E}B$).
+
+```{python}
+#| label: fpr-normal
+#| output-location: column
+
+np.random.seed(42)
+
+N      = 20_000      # number of experiments
+alpha  = 0.05
+n      = 5           # tiny sample!
+dist   = stats.norm(loc=2, scale=3)
+
+bad_cnt = 0
+for _ in range(N):
+    test    = dist.rvs(n)   # H0 is true:
+    control = dist.rvs(n)   # same distribution
+    pvalue  = stats.ttest_ind(test, control).pvalue
+    bad_cnt += pvalue < alpha
+
+print(f"FPR: {bad_cnt / N:.4f}")
+```
+
+We got FPR $\approx 5\%$... but not **exactly** 5%. Is the criterion broken? 🤔
+
+::: {.notes}
+Перший приклад — найбезпечніша клітинка: мала нормальна вибірка (n=5), H0 вірна (тест і контроль з того самого розподілу). Звичайний двовибірковий t-тест (Стьюдента). Отримуємо ~5%, але не рівно. Перша думка студента: «не 5% — значить критерій неправильний». Це хибна думка — у нас лише точкова оцінка по скінченному N. Далі полагодимо це довірчим інтервалом.
+:::
+
+## 📏 Don't forget the noise: a confidence interval {.smaller}
+
+`FPR = bad_cnt / N` is just a **point estimate** from `N` experiments. We need a confidence interval for it.
+
+A `bad`/`good` outcome is Bernoulli → use the ready-made [Wilson interval](https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval#Wilson_score_interval):
+
+```{python}
+#| label: fpr-ci
+#| output-location: column
+
+ci = proportion_confint(
+    count=bad_cnt, nobs=N,
+    alpha=0.05, method="wilson"
+)
+print(f"FPR: {bad_cnt / N:.4f}")
+print(f"95% CI: ({ci[0]:.4f}, {ci[1]:.4f})")
+```
+
+. . .
+
+::: {.callout-note icon=false}
+## Verdict
+$5\%$ lies **inside** the confidence interval → the $t$-test is **valid** for small normal samples. ✅
+
+Need more precision? Increase `N` --- the interval shrinks.
+:::
+
+::: {.notes}
+Виправляємо крок 4: будуємо довірчий інтервал для FPR. Оскільки кожен експеримент — Бернуллі (помилився/ні), беремо інтервал Уілсона з коробки (statsmodels), не виводимо вручну. 5% потрапило в інтервал → критерій валідний. Якщо хочемо вужчий інтервал — збільшуємо N (але довше рахується, особливо для складних критеріїв). Це і є чесна перевірка, а не точкова оцінка.
+:::
+
+## ⚠️ A trickier case: same mean, different shape {.smaller}
+
+Now $H_0$ is **still true** ($\mathbb{E}A = \mathbb{E}B = 10$), but the two distributions have **different shapes** --- a realistic revenue scenario.
+
+```{python}
+#| label: two-expon-plot
+#| code-fold: true
+#| fig-align: center
+
+test_dist    = stats.expon(scale=10)          # mean = 10
+control_dist = stats.expon(loc=5, scale=5)    # mean = 5 + 5 = 10
+
+x = np.linspace(0, 60, 1000)
+fig, ax = plt.subplots(figsize=(11, 4.2))
+ax.plot(x, test_dist.pdf(x),    color=red_pink, lw=2, label="test")
+ax.plot(x, control_dist.pdf(x), color=turquoise, lw=2, label="control")
+ax.axvline(10, color=slate, ls="--", lw=1, label="common mean = 10")
+ax.set_title("Two different distributions with the same mean")
+ax.set_xlabel("Revenue")
+ax.set_ylabel("Density")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+Same mean, so the $t$-test (comparing means) **should** keep $H_0$. Will it?
+
+::: {.notes}
+Тепер складніший кейс: H0 все ще вірна (мат. сподівання обох = 10), але форми розподілів РІЗНІ. Бізнес-аналогія: раніше виторг з користувача був у середньому 10 і не менший за 5; після зміни частина почала платити менше, але середній чек лишився 10. Це валідний сценарій для перевірки критерію рівності середніх — розподіли можуть відрізнятись, важливо лише що середні рівні. t-тест ТЕОРЕТИЧНО має тримати H0.
+:::
+
+## 🛠️ A reusable function: `simulate_rejections` {.smaller}
+
+We will reuse this procedure many times, so let's wrap it once and for all.
+
+```{python}
+#| label: simulate-fn
+
+def simulate_rejections(test_dist, control_dist, n_test, n_control=None,
+                        n_exps=10_000, alpha=0.05, equal_var=False,
+                        alternative="two-sided", effect=0.0, seed=42):
+    """Run an A/B (or A/A) experiment n_exps times and return the rejection
+    rate together with its 95% Wilson confidence interval.
+
+    effect=0   → H0 is true  → the rate is the FPR.
+    effect>0   → H1 is true  → the rate is the power (TPR).
+    """
+    if n_control is None:
+        n_control = n_test
+    rng, rej = np.random.default_rng(seed), 0
+    for _ in range(n_exps):
+        test    = test_dist.rvs(n_test,    random_state=rng) + effect
+        control = control_dist.rvs(n_control, random_state=rng)
+        pvalue  = stats.ttest_ind(test, control, equal_var=equal_var,
+                                  alternative=alternative).pvalue
+        rej += pvalue < alpha
+    ci = proportion_confint(rej, n_exps, alpha=0.05, method="wilson")
+    return rej / n_exps, ci
+```
+
+::: {.callout-tip icon=false}
+One function, three jobs: **FPR** (`effect=0`), **power** (`effect>0`), and comparing **Student** vs **Welch** (`equal_var`).
+:::
+
+::: {.notes}
+Виносимо процедуру в одну функцію, яку перевикористаємо до кінця лекції (і курсу). За замовчуванням equal_var=False — це Welch, безпечніший варіант з лекції про t-тест. Параметр effect зсуває тест: 0 → A/A → міряємо FPR; >0 → A/B → міряємо потужність. random_state=rng у кожному rvs гарантує незалежність і відтворюваність. Функція повертає і точкову оцінку, і довірчий інтервал — щоб одразу робити чесний висновок.
+:::
+
+## ❌ The $t$-test fails here {.smaller}
+
+```{python}
+#| label: expon-fail
+#| output-location: column
+
+rate, ci = simulate_rejections(
+    test_dist, control_dist,
+    n_test=20, n_exps=10_000
+)
+print(f"FPR: {rate:.4f}")
+print(f"95% CI: ({ci[0]:.4f}, {ci[1]:.4f})")
+print(f"5% inside CI? {ci[0] < 0.05 < ci[1]}")
+```
+
+. . .
+
+::: {.callout-important icon=false}
+At $n = 20$ the FPR is **significantly above** 5% --- the interval does **not** contain $\alpha$.
+
+For these distributions and this sample size the $t$-test is **not valid**: it cries "effect!" too often.
+:::
+
+From which sample size does it start to behave?
+
+::: {.notes}
+Викликаємо нашу функцію для двох різних експоненційних розподілів, n=20. FPR помітно вищий за 5%, і 5% НЕ в довірчому інтервалі → критерій некоректний для такої малої вибірки. Це той самий тип помилки, що коштує грошей: занадто часто бачимо ефект там, де його нема. Наступне питання — а з якого розміру вибірки t-тест «оживає»?
+:::
+
+## 📐 Finding the minimum sample size {.smaller}
+
+Run the **same** check across growing sample sizes and stop when $\alpha$ first lands inside the CI.
+
+```{python}
+#| label: min-size
+#| output-location: column
+
+alpha = 0.05
+for n in range(20, 121, 20):
+    rate, (lo, hi) = simulate_rejections(
+        test_dist, control_dist,
+        n_test=n, n_exps=10_000
+    )
+    ok = lo < alpha < hi
+    print(f"n={n:3d}  FPR={rate:.4f}  "
+          f"CI=({lo:.4f},{hi:.4f})  "
+          f"{'✅' if ok else '❌'}")
+    if ok:
+        print(f"\nMin sample size: {n}")
+        break
+```
+
+From $n \approx 60$ the $t$-test keeps its promise even for these skewed, unequal distributions.
+
+::: {.notes}
+Прогоняємо ту саму перевірку для зростаючих розмірів вибірки й зупиняємось, коли 5% уперше потрапляє в довірчий інтервал. Бачимо: десь із n≈60 t-тест уже коректний навіть для таких скошених різних розподілів. Хочемо точніше / вужчий інтервал — збільшуємо n_exps до 100k. Так ми емпірично знаходимо межу між «малою» і «великою» вибіркою для КОНКРЕТНИХ даних.
+:::
+
+## 🧩 Filling the empty cell {.smaller}
+
+So what goes in the **?** cell? The answer: [run a Monte Carlo check]{.hi}.
+
+|                          | small sample              | large sample |
+|--------------------------|:-------------------------:|:------------:|
+| **normal** distribution  | $t$-test                  | $t$-test     |
+| **any** distribution     | **Monte Carlo check**     | $t$-test     |
+
+. . .
+
+Sometimes the $t$-test is even **conservative** --- FPR *below* $\alpha$:
+
+```{python}
+#| label: conservative
+#| output-location: column
+
+equal = stats.expon(scale=20)
+rate, ci = simulate_rejections(
+    equal, equal, n_test=10, n_exps=10_000
+)
+print(f"FPR: {rate:.4f}")
+print(f"95% CI: ({ci[0]:.4f}, {ci[1]:.4f})")
+```
+
+Here FPR $< 5\%$ → the $t$-test **may** be used (just expect somewhat lower power).
+
+::: {.notes}
+Заповнюємо порожню клітинку: відповідь дає Монте-Карло перевірка — для конкретних даних і розміру вибірки. Приклад: дві ОДНАКОВІ експоненти, n=10 — FPR виходить НИЖЧЕ 5%. Це означає, що t-тест тут МОЖНА застосовувати: він помиляється рідше, ніж заявлено (це безпечно), просто буде трохи менш потужним. Тобто «мала ненормальна» не завжди = «не можна»; завжди перевіряй.
+:::
+
+# How to simulate an experiment? {background-iframe=".04-monte-carlo_files/libs/colored-particles/index.html"}
+
+## 🧪 Two ways to generate experiments {.smaller}
+
+:::: {.columns}
+
+::: {.column width="50%"}
+**1. Artificial modelling**
+
+Approximate the real data with distributions:
+
+- revenue → exponential;
+- conversion → Bernoulli;
+- "90% pay nothing" → Bernoulli × exponential mixture.
+
+➕ infinitely many, fast, full control of the distribution.
+➖ valid on *artificial* data --- maybe not on yours.
+:::
+
+::: {.column width="50%"}
+**2. Historical company data**
+
+Use logs from the last few years as the ground truth.
+
+- split real users into test / control → one "experiment";
+- repeat on many slices of the logs.
+
+➕ the data look **exactly** like your real task.
+➖ hard to collect many independent slices.
+:::
+
+::::
+
+::: {.notes}
+Два способи згенерувати експерименти. Штучне моделювання: підбираємо розподіли (виторг — експонента, конверсія — Бернуллі, суміші для «90% платять нуль»). Багато, швидко, повний контроль — але валідність лише на штучних даних. Історичні дані: беремо реальні логи за роки — дані виглядають точно як у реальній задачі, але зібрати багато незалежних зрізів складно. На етапі дебагу нового критерію штучні дані зручніші, для фінальної валідації — історичні.
+:::
+
+## 🏷️ From one dataset to a thousand {.smaller}
+
+How do we get **many** experiments out of **one** log? Slice it along independent dimensions.
+
+- by **category**: auto, real estate, services, jobs, ...
+- by **month**: Nov, Dec, Jan, ...
+- (optionally) by **region**.
+
+. . .
+
+The Cartesian product explodes the count: $40 \text{ categories} \times 24 \text{ months} \approx 960$ datasets. Add 80 regions → tens of thousands.
+
+::: {.callout-note icon=false}
+On each slice we run an [A/A test]{.hi}: randomly split users into test/control with **no** treatment, so $H_0$ is **guaranteed** true. About **1000 A/A tests** is enough to tell a broken criterion from a good one.
+:::
+
+::: {.notes}
+Як з одного логу зробити багато експериментів: ріжемо за незалежними вимірами — категорія × місяць (× регіон). Декартів добуток дає тисячі датасетів. На кожному зрізі — A/A-тест: випадково ділимо користувачів на тест/контроль БЕЗ жодного впливу, тож H0 заведомо вірна. Важливо ділити НЕЗАЛЕЖНО в кожному зрізі, інакше великі користувачі зміщують усі тести в один бік і вони стають залежними. Один A/A-тест нічого не каже; потрібна тисяча.
+:::
+
+## 🔬 1000 A/A tests in code {.smaller}
+
+Let's build a synthetic "revenue log" (category × month) and run an A/A test on every slice.
+
+```{python}
+#| label: build-log
+#| code-fold: true
+
+rng = np.random.default_rng(7)
+categories = [f"cat_{i}"       for i in range(40)]
+months     = [f"2024-{m:02d}"  for m in range(1, 13)] + \
+             [f"2025-{m:02d}"  for m in range(1, 13)]
+
+rows = []
+for cat in categories:
+    base = rng.uniform(50, 400)              # category-specific average revenue
+    for mon in months:
+        n   = rng.integers(200, 600)
+        rev = stats.expon.rvs(scale=base, size=n, random_state=rng)
+        rows.append(pd.DataFrame({"category": cat, "month": mon, "revenue": rev}))
+
+log = pd.concat(rows, ignore_index=True)
+print(f"users: {len(log):,}   datasets: {log.groupby(['category','month']).ngroups}")
+```
+
+```{python}
+#| label: aa-tests
+
+def thousand_aa_tests(log, alpha=0.05, effect=0.0, seed=1):
+    rng, rej, k = np.random.default_rng(seed), 0, 0
+    for _, g in log.groupby(["category", "month"]):
+        rev  = g["revenue"].to_numpy()
+        idx  = rng.permutation(len(rev))      # independent split every time
+        half = len(rev) // 2
+        control = rev[idx[:half]]
+        test    = rev[idx[half:2 * half]] * (1 + effect)   # effect=0 → A/A
+        rej += stats.ttest_ind(test, control, equal_var=False).pvalue < alpha
+        k   += 1
+    return rej / k, proportion_confint(rej, k, alpha=0.05, method="wilson")
+
+rate, ci = thousand_aa_tests(log)
+print(f"A/A FPR over {log.groupby(['category','month']).ngroups} datasets: "
+      f"{rate:.4f}  CI=({ci[0]:.4f}, {ci[1]:.4f})")
+```
+
+5% sits inside the interval → on **real-looking** data the $t$-test is valid. ✅
+
+::: {.notes}
+Будуємо синтетичний лог виторгу (40 категорій × 24 місяці ≈ 960 датасетів) — імітація реальних історичних даних. Функція thousand_aa_tests на кожному зрізі НЕЗАЛЕЖНО перемішує користувачів, ділить навпіл (A/A) і запускає Welch t-тест. Рахуємо частку хибних спрацювань по всіх ~960 тестах + довірчий інтервал. 5% всередині → на «реалістичних» даних критерій коректний. Параметр effect знадобиться далі для потужності.
+:::
+
+## ⚖️ Artificial vs historical: a summary {.smaller}
+
+|                         | Artificial data        | Historical data            |
+|-------------------------|------------------------|----------------------------|
+| **Amount**              | unlimited              | limited by your logs       |
+| **Speed**               | fast                   | slower, needs good logging |
+| **Realism**             | only as good as your guess | exactly your real data |
+| **Best for**            | early debugging of a new criterion | final go/no-go decision |
+
+. . .
+
+::: {.callout-tip icon=false}
+Use **artificial** data to debug a new criterion fast, and **historical** data to make the final call --- a criterion can pass on clean synthetic data yet fail on noisier reality.
+:::
+
+::: {.notes}
+Підсумок порівняння. Штучні: безліч, швидко, але реалізм залежить від вашої здогадки про розподіл. Історичні: точно як реальність, але зібрати багато складно. Практика: спочатку дебажимо новий критерій на штучних (швидко ловимо баги в коді/математиці), фінальне рішення «застосовувати чи ні» — на історичних. Бо завжди можна написати критерій, що ідеальний на штучних даних, але ламається на шумнішій реальності.
+:::
+
+# Which criterion is better? (Power) {background-iframe=".04-monte-carlo_files/libs/colored-particles/index.html"}
+
+## 💪 Power = true positive rate {.smaller}
+
+Suppose **two** criteria are both valid (correct FPR). Which one is better?
+
+> The better one has higher [power]{.hi} --- it detects a real effect more often.
+
+Same Monte Carlo procedure, two changes:
+
+- generate experiments where $H_1$ is **true** (add an effect to the test group);
+- instead of `bad_cnt` count `rej_cnt` (now a rejection is **good**) → that share is the **power / TPR**.
+
+::: {.notes}
+Друга велика задача: маємо два валідні критерії (обидва з правильним α=5%) — який кращий? Той, у кого більша потужність: частіше виявляє ефект, коли він справді є (більше true positives). Процедура та сама, але: генеруємо дані, де вірна альтернатива (додаємо ефект тесту), і рахуємо НЕ bad, а rejection — тепер відхилення це добре. Частка відхилень = потужність = TPR.
+:::
+
+## 🧮 Power of the $t$-test {.smaller}
+
+Reuse the **same function** --- just pass an `effect`. Here the test group gets a real shift.
+
+```{python}
+#| label: power-basic
+#| output-location: column
+
+dist = stats.norm(loc=2, scale=3)
+
+power, ci = simulate_rejections(
+    dist, dist,
+    n_test=15, effect=1.0,    # H1 is true
+    n_exps=10_000
+)
+print(f"Power (TPR): {power:.4f}")
+print(f"95% CI: ({ci[0]:.4f}, {ci[1]:.4f})")
+```
+
+. . .
+
+Power $\approx 14\%$ --- quite low. To compare a **second** criterion, just run the same check on it and see which TPR is higher (don't forget statistical significance).
+
+::: {.callout-note icon=false}
+The same `simulate_rejections` now measures **power** --- we only added `effect`.
+:::
+
+::: {.notes}
+Перевикористовуємо ту саму функцію — лише передаємо effect (зсув тесту), тобто робимо H1 вірною. Потужність ~14% — низька. Якщо є другий критерій, запускаємо ту саму перевірку для нього і порівнюємо TPR (зважаючи на стат. значущість — довірчі інтервали). Жодної нової математики: один і той самий Монте-Карло, лише генеруємо під альтернативою. Це детально відпрацюємо в домашньому завданні.
+:::
+
+## 📈 Power grows with effect and sample size {.smaller}
+
+```{python}
+#| label: power-grid
+#| code-fold: true
+#| fig-align: center
+
+dist = stats.norm(loc=2, scale=3)
+configs = [("effect=1, n=15", 1.0, 15),
+           ("effect=2, n=15", 2.0, 15),
+           ("effect=2, n=50", 2.0, 50)]
+
+labels, powers, errs = [], [], []
+for label, eff, n in configs:
+    p, (lo, hi) = simulate_rejections(dist, dist, n_test=n, effect=eff, n_exps=10_000)
+    labels.append(label); powers.append(p)
+    errs.append([p - lo, hi - p])
+
+errs = np.array(errs).T
+fig, ax = plt.subplots(figsize=(11, 4.2))
+ax.bar(labels, powers, color=[turquoise, green, blue], width=0.55,
+       yerr=errs, capsize=6, error_kw={"ecolor": slate})
+ax.axhline(0.8, color=red, ls="--", lw=2, label="80% gold standard")
+ax.set_ylim(0, 1)
+ax.set_ylabel("Power (TPR)")
+ax.set_title("Bigger effect and bigger sample → more power")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+A bigger true effect and a bigger sample both raise power. In practice **80%** power is the gold standard.
+
+::: {.notes}
+Потужність залежить від того, ЯК виглядає альтернатива. Більший справжній ефект детектувати легше → потужність росте. Більша вибірка → теж більша потужність. На графіку: ефект 1 при n=15 дає ~14%, ефект 2 — близько 42%, а при n=50 переходимо за 80%. 80% — золотий стандарт: якщо критерій його досягає на вашому розмірі вибірки, можна сміливо застосовувати. Важливо підбирати ефект, який реалістично очікуєте на практиці.
+:::
+
+## 🥊 Student vs Welch: two valid-looking criteria {.smaller}
+
+We know **two** $t$-tests from the previous lecture: Student's (`equal_var=True`) and Welch's (`equal_var=False`). Are they interchangeable?
+
+A realistic A/B split: **70% / 30%**, and the smaller group is **noisier** ($\sigma$ twice as large). $H_0$ is true (equal means).
+
+```{python}
+#| label: student-vs-welch
+#| output-location: column
+
+A = stats.norm(loc=0, scale=1)   # 70%, low variance
+B = stats.norm(loc=0, scale=2)   # 30%, high variance
+
+stud, ci_s = simulate_rejections(
+    A, B, n_test=70, n_control=30,
+    equal_var=True,  n_exps=10_000)   # Student
+
+welch, ci_w = simulate_rejections(
+    A, B, n_test=70, n_control=30,
+    equal_var=False, n_exps=10_000)   # Welch
+
+print(f"Student FPR: {stud:.4f}  CI=({ci_s[0]:.3f},{ci_s[1]:.3f})")
+print(f"Welch   FPR: {welch:.4f}  CI=({ci_w[0]:.3f},{ci_w[1]:.3f})")
+```
+
+::: {.notes}
+Порівнюємо два знайомі критерії — Стьюдента (equal_var=True) і Велча (equal_var=False). Сценарій реалістичний для A/B: розбивка 70/30, причому менша група шумніша (σ удвічі більша). H0 вірна — середні рівні. Це не новий критерій (жодного Манна-Уітні!), просто два варіанти t-тесту з минулої лекції. Подивимось, чи обидва тримають 5%.
+:::
+
+## 🥊 Student vs Welch: the verdict {.smaller}
+
+```{python}
+#| label: student-vs-welch-plot
+#| code-fold: true
+#| fig-align: center
+
+names  = ["Student\n(equal_var=True)", "Welch\n(equal_var=False)"]
+vals   = [stud, welch]
+cis    = [ci_s, ci_w]
+errs   = np.array([[v - lo, hi - v] for v, (lo, hi) in zip(vals, cis)]).T
+
+fig, ax = plt.subplots(figsize=(10, 4.2))
+ax.bar(names, vals, color=[red_pink, turquoise], width=0.5,
+       yerr=errs, capsize=6, error_kw={"ecolor": slate})
+ax.axhline(0.05, color=red, ls="--", lw=2, label="promised α = 5%")
+ax.set_ylabel("FPR (H0 is true)")
+ax.set_title("Unequal variances + unequal group sizes")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+::: {.callout-important icon=false}
+With unequal group sizes **and** unequal variances, **Student's test inflates the FPR to ~12%** instead of 5% --- invalid! **Welch keeps it at ~5%.** That is why Welch (`equal_var=False`) is the safer default.
+:::
+
+::: {.notes}
+Вердикт: коли розміри груп різні І дисперсії різні (менша група шумніша), Стьюдент роздуває FPR до ~12% замість 5% — некоректний, втрачає гроші. Welch тримає ~5%. Ось чому в лекції про t-тест ми за замовчуванням брали equal_var=False. Монте-Карло наочно показав різницю між двома «однаковими на вигляд» критеріями. Найважливіше припущення, до речі, — незалежність спостережень, а не рівність дисперсій. (Манна-Уітні тут не чіпаємо — він у наступних лекціях.)
+:::
+
+## 🏭 Power on historical data {.smaller}
+
+On the A/A log there is no real effect, so we **simulate** one: imagine a promotion lifts revenue by some %. Reuse `thousand_aa_tests` with `effect > 0`.
+
+```{python}
+#| label: power-historical
+#| output-location: column
+
+for eff in [0.05, 0.10, 0.20]:
+    power, ci = thousand_aa_tests(log, effect=eff)
+    print(f"effect +{eff:.0%}:  "
+          f"power={power:.3f}  "
+          f"CI=({ci[0]:.3f}, {ci[1]:.3f})")
+```
+
+. . .
+
+The larger the simulated effect, the higher the power. You don't need the *exact* effect --- a plausible one is enough, especially when **comparing two criteria**.
+
+::: {.notes}
+На історичних даних (A/A-лог) справжнього ефекту нема, тож моделюємо його самі: припускаємо, що акція підняла виторг на X%. Перевикористовуємо ту саму функцію з effect>0. Бачимо: що більший змодельований ефект — то більша потужність. Точний розмір ефекту не критичний — достатньо правдоподібного, особливо коли ПОРІВНЮЄМО два критерії: переможе той, що кращий навіть на приблизно змодельованому ефекті. Так оцінюють потужність на реальних даних.
+:::
+
+# Summary {background-iframe=".04-monte-carlo_files/libs/colored-particles/index.html"}
+
+## 🧾 What Monte Carlo gives you {.smaller}
+
+The method is always the same: [generate many experiments with a known answer and count a statistic.]{.hi}
+
+- **Validate a criterion (FPR).** Generate data where $H_0$ is true, count false rejections, build a confidence interval for the FPR.
+- **Generate experiments** two ways: artificial distributions, or ~1000 A/A tests on historical logs.
+- **Find the minimum sample size** for the $t$-test --- the smallest $n$ where $\alpha$ lands inside the CI.
+- **Measure & compare power (TPR).** Generate under $H_1$; the better criterion detects the effect more often (Welch beat Student under heteroscedastic, unbalanced groups).
+
+. . .
+
+::: {.callout-tip icon=false}
+You now hold the fishing rod: stop trusting authority, **check** any criterion yourself. We will use this tool again and again.
+:::
+
+::: {.notes}
+Підсумок лекції. Усе зводиться до однієї ідеї: згенерувати багато експериментів із відомою відповіддю й порахувати статистику. Навчилися: перевіряти коректність критерію через FPR + довірчий інтервал; генерувати експерименти (штучно або тисячею A/A на історичних даних); знаходити мінімальний розмір вибірки; міряти й порівнювати потужність (Welch виявився кращим за Стьюдента на незбалансованих групах з різними дисперсіями). Це універсальний інструмент — повертатимемось до нього не раз.
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe=".04-monte-carlo_files/libs/colored-particles/index.html"}
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=4049)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src=".04-monte-carlo_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".04-monte-carlo_files/libs/quarto-html/tabby.min.js"></script>
+<script src=".04-monte-carlo_files/libs/quarto-html/popper.min.js"></script>
+<script src=".04-monte-carlo_files/libs/quarto-html/tippy.umd.min.js"></script>
+<link href=".04-monte-carlo_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".04-monte-carlo_files/libs/quarto-html/light-border.css" rel="stylesheet">
+<link href=".04-monte-carlo_files/libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".04-monte-carlo_files/libs/quarto-contrib/iconify-1.0.7/iconify-icon.min.js"></script><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.9.37">
+
+  <meta name="author" content="Ihor Miroshnychenko">
+  <title>Monte Carlo methods for testing hypotheses</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href=".04-monte-carlo_files/libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href=".04-monte-carlo_files/libs/revealjs/dist/reveal.css">
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+      vertical-align: middle;
+    }
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+      }
+    pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+    div.sourceCode
+      { color: #24292e;  }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #24292e; } /* Normal */
+    code span.al { color: #ff5555; font-weight: bold; } /* Alert */
+    code span.an { color: #6a737d; } /* Annotation */
+    code span.at { color: #d73a49; } /* Attribute */
+    code span.bn { color: #005cc5; } /* BaseN */
+    code span.bu { color: #d73a49; } /* BuiltIn */
+    code span.cf { color: #d73a49; } /* ControlFlow */
+    code span.ch { color: #032f62; } /* Char */
+    code span.cn { color: #005cc5; } /* Constant */
+    code span.co { color: #6a737d; } /* Comment */
+    code span.cv { color: #6a737d; } /* CommentVar */
+    code span.do { color: #6a737d; } /* Documentation */
+    code span.dt { color: #d73a49; } /* DataType */
+    code span.dv { color: #005cc5; } /* DecVal */
+    code span.er { color: #ff5555; text-decoration: underline; } /* Error */
+    code span.ex { color: #d73a49; font-weight: bold; } /* Extension */
+    code span.fl { color: #005cc5; } /* Float */
+    code span.fu { color: #6f42c1; } /* Function */
+    code span.im { color: #032f62; } /* Import */
+    code span.in { color: #6a737d; } /* Information */
+    code span.kw { color: #d73a49; } /* Keyword */
+    code span.op { color: #24292e; } /* Operator */
+    code span.ot { color: #6f42c1; } /* Other */
+    code span.pp { color: #d73a49; } /* Preprocessor */
+    code span.re { color: #6a737d; } /* RegionMarker */
+    code span.sc { color: #005cc5; } /* SpecialChar */
+    code span.ss { color: #032f62; } /* SpecialString */
+    code span.st { color: #032f62; } /* String */
+    code span.va { color: #e36209; } /* Variable */
+    code span.vs { color: #032f62; } /* VerbatimString */
+    code span.wa { color: #ff5555; } /* Warning */
+  </style>
+  <link rel="stylesheet" href=".04-monte-carlo_files/libs/revealjs/dist/theme/quarto-8a52321a21477e1bb40c2cb18c896737.css">
+  <link href=".04-monte-carlo_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href=".04-monte-carlo_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href=".04-monte-carlo_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href=".04-monte-carlo_files/libs/revealjs/plugin/reveal-chalkboard/font-awesome/css/all.css" rel="stylesheet">
+  <link href=".04-monte-carlo_files/libs/revealjs/plugin/reveal-chalkboard/style.css" rel="stylesheet">
+  <link href=".04-monte-carlo_files/libs/revealjs/plugin/verticator/verticator.css" rel="stylesheet">
+  <link href=".04-monte-carlo_files/libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+</head>
+<body class="quarto-light">
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide" data-background-iframe=".04-monte-carlo_files/libs/colored-particles/index.html" class="quarto-title-block center">
+  <h1 class="title">Monte Carlo methods for testing hypotheses</h1>
+  <p class="subtitle">Applied Statistics</p>
+
+<div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+Ihor Miroshnychenko 
+</div>
+        <p class="quarto-title-affiliation">
+            Kyiv School of Economics
+          </p>
+    </div>
+</div>
+
+</section><section id="TOC">
+<nav role="doc-toc"> 
+<h2 id="toc-title">Table of contents</h2>
+<ul>
+<li><a href="#/why-validate-criteria" id="/toc-why-validate-criteria">Why validate criteria?</a></li>
+<li><a href="#/is-the-criterion-correct-fpr" id="/toc-is-the-criterion-correct-fpr">Is the criterion correct? (FPR)</a></li>
+<li><a href="#/how-to-simulate-an-experiment" id="/toc-how-to-simulate-an-experiment">How to simulate an experiment?</a></li>
+<li><a href="#/which-criterion-is-better-power" id="/toc-which-criterion-is-better-power">Which criterion is better? (Power)</a></li>
+<li><a href="#/summary" id="/toc-summary">Summary</a></li>
+</ul>
+</nav>
+</section>
+<section>
+<section id="why-validate-criteria" class="title-slide slide level1 center" data-background-iframe=".04-monte-carlo_files/libs/colored-particles/index.html">
+<h1>Why validate criteria?</h1>
+
+</section>
+<section id="the-most-important-tool-of-the-course" class="slide level2 smaller">
+<h2>🎯 The most important tool of the course</h2>
+<p>Today we learn the <span class="hi">Monte Carlo method</span> — a way to <strong>validate</strong> any statistical criterion on real or simulated data.</p>
+<p>With it we will answer three practical questions:</p>
+<ul>
+<li><strong>Is my criterion correct?</strong> Does it really keep the promised error rate? (e.g.&nbsp;does the <span class="math inline">\(t\)</span>-test work on small samples?)</li>
+<li><strong>I have two valid criteria. Which one is better</strong> for my task?</li>
+<li><strong>How small a sample is “too small”</strong> for the <span class="math inline">\(t\)</span>-test?</li>
+</ul>
+<div class="fragment">
+<div class="callout callout-tip no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p>You no longer have to <em>trust</em> the textbook or the lecturer. Monte Carlo is a fishing rod: you can check every claim yourself.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Це найважливіша лекція курсу — результати будемо перевикористовувати далі. Головна ідея: не вірте авторитету, перевіряйте. У реальній роботі ми застосовуємо складні критерії (зменшення варіації, ML, хитрі гіпотези), а де складно — там легко припуститися помилки в коді чи в математиці, яку сам не помітиш. Монте-Карло — універсальна «вудка» для валідації. Але демонструвати будемо на простому й знайомому t-тесті.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="recall-the-t-test-map" class="slide level2 smaller">
+<h2>🧩 Recall the <span class="math inline">\(t\)</span>-test map</h2>
+<p>From the previous lecture we promised: the <span class="math inline">\(t\)</span>-test works <strong>everywhere except small non-normal samples</strong>.</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th></th>
+<th style="text-align: center;">small sample</th>
+<th style="text-align: center;">large sample</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>normal</strong> distribution</td>
+<td style="text-align: center;"><span class="math inline">\(t\)</span>-test</td>
+<td style="text-align: center;"><span class="math inline">\(t\)</span>-test</td>
+</tr>
+<tr class="even">
+<td><strong>any</strong> distribution</td>
+<td style="text-align: center;"><strong>?</strong></td>
+<td style="text-align: center;"><span class="math inline">\(t\)</span>-test</td>
+</tr>
+</tbody>
+</table>
+<div class="fragment">
+<p>Two honest questions remain:</p>
+<ul>
+<li>Can we <em>prove on data</em> (not just trust the math) that the <span class="math inline">\(t\)</span>-test really works in the green cells?</li>
+<li>What do we put in the empty cell <strong>?</strong></li>
+</ul>
+<aside class="notes">
+<p>Повертаємось до таблиці з лекції про t-тест. Велика вибірка — рятує ЦГТ (працює для будь-якого розподілу). Мала + нормальна — працює точний t-розподіл. Порожня клітинка — мала + ненормальна — це інтрига лекції. Монте-Карло дасть відповідь і заразом дозволить <em>перевірити на даних</em> те, що ми досі брали на віру з математики.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="what-is-the-monte-carlo-method" class="slide level2 smaller">
+<h2>🎲 What is the Monte Carlo method?</h2>
+<p>The idea: <strong>put on the hat of an omniscient god</strong>. We <em>decide</em> how the data are distributed, then simulate the experiment a huge number of times and count a statistic.</p>
+<p>To check an <strong>error rate</strong> we must generate experiments where we <em>know the truth</em>:</p>
+<ul>
+<li>to measure false positives → generate data where <span class="math inline">\(H_0\)</span> is <strong>true</strong>;</li>
+<li>to measure power → generate data where <span class="math inline">\(H_1\)</span> is <strong>true</strong>.</li>
+</ul>
+<div class="fragment">
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Monte Carlo in one sentence:</strong> generate many experiments with a known answer, run the criterion on each, and see how often it is right.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Суть методу: ми вдаємо всезнаючого бога — самі задаємо «істинний» розподіл даних, тож знаємо правильну відповідь наперед. Якщо хочемо виміряти частоту хибних спрацювань — генеруємо дані, де H0 заведомо вірна. Якщо потужність — де вірна альтернатива. Далі тисячі разів повторюємо експеримент і рахуємо статистику. Уся лекція — варіації цієї однієї ідеї.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section></section>
+<section>
+<section id="is-the-criterion-correct-fpr" class="title-slide slide level1 center" data-background-iframe=".04-monte-carlo_files/libs/colored-particles/index.html">
+<h1>Is the criterion correct? (FPR)</h1>
+
+</section>
+<section id="what-does-correct-mean" class="slide level2 smaller">
+<h2>✅ What does “correct” mean?</h2>
+<p>Back to the definition. A criterion of significance level <span class="math inline">\(\alpha\)</span> means:</p>
+<blockquote>
+<p>the probability of <strong>wrongly</strong> rejecting a true <span class="math inline">\(H_0\)</span> is <span class="math inline">\(\le \alpha\)</span>.</p>
+</blockquote>
+<p>This is the <span class="hi">false positive rate (FPR)</span>, a.k.a. error of the first kind.</p>
+<div class="fragment">
+<p>In plain words: if we repeat the <strong>same</strong> experiment infinitely many times, <strong>regenerating</strong> the data so that <span class="math inline">\(H_0\)</span> is true, the share of false rejections must be <span class="math inline">\(\approx \alpha\)</span> (say, 5%).</p>
+<div class="callout callout-important no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Important</strong></p>
+</div>
+<div class="callout-content">
+<p>A correct criterion run at <span class="math inline">\(\alpha = 5\%\)</span> should be wrong in <strong>about 5 of every 100</strong> experiments — no more.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Означення коректності через FPR. α — це контракт: «помиляйся хибно-позитивно не частіше ніж у 5% випадків». Бізнес-сенс: якщо за рік запустили критерій 100 разів з α=5%, то приблизно 5 разів зробите хибне відкриття (побачите ефект там, де його нема — наприклад, розкатаєте зміну, яка насправді нічого не дала). Звідси вибір α: не подобається 5 помилок зі 100 — беріть α менше.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="the-validation-procedure" class="slide level2 smaller">
+<h2>🔁 The validation procedure</h2>
+<p>To check FPR we literally re-enact the definition:</p>
+<ol start="0" type="1">
+<li>Code up the criterion to be checked.</li>
+<li>Pick a distribution that describes the data (Bernoulli for conversion, exponential for revenue, …).</li>
+<li>Set a counter <code>bad_cnt = 0</code>.</li>
+<li>Repeat <code>N</code> times (the bigger <code>N</code>, the better):
+<ul>
+<li>simulate <strong>test</strong> and <strong>control</strong> so that <span class="math inline">\(H_0\)</span> is true;</li>
+<li>run the criterion, get its <code>p-value</code>;</li>
+<li>if <code>p-value &lt; alpha</code> → <code>bad_cnt += 1</code> (a false positive).</li>
+</ul></li>
+<li>The estimate of FPR is <code>bad_cnt / N</code>.</li>
+</ol>
+<div class="fragment">
+<p>If FPR <span class="math inline">\(\approx \alpha\)</span> → fine. If FPR <span class="math inline">\(&gt; \alpha\)</span> → the criterion is <strong>invalid</strong> (you lose money more often than promised).</p>
+<aside class="notes">
+<p>Алгоритм буквально повторює означення. Ключове — на кроці 1 правильно обрати розподіл, на кроці 3 згенерувати так, щоб H0 була вірна (для AB-тесту — дві вибірки з однаковим середнім). bad — бо хибне відхилення в A/A це погано. Якщо FPR більший за α — критерієм користуватися не можна. Якщо менший — критерій валідний, але, як побачимо, менш потужний.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="example-t-test-on-small-normal-samples" class="slide level2 smaller">
+<h2>🧪 Example: <span class="math inline">\(t\)</span>-test on small normal samples</h2>
+<p>Our running case: an <strong>A/B test</strong> comparing two groups. Start in the “safe” cell — small <strong>normal</strong> samples, <span class="math inline">\(H_0\)</span> true (<span class="math inline">\(\mathbb{E}A = \mathbb{E}B\)</span>).</p>
+<div id="fpr-normal" class="cell columns column-output-location" data-execution_count="2">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="" aria-hidden="true" tabindex="-1"></a>np.random.seed(<span class="dv">42</span>)</span>
+<span id="cb1-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="" aria-hidden="true" tabindex="-1"></a>N      <span class="op">=</span> <span class="dv">20_000</span>      <span class="co"># number of experiments</span></span>
+<span id="cb1-4"><a href="" aria-hidden="true" tabindex="-1"></a>alpha  <span class="op">=</span> <span class="fl">0.05</span></span>
+<span id="cb1-5"><a href="" aria-hidden="true" tabindex="-1"></a>n      <span class="op">=</span> <span class="dv">5</span>           <span class="co"># tiny sample!</span></span>
+<span id="cb1-6"><a href="" aria-hidden="true" tabindex="-1"></a>dist   <span class="op">=</span> stats.norm(loc<span class="op">=</span><span class="dv">2</span>, scale<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb1-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="" aria-hidden="true" tabindex="-1"></a>bad_cnt <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb1-9"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(N):</span>
+<span id="cb1-10"><a href="" aria-hidden="true" tabindex="-1"></a>    test    <span class="op">=</span> dist.rvs(n)   <span class="co"># H0 is true:</span></span>
+<span id="cb1-11"><a href="" aria-hidden="true" tabindex="-1"></a>    control <span class="op">=</span> dist.rvs(n)   <span class="co"># same distribution</span></span>
+<span id="cb1-12"><a href="" aria-hidden="true" tabindex="-1"></a>    pvalue  <span class="op">=</span> stats.ttest_ind(test, control).pvalue</span>
+<span id="cb1-13"><a href="" aria-hidden="true" tabindex="-1"></a>    bad_cnt <span class="op">+=</span> pvalue <span class="op">&lt;</span> alpha</span>
+<span id="cb1-14"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR: </span><span class="sc">{</span>bad_cnt <span class="op">/</span> N<span class="sc">:.4f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>FPR: 0.0488</code></pre>
+</div>
+</div></div>
+<p>We got FPR <span class="math inline">\(\approx 5\%\)</span>… but not <strong>exactly</strong> 5%. Is the criterion broken? 🤔</p>
+<aside class="notes">
+<p>Перший приклад — найбезпечніша клітинка: мала нормальна вибірка (n=5), H0 вірна (тест і контроль з того самого розподілу). Звичайний двовибірковий t-тест (Стьюдента). Отримуємо ~5%, але не рівно. Перша думка студента: «не 5% — значить критерій неправильний». Це хибна думка — у нас лише точкова оцінка по скінченному N. Далі полагодимо це довірчим інтервалом.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="dont-forget-the-noise-a-confidence-interval" class="slide level2 smaller">
+<h2>📏 Don’t forget the noise: a confidence interval</h2>
+<p><code>FPR = bad_cnt / N</code> is just a <strong>point estimate</strong> from <code>N</code> experiments. We need a confidence interval for it.</p>
+<p>A <code>bad</code>/<code>good</code> outcome is Bernoulli → use the ready-made <a href="https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval#Wilson_score_interval">Wilson interval</a>:</p>
+<div id="fpr-ci" class="cell columns column-output-location" data-execution_count="3">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="" aria-hidden="true" tabindex="-1"></a>ci <span class="op">=</span> proportion_confint(</span>
+<span id="cb3-2"><a href="" aria-hidden="true" tabindex="-1"></a>    count<span class="op">=</span>bad_cnt, nobs<span class="op">=</span>N,</span>
+<span id="cb3-3"><a href="" aria-hidden="true" tabindex="-1"></a>    alpha<span class="op">=</span><span class="fl">0.05</span>, method<span class="op">=</span><span class="st">"wilson"</span></span>
+<span id="cb3-4"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR: </span><span class="sc">{</span>bad_cnt <span class="op">/</span> N<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb3-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"95% CI: (</span><span class="sc">{</span>ci[<span class="dv">0</span>]<span class="sc">:.4f}</span><span class="ss">, </span><span class="sc">{</span>ci[<span class="dv">1</span>]<span class="sc">:.4f}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>FPR: 0.0488
+95% CI: (0.0459, 0.0518)</code></pre>
+</div>
+</div></div>
+<div class="fragment">
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Verdict</strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math inline">\(5\%\)</span> lies <strong>inside</strong> the confidence interval → the <span class="math inline">\(t\)</span>-test is <strong>valid</strong> for small normal samples. ✅</p>
+<p>Need more precision? Increase <code>N</code> — the interval shrinks.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Виправляємо крок 4: будуємо довірчий інтервал для FPR. Оскільки кожен експеримент — Бернуллі (помилився/ні), беремо інтервал Уілсона з коробки (statsmodels), не виводимо вручну. 5% потрапило в інтервал → критерій валідний. Якщо хочемо вужчий інтервал — збільшуємо N (але довше рахується, особливо для складних критеріїв). Це і є чесна перевірка, а не точкова оцінка.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="a-trickier-case-same-mean-different-shape" class="slide level2 smaller">
+<h2>⚠️ A trickier case: same mean, different shape</h2>
+<p>Now <span class="math inline">\(H_0\)</span> is <strong>still true</strong> (<span class="math inline">\(\mathbb{E}A = \mathbb{E}B = 10\)</span>), but the two distributions have <strong>different shapes</strong> — a realistic revenue scenario.</p>
+<div id="cell-two-expon-plot" class="cell" data-execution_count="4">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="" aria-hidden="true" tabindex="-1"></a>test_dist    <span class="op">=</span> stats.expon(scale<span class="op">=</span><span class="dv">10</span>)          <span class="co"># mean = 10</span></span>
+<span id="cb5-2"><a href="" aria-hidden="true" tabindex="-1"></a>control_dist <span class="op">=</span> stats.expon(loc<span class="op">=</span><span class="dv">5</span>, scale<span class="op">=</span><span class="dv">5</span>)    <span class="co"># mean = 5 + 5 = 10</span></span>
+<span id="cb5-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="" aria-hidden="true" tabindex="-1"></a>x <span class="op">=</span> np.linspace(<span class="dv">0</span>, <span class="dv">60</span>, <span class="dv">1000</span>)</span>
+<span id="cb5-5"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">4.2</span>))</span>
+<span id="cb5-6"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(x, test_dist.pdf(x),    color<span class="op">=</span>red_pink, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"test"</span>)</span>
+<span id="cb5-7"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(x, control_dist.pdf(x), color<span class="op">=</span>turquoise, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"control"</span>)</span>
+<span id="cb5-8"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axvline(<span class="dv">10</span>, color<span class="op">=</span>slate, ls<span class="op">=</span><span class="st">"--"</span>, lw<span class="op">=</span><span class="dv">1</span>, label<span class="op">=</span><span class="st">"common mean = 10"</span>)</span>
+<span id="cb5-9"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Two different distributions with the same mean"</span>)</span>
+<span id="cb5-10"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"Revenue"</span>)</span>
+<span id="cb5-11"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"Density"</span>)</span>
+<span id="cb5-12"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb5-13"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb5-14"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04-monte-carlo_files/figure-revealjs/two-expon-plot-output-1.svg" id="two-expon-plot" class="quarto-figure quarto-figure-center r-stretch"><p>Same mean, so the <span class="math inline">\(t\)</span>-test (comparing means) <strong>should</strong> keep <span class="math inline">\(H_0\)</span>. Will it?</p>
+<aside class="notes">
+<p>Тепер складніший кейс: H0 все ще вірна (мат. сподівання обох = 10), але форми розподілів РІЗНІ. Бізнес-аналогія: раніше виторг з користувача був у середньому 10 і не менший за 5; після зміни частина почала платити менше, але середній чек лишився 10. Це валідний сценарій для перевірки критерію рівності середніх — розподіли можуть відрізнятись, важливо лише що середні рівні. t-тест ТЕОРЕТИЧНО має тримати H0.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="a-reusable-function-simulate_rejections" class="slide level2 smaller">
+<h2>🛠️ A reusable function: <code>simulate_rejections</code></h2>
+<p>We will reuse this procedure many times, so let’s wrap it once and for all.</p>
+<div id="simulate-fn" class="cell" data-execution_count="5">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> simulate_rejections(test_dist, control_dist, n_test, n_control<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb6-2"><a href="" aria-hidden="true" tabindex="-1"></a>                        n_exps<span class="op">=</span><span class="dv">10_000</span>, alpha<span class="op">=</span><span class="fl">0.05</span>, equal_var<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb6-3"><a href="" aria-hidden="true" tabindex="-1"></a>                        alternative<span class="op">=</span><span class="st">"two-sided"</span>, effect<span class="op">=</span><span class="fl">0.0</span>, seed<span class="op">=</span><span class="dv">42</span>):</span>
+<span id="cb6-4"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Run an A/B (or A/A) experiment n_exps times and return the rejection</span></span>
+<span id="cb6-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">    rate together with its 95% Wilson confidence interval.</span></span>
+<span id="cb6-6"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">    effect=0   → H0 is true  → the rate is the FPR.</span></span>
+<span id="cb6-8"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">    effect&gt;0   → H1 is true  → the rate is the power (TPR).</span></span>
+<span id="cb6-9"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb6-10"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> n_control <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb6-11"><a href="" aria-hidden="true" tabindex="-1"></a>        n_control <span class="op">=</span> n_test</span>
+<span id="cb6-12"><a href="" aria-hidden="true" tabindex="-1"></a>    rng, rej <span class="op">=</span> np.random.default_rng(seed), <span class="dv">0</span></span>
+<span id="cb6-13"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(n_exps):</span>
+<span id="cb6-14"><a href="" aria-hidden="true" tabindex="-1"></a>        test    <span class="op">=</span> test_dist.rvs(n_test,    random_state<span class="op">=</span>rng) <span class="op">+</span> effect</span>
+<span id="cb6-15"><a href="" aria-hidden="true" tabindex="-1"></a>        control <span class="op">=</span> control_dist.rvs(n_control, random_state<span class="op">=</span>rng)</span>
+<span id="cb6-16"><a href="" aria-hidden="true" tabindex="-1"></a>        pvalue  <span class="op">=</span> stats.ttest_ind(test, control, equal_var<span class="op">=</span>equal_var,</span>
+<span id="cb6-17"><a href="" aria-hidden="true" tabindex="-1"></a>                                  alternative<span class="op">=</span>alternative).pvalue</span>
+<span id="cb6-18"><a href="" aria-hidden="true" tabindex="-1"></a>        rej <span class="op">+=</span> pvalue <span class="op">&lt;</span> alpha</span>
+<span id="cb6-19"><a href="" aria-hidden="true" tabindex="-1"></a>    ci <span class="op">=</span> proportion_confint(rej, n_exps, alpha<span class="op">=</span><span class="fl">0.05</span>, method<span class="op">=</span><span class="st">"wilson"</span>)</span>
+<span id="cb6-20"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> rej <span class="op">/</span> n_exps, ci</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-tip no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p>One function, three jobs: <strong>FPR</strong> (<code>effect=0</code>), <strong>power</strong> (<code>effect&gt;0</code>), and comparing <strong>Student</strong> vs <strong>Welch</strong> (<code>equal_var</code>).</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Виносимо процедуру в одну функцію, яку перевикористаємо до кінця лекції (і курсу). За замовчуванням equal_var=False — це Welch, безпечніший варіант з лекції про t-тест. Параметр effect зсуває тест: 0 → A/A → міряємо FPR; &gt;0 → A/B → міряємо потужність. random_state=rng у кожному rvs гарантує незалежність і відтворюваність. Функція повертає і точкову оцінку, і довірчий інтервал — щоб одразу робити чесний висновок.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="the-t-test-fails-here" class="slide level2 smaller">
+<h2>❌ The <span class="math inline">\(t\)</span>-test fails here</h2>
+<div id="expon-fail" class="cell columns column-output-location" data-execution_count="6">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="" aria-hidden="true" tabindex="-1"></a>rate, ci <span class="op">=</span> simulate_rejections(</span>
+<span id="cb7-2"><a href="" aria-hidden="true" tabindex="-1"></a>    test_dist, control_dist,</span>
+<span id="cb7-3"><a href="" aria-hidden="true" tabindex="-1"></a>    n_test<span class="op">=</span><span class="dv">20</span>, n_exps<span class="op">=</span><span class="dv">10_000</span></span>
+<span id="cb7-4"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR: </span><span class="sc">{</span>rate<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb7-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"95% CI: (</span><span class="sc">{</span>ci[<span class="dv">0</span>]<span class="sc">:.4f}</span><span class="ss">, </span><span class="sc">{</span>ci[<span class="dv">1</span>]<span class="sc">:.4f}</span><span class="ss">)"</span>)</span>
+<span id="cb7-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"5% inside CI? </span><span class="sc">{</span>ci[<span class="dv">0</span>] <span class="op">&lt;</span> <span class="fl">0.05</span> <span class="op">&lt;</span> ci[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>FPR: 0.0597
+95% CI: (0.0552, 0.0645)
+5% inside CI? False</code></pre>
+</div>
+</div></div>
+<div class="fragment">
+<div class="callout callout-important no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Important</strong></p>
+</div>
+<div class="callout-content">
+<p>At <span class="math inline">\(n = 20\)</span> the FPR is <strong>significantly above</strong> 5% — the interval does <strong>not</strong> contain <span class="math inline">\(\alpha\)</span>.</p>
+<p>For these distributions and this sample size the <span class="math inline">\(t\)</span>-test is <strong>not valid</strong>: it cries “effect!” too often.</p>
+</div>
+</div>
+</div>
+<p>From which sample size does it start to behave?</p>
+<aside class="notes">
+<p>Викликаємо нашу функцію для двох різних експоненційних розподілів, n=20. FPR помітно вищий за 5%, і 5% НЕ в довірчому інтервалі → критерій некоректний для такої малої вибірки. Це той самий тип помилки, що коштує грошей: занадто часто бачимо ефект там, де його нема. Наступне питання — а з якого розміру вибірки t-тест «оживає»?</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="finding-the-minimum-sample-size" class="slide level2 smaller">
+<h2>📐 Finding the minimum sample size</h2>
+<p>Run the <strong>same</strong> check across growing sample sizes and stop when <span class="math inline">\(\alpha\)</span> first lands inside the CI.</p>
+<div id="min-size" class="cell columns column-output-location" data-execution_count="7">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="" aria-hidden="true" tabindex="-1"></a>alpha <span class="op">=</span> <span class="fl">0.05</span></span>
+<span id="cb9-2"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">20</span>, <span class="dv">121</span>, <span class="dv">20</span>):</span>
+<span id="cb9-3"><a href="" aria-hidden="true" tabindex="-1"></a>    rate, (lo, hi) <span class="op">=</span> simulate_rejections(</span>
+<span id="cb9-4"><a href="" aria-hidden="true" tabindex="-1"></a>        test_dist, control_dist,</span>
+<span id="cb9-5"><a href="" aria-hidden="true" tabindex="-1"></a>        n_test<span class="op">=</span>n, n_exps<span class="op">=</span><span class="dv">10_000</span></span>
+<span id="cb9-6"><a href="" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb9-7"><a href="" aria-hidden="true" tabindex="-1"></a>    ok <span class="op">=</span> lo <span class="op">&lt;</span> alpha <span class="op">&lt;</span> hi</span>
+<span id="cb9-8"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"n=</span><span class="sc">{</span>n<span class="sc">:3d}</span><span class="ss">  FPR=</span><span class="sc">{</span>rate<span class="sc">:.4f}</span><span class="ss">  "</span></span>
+<span id="cb9-9"><a href="" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"CI=(</span><span class="sc">{</span>lo<span class="sc">:.4f}</span><span class="ss">,</span><span class="sc">{</span>hi<span class="sc">:.4f}</span><span class="ss">)  "</span></span>
+<span id="cb9-10"><a href="" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"</span><span class="sc">{</span><span class="st">'✅'</span> <span class="cf">if</span> ok <span class="cf">else</span> <span class="st">'❌'</span><span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb9-11"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> ok:</span>
+<span id="cb9-12"><a href="" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Min sample size: </span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb9-13"><a href="" aria-hidden="true" tabindex="-1"></a>        <span class="cf">break</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>n= 20  FPR=0.0597  CI=(0.0552,0.0645)  ❌
+n= 40  FPR=0.0574  CI=(0.0530,0.0621)  ❌
+n= 60  FPR=0.0524  CI=(0.0482,0.0569)  ✅
+
+Min sample size: 60</code></pre>
+</div>
+</div></div>
+<p>From <span class="math inline">\(n \approx 60\)</span> the <span class="math inline">\(t\)</span>-test keeps its promise even for these skewed, unequal distributions.</p>
+<aside class="notes">
+<p>Прогоняємо ту саму перевірку для зростаючих розмірів вибірки й зупиняємось, коли 5% уперше потрапляє в довірчий інтервал. Бачимо: десь із n≈60 t-тест уже коректний навіть для таких скошених різних розподілів. Хочемо точніше / вужчий інтервал — збільшуємо n_exps до 100k. Так ми емпірично знаходимо межу між «малою» і «великою» вибіркою для КОНКРЕТНИХ даних.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="filling-the-empty-cell" class="slide level2 smaller">
+<h2>🧩 Filling the empty cell</h2>
+<p>So what goes in the <strong>?</strong> cell? The answer: <span class="hi">run a Monte Carlo check</span>.</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th></th>
+<th style="text-align: center;">small sample</th>
+<th style="text-align: center;">large sample</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>normal</strong> distribution</td>
+<td style="text-align: center;"><span class="math inline">\(t\)</span>-test</td>
+<td style="text-align: center;"><span class="math inline">\(t\)</span>-test</td>
+</tr>
+<tr class="even">
+<td><strong>any</strong> distribution</td>
+<td style="text-align: center;"><strong>Monte Carlo check</strong></td>
+<td style="text-align: center;"><span class="math inline">\(t\)</span>-test</td>
+</tr>
+</tbody>
+</table>
+<div class="fragment">
+<p>Sometimes the <span class="math inline">\(t\)</span>-test is even <strong>conservative</strong> — FPR <em>below</em> <span class="math inline">\(\alpha\)</span>:</p>
+<div id="conservative" class="cell columns column-output-location" data-execution_count="8">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="" aria-hidden="true" tabindex="-1"></a>equal <span class="op">=</span> stats.expon(scale<span class="op">=</span><span class="dv">20</span>)</span>
+<span id="cb11-2"><a href="" aria-hidden="true" tabindex="-1"></a>rate, ci <span class="op">=</span> simulate_rejections(</span>
+<span id="cb11-3"><a href="" aria-hidden="true" tabindex="-1"></a>    equal, equal, n_test<span class="op">=</span><span class="dv">10</span>, n_exps<span class="op">=</span><span class="dv">10_000</span></span>
+<span id="cb11-4"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb11-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR: </span><span class="sc">{</span>rate<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb11-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"95% CI: (</span><span class="sc">{</span>ci[<span class="dv">0</span>]<span class="sc">:.4f}</span><span class="ss">, </span><span class="sc">{</span>ci[<span class="dv">1</span>]<span class="sc">:.4f}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>FPR: 0.0387
+95% CI: (0.0351, 0.0427)</code></pre>
+</div>
+</div></div>
+<p>Here FPR <span class="math inline">\(&lt; 5\%\)</span> → the <span class="math inline">\(t\)</span>-test <strong>may</strong> be used (just expect somewhat lower power).</p>
+<aside class="notes">
+<p>Заповнюємо порожню клітинку: відповідь дає Монте-Карло перевірка — для конкретних даних і розміру вибірки. Приклад: дві ОДНАКОВІ експоненти, n=10 — FPR виходить НИЖЧЕ 5%. Це означає, що t-тест тут МОЖНА застосовувати: він помиляється рідше, ніж заявлено (це безпечно), просто буде трохи менш потужним. Тобто «мала ненормальна» не завжди = «не можна»; завжди перевіряй.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section></section>
+<section>
+<section id="how-to-simulate-an-experiment" class="title-slide slide level1 center" data-background-iframe=".04-monte-carlo_files/libs/colored-particles/index.html">
+<h1>How to simulate an experiment?</h1>
+
+</section>
+<section id="two-ways-to-generate-experiments" class="slide level2 smaller">
+<h2>🧪 Two ways to generate experiments</h2>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong>1. Artificial modelling</strong></p>
+<p>Approximate the real data with distributions:</p>
+<ul>
+<li>revenue → exponential;</li>
+<li>conversion → Bernoulli;</li>
+<li>“90% pay nothing” → Bernoulli × exponential mixture.</li>
+</ul>
+<p>➕ infinitely many, fast, full control of the distribution. ➖ valid on <em>artificial</em> data — maybe not on yours.</p>
+</div><div class="column" style="width:50%;">
+<p><strong>2. Historical company data</strong></p>
+<p>Use logs from the last few years as the ground truth.</p>
+<ul>
+<li>split real users into test / control → one “experiment”;</li>
+<li>repeat on many slices of the logs.</li>
+</ul>
+<p>➕ the data look <strong>exactly</strong> like your real task. ➖ hard to collect many independent slices.</p>
+</div></div>
+<aside class="notes">
+<p>Два способи згенерувати експерименти. Штучне моделювання: підбираємо розподіли (виторг — експонента, конверсія — Бернуллі, суміші для «90% платять нуль»). Багато, швидко, повний контроль — але валідність лише на штучних даних. Історичні дані: беремо реальні логи за роки — дані виглядають точно як у реальній задачі, але зібрати багато незалежних зрізів складно. На етапі дебагу нового критерію штучні дані зручніші, для фінальної валідації — історичні.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="from-one-dataset-to-a-thousand" class="slide level2 smaller">
+<h2>🏷️ From one dataset to a thousand</h2>
+<p>How do we get <strong>many</strong> experiments out of <strong>one</strong> log? Slice it along independent dimensions.</p>
+<ul>
+<li>by <strong>category</strong>: auto, real estate, services, jobs, …</li>
+<li>by <strong>month</strong>: Nov, Dec, Jan, …</li>
+<li>(optionally) by <strong>region</strong>.</li>
+</ul>
+<div class="fragment">
+<p>The Cartesian product explodes the count: <span class="math inline">\(40 \text{ categories} \times 24 \text{ months} \approx 960\)</span> datasets. Add 80 regions → tens of thousands.</p>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p>On each slice we run an <span class="hi">A/A test</span>: randomly split users into test/control with <strong>no</strong> treatment, so <span class="math inline">\(H_0\)</span> is <strong>guaranteed</strong> true. About <strong>1000 A/A tests</strong> is enough to tell a broken criterion from a good one.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Як з одного логу зробити багато експериментів: ріжемо за незалежними вимірами — категорія × місяць (× регіон). Декартів добуток дає тисячі датасетів. На кожному зрізі — A/A-тест: випадково ділимо користувачів на тест/контроль БЕЗ жодного впливу, тож H0 заведомо вірна. Важливо ділити НЕЗАЛЕЖНО в кожному зрізі, інакше великі користувачі зміщують усі тести в один бік і вони стають залежними. Один A/A-тест нічого не каже; потрібна тисяча.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="aa-tests-in-code" class="slide level2 smaller">
+<h2>🔬 1000 A/A tests in code</h2>
+<p>Let’s build a synthetic “revenue log” (category × month) and run an A/A test on every slice.</p>
+<div id="build-log" class="cell" data-execution_count="9">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">7</span>)</span>
+<span id="cb13-2"><a href="" aria-hidden="true" tabindex="-1"></a>categories <span class="op">=</span> [<span class="ss">f"cat_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>       <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">40</span>)]</span>
+<span id="cb13-3"><a href="" aria-hidden="true" tabindex="-1"></a>months     <span class="op">=</span> [<span class="ss">f"2024-</span><span class="sc">{</span>m<span class="sc">:02d}</span><span class="ss">"</span>  <span class="cf">for</span> m <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, <span class="dv">13</span>)] <span class="op">+</span> <span class="op">\</span></span>
+<span id="cb13-4"><a href="" aria-hidden="true" tabindex="-1"></a>             [<span class="ss">f"2025-</span><span class="sc">{</span>m<span class="sc">:02d}</span><span class="ss">"</span>  <span class="cf">for</span> m <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, <span class="dv">13</span>)]</span>
+<span id="cb13-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
+<span id="cb13-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> cat <span class="kw">in</span> categories:</span>
+<span id="cb13-8"><a href="" aria-hidden="true" tabindex="-1"></a>    base <span class="op">=</span> rng.uniform(<span class="dv">50</span>, <span class="dv">400</span>)              <span class="co"># category-specific average revenue</span></span>
+<span id="cb13-9"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> mon <span class="kw">in</span> months:</span>
+<span id="cb13-10"><a href="" aria-hidden="true" tabindex="-1"></a>        n   <span class="op">=</span> rng.integers(<span class="dv">200</span>, <span class="dv">600</span>)</span>
+<span id="cb13-11"><a href="" aria-hidden="true" tabindex="-1"></a>        rev <span class="op">=</span> stats.expon.rvs(scale<span class="op">=</span>base, size<span class="op">=</span>n, random_state<span class="op">=</span>rng)</span>
+<span id="cb13-12"><a href="" aria-hidden="true" tabindex="-1"></a>        rows.append(pd.DataFrame({<span class="st">"category"</span>: cat, <span class="st">"month"</span>: mon, <span class="st">"revenue"</span>: rev}))</span>
+<span id="cb13-13"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-14"><a href="" aria-hidden="true" tabindex="-1"></a>log <span class="op">=</span> pd.concat(rows, ignore_index<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb13-15"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"users: </span><span class="sc">{</span><span class="bu">len</span>(log)<span class="sc">:,}</span><span class="ss">   datasets: </span><span class="sc">{</span>log<span class="sc">.</span>groupby([<span class="st">'category'</span>,<span class="st">'month'</span>])<span class="sc">.</span>ngroups<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>users: 382,138   datasets: 960</code></pre>
+</div>
+</div>
+<div id="aa-tests" class="cell" data-execution_count="10">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> thousand_aa_tests(log, alpha<span class="op">=</span><span class="fl">0.05</span>, effect<span class="op">=</span><span class="fl">0.0</span>, seed<span class="op">=</span><span class="dv">1</span>):</span>
+<span id="cb15-2"><a href="" aria-hidden="true" tabindex="-1"></a>    rng, rej, k <span class="op">=</span> np.random.default_rng(seed), <span class="dv">0</span>, <span class="dv">0</span></span>
+<span id="cb15-3"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _, g <span class="kw">in</span> log.groupby([<span class="st">"category"</span>, <span class="st">"month"</span>]):</span>
+<span id="cb15-4"><a href="" aria-hidden="true" tabindex="-1"></a>        rev  <span class="op">=</span> g[<span class="st">"revenue"</span>].to_numpy()</span>
+<span id="cb15-5"><a href="" aria-hidden="true" tabindex="-1"></a>        idx  <span class="op">=</span> rng.permutation(<span class="bu">len</span>(rev))      <span class="co"># independent split every time</span></span>
+<span id="cb15-6"><a href="" aria-hidden="true" tabindex="-1"></a>        half <span class="op">=</span> <span class="bu">len</span>(rev) <span class="op">//</span> <span class="dv">2</span></span>
+<span id="cb15-7"><a href="" aria-hidden="true" tabindex="-1"></a>        control <span class="op">=</span> rev[idx[:half]]</span>
+<span id="cb15-8"><a href="" aria-hidden="true" tabindex="-1"></a>        test    <span class="op">=</span> rev[idx[half:<span class="dv">2</span> <span class="op">*</span> half]] <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> effect)   <span class="co"># effect=0 → A/A</span></span>
+<span id="cb15-9"><a href="" aria-hidden="true" tabindex="-1"></a>        rej <span class="op">+=</span> stats.ttest_ind(test, control, equal_var<span class="op">=</span><span class="va">False</span>).pvalue <span class="op">&lt;</span> alpha</span>
+<span id="cb15-10"><a href="" aria-hidden="true" tabindex="-1"></a>        k   <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb15-11"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> rej <span class="op">/</span> k, proportion_confint(rej, k, alpha<span class="op">=</span><span class="fl">0.05</span>, method<span class="op">=</span><span class="st">"wilson"</span>)</span>
+<span id="cb15-12"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-13"><a href="" aria-hidden="true" tabindex="-1"></a>rate, ci <span class="op">=</span> thousand_aa_tests(log)</span>
+<span id="cb15-14"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"A/A FPR over </span><span class="sc">{</span>log<span class="sc">.</span>groupby([<span class="st">'category'</span>,<span class="st">'month'</span>])<span class="sc">.</span>ngroups<span class="sc">}</span><span class="ss"> datasets: "</span></span>
+<span id="cb15-15"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"</span><span class="sc">{</span>rate<span class="sc">:.4f}</span><span class="ss">  CI=(</span><span class="sc">{</span>ci[<span class="dv">0</span>]<span class="sc">:.4f}</span><span class="ss">, </span><span class="sc">{</span>ci[<span class="dv">1</span>]<span class="sc">:.4f}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>A/A FPR over 960 datasets: 0.0531  CI=(0.0406, 0.0692)</code></pre>
+</div>
+</div>
+<p>5% sits inside the interval → on <strong>real-looking</strong> data the <span class="math inline">\(t\)</span>-test is valid. ✅</p>
+<aside class="notes">
+<p>Будуємо синтетичний лог виторгу (40 категорій × 24 місяці ≈ 960 датасетів) — імітація реальних історичних даних. Функція thousand_aa_tests на кожному зрізі НЕЗАЛЕЖНО перемішує користувачів, ділить навпіл (A/A) і запускає Welch t-тест. Рахуємо частку хибних спрацювань по всіх ~960 тестах + довірчий інтервал. 5% всередині → на «реалістичних» даних критерій коректний. Параметр effect знадобиться далі для потужності.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="artificial-vs-historical-a-summary" class="slide level2 smaller">
+<h2>⚖️ Artificial vs historical: a summary</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 32%">
+<col style="width: 31%">
+<col style="width: 36%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Artificial data</th>
+<th>Historical data</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Amount</strong></td>
+<td>unlimited</td>
+<td>limited by your logs</td>
+</tr>
+<tr class="even">
+<td><strong>Speed</strong></td>
+<td>fast</td>
+<td>slower, needs good logging</td>
+</tr>
+<tr class="odd">
+<td><strong>Realism</strong></td>
+<td>only as good as your guess</td>
+<td>exactly your real data</td>
+</tr>
+<tr class="even">
+<td><strong>Best for</strong></td>
+<td>early debugging of a new criterion</td>
+<td>final go/no-go decision</td>
+</tr>
+</tbody>
+</table>
+<div class="fragment">
+<div class="callout callout-tip no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p>Use <strong>artificial</strong> data to debug a new criterion fast, and <strong>historical</strong> data to make the final call — a criterion can pass on clean synthetic data yet fail on noisier reality.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Підсумок порівняння. Штучні: безліч, швидко, але реалізм залежить від вашої здогадки про розподіл. Історичні: точно як реальність, але зібрати багато складно. Практика: спочатку дебажимо новий критерій на штучних (швидко ловимо баги в коді/математиці), фінальне рішення «застосовувати чи ні» — на історичних. Бо завжди можна написати критерій, що ідеальний на штучних даних, але ламається на шумнішій реальності.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section></section>
+<section>
+<section id="which-criterion-is-better-power" class="title-slide slide level1 center" data-background-iframe=".04-monte-carlo_files/libs/colored-particles/index.html">
+<h1>Which criterion is better? (Power)</h1>
+
+</section>
+<section id="power-true-positive-rate" class="slide level2 smaller">
+<h2>💪 Power = true positive rate</h2>
+<p>Suppose <strong>two</strong> criteria are both valid (correct FPR). Which one is better?</p>
+<blockquote>
+<p>The better one has higher <span class="hi">power</span> — it detects a real effect more often.</p>
+</blockquote>
+<p>Same Monte Carlo procedure, two changes:</p>
+<ul>
+<li>generate experiments where <span class="math inline">\(H_1\)</span> is <strong>true</strong> (add an effect to the test group);</li>
+<li>instead of <code>bad_cnt</code> count <code>rej_cnt</code> (now a rejection is <strong>good</strong>) → that share is the <strong>power / TPR</strong>.</li>
+</ul>
+<aside class="notes">
+<p>Друга велика задача: маємо два валідні критерії (обидва з правильним α=5%) — який кращий? Той, у кого більша потужність: частіше виявляє ефект, коли він справді є (більше true positives). Процедура та сама, але: генеруємо дані, де вірна альтернатива (додаємо ефект тесту), і рахуємо НЕ bad, а rejection — тепер відхилення це добре. Частка відхилень = потужність = TPR.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="power-of-the-t-test" class="slide level2 smaller">
+<h2>🧮 Power of the <span class="math inline">\(t\)</span>-test</h2>
+<p>Reuse the <strong>same function</strong> — just pass an <code>effect</code>. Here the test group gets a real shift.</p>
+<div id="power-basic" class="cell columns column-output-location" data-execution_count="11">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="" aria-hidden="true" tabindex="-1"></a>dist <span class="op">=</span> stats.norm(loc<span class="op">=</span><span class="dv">2</span>, scale<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb17-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-3"><a href="" aria-hidden="true" tabindex="-1"></a>power, ci <span class="op">=</span> simulate_rejections(</span>
+<span id="cb17-4"><a href="" aria-hidden="true" tabindex="-1"></a>    dist, dist,</span>
+<span id="cb17-5"><a href="" aria-hidden="true" tabindex="-1"></a>    n_test<span class="op">=</span><span class="dv">15</span>, effect<span class="op">=</span><span class="fl">1.0</span>,    <span class="co"># H1 is true</span></span>
+<span id="cb17-6"><a href="" aria-hidden="true" tabindex="-1"></a>    n_exps<span class="op">=</span><span class="dv">10_000</span></span>
+<span id="cb17-7"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb17-8"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Power (TPR): </span><span class="sc">{</span>power<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb17-9"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"95% CI: (</span><span class="sc">{</span>ci[<span class="dv">0</span>]<span class="sc">:.4f}</span><span class="ss">, </span><span class="sc">{</span>ci[<span class="dv">1</span>]<span class="sc">:.4f}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>Power (TPR): 0.1416
+95% CI: (0.1349, 0.1486)</code></pre>
+</div>
+</div></div>
+<div class="fragment">
+<p>Power <span class="math inline">\(\approx 14\%\)</span> — quite low. To compare a <strong>second</strong> criterion, just run the same check on it and see which TPR is higher (don’t forget statistical significance).</p>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p>The same <code>simulate_rejections</code> now measures <strong>power</strong> — we only added <code>effect</code>.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Перевикористовуємо ту саму функцію — лише передаємо effect (зсув тесту), тобто робимо H1 вірною. Потужність ~14% — низька. Якщо є другий критерій, запускаємо ту саму перевірку для нього і порівнюємо TPR (зважаючи на стат. значущість — довірчі інтервали). Жодної нової математики: один і той самий Монте-Карло, лише генеруємо під альтернативою. Це детально відпрацюємо в домашньому завданні.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="power-grows-with-effect-and-sample-size" class="slide level2 smaller">
+<h2>📈 Power grows with effect and sample size</h2>
+<div id="cell-power-grid" class="cell" data-execution_count="12">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="" aria-hidden="true" tabindex="-1"></a>dist <span class="op">=</span> stats.norm(loc<span class="op">=</span><span class="dv">2</span>, scale<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb19-2"><a href="" aria-hidden="true" tabindex="-1"></a>configs <span class="op">=</span> [(<span class="st">"effect=1, n=15"</span>, <span class="fl">1.0</span>, <span class="dv">15</span>),</span>
+<span id="cb19-3"><a href="" aria-hidden="true" tabindex="-1"></a>           (<span class="st">"effect=2, n=15"</span>, <span class="fl">2.0</span>, <span class="dv">15</span>),</span>
+<span id="cb19-4"><a href="" aria-hidden="true" tabindex="-1"></a>           (<span class="st">"effect=2, n=50"</span>, <span class="fl">2.0</span>, <span class="dv">50</span>)]</span>
+<span id="cb19-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-6"><a href="" aria-hidden="true" tabindex="-1"></a>labels, powers, errs <span class="op">=</span> [], [], []</span>
+<span id="cb19-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> label, eff, n <span class="kw">in</span> configs:</span>
+<span id="cb19-8"><a href="" aria-hidden="true" tabindex="-1"></a>    p, (lo, hi) <span class="op">=</span> simulate_rejections(dist, dist, n_test<span class="op">=</span>n, effect<span class="op">=</span>eff, n_exps<span class="op">=</span><span class="dv">10_000</span>)</span>
+<span id="cb19-9"><a href="" aria-hidden="true" tabindex="-1"></a>    labels.append(label)<span class="op">;</span> powers.append(p)</span>
+<span id="cb19-10"><a href="" aria-hidden="true" tabindex="-1"></a>    errs.append([p <span class="op">-</span> lo, hi <span class="op">-</span> p])</span>
+<span id="cb19-11"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-12"><a href="" aria-hidden="true" tabindex="-1"></a>errs <span class="op">=</span> np.array(errs).T</span>
+<span id="cb19-13"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">4.2</span>))</span>
+<span id="cb19-14"><a href="" aria-hidden="true" tabindex="-1"></a>ax.bar(labels, powers, color<span class="op">=</span>[turquoise, green, blue], width<span class="op">=</span><span class="fl">0.55</span>,</span>
+<span id="cb19-15"><a href="" aria-hidden="true" tabindex="-1"></a>       yerr<span class="op">=</span>errs, capsize<span class="op">=</span><span class="dv">6</span>, error_kw<span class="op">=</span>{<span class="st">"ecolor"</span>: slate})</span>
+<span id="cb19-16"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axhline(<span class="fl">0.8</span>, color<span class="op">=</span>red, ls<span class="op">=</span><span class="st">"--"</span>, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"80</span><span class="sc">% g</span><span class="st">old standard"</span>)</span>
+<span id="cb19-17"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylim(<span class="dv">0</span>, <span class="dv">1</span>)</span>
+<span id="cb19-18"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"Power (TPR)"</span>)</span>
+<span id="cb19-19"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Bigger effect and bigger sample → more power"</span>)</span>
+<span id="cb19-20"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb19-21"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb19-22"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04-monte-carlo_files/figure-revealjs/power-grid-output-1.svg" id="power-grid" class="quarto-figure quarto-figure-center r-stretch"><p>A bigger true effect and a bigger sample both raise power. In practice <strong>80%</strong> power is the gold standard.</p>
+<aside class="notes">
+<p>Потужність залежить від того, ЯК виглядає альтернатива. Більший справжній ефект детектувати легше → потужність росте. Більша вибірка → теж більша потужність. На графіку: ефект 1 при n=15 дає ~14%, ефект 2 — близько 42%, а при n=50 переходимо за 80%. 80% — золотий стандарт: якщо критерій його досягає на вашому розмірі вибірки, можна сміливо застосовувати. Важливо підбирати ефект, який реалістично очікуєте на практиці.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="student-vs-welch-two-valid-looking-criteria" class="slide level2 smaller">
+<h2>🥊 Student vs Welch: two valid-looking criteria</h2>
+<p>We know <strong>two</strong> <span class="math inline">\(t\)</span>-tests from the previous lecture: Student’s (<code>equal_var=True</code>) and Welch’s (<code>equal_var=False</code>). Are they interchangeable?</p>
+<p>A realistic A/B split: <strong>70% / 30%</strong>, and the smaller group is <strong>noisier</strong> (<span class="math inline">\(\sigma\)</span> twice as large). <span class="math inline">\(H_0\)</span> is true (equal means).</p>
+<div id="student-vs-welch" class="cell columns column-output-location" data-execution_count="13">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="" aria-hidden="true" tabindex="-1"></a>A <span class="op">=</span> stats.norm(loc<span class="op">=</span><span class="dv">0</span>, scale<span class="op">=</span><span class="dv">1</span>)   <span class="co"># 70%, low variance</span></span>
+<span id="cb20-2"><a href="" aria-hidden="true" tabindex="-1"></a>B <span class="op">=</span> stats.norm(loc<span class="op">=</span><span class="dv">0</span>, scale<span class="op">=</span><span class="dv">2</span>)   <span class="co"># 30%, high variance</span></span>
+<span id="cb20-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-4"><a href="" aria-hidden="true" tabindex="-1"></a>stud, ci_s <span class="op">=</span> simulate_rejections(</span>
+<span id="cb20-5"><a href="" aria-hidden="true" tabindex="-1"></a>    A, B, n_test<span class="op">=</span><span class="dv">70</span>, n_control<span class="op">=</span><span class="dv">30</span>,</span>
+<span id="cb20-6"><a href="" aria-hidden="true" tabindex="-1"></a>    equal_var<span class="op">=</span><span class="va">True</span>,  n_exps<span class="op">=</span><span class="dv">10_000</span>)   <span class="co"># Student</span></span>
+<span id="cb20-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-8"><a href="" aria-hidden="true" tabindex="-1"></a>welch, ci_w <span class="op">=</span> simulate_rejections(</span>
+<span id="cb20-9"><a href="" aria-hidden="true" tabindex="-1"></a>    A, B, n_test<span class="op">=</span><span class="dv">70</span>, n_control<span class="op">=</span><span class="dv">30</span>,</span>
+<span id="cb20-10"><a href="" aria-hidden="true" tabindex="-1"></a>    equal_var<span class="op">=</span><span class="va">False</span>, n_exps<span class="op">=</span><span class="dv">10_000</span>)   <span class="co"># Welch</span></span>
+<span id="cb20-11"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-12"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Student FPR: </span><span class="sc">{</span>stud<span class="sc">:.4f}</span><span class="ss">  CI=(</span><span class="sc">{</span>ci_s[<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">,</span><span class="sc">{</span>ci_s[<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span>
+<span id="cb20-13"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Welch   FPR: </span><span class="sc">{</span>welch<span class="sc">:.4f}</span><span class="ss">  CI=(</span><span class="sc">{</span>ci_w[<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">,</span><span class="sc">{</span>ci_w[<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>Student FPR: 0.1229  CI=(0.117,0.129)
+Welch   FPR: 0.0505  CI=(0.046,0.055)</code></pre>
+</div>
+</div></div>
+<aside class="notes">
+<p>Порівнюємо два знайомі критерії — Стьюдента (equal_var=True) і Велча (equal_var=False). Сценарій реалістичний для A/B: розбивка 70/30, причому менша група шумніша (σ удвічі більша). H0 вірна — середні рівні. Це не новий критерій (жодного Манна-Уітні!), просто два варіанти t-тесту з минулої лекції. Подивимось, чи обидва тримають 5%.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="student-vs-welch-the-verdict" class="slide level2 smaller">
+<h2>🥊 Student vs Welch: the verdict</h2>
+<div id="cell-student-vs-welch-plot" class="cell" data-execution_count="14">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="" aria-hidden="true" tabindex="-1"></a>names  <span class="op">=</span> [<span class="st">"Student</span><span class="ch">\n</span><span class="st">(equal_var=True)"</span>, <span class="st">"Welch</span><span class="ch">\n</span><span class="st">(equal_var=False)"</span>]</span>
+<span id="cb22-2"><a href="" aria-hidden="true" tabindex="-1"></a>vals   <span class="op">=</span> [stud, welch]</span>
+<span id="cb22-3"><a href="" aria-hidden="true" tabindex="-1"></a>cis    <span class="op">=</span> [ci_s, ci_w]</span>
+<span id="cb22-4"><a href="" aria-hidden="true" tabindex="-1"></a>errs   <span class="op">=</span> np.array([[v <span class="op">-</span> lo, hi <span class="op">-</span> v] <span class="cf">for</span> v, (lo, hi) <span class="kw">in</span> <span class="bu">zip</span>(vals, cis)]).T</span>
+<span id="cb22-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-6"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="fl">4.2</span>))</span>
+<span id="cb22-7"><a href="" aria-hidden="true" tabindex="-1"></a>ax.bar(names, vals, color<span class="op">=</span>[red_pink, turquoise], width<span class="op">=</span><span class="fl">0.5</span>,</span>
+<span id="cb22-8"><a href="" aria-hidden="true" tabindex="-1"></a>       yerr<span class="op">=</span>errs, capsize<span class="op">=</span><span class="dv">6</span>, error_kw<span class="op">=</span>{<span class="st">"ecolor"</span>: slate})</span>
+<span id="cb22-9"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axhline(<span class="fl">0.05</span>, color<span class="op">=</span>red, ls<span class="op">=</span><span class="st">"--"</span>, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"promised α = 5%"</span>)</span>
+<span id="cb22-10"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"FPR (H0 is true)"</span>)</span>
+<span id="cb22-11"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Unequal variances + unequal group sizes"</span>)</span>
+<span id="cb22-12"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb22-13"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb22-14"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04-monte-carlo_files/figure-revealjs/student-vs-welch-plot-output-1.svg" id="student-vs-welch-plot" class="quarto-figure quarto-figure-center r-stretch"><div class="callout callout-important no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Important</strong></p>
+</div>
+<div class="callout-content">
+<p>With unequal group sizes <strong>and</strong> unequal variances, <strong>Student’s test inflates the FPR to ~12%</strong> instead of 5% — invalid! <strong>Welch keeps it at ~5%.</strong> That is why Welch (<code>equal_var=False</code>) is the safer default.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Вердикт: коли розміри груп різні І дисперсії різні (менша група шумніша), Стьюдент роздуває FPR до ~12% замість 5% — некоректний, втрачає гроші. Welch тримає ~5%. Ось чому в лекції про t-тест ми за замовчуванням брали equal_var=False. Монте-Карло наочно показав різницю між двома «однаковими на вигляд» критеріями. Найважливіше припущення, до речі, — незалежність спостережень, а не рівність дисперсій. (Манна-Уітні тут не чіпаємо — він у наступних лекціях.)</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="power-on-historical-data" class="slide level2 smaller">
+<h2>🏭 Power on historical data</h2>
+<p>On the A/A log there is no real effect, so we <strong>simulate</strong> one: imagine a promotion lifts revenue by some %. Reuse <code>thousand_aa_tests</code> with <code>effect &gt; 0</code>.</p>
+<div id="power-historical" class="cell columns column-output-location" data-execution_count="15">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> eff <span class="kw">in</span> [<span class="fl">0.05</span>, <span class="fl">0.10</span>, <span class="fl">0.20</span>]:</span>
+<span id="cb23-2"><a href="" aria-hidden="true" tabindex="-1"></a>    power, ci <span class="op">=</span> thousand_aa_tests(log, effect<span class="op">=</span>eff)</span>
+<span id="cb23-3"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"effect +</span><span class="sc">{</span>eff<span class="sc">:.0%}</span><span class="ss">:  "</span></span>
+<span id="cb23-4"><a href="" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"power=</span><span class="sc">{</span>power<span class="sc">:.3f}</span><span class="ss">  "</span></span>
+<span id="cb23-5"><a href="" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"CI=(</span><span class="sc">{</span>ci[<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>ci[<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>effect +5%:  power=0.079  CI=(0.064, 0.098)
+effect +10%:  power=0.157  CI=(0.136, 0.182)
+effect +20%:  power=0.459  CI=(0.428, 0.491)</code></pre>
+</div>
+</div></div>
+<div class="fragment">
+<p>The larger the simulated effect, the higher the power. You don’t need the <em>exact</em> effect — a plausible one is enough, especially when <strong>comparing two criteria</strong>.</p>
+<aside class="notes">
+<p>На історичних даних (A/A-лог) справжнього ефекту нема, тож моделюємо його самі: припускаємо, що акція підняла виторг на X%. Перевикористовуємо ту саму функцію з effect&gt;0. Бачимо: що більший змодельований ефект — то більша потужність. Точний розмір ефекту не критичний — достатньо правдоподібного, особливо коли ПОРІВНЮЄМО два критерії: переможе той, що кращий навіть на приблизно змодельованому ефекті. Так оцінюють потужність на реальних даних.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section></section>
+<section>
+<section id="summary" class="title-slide slide level1 center" data-background-iframe=".04-monte-carlo_files/libs/colored-particles/index.html">
+<h1>Summary</h1>
+
+</section>
+<section id="what-monte-carlo-gives-you" class="slide level2 smaller">
+<h2>🧾 What Monte Carlo gives you</h2>
+<p>The method is always the same: <span class="hi">generate many experiments with a known answer and count a statistic.</span></p>
+<ul>
+<li><strong>Validate a criterion (FPR).</strong> Generate data where <span class="math inline">\(H_0\)</span> is true, count false rejections, build a confidence interval for the FPR.</li>
+<li><strong>Generate experiments</strong> two ways: artificial distributions, or ~1000 A/A tests on historical logs.</li>
+<li><strong>Find the minimum sample size</strong> for the <span class="math inline">\(t\)</span>-test — the smallest <span class="math inline">\(n\)</span> where <span class="math inline">\(\alpha\)</span> lands inside the CI.</li>
+<li><strong>Measure &amp; compare power (TPR).</strong> Generate under <span class="math inline">\(H_1\)</span>; the better criterion detects the effect more often (Welch beat Student under heteroscedastic, unbalanced groups).</li>
+</ul>
+<div class="fragment">
+<div class="callout callout-tip no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p>You now hold the fishing rod: stop trusting authority, <strong>check</strong> any criterion yourself. We will use this tool again and again.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Підсумок лекції. Усе зводиться до однієї ідеї: згенерувати багато експериментів із відомою відповіддю й порахувати статистику. Навчилися: перевіряти коректність критерію через FPR + довірчий інтервал; генерувати експерименти (штучно або тисячею A/A на історичних даних); знаходити мінімальний розмір вибірки; міряти й порівнювати потужність (Welch виявився кращим за Стьюдента на незбалансованих групах з різними дисперсіями). Це універсальний інструмент — повертатимемось до нього не раз.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section></section>
+<section id="questions" class="title-slide slide level1 unnumbered unlisted center" data-background-iframe=".04-monte-carlo_files/libs/colored-particles/index.html">
+<h1>Questions?</h1>
+<p><iconify-icon inline="" icon="solar:book-bold"></iconify-icon> <a href="https://teaching.kse.org.ua/course/view.php?id=4049">Course materials</a></p>
+<p><iconify-icon inline="" icon="mdi:envelope"></iconify-icon> imiroshnychenko@kse.org.ua</p>
+<p><iconify-icon inline="" icon="ic:baseline-telegram"></iconify-icon> <a href="https://t.me/araprof"><span class="citation" data-cites="araprof">@araprof</span></a></p>
+<p><iconify-icon inline="" icon="mdi:youtube"></iconify-icon> <a href="https://www.youtube.com/@datamirosh"><span class="citation" data-cites="datamirosh">@datamirosh</span></a></p>
+<p><iconify-icon inline="" icon="mdi:linkedin"></iconify-icon> <a href="https://www.linkedin.com/in/ihormiroshnychenko/">@ihormiroshnychenko</a></p>
+<p><iconify-icon inline="" icon="mdi:github"></iconify-icon> <a href="https://github.com/Aranaur">@aranaur</a></p>
+<p><iconify-icon inline="" icon="ion:home"></iconify-icon> <a href="https://aranaur.rbind.io">aranaur.rbind.io</a></p>
+
+</section>
+    </div>
+  <div class="quarto-auto-generated-content" style="display: none;">
+<p><img src="img/kse.png" class="slide-logo"></p>
+<div class="footer footer-default">
+<p><a href="https://teaching.kse.org.ua/course/view.php?id=4049">🔗Applied Statistics</a></p>
+</div>
+</div></div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src=".04-monte-carlo_files/libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src=".04-monte-carlo_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src=".04-monte-carlo_files/libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src=".04-monte-carlo_files/libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src=".04-monte-carlo_files/libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src=".04-monte-carlo_files/libs/revealjs/plugin/reveal-chalkboard/plugin.js"></script>
+  <script src=".04-monte-carlo_files/libs/revealjs/plugin/verticator/verticator.js"></script>
+  <script src=".04-monte-carlo_files/libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src=".04-monte-carlo_files/libs/revealjs/plugin/notes/notes.js"></script>
+  <script src=".04-monte-carlo_files/libs/revealjs/plugin/search/search.js"></script>
+  <script src=".04-monte-carlo_files/libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script src=".04-monte-carlo_files/libs/revealjs/plugin/math/math.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': true,
+'previewLinksAuto': false,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'jumpToSlide': true,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.togglePdfExport(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleScrollView(event)\"><kbd>r</kbd> Scroll View Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleChalkboard(event)\"><kbd>b</kbd> Toggle Chalkboard</a></li>\n<li class=\"slide-tool-item\" data-item=\"6\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleNotesCanvas(event)\"><kbd>c</kbd> Toggle Notes Canvas</a></li>\n<li class=\"slide-tool-item\" data-item=\"7\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.downloadDrawings(event)\"><kbd>d</kbd> Download Drawings</a></li>\n<li class=\"slide-tool-item\" data-item=\"8\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'chalkboard': {"buttons":true},
+'verticator': {"themetag":"h1","color":"","inversecolor":"","skipuncounted":false,"clickable":true,"position":"auto","offset":"3vmin","autogenerate":true,"tooltip":false,"scale":1},
+'smaller': false,
+ 
+        // Display controls in the bottom right corner
+        controls: false,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: 'h.v',
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'default',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: true,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: true,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'fade',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'fade',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1350,
+
+        height: 759.375,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 0.1,
+
+        math: {
+          mathjax: 'https://cdn.jsdelivr.net/npm/mathjax@2.7.9/MathJax.js',
+          config: 'TeX-AMS_HTML-full',
+          tex2jax: {
+            inlineMath: [['\\(','\\)']],
+            displayMath: [['\\[','\\]']],
+            balanceBraces: true,
+            processEscapes: false,
+            processRefs: true,
+            processEnvironments: true,
+            preview: 'TeX',
+            skipTags: ['script','noscript','style','textarea','pre','code'],
+            ignoreClass: 'tex2jax_ignore',
+            processClass: 'tex2jax_process'
+          },
+        },
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, RevealChalkboard, Verticator, QuartoSupport,
+
+          RevealMath,
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    <script id="quarto-html-after-body" type="application/javascript">
+      window.document.addEventListener("DOMContentLoaded", function (event) {
+        const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+        tabsets.forEach(function(tabset) {
+          const tabby = new Tabby('#' + tabset.id);
+        });
+        const isCodeAnnotation = (el) => {
+          for (const clz of el.classList) {
+            if (clz.startsWith('code-annotation-')) {                     
+              return true;
+            }
+          }
+          return false;
+        }
+        const onCopySuccess = function(e) {
+          // button target
+          const button = e.trigger;
+          // don't keep focus
+          button.blur();
+          // flash "checked"
+          button.classList.add('code-copy-button-checked');
+          var currentTitle = button.getAttribute("title");
+          button.setAttribute("title", "Copied!");
+          let tooltip;
+          if (window.bootstrap) {
+            button.setAttribute("data-bs-toggle", "tooltip");
+            button.setAttribute("data-bs-placement", "left");
+            button.setAttribute("data-bs-title", "Copied!");
+            tooltip = new bootstrap.Tooltip(button, 
+              { trigger: "manual", 
+                customClass: "code-copy-button-tooltip",
+                offset: [0, -8]});
+            tooltip.show();    
+          }
+          setTimeout(function() {
+            if (tooltip) {
+              tooltip.hide();
+              button.removeAttribute("data-bs-title");
+              button.removeAttribute("data-bs-toggle");
+              button.removeAttribute("data-bs-placement");
+            }
+            button.setAttribute("title", currentTitle);
+            button.classList.remove('code-copy-button-checked');
+          }, 1000);
+          // clear code selection
+          e.clearSelection();
+        }
+        const getTextToCopy = function(trigger) {
+          const outerScaffold = trigger.parentElement.cloneNode(true);
+          const codeEl = outerScaffold.querySelector('code');
+          for (const childEl of codeEl.children) {
+            if (isCodeAnnotation(childEl)) {
+              childEl.remove();
+            }
+          }
+          return codeEl.innerText;
+        }
+        const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+          text: getTextToCopy
+        });
+        clipboard.on('success', onCopySuccess);
+        if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+          const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+            text: getTextToCopy,
+            container: window.document.getElementById('quarto-embedded-source-code-modal')
+          });
+          clipboardModal.on('success', onCopySuccess);
+        }
+          var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+          var mailtoRegex = new RegExp(/^mailto:/);
+            var filterRegex = new RegExp('/' + window.location.host + '/');
+          var isInternal = (href) => {
+              return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+          }
+          // Inspect non-navigation links and adorn them if external
+         var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+          for (var i=0; i<links.length; i++) {
+            const link = links[i];
+            if (!isInternal(link.href)) {
+              // undo the damage that might have been done by quarto-nav.js in the case of
+              // links that we want to consider external
+              if (link.dataset.originalHref !== undefined) {
+                link.href = link.dataset.originalHref;
+              }
+            }
+          }
+        function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+          const config = {
+            allowHTML: true,
+            maxWidth: 500,
+            delay: 100,
+            arrow: false,
+            appendTo: function(el) {
+                return el.closest('section.slide') || el.parentElement;
+            },
+            interactive: true,
+            interactiveBorder: 10,
+            theme: 'light-border',
+            placement: 'bottom-start',
+          };
+          if (contentFn) {
+            config.content = contentFn;
+          }
+          if (onTriggerFn) {
+            config.onTrigger = onTriggerFn;
+          }
+          if (onUntriggerFn) {
+            config.onUntrigger = onUntriggerFn;
+          }
+            config['offset'] = [0,0];
+            config['maxWidth'] = 700;
+          window.tippy(el, config); 
+        }
+        const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+        for (var i=0; i<noterefs.length; i++) {
+          const ref = noterefs[i];
+          tippyHover(ref, function() {
+            // use id or data attribute instead here
+            let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+            try { href = new URL(href).hash; } catch {}
+            const id = href.replace(/^#\/?/, "");
+            const note = window.document.getElementById(id);
+            if (note) {
+              return note.innerHTML;
+            } else {
+              return "";
+            }
+          });
+        }
+        const findCites = (el) => {
+          const parentEl = el.parentElement;
+          if (parentEl) {
+            const cites = parentEl.dataset.cites;
+            if (cites) {
+              return {
+                el,
+                cites: cites.split(' ')
+              };
+            } else {
+              return findCites(el.parentElement)
+            }
+          } else {
+            return undefined;
+          }
+        };
+        var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+        for (var i=0; i<bibliorefs.length; i++) {
+          const ref = bibliorefs[i];
+          const citeInfo = findCites(ref);
+          if (citeInfo) {
+            tippyHover(citeInfo.el, function() {
+              var popup = window.document.createElement('div');
+              citeInfo.cites.forEach(function(cite) {
+                var citeDiv = window.document.createElement('div');
+                citeDiv.classList.add('hanging-indent');
+                citeDiv.classList.add('csl-entry');
+                var biblioDiv = window.document.getElementById('ref-' + cite);
+                if (biblioDiv) {
+                  citeDiv.innerHTML = biblioDiv.innerHTML;
+                }
+                popup.appendChild(citeDiv);
+              });
+              return popup.innerHTML;
+            });
+          }
+        }
+      });
+      </script>
+    
+
+</body></html>

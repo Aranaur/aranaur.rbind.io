@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="ua" xml:lang="ua"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Ihor Miroshnychenko">
+<meta name="dcterms.date" content="2026-06-08">
+
+<title>Практика 5</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src=".05-monte-carlo_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".05-monte-carlo_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src=".05-monte-carlo_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src=".05-monte-carlo_files/libs/quarto-html/popper.min.js"></script>
+<script src=".05-monte-carlo_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src=".05-monte-carlo_files/libs/quarto-html/anchor.min.js"></script>
+<link href=".05-monte-carlo_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".05-monte-carlo_files/libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".05-monte-carlo_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href=".05-monte-carlo_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href=".05-monte-carlo_files/libs/bootstrap/bootstrap-09e35026b45fe6f219ffef6ea8e22102.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Зміст</h2>
+   
+  <ul>
+  <li><a href="#що-ми-робимо-сьогодні" id="toc-що-ми-робимо-сьогодні" class="nav-link active" data-scroll-target="#що-ми-робимо-сьогодні">Що ми робимо сьогодні</a></li>
+  <li><a href="#кейс-чи-можна-довіряти-t-тесту-на-arpu-greenbowl" id="toc-кейс-чи-можна-довіряти-t-тесту-на-arpu-greenbowl" class="nav-link" data-scroll-target="#кейс-чи-можна-довіряти-t-тесту-на-arpu-greenbowl"><span class="header-section-number">1</span> Кейс: чи можна довіряти <span class="math inline">\(t\)</span>-тесту на ARPU GreenBowl?</a></li>
+  <li><a href="#версія-1-fpr-точкова-оцінка" id="toc-версія-1-fpr-точкова-оцінка" class="nav-link" data-scroll-target="#версія-1-fpr-точкова-оцінка"><span class="header-section-number">2</span> Версія 1 — FPR (точкова оцінка)</a></li>
+  <li><a href="#версія-2-довірчий-інтервал-для-fpr" id="toc-версія-2-довірчий-інтервал-для-fpr" class="nav-link" data-scroll-target="#версія-2-довірчий-інтервал-для-fpr"><span class="header-section-number">3</span> Версія 2 — довірчий інтервал для FPR</a></li>
+  <li><a href="#версія-3-універсальний-simulate_rejections" id="toc-версія-3-універсальний-simulate_rejections" class="nav-link" data-scroll-target="#версія-3-універсальний-simulate_rejections"><span class="header-section-number">4</span> Версія 3 — універсальний <code>simulate_rejections</code></a>
+  <ul class="collapse">
+  <li><a href="#підступний-кейс-однакове-середнє-різна-форма" id="toc-підступний-кейс-однакове-середнє-різна-форма" class="nav-link" data-scroll-target="#підступний-кейс-однакове-середнє-різна-форма"><span class="header-section-number">4.1</span> Підступний кейс: однакове середнє, різна форма</a></li>
+  </ul></li>
+  <li><a href="#версія-4-мінімальний-розмір-вибірки" id="toc-версія-4-мінімальний-розмір-вибірки" class="nav-link" data-scroll-target="#версія-4-мінімальний-розмір-вибірки"><span class="header-section-number">5</span> Версія 4 — мінімальний розмір вибірки</a></li>
+  <li><a href="#версія-5-потужність-tpr-і-порівняння-критеріїв" id="toc-версія-5-потужність-tpr-і-порівняння-критеріїв" class="nav-link" data-scroll-target="#версія-5-потужність-tpr-і-порівняння-критеріїв"><span class="header-section-number">6</span> Версія 5 — потужність (TPR) і порівняння критеріїв</a>
+  <ul class="collapse">
+  <li><a href="#який-критерій-кращий-стьюдент-чи-welch" id="toc-який-критерій-кращий-стьюдент-чи-welch" class="nav-link" data-scroll-target="#який-критерій-кращий-стьюдент-чи-welch"><span class="header-section-number">6.1</span> Який критерій кращий: Стьюдент чи Welch?</a></li>
+  </ul></li>
+  <li><a href="#фінал-валідація-на-історичних-даних-1000-aa" id="toc-фінал-валідація-на-історичних-даних-1000-aa" class="nav-link" data-scroll-target="#фінал-валідація-на-історичних-даних-1000-aa"><span class="header-section-number">7</span> Фінал — валідація на історичних даних (1000 A/A)</a></li>
+  <li><a href="#пастки-інтерпретації" id="toc-пастки-інтерпретації" class="nav-link" data-scroll-target="#пастки-інтерпретації"><span class="header-section-number">8</span> Пастки інтерпретації</a></li>
+  <li><a href="#чек-лист-валідації-критерію" id="toc-чек-лист-валідації-критерію" class="nav-link" data-scroll-target="#чек-лист-валідації-критерію">Чек-лист валідації критерію</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Практика 5</h1>
+<p class="subtitle lead">Метод Монте-Карло: валідація статистичних критеріїв</p>
+</div>
+
+
+<div class="quarto-title-meta-author">
+  <div class="quarto-title-meta-heading">Автор</div>
+  <div class="quarto-title-meta-heading">Приналежність</div>
+  
+    <div class="quarto-title-meta-contents">
+    <p class="author">Ihor Miroshnychenko </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            Kyiv School of Economics
+          </p>
+      </div>
+  </div>
+
+<div class="quarto-title-meta">
+
+      
+    <div>
+    <div class="quarto-title-meta-heading">Дата публікації</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">June 8, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="що-ми-робимо-сьогодні" class="level1 unnumbered">
+<h1 class="unnumbered">Що ми робимо сьогодні</h1>
+<p>На лекції ми побачили головну ідею <strong>методу Монте-Карло</strong>: щоб перевірити будь-який статистичний критерій, треба <strong>багато разів повторити один і той самий експеримент із відомою відповіддю</strong> і порахувати, як часто критерій помиляється. Так ми відповіли на три питання: <em>чи коректний критерій?</em>, <em>який критерій кращий?</em>, <em>з якого розміру вибірки можна довіряти <span class="math inline">\(t\)</span>-тесту?</em></p>
+<p>Сьогодні <strong>збираємо це в один інструмент</strong> — власну функцію <code>simulate_rejections()</code>, яку нарощуємо крок за кроком (FPR → довірчий інтервал → дві вибірки → потужність), а наприкінці робимо її «історичного близнюка» <code>thousand_aa_tests()</code> для перевірки на реальних логах.</p>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Примітка</span>Правила гри
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Інструмент, який ми <strong>будуємо</strong> сьогодні, — це <strong>Монте-Карло валідатор</strong>, а не сам <span class="math inline">\(t\)</span>-тест. Сам критерій (те, що ми <em>перевіряємо</em>) беремо готовий: <code>scipy.stats.ttest_ind</code> — або ваш власний <code>my_two_sample_t_test</code> з Практики 4.</li>
+<li>Кожна версія — це маленьке розширення попередньої.</li>
+<li>Кожен фінальний крок <strong>перевикористовує</strong> попередні функції, а не дублює їх.</li>
+<li>Після кожної версії — блок <strong>«Ваша черга»</strong> з мінізадачею.</li>
+<li>Усюди <span class="math inline">\(H_0\)</span>/<span class="math inline">\(H_1\)</span> генеруємо <strong>самі</strong> (роль «всеведучого бога»): лише так ми знаємо правильну відповідь і можемо рахувати помилки.</li>
+</ul>
+</div>
+</div>
+<hr>
+</section>
+<section id="кейс-чи-можна-довіряти-t-тесту-на-arpu-greenbowl" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Кейс: чи можна довіряти <span class="math inline">\(t\)</span>-тесту на ARPU GreenBowl?</h1>
+<p>Працюємо з тим самим застосунком доставки <strong>GreenBowl</strong>, що й у Практиці 4. Команда експериментів запускає <strong>багато</strong> дрібних A/B-тестів: окремо по містах і по категоріях кухні. У великих містах вибірки великі, а в нових — <strong>маленькі</strong> (кілька десятків користувачів за тиждень). Метрика — <strong>ARPU</strong> (виторг на користувача), сильно <strong>скошена</strong>.</p>
+<div class="border">
+<ul>
+<li><strong>Одиниця спостереження:</strong> один користувач за тиждень.</li>
+<li><strong>Метрика:</strong> ARPU у гривнях — неперервна, додатна, <strong>скошена</strong> (логнормальна: маса дрібних замовлень + довгий правий хвіст «китів»).</li>
+<li><strong>Критерій під перевіркою:</strong> двовибірковий <span class="math inline">\(t\)</span>-тест (Welch за замовчуванням).</li>
+<li><strong>Рівень значущості:</strong> <span class="math inline">\(\alpha = 0{,}05\)</span>.</li>
+</ul>
+</div>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Важливо</span>Питання, на які сьогодні відповість Монте-Карло
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li><strong>Чи коректний</strong> <span class="math inline">\(t\)</span>-тест на наших скошених ARPU? (тримає він обіцяні 5% хибних спрацювань чи ні?)</li>
+<li><strong>З якого розміру вибірки</strong> йому можна довіряти в маленьких містах?</li>
+<li><strong>Який варіант кращий</strong> — Стьюдента чи Welch — коли групи різного розміру й різного розкиду?</li>
+<li><strong>Яку потужність</strong> має тест на реалістичному ефекті — і чи вистачить її, щоб зловити ефект акції?</li>
+</ol>
+<p>Жодне з цих питань не можна чесно закрити «теоремою з підручника» — лише симуляцією на <em>наших</em> даних.</p>
+</div>
+</div>
+<p>Генеруємо скошений ARPU так само, як у Практиці 4 (логнормальний розподіл із заданим <strong>середнім</strong>; параметр <code>sigma</code> регулює розкид/важкість хвоста, не зміщуючи середнє):</p>
+<div id="cell-data-gen" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> arpu_sample(true_mean, n, sigma<span class="op">=</span><span class="fl">0.6</span>):</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Логнормальна вибірка ARPU із заданим середнім true_mean."""</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    mu <span class="op">=</span> np.log(true_mean) <span class="op">-</span> sigma<span class="op">**</span><span class="dv">2</span> <span class="op">/</span> <span class="dv">2</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.random.lognormal(mean<span class="op">=</span>mu, sigma<span class="op">=</span>sigma, size<span class="op">=</span>n)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>np.random.seed(<span class="dv">73</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>demo <span class="op">=</span> arpu_sample(<span class="dv">250</span>, <span class="dv">3000</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">4</span>))</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>ax.hist(demo, bins<span class="op">=</span><span class="dv">60</span>, color<span class="op">=</span>turquoise, alpha<span class="op">=</span><span class="fl">0.7</span>, edgecolor<span class="op">=</span><span class="st">"white"</span>)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>ax.axvline(<span class="dv">250</span>, color<span class="op">=</span>red, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"справжнє середнє = 250 ₴"</span>)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"ARPU користувача, ₴"</span>)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"Частота"</span>)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Розподіл ARPU — скошений праворуч (n = 3000)"</span>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Середнє = </span><span class="sc">{</span>demo<span class="sc">.</span>mean()<span class="sc">:.1f}</span><span class="ss"> ₴,  медіана = </span><span class="sc">{</span>np<span class="sc">.</span>median(demo)<span class="sc">:.1f}</span><span class="ss"> ₴  "</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"→  скошеність очевидна (середнє &gt; медіани)"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src=".05-monte-carlo_files/figure-html/data-gen-output-1.png" id="data-gen" class="quarto-figure quarto-figure-center anchored figure-img" width="758" height="375"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Середнє = 250.8 ₴,  медіана = 212.6 ₴  →  скошеність очевидна (середнє &gt; медіани)</code></pre>
+</div>
+</div>
+<p>Розподіл явно <strong>не нормальний</strong>. Питання лекції: чи рятує <span class="math inline">\(t\)</span>-тест ЦГТ — і <strong>з якого <span class="math inline">\(n\)</span></strong>? Перевіримо це не на віру, а симуляцією.</p>
+<hr>
+</section>
+<section id="версія-1-fpr-точкова-оцінка" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Версія 1 — FPR (точкова оцінка)</h1>
+<p>Найпростіша перевірка: запускаємо <strong>A/A-тест</strong> (дві групи з <strong>однакового</strong> розподілу, тож <span class="math inline">\(H_0\)</span> заведомо вірна) багато разів і рахуємо, у якій частці випадків критерій <strong>хибно</strong> відхилив <span class="math inline">\(H_0\)</span>. Це і є <strong>FPR</strong> (false positive rate) — частота помилок першого роду.</p>
+<div id="v1" class="cell" data-execution_count="3">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> simulate_fpr(gen, n, n_exps<span class="op">=</span><span class="dv">10_000</span>, alpha<span class="op">=</span><span class="fl">0.05</span>, seed<span class="op">=</span><span class="dv">73</span>):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Версія 1. Емпіричний FPR двовибіркового t-тесту під H0.</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">    gen(n) -&gt; вибірка розміру n. Обидві групи беремо з gen → H0 вірна.</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    np.random.seed(seed)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    bad_cnt <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(n_exps):</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>        test    <span class="op">=</span> gen(n)   <span class="co"># H0 вірна:</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>        control <span class="op">=</span> gen(n)   <span class="co"># обидві групи з того самого розподілу</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>        pvalue  <span class="op">=</span> stats.ttest_ind(test, control).pvalue</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>        bad_cnt <span class="op">+=</span> pvalue <span class="op">&lt;</span> alpha</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> bad_cnt <span class="op">/</span> n_exps</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Перевіримо на скошених ARPU. Спершу — «достатньо велика» вибірка (<span class="math inline">\(n = 200\)</span> користувачів на групу):</p>
+<div id="v1-demo" class="cell" data-execution_count="4">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>arpu_aa <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n)   <span class="co"># генератор A/A: середнє 250</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>fpr_200 <span class="op">=</span> simulate_fpr(arpu_aa, n<span class="op">=</span><span class="dv">200</span>)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>fpr_30  <span class="op">=</span> simulate_fpr(arpu_aa, n<span class="op">=</span><span class="dv">30</span>)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR при n=200:  </span><span class="sc">{</span>fpr_200<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR при n=30:   </span><span class="sc">{</span>fpr_30<span class="sc">:.4f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>FPR при n=200:  0.0496
+FPR при n=30:   0.0445</code></pre>
+</div>
+</div>
+<p>При <span class="math inline">\(n=200\)</span> FPR <span class="math inline">\(\approx 0{,}05\)</span> — начебто чудово. При <span class="math inline">\(n=30\)</span> виходить трохи менше. Але точкова оцінка <strong>гуляє</strong> від запуску до запуску: чи це «ок», чи критерій справді зміщений? Поки що сказати не можна — потрібен <strong>довірчий інтервал</strong> (Версія 2).</p>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Порада</span>Ваша черга 1
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Запустіть <code>simulate_fpr</code> із різними <code>seed</code> (напр. 1, 2, 3) при фіксованому <span class="math inline">\(n=200\)</span>. Наскільки «стрибає» точкова оцінка? Це і є шум, який ми приборкаємо інтервалом.</li>
+<li>Збільште <code>n_exps</code> із 10 000 до 50 000 при <span class="math inline">\(n=200\)</span>. Оцінка стає стабільнішою? Чому?</li>
+<li><strong>Прикладне.</strong> У новому місті за тиждень набралось лише <span class="math inline">\(n=15\)</span> користувачів на групу. Оцініть FPR. Тест уже «їде»?</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-4-contents" aria-controls="callout-4" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Примітка</span>Розв’язання 1
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-4" class="callout-4-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div id="sol1" class="cell" data-execution_count="5">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) шум точкової оцінки</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>ests <span class="op">=</span> [simulate_fpr(arpu_aa, <span class="dv">200</span>, n_exps<span class="op">=</span><span class="dv">10_000</span>, seed<span class="op">=</span>s) <span class="cf">for</span> s <span class="kw">in</span> (<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>)]</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR при різних seed: </span><span class="sc">{</span>[<span class="ss">f'</span><span class="sc">{</span>e<span class="sc">:.4f}</span><span class="ss">'</span> <span class="cf">for</span> e <span class="kw">in</span> ests]<span class="sc">}</span><span class="ss">  "</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"→ розкид ≈ </span><span class="sc">{</span><span class="bu">max</span>(ests)<span class="op">-</span><span class="bu">min</span>(ests)<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) більше експериментів → стабільніша оцінка</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"n_exps=10k:  </span><span class="sc">{</span>simulate_fpr(arpu_aa, <span class="dv">200</span>, n_exps<span class="op">=</span><span class="dv">10_000</span>)<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"n_exps=50k:  </span><span class="sc">{</span>simulate_fpr(arpu_aa, <span class="dv">200</span>, n_exps<span class="op">=</span><span class="dv">50_000</span>)<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="co"># (3) дуже мала вибірка</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR при n=15: </span><span class="sc">{</span>simulate_fpr(arpu_aa, <span class="dv">15</span>)<span class="sc">:.4f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>FPR при різних seed: ['0.0487', '0.0491', '0.0457']  → розкид ≈ 0.0034
+n_exps=10k:  0.0496
+n_exps=50k:  0.0494
+FPR при n=15: 0.0465</code></pre>
+</div>
+</div>
+<p><strong>Інтерпретація.</strong> Точкова оцінка FPR — сама випадкова величина зі стандартною похибкою <span class="math inline">\(\sqrt{\alpha(1-\alpha)/n_{\text{exps}}}\)</span>. Більше експериментів → вужчий розкид (як SEM у Практиці 4). На <span class="math inline">\(n=15\)</span> скошеність тягне FPR ще нижче 5% — тест стає <strong>консервативним</strong> (помиляється рідше, ніж заявлено). Це безпечно, але коштує потужності. Точну межу встановимо лише з довірчим інтервалом.</p>
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="версія-2-довірчий-інтервал-для-fpr" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Версія 2 — довірчий інтервал для FPR</h1>
+<p>Точкова оцінка без інтервалу — це пастка з лекції. Результат A/A — бернуллівська величина (помилився/ні), тож беремо готовий <a href="https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval#Wilson_score_interval">інтервал Уілсона</a> і формулюємо <strong>чесний вердикт</strong>: чи лежить <span class="math inline">\(\alpha\)</span> всередині?</p>
+<div id="v2" class="cell" data-execution_count="6">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> simulate_fpr(gen, n, n_exps<span class="op">=</span><span class="dv">10_000</span>, alpha<span class="op">=</span><span class="fl">0.05</span>, seed<span class="op">=</span><span class="dv">73</span>):</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Версія 2. Повертає dict: FPR + 95% Wilson-CI + вердикт."""</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    np.random.seed(seed)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    bad_cnt <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(n_exps):</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>        bad_cnt <span class="op">+=</span> stats.ttest_ind(gen(n), gen(n)).pvalue <span class="op">&lt;</span> alpha</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    fpr    <span class="op">=</span> bad_cnt <span class="op">/</span> n_exps</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> proportion_confint(bad_cnt, n_exps, alpha<span class="op">=</span><span class="fl">0.05</span>, method<span class="op">=</span><span class="st">"wilson"</span>)</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> lo <span class="op">&lt;=</span> alpha <span class="op">&lt;=</span> hi:</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>        verdict <span class="op">=</span> <span class="st">"✅ валідний (α всередині CI)"</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> hi <span class="op">&lt;</span> alpha:</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>        verdict <span class="op">=</span> <span class="st">"🟡 консервативний (FPR &lt; α: безпечно, але менш потужний)"</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>        verdict <span class="op">=</span> <span class="st">"⛔ НЕвалідний (FPR &gt; α: завелика помилка I роду)"</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"fpr"</span>: fpr, <span class="st">"ci"</span>: (lo, hi), <span class="st">"verdict"</span>: verdict}</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="v2-demo" class="cell" data-execution_count="7">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> (<span class="dv">200</span>, <span class="dv">30</span>):</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> simulate_fpr(arpu_aa, n)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"n=</span><span class="sc">{</span>n<span class="sc">:&gt;3d}</span><span class="ss">:  FPR=</span><span class="sc">{</span>r[<span class="st">'fpr'</span>]<span class="sc">:.4f}</span><span class="ss">  "</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"CI=(</span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.4f}</span><span class="ss">, </span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.4f}</span><span class="ss">)  →  </span><span class="sc">{</span>r[<span class="st">'verdict'</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>n=200:  FPR=0.0496  CI=(0.0455, 0.0540)  →  ✅ валідний (α всередині CI)
+n= 30:  FPR=0.0445  CI=(0.0406, 0.0487)  →  🟡 консервативний (FPR &lt; α: безпечно, але менш потужний)</code></pre>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Примітка</span>Що показав вердикт
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong><span class="math inline">\(n=200\)</span>:</strong> <span class="math inline">\(\alpha = 0{,}05\)</span> <strong>всередині</strong> CI → на скошених ARPU <span class="math inline">\(t\)</span>-тест <strong>коректний</strong>, щойно вибірка пристойного розміру. Це ЦГТ + Слуцького з лекції про <span class="math inline">\(t\)</span>-тест у дії.</li>
+<li><strong><span class="math inline">\(n=30\)</span>:</strong> верхня межа CI <strong>нижче</strong> 5% → тест <strong>консервативний</strong>. Помиляється рідше, ніж обіцяв, — це не страшно (хибних розкаток буде менше), але потужність нижча за можливу.</li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Порада</span>Ваша черга 2
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Знайдіть приблизно мінімальне <span class="math inline">\(n\)</span>, при якому вердикт для <code>arpu_aa</code> стає «✅ валідний» (переберіть кілька значень).</li>
+<li>Підсильте скошеність (<code>sigma=1.1</code> у генераторі). Як зсувається межа, з якої тест стає валідним? Звʼяжіть це з «достатнім <span class="math inline">\(n\)</span>» для ЦГТ.</li>
+<li><strong>Прикладне.</strong> Метрика «частка користувачів, що зробили ≥2 замовлення» — бернуллівська. Згенеруйте A/A для неї (<code>lambda n: (np.random.rand(n) &lt; 0.3).astype(float)</code>) і перевірте <span class="math inline">\(t\)</span>-тест при <span class="math inline">\(n=30\)</span>. Чи валідний?</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-7-contents" aria-controls="callout-7" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Примітка</span>Розв’язання 2
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-7" class="callout-7-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div id="sol2" class="cell" data-execution_count="8">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) межа валідності для помірної скошеності</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Помірна скошеність (sigma=0.6):"</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> (<span class="dv">30</span>, <span class="dv">60</span>, <span class="dv">100</span>, <span class="dv">150</span>, <span class="dv">200</span>):</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> simulate_fpr(arpu_aa, n)</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  n=</span><span class="sc">{</span>n<span class="sc">:&gt;3d}</span><span class="ss">: FPR=</span><span class="sc">{</span>r[<span class="st">'fpr'</span>]<span class="sc">:.4f}</span><span class="ss"> → </span><span class="sc">{</span>r[<span class="st">'verdict'</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) сильніша скошеність — межа зсувається вправо</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>heavy_aa <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">1.1</span>)</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Сильна скошеність (sigma=1.1):"</span>)</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> (<span class="dv">100</span>, <span class="dv">200</span>, <span class="dv">400</span>):</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> simulate_fpr(heavy_aa, n)</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  n=</span><span class="sc">{</span>n<span class="sc">:&gt;3d}</span><span class="ss">: FPR=</span><span class="sc">{</span>r[<span class="st">'fpr'</span>]<span class="sc">:.4f}</span><span class="ss"> → </span><span class="sc">{</span>r[<span class="st">'verdict'</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a><span class="co"># (3) бернуллівська метрика</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>binom_aa <span class="op">=</span> <span class="kw">lambda</span> n: (np.random.rand(n) <span class="op">&lt;</span> <span class="fl">0.3</span>).astype(<span class="bu">float</span>)</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> simulate_fpr(binom_aa, <span class="dv">30</span>)</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Бернуллі p=0.3, n=30: FPR=</span><span class="sc">{</span>r[<span class="st">'fpr'</span>]<span class="sc">:.4f}</span><span class="ss"> → </span><span class="sc">{</span>r[<span class="st">'verdict'</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Помірна скошеність (sigma=0.6):
+  n= 30: FPR=0.0445 → 🟡 консервативний (FPR &lt; α: безпечно, але менш потужний)
+  n= 60: FPR=0.0452 → 🟡 консервативний (FPR &lt; α: безпечно, але менш потужний)
+  n=100: FPR=0.0444 → 🟡 консервативний (FPR &lt; α: безпечно, але менш потужний)
+  n=150: FPR=0.0461 → ✅ валідний (α всередині CI)
+  n=200: FPR=0.0496 → ✅ валідний (α всередині CI)
+
+Сильна скошеність (sigma=1.1):
+  n=100: FPR=0.0411 → 🟡 консервативний (FPR &lt; α: безпечно, але менш потужний)
+  n=200: FPR=0.0484 → ✅ валідний (α всередині CI)
+  n=400: FPR=0.0453 → 🟡 консервативний (FPR &lt; α: безпечно, але менш потужний)
+
+Бернуллі p=0.3, n=30: FPR=0.0504 → ✅ валідний (α всередині CI)</code></pre>
+</div>
+</div>
+<p><strong>Інтерпретація.</strong> Що важчий хвіст, то <strong>більший <span class="math inline">\(n\)</span></strong> потрібен ЦГТ — сильно скошеному ARPU треба помітно більше спостережень, ніж помірному. Для бінарної метрики з не надто малим <span class="math inline">\(p\)</span> <span class="math inline">\(t\)</span>-тест зазвичай валідний уже на скромних <span class="math inline">\(n\)</span>. Висновок універсальний: <strong>«достатнє <span class="math inline">\(n\)</span>» залежить від форми даних</strong>, і дізнатися його можна лише симуляцією.</p>
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="версія-3-універсальний-simulate_rejections" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Версія 3 — універсальний <code>simulate_rejections</code></h1>
+<p>Досі ми генерували <strong>обидві</strong> групи з одного генератора. Реальність складніша: тест і контроль можуть бути <strong>різної форми</strong>, <strong>різного розміру</strong>, а ще нас цікавлять різні <code>alternative</code> і вибір Стьюдент/Welch. Узагальнюємо <code>simulate_fpr</code> в один інструмент — <code>simulate_rejections</code>.</p>
+<div id="v3" class="cell" data-execution_count="9">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> simulate_rejections(test_gen, control_gen, n_test, n_control<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>                        n_exps<span class="op">=</span><span class="dv">10_000</span>, alpha<span class="op">=</span><span class="fl">0.05</span>, equal_var<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>                        alternative<span class="op">=</span><span class="st">"two-sided"</span>, seed<span class="op">=</span><span class="dv">73</span>):</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Універсальний Монте-Карло валідатор.</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="co">    Рахує частку відхилень H0 + 95% Wilson-CI.</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="co">      • test_gen ≡ control_gen, рівні середні  → частка = FPR</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="co">      • середні різні (є ефект)                → частка = потужність (TPR)</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a><span class="co">    equal_var=False → Welch (дефолт); True → t-тест Стьюдента.</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> n_control <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>        n_control <span class="op">=</span> n_test</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>    np.random.seed(seed)</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    rej <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(n_exps):</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>        test    <span class="op">=</span> test_gen(n_test)</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>        control <span class="op">=</span> control_gen(n_control)</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>        pvalue  <span class="op">=</span> stats.ttest_ind(test, control, equal_var<span class="op">=</span>equal_var,</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>                                  alternative<span class="op">=</span>alternative).pvalue</span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>        rej <span class="op">+=</span> pvalue <span class="op">&lt;</span> alpha</span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>    rate   <span class="op">=</span> rej <span class="op">/</span> n_exps</span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> proportion_confint(rej, n_exps, alpha<span class="op">=</span><span class="fl">0.05</span>, method<span class="op">=</span><span class="st">"wilson"</span>)</span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"rate"</span>: rate, <span class="st">"ci"</span>: (lo, hi)}</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<section id="підступний-кейс-однакове-середнє-різна-форма" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="підступний-кейс-однакове-середнє-різна-форма"><span class="header-section-number">4.1</span> Підступний кейс: однакове середнє, різна форма</h2>
+<p>Тепер <span class="math inline">\(H_0\)</span> <strong>все ще вірна</strong> (обидва середні = 250 ₴), але групи різні за розкидом. Бізнес-аналогія: акція не змінила середній чек, але зробила тестову групу <strong>різноріднішою</strong> (хтось почав замовляти більше, хтось менше). У новому місті обидві групи маленькі — <span class="math inline">\(n = 30\)</span>.</p>
+<div id="v3-demo" class="cell" data-execution_count="10">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>test_wide  <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.8</span>)   <span class="co"># ширший розкид</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>ctrl_tight <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.4</span>)   <span class="co"># вужчий розкид</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> simulate_rejections(test_wide, ctrl_tight, n_test<span class="op">=</span><span class="dv">30</span>)</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR = </span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss">   CI = (</span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.4f}</span><span class="ss">, </span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.4f}</span><span class="ss">)"</span>)</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"5% всередині CI? </span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">0</span>] <span class="op">&lt;=</span> <span class="fl">0.05</span> <span class="op">&lt;=</span> r[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>FPR = 0.0727   CI = (0.0678, 0.0780)
+5% всередині CI? False</code></pre>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Попередження</span>Тест <strong>не валідний</strong> тут
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>FPR помітно <strong>вище</strong> 5%, і <span class="math inline">\(\alpha\)</span> <strong>поза</strong> CI. На малих різнорідних групах <span class="math inline">\(t\)</span>-тест «бачить ефект» частіше, ніж дозволено, — кожна така помилка це <strong>хибна розкатка фічі</strong>, що насправді нічого не дала. Питання: з якого <span class="math inline">\(n\)</span> він виправляється? (Версія 4.)</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Порада</span>Ваша черга 3
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Зробіть розкид груп <strong>однаковим</strong> (<code>sigma=0.6</code> в обох) при <span class="math inline">\(n=30\)</span>. FPR повертається до 5%? Тобто проблема саме в <strong>нерівності розкиду</strong> на малому <span class="math inline">\(n\)</span>.</li>
+<li>Поміняйте <code>alternative</code> на <code>"greater"</code>/<code>"less"</code>. Як це впливає на FPR у цьому A/A?</li>
+<li><strong>Прикладне.</strong> Уявіть «викид-кита»: домішайте до тестової групи 1% величезних замовлень (<code>np.where(np.random.rand(n)&lt;0.01, 50000, base)</code>). Що стає з FPR?</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-10-contents" aria-controls="callout-10" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Примітка</span>Розв’язання 3
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-10" class="callout-10-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div id="sol3" class="cell" data-execution_count="11">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) рівний розкид рятує</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>same <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.6</span>)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> simulate_rejections(same, same, n_test<span class="op">=</span><span class="dv">30</span>)</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Рівний розкид, n=30: FPR=</span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss"> "</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"(</span><span class="sc">{</span><span class="st">'✅'</span> <span class="cf">if</span> r[<span class="st">'ci'</span>][<span class="dv">0</span>] <span class="op">&lt;=</span> <span class="fl">0.05</span> <span class="op">&lt;=</span> r[<span class="st">'ci'</span>][<span class="dv">1</span>] <span class="cf">else</span> <span class="st">'⛔'</span><span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) односторонні</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> alt <span class="kw">in</span> (<span class="st">"greater"</span>, <span class="st">"less"</span>, <span class="st">"two-sided"</span>):</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> simulate_rejections(test_wide, ctrl_tight, <span class="dv">30</span>, alternative<span class="op">=</span>alt)</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  alt=</span><span class="sc">{</span>alt<span class="sc">:&gt;9s}</span><span class="ss">: FPR=</span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a><span class="co"># (3) кит-викид у тесті</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> whale(n):</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>    base <span class="op">=</span> arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.where(np.random.rand(n) <span class="op">&lt;</span> <span class="fl">0.01</span>, <span class="fl">50000.0</span>, base)</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> simulate_rejections(whale, <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.5</span>), n_test<span class="op">=</span><span class="dv">200</span>)</span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Кит-викид у тесті, n=200: FPR=</span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss"> "</span></span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"(</span><span class="sc">{</span><span class="st">'✅'</span> <span class="cf">if</span> r[<span class="st">'ci'</span>][<span class="dv">0</span>] <span class="op">&lt;=</span> <span class="fl">0.05</span> <span class="op">&lt;=</span> r[<span class="st">'ci'</span>][<span class="dv">1</span>] <span class="cf">else</span> <span class="st">'⛔'</span><span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Рівний розкид, n=30: FPR=0.0436 (⛔)
+  alt=  greater: FPR=0.0202
+  alt=     less: FPR=0.1005
+  alt=two-sided: FPR=0.0727
+Кит-викид у тесті, n=200: FPR=0.1463 (⛔)</code></pre>
+</div>
+</div>
+<p><strong>Інтерпретація.</strong> Зламати <span class="math inline">\(t\)</span>-тест на малому <span class="math inline">\(n\)</span> можна <strong>нерівністю розкиду</strong> (п.1 показує: рівні дисперсії → FPR повертається до 5%). Односторонні версії перерозподіляють помилку по хвостах, але сумарну проблему не прибирають. «Кит-викид» — найгірший ворог середнього: один гігант на 50 000 ₴ роздуває дисперсію тестової групи й збиває FPR навіть на <span class="math inline">\(n=200\)</span>. На практиці таких китів <strong>вінзоризують</strong> або переходять на робастні метрики.</p>
+</div>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="версія-4-мінімальний-розмір-вибірки" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Версія 4 — мінімальний розмір вибірки</h1>
+<p>Маємо інструмент — застосуймо його так, як на лекції: проганяємо перевірку для зростаючих <span class="math inline">\(n\)</span> і зупиняємось, щойно <span class="math inline">\(\alpha\)</span> <strong>вперше</strong> потрапляє в довірчий інтервал. Функція <strong>перевикористовує</strong> <code>simulate_rejections</code>.</p>
+<div id="v4" class="cell" data-execution_count="12">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> min_sample_size(test_gen, control_gen, grid, alpha<span class="op">=</span><span class="fl">0.05</span>, <span class="op">**</span>kw):</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Найменший n із grid, при якому α лежить у CI для FPR. Reuses V3."""</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> n <span class="kw">in</span> grid:</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>        r <span class="op">=</span> simulate_rejections(test_gen, control_gen, n_test<span class="op">=</span>n, alpha<span class="op">=</span>alpha, <span class="op">**</span>kw)</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>        lo, hi <span class="op">=</span> r[<span class="st">"ci"</span>]</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>        ok <span class="op">=</span> lo <span class="op">&lt;=</span> alpha <span class="op">&lt;=</span> hi</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"  n=</span><span class="sc">{</span>n<span class="sc">:&gt;4d}</span><span class="ss">:  FPR=</span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss">  "</span></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>              <span class="ss">f"CI=(</span><span class="sc">{</span>lo<span class="sc">:.4f}</span><span class="ss">, </span><span class="sc">{</span>hi<span class="sc">:.4f}</span><span class="ss">)  </span><span class="sc">{</span><span class="st">'✅'</span> <span class="cf">if</span> ok <span class="cf">else</span> <span class="st">'⛔'</span><span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> ok:</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> n</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="va">None</span></span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="v4-demo" class="cell" data-execution_count="13">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>n_min <span class="op">=</span> min_sample_size(test_wide, ctrl_tight, grid<span class="op">=</span><span class="bu">range</span>(<span class="dv">50</span>, <span class="dv">401</span>, <span class="dv">50</span>))</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Мінімальний розмір вибірки: ~</span><span class="sc">{</span>n_min<span class="sc">}</span><span class="ss"> на групу"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>  n=  50:  FPR=0.0665  CI=(0.0618, 0.0716)  ⛔
+  n= 100:  FPR=0.0555  CI=(0.0512, 0.0602)  ⛔
+  n= 150:  FPR=0.0516  CI=(0.0474, 0.0561)  ✅
+
+Мінімальний розмір вибірки: ~150 на групу</code></pre>
+</div>
+</div>
+<p>Для цих різнорідних ARPU-груп <span class="math inline">\(t\)</span>-тесту потрібно <strong>близько 150</strong> користувачів на групу, перш ніж йому можна довіряти. У великих містах це не проблема; у нових — сигнал <strong>зачекати з висновками</strong> або агрегувати дані.</p>
+<div id="cell-v4-plot" class="cell" data-execution_count="14">
+<details class="code-fold">
+<summary>Код</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>grid <span class="op">=</span> np.arange(<span class="dv">25</span>, <span class="dv">401</span>, <span class="dv">25</span>)</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>fprs, los, his <span class="op">=</span> [], [], []</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> grid:</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> simulate_rejections(test_wide, ctrl_tight, n_test<span class="op">=</span>n, n_exps<span class="op">=</span><span class="dv">5000</span>)</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>    fprs.append(r[<span class="st">"rate"</span>])<span class="op">;</span> los.append(r[<span class="st">"ci"</span>][<span class="dv">0</span>])<span class="op">;</span> his.append(r[<span class="st">"ci"</span>][<span class="dv">1</span>])</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">4</span>))</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>ax.plot(grid, fprs, color<span class="op">=</span>blue, lw<span class="op">=</span><span class="dv">2</span>, marker<span class="op">=</span><span class="st">"o"</span>, ms<span class="op">=</span><span class="dv">3</span>, label<span class="op">=</span><span class="st">"емпіричний FPR"</span>)</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>ax.fill_between(grid, los, his, color<span class="op">=</span>blue, alpha<span class="op">=</span><span class="fl">0.15</span>, label<span class="op">=</span><span class="st">"95% Wilson-CI"</span>)</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>ax.axhline(<span class="fl">0.05</span>, color<span class="op">=</span>red, ls<span class="op">=</span><span class="st">"--"</span>, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"обіцяні α = 0.05"</span>)</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"n на групу"</span>)</span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"FPR"</span>)</span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"FPR $t$-тесту спадає до 0.05 зі зростанням n"</span>)</span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src=".05-monte-carlo_files/figure-html/v4-plot-output-1.png" id="v4-plot" class="quarto-figure quarto-figure-center anchored figure-img" width="758" height="373"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Порада</span>Ваша черга 4
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Прогоніть <code>min_sample_size</code> для <strong>рівних</strong> дисперсій (обидва <code>sigma=0.6</code>). Поріг сильно менший?</li>
+<li>Передайте <code>alternative="greater"</code> у <code>min_sample_size</code> (через <code>**kw</code>). Чи змінюється поріг для одностороннього тесту?</li>
+<li><strong>Прикладне.</strong> Зменшіть <code>n_exps</code> до 2000 у <code>simulate_rejections</code> всередині пошуку. Чому при цьому пошук стає <strong>ненадійним</strong> (CI ширшає)? Який компроміс «точність ↔︎ час»?</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-12-contents" aria-controls="callout-12" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Примітка</span>Розв’язання 4
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-12" class="callout-12-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div id="sol4" class="cell" data-execution_count="15">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Рівні дисперсії (sigma=0.6 в обох):"</span>)</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>same <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.6</span>)</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>n_eq <span class="op">=</span> min_sample_size(same, same, grid<span class="op">=</span><span class="bu">range</span>(<span class="dv">20</span>, <span class="dv">201</span>, <span class="dv">20</span>))</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"→ поріг ~</span><span class="sc">{</span>n_eq<span class="sc">}</span><span class="ss"> (набагато менший)</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Односторонній greater (нерівні дисперсії):"</span>)</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>n_gr <span class="op">=</span> min_sample_size(test_wide, ctrl_tight, grid<span class="op">=</span><span class="bu">range</span>(<span class="dv">50</span>, <span class="dv">401</span>, <span class="dv">50</span>),</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>                       alternative<span class="op">=</span><span class="st">"greater"</span>)</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"→ поріг ~</span><span class="sc">{</span>n_gr<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Рівні дисперсії (sigma=0.6 в обох):
+  n=  20:  FPR=0.0399  CI=(0.0362, 0.0439)  ⛔
+  n=  40:  FPR=0.0473  CI=(0.0433, 0.0516)  ✅
+→ поріг ~40 (набагато менший)
+
+Односторонній greater (нерівні дисперсії):
+  n=  50:  FPR=0.0231  CI=(0.0203, 0.0262)  ⛔
+  n= 100:  FPR=0.0243  CI=(0.0215, 0.0275)  ⛔
+  n= 150:  FPR=0.0331  CI=(0.0298, 0.0368)  ⛔
+  n= 200:  FPR=0.0304  CI=(0.0272, 0.0339)  ⛔
+  n= 250:  FPR=0.0342  CI=(0.0308, 0.0379)  ⛔
+  n= 300:  FPR=0.0351  CI=(0.0317, 0.0389)  ⛔
+  n= 350:  FPR=0.0335  CI=(0.0301, 0.0372)  ⛔
+  n= 400:  FPR=0.0358  CI=(0.0323, 0.0396)  ⛔
+→ поріг ~None</code></pre>
+</div>
+</div>
+<p><strong>Інтерпретація.</strong> За <strong>рівних</strong> дисперсій <span class="math inline">\(t\)</span>-тест валідний уже на скромних <span class="math inline">\(n\)</span> — проблема саме в <strong>поєднанні</strong> скошеності й нерівності розкиду. Менший <code>n_exps</code> пришвидшує пошук, але робить CI ширшим, і вердикт «α всередині» стає крихким: можна випадково «оголосити» тест валідним зарано. Класичний компроміс точність/час із лекції: <code>n_exps → ∞</code> дає точність, але коштує часу.</p>
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="версія-5-потужність-tpr-і-порівняння-критеріїв" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Версія 5 — потужність (TPR) і порівняння критеріїв</h1>
+<p>Той самий інструмент міряє <strong>потужність</strong>: треба лише згенерувати дані, де вірна <strong>альтернатива</strong> (тестова група має вищий ARPU). Тоді відхилення <span class="math inline">\(H_0\)</span> — це <strong>правильне</strong> спрацювання, і його частка = TPR.</p>
+<div id="v5-power" class="cell" data-execution_count="16">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>control <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n)        <span class="co"># старе меню</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> lift, n <span class="kw">in</span> [(<span class="dv">15</span>, <span class="dv">500</span>), (<span class="dv">15</span>, <span class="dv">2000</span>), (<span class="dv">30</span>, <span class="dv">500</span>), (<span class="dv">30</span>, <span class="dv">2000</span>)]:</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>    test <span class="op">=</span> <span class="kw">lambda</span> n, L<span class="op">=</span>lift: arpu_sample(<span class="dv">250</span> <span class="op">+</span> L, n)   <span class="co"># ефект +L ₴</span></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> simulate_rejections(test, control, n_test<span class="op">=</span>n, alternative<span class="op">=</span><span class="st">"greater"</span>)</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"lift=+</span><span class="sc">{</span>lift<span class="sc">}</span><span class="ss"> ₴, n=</span><span class="sc">{</span>n<span class="sc">:&gt;4d}</span><span class="ss">:  power = </span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.3f}</span><span class="ss">  "</span></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"CI=(</span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>lift=+15 ₴, n= 500:  power = 0.401  CI=(0.391, 0.411)
+lift=+15 ₴, n=2000:  power = 0.877  CI=(0.871, 0.883)
+lift=+30 ₴, n= 500:  power = 0.858  CI=(0.851, 0.865)
+lift=+30 ₴, n=2000:  power = 1.000  CI=(1.000, 1.000)</code></pre>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Примітка</span>Як читати таблицю
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Потужність зростає і від <strong>розміру ефекту</strong>, і від <strong>розміру вибірки</strong>. Маленький ефект (+15 ₴) на <span class="math inline">\(n=500\)</span> ловиться лише в ~40% випадків — <strong>недостатньо</strong> (золотий стандарт — 80%); тож або більший <span class="math inline">\(n\)</span>, або чекаємо більший ефект. Це той самий звʼязок <span class="math inline">\(n \leftrightarrow\)</span> MDE, що й у Практиці 4, але тепер виміряний <strong>симуляцією</strong>, без формул.</p>
+</div>
+</div>
+<section id="який-критерій-кращий-стьюдент-чи-welch" class="level2" data-number="6.1">
+<h2 data-number="6.1" class="anchored" data-anchor-id="який-критерій-кращий-стьюдент-чи-welch"><span class="header-section-number">6.1</span> Який критерій кращий: Стьюдент чи Welch?</h2>
+<p>Обидва ми знаємо з Практики 4. На лекції побачили: вони <strong>не</strong> взаємозамінні. Реалістичний A/B: фічу розкотили на <strong>20%</strong> користувачів, тож тестова група менша; до того ж вона <strong>різнорідніша</strong> (акція додала розкиду). <span class="math inline">\(H_0\)</span> вірна (середні рівні).</p>
+<div id="v5-criteria" class="cell" data-execution_count="17">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>test_small <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.6</span>)   <span class="co"># 20%, ширший розкид</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>ctrl_big   <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n, sigma<span class="op">=</span><span class="fl">0.4</span>)   <span class="co"># 80%, вужчий розкид</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>student <span class="op">=</span> simulate_rejections(test_small, ctrl_big, n_test<span class="op">=</span><span class="dv">200</span>, n_control<span class="op">=</span><span class="dv">800</span>,</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>                              equal_var<span class="op">=</span><span class="va">True</span>)            <span class="co"># Стьюдент</span></span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>welch   <span class="op">=</span> simulate_rejections(test_small, ctrl_big, n_test<span class="op">=</span><span class="dv">200</span>, n_control<span class="op">=</span><span class="dv">800</span>,</span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>                              equal_var<span class="op">=</span><span class="va">False</span>)           <span class="co"># Welch</span></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Стьюдент: FPR = </span><span class="sc">{</span>student[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss">  "</span></span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"CI=(</span><span class="sc">{</span>student[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>student[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Welch:    FPR = </span><span class="sc">{</span>welch[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss">  "</span></span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"CI=(</span><span class="sc">{</span>welch[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>welch[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Стьюдент: FPR = 0.1280  CI=(0.122, 0.135)
+Welch:    FPR = 0.0543  CI=(0.050, 0.059)</code></pre>
+</div>
+</div>
+<div id="cell-v5-criteria-plot" class="cell" data-execution_count="18">
+<details class="code-fold">
+<summary>Код</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>names <span class="op">=</span> [<span class="st">"Стьюдент</span><span class="ch">\n</span><span class="st">(equal_var=True)"</span>, <span class="st">"Welch</span><span class="ch">\n</span><span class="st">(equal_var=False)"</span>]</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>vals  <span class="op">=</span> [student[<span class="st">"rate"</span>], welch[<span class="st">"rate"</span>]]</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>errs  <span class="op">=</span> np.array([[v <span class="op">-</span> r[<span class="st">"ci"</span>][<span class="dv">0</span>], r[<span class="st">"ci"</span>][<span class="dv">1</span>] <span class="op">-</span> v]</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>                  <span class="cf">for</span> v, r <span class="kw">in</span> <span class="bu">zip</span>(vals, (student, welch))]).T</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="fl">7.5</span>, <span class="dv">4</span>))</span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>ax.bar(names, vals, color<span class="op">=</span>[red_pink, turquoise], width<span class="op">=</span><span class="fl">0.5</span>,</span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>       yerr<span class="op">=</span>errs, capsize<span class="op">=</span><span class="dv">6</span>, error_kw<span class="op">=</span>{<span class="st">"ecolor"</span>: gray})</span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>ax.axhline(<span class="fl">0.05</span>, color<span class="op">=</span>red, ls<span class="op">=</span><span class="st">"--"</span>, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"обіцяні α = 5%"</span>)</span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"FPR (H0 вірна)"</span>)</span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Нерівні групи (200 vs 800) + нерівний розкид"</span>)</span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src=".05-monte-carlo_files/figure-html/v5-criteria-plot-output-1.png" id="v5-criteria-plot" class="quarto-figure quarto-figure-center anchored figure-img" width="710" height="375"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Важливо</span>Вердикт
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>За <strong>нерівних розмірів груп і нерівних дисперсій</strong> Стьюдент роздуває FPR у <strong>2–3 рази</strong> (тут ~13% замість 5%) — він занижує стандартну похибку й дає хибно-позитивні. <strong>Welch тримає ~5%.</strong> Саме тому в Практиці 4 дефолтом був <code>equal_var=False</code>. Монте-Карло наочно довів те, що ми брали на віру.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Порада</span>Ваша черга 5
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Зробіть групи <strong>рівними</strong> (<span class="math inline">\(n=500\)</span> кожна), лишивши нерівний розкид. Чи зникає перевага Welch? (підказка з Практики 4: при рівних <span class="math inline">\(n\)</span> різниця мала).</li>
+<li>Виміряйте <strong>потужність</strong> Стьюдента й Welch на ефекті +20 ₴ при тих самих 200/800. Чи платить Welch за коректність помітною втратою потужності?</li>
+<li><strong>Прикладне.</strong> Команда хоче «зловити +15 ₴ із power ≥ 0.8» на рівних групах. Переберіть <span class="math inline">\(n \in \{1000, 2000, 4000\}\)</span> і знайдіть достатній.</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-16-contents" aria-controls="callout-16" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Примітка</span>Розв’язання 5
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-16" class="callout-16-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div id="sol5" class="cell" data-execution_count="19">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) рівні групи — перевага Welch зникає</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>s <span class="op">=</span> simulate_rejections(test_small, ctrl_big, <span class="dv">500</span>, <span class="dv">500</span>, equal_var<span class="op">=</span><span class="va">True</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>w <span class="op">=</span> simulate_rejections(test_small, ctrl_big, <span class="dv">500</span>, <span class="dv">500</span>, equal_var<span class="op">=</span><span class="va">False</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Рівні n=500:  Стьюдент=</span><span class="sc">{</span>s<span class="sc">:.4f}</span><span class="ss">  Welch=</span><span class="sc">{</span>w<span class="sc">:.4f}</span><span class="ss">  → майже однакові"</span>)</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) потужність — ціна коректності</span></span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>test20 <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">270</span>, n, sigma<span class="op">=</span><span class="fl">0.6</span>)</span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>ps <span class="op">=</span> simulate_rejections(test20, ctrl_big, <span class="dv">200</span>, <span class="dv">800</span>, equal_var<span class="op">=</span><span class="va">True</span>,  alternative<span class="op">=</span><span class="st">"greater"</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>pw <span class="op">=</span> simulate_rejections(test20, ctrl_big, <span class="dv">200</span>, <span class="dv">800</span>, equal_var<span class="op">=</span><span class="va">False</span>, alternative<span class="op">=</span><span class="st">"greater"</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Power(+20 ₴): Стьюдент=</span><span class="sc">{</span>ps<span class="sc">:.3f}</span><span class="ss">  Welch=</span><span class="sc">{</span>pw<span class="sc">:.3f}</span><span class="ss">  "</span></span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"(але Стьюдент тут НЕвалідний → його потужність оманлива)"</span>)</span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a><span class="co"># (3) скільки треба на +15 ₴</span></span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>control <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">250</span>, n)</span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Пошук n для power≥0.8 на +15 ₴ (рівні групи):"</span>)</span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> (<span class="dv">1000</span>, <span class="dv">2000</span>, <span class="dv">4000</span>):</span>
+<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a>    test15 <span class="op">=</span> <span class="kw">lambda</span> n: arpu_sample(<span class="dv">265</span>, n)</span>
+<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a>    p <span class="op">=</span> simulate_rejections(test15, control, n_test<span class="op">=</span>n, alternative<span class="op">=</span><span class="st">"greater"</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  n=</span><span class="sc">{</span>n<span class="sc">:&gt;4d}</span><span class="ss">: power=</span><span class="sc">{</span>p<span class="sc">:.3f}</span><span class="ss"> </span><span class="sc">{</span><span class="st">'✅'</span> <span class="cf">if</span> p<span class="op">&gt;=</span><span class="fl">0.8</span> <span class="cf">else</span> <span class="st">''</span><span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Рівні n=500:  Стьюдент=0.0497  Welch=0.0495  → майже однакові
+Power(+20 ₴): Стьюдент=0.615  Welch=0.445  (але Стьюдент тут НЕвалідний → його потужність оманлива)
+
+Пошук n для power≥0.8 на +15 ₴ (рівні групи):
+  n=1000: power=0.631 
+  n=2000: power=0.877 ✅
+  n=4000: power=0.990 ✅</code></pre>
+</div>
+</div>
+<p><strong>Інтерпретація.</strong> При <strong>рівних</strong> групах Стьюдент і Welch майже збігаються — біда лише за нерівних <span class="math inline">\(n\)</span>. Порівнювати потужність можна <strong>тільки серед валідних</strong> критеріїв: вища «потужність» Стьюдента — це наслідок його завищеного FPR, а не реальна перевага. Для +15 ₴ із power ≥ 0.8 на рівних групах треба кілька тисяч користувачів на групу — маленький ефект дорогий (як і MDE-trade-off із Практики 4).</p>
+</div>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="фінал-валідація-на-історичних-даних-1000-aa" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> Фінал — валідація на історичних даних (1000 A/A)</h1>
+<p>Штучні генератори зручні, але «а раптом мої реальні дані інші?». Відповідь із лекції: <strong>метод тисячі A/A-тестів</strong>. Беремо історичні логи, ріжемо їх на зрізи (місто × кухня), і на <strong>кожному</strong> зрізі робимо A/A: випадково ділимо користувачів навпіл (жодного впливу → <span class="math inline">\(H_0\)</span> вірна) і запускаємо критерій. Частка спрацювань по всіх зрізах = FPR на <strong>реальних</strong> даних.</p>
+<div id="final-log" class="cell" data-execution_count="20">
+<details class="code-fold">
+<summary>Код</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Імітуємо «історичний» лог ARPU: 50 міст × 8 кухонь = 400 зрізів</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>np.random.seed(<span class="dv">2026</span>)                  <span class="co"># відтворюваність: arpu_sample бере глобальний RNG</span></span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">2026</span>)</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>cities   <span class="op">=</span> [<span class="ss">f"city_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">50</span>)]</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>cuisines <span class="op">=</span> [<span class="st">"pizza"</span>, <span class="st">"sushi"</span>, <span class="st">"burger"</span>, <span class="st">"vegan"</span>, <span class="st">"asian"</span>, <span class="st">"bbq"</span>, <span class="st">"dessert"</span>, <span class="st">"salad"</span>]</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> city <span class="kw">in</span> cities:</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>    base <span class="op">=</span> rng.uniform(<span class="dv">150</span>, <span class="dv">400</span>)                  <span class="co"># своя середня ARPU</span></span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> cuisine <span class="kw">in</span> cuisines:</span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>        n   <span class="op">=</span> rng.integers(<span class="dv">150</span>, <span class="dv">500</span>)</span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a>        sig <span class="op">=</span> rng.uniform(<span class="fl">0.5</span>, <span class="fl">0.9</span>)               <span class="co"># своя скошеність</span></span>
+<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a>        arpu <span class="op">=</span> arpu_sample(base, n, sigma<span class="op">=</span>sig)</span>
+<span id="cb31-14"><a href="#cb31-14" aria-hidden="true" tabindex="-1"></a>        rows.append(pd.DataFrame({<span class="st">"city"</span>: city, <span class="st">"cuisine"</span>: cuisine, <span class="st">"arpu"</span>: arpu}))</span>
+<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-16"><a href="#cb31-16" aria-hidden="true" tabindex="-1"></a>log <span class="op">=</span> pd.concat(rows, ignore_index<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"користувачів: </span><span class="sc">{</span><span class="bu">len</span>(log)<span class="sc">:,}</span><span class="ss">   зрізів (датасетів): "</span></span>
+<span id="cb31-18"><a href="#cb31-18" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"</span><span class="sc">{</span>log<span class="sc">.</span>groupby([<span class="st">'city'</span>,<span class="st">'cuisine'</span>])<span class="sc">.</span>ngroups<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>користувачів: 127,228   зрізів (датасетів): 400</code></pre>
+</div>
+</div>
+<div id="final-fn" class="cell" data-execution_count="21">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> thousand_aa_tests(log, alpha<span class="op">=</span><span class="fl">0.05</span>, lift<span class="op">=</span><span class="fl">0.0</span>, equal_var<span class="op">=</span><span class="va">False</span>, seed<span class="op">=</span><span class="dv">1</span>):</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Тисяча A/A (або A/B) тестів на історичних зрізах. Reuses ttest_ind.</span></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a><span class="co">    lift=0   → A/A → частка = FPR на реальних даних.</span></span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a><span class="co">    lift&gt;0   → A/B із змодельованим ефектом → частка = потужність.</span></span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a><span class="co">    Користувачів у кожному зрізі ділимо НЕЗАЛЕЖНО (інакше тести залежні).</span></span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>    rng, rej, k <span class="op">=</span> np.random.default_rng(seed), <span class="dv">0</span>, <span class="dv">0</span></span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _, g <span class="kw">in</span> log.groupby([<span class="st">"city"</span>, <span class="st">"cuisine"</span>]):</span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>        arpu <span class="op">=</span> g[<span class="st">"arpu"</span>].to_numpy()</span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>        idx  <span class="op">=</span> rng.permutation(<span class="bu">len</span>(arpu))          <span class="co"># незалежний поділ</span></span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>        half <span class="op">=</span> <span class="bu">len</span>(arpu) <span class="op">//</span> <span class="dv">2</span></span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>        control <span class="op">=</span> arpu[idx[:half]]</span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>        test    <span class="op">=</span> arpu[idx[half:<span class="dv">2</span> <span class="op">*</span> half]] <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> lift)</span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>        rej <span class="op">+=</span> stats.ttest_ind(test, control, equal_var<span class="op">=</span>equal_var).pvalue <span class="op">&lt;</span> alpha</span>
+<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a>        k   <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> proportion_confint(rej, k, alpha<span class="op">=</span><span class="fl">0.05</span>, method<span class="op">=</span><span class="st">"wilson"</span>)</span>
+<span id="cb33-18"><a href="#cb33-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"rate"</span>: rej <span class="op">/</span> k, <span class="st">"ci"</span>: (lo, hi), <span class="st">"k"</span>: k}</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="final-demo" class="cell" data-execution_count="22">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>aa <span class="op">=</span> thousand_aa_tests(log)</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"A/A FPR на </span><span class="sc">{</span>aa[<span class="st">'k'</span>]<span class="sc">}</span><span class="ss"> зрізах: </span><span class="sc">{</span>aa[<span class="st">'rate'</span>]<span class="sc">:.4f}</span><span class="ss">  "</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"CI=(</span><span class="sc">{</span>aa[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.4f}</span><span class="ss">, </span><span class="sc">{</span>aa[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.4f}</span><span class="ss">)  "</span></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"→ </span><span class="sc">{</span><span class="st">'✅ валідний'</span> <span class="cf">if</span> aa[<span class="st">'ci'</span>][<span class="dv">0</span>] <span class="op">&lt;=</span> <span class="fl">0.05</span> <span class="op">&lt;=</span> aa[<span class="st">'ci'</span>][<span class="dv">1</span>] <span class="cf">else</span> <span class="st">'⛔'</span><span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Потужність на змодельованому ефекті (lift % від ARPU):"</span>)</span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> lift <span class="kw">in</span> (<span class="fl">0.03</span>, <span class="fl">0.05</span>, <span class="fl">0.10</span>):</span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> thousand_aa_tests(log, lift<span class="op">=</span>lift)</span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  lift=+</span><span class="sc">{</span>lift<span class="sc">:.0%}</span><span class="ss">:  power = </span><span class="sc">{</span>r[<span class="st">'rate'</span>]<span class="sc">:.3f}</span><span class="ss">  "</span></span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"CI=(</span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>A/A FPR на 400 зрізах: 0.0500  CI=(0.0326, 0.0760)  → ✅ валідний
+
+Потужність на змодельованому ефекті (lift % від ARPU):
+  lift=+3%:  power = 0.080  CI=(0.057, 0.111)
+  lift=+5%:  power = 0.102  CI=(0.076, 0.136)
+  lift=+10%:  power = 0.203  CI=(0.166, 0.245)</code></pre>
+</div>
+</div>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Важливо</span>Чому це переконливіше за штучні дані
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>На зрізах — <strong>справжній</strong> розподіл ARPU GreenBowl, з усіма реальними китами й скошеністю. <span class="math inline">\(\alpha = 0{,}05\)</span> всередині CI → інфраструктурі A/A можна довіряти. Для потужності ефекту нема, тож ми його <strong>домоделювали</strong> (множимо тест на <span class="math inline">\(1+\text{lift}\)</span>): точний розмір не критичний, особливо коли <strong>порівнюємо</strong> два критерії. CI ширший, ніж на штучних даних, бо зрізів лише 400 — більше логів дали б точнішу оцінку.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Порада</span>Ваша черга 6
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Порівняйте на історичних зрізах Стьюдента (<code>equal_var=True</code>) і Welch. Тут поділ 50/50 (рівні групи) — різниця помітна?</li>
+<li>Додайте третій вимір нарізки — <strong>місяць</strong> (додайте випадковий <code>month</code> у лог). Скільки тепер зрізів і як це впливає на ширину CI?</li>
+<li><strong>Прикладне.</strong> Один зріз = один A/A. Покажіть, що <strong>один</strong> A/A-тест нічого не доводить: візьміть будь-який зріз і порахуйте на ньому FPR на 2000 повторних поділах. Чому висновок дає лише <strong>сукупність</strong> зрізів?</li>
+</ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-19-contents" aria-controls="callout-19" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Примітка</span>Розв’язання 6
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-19" class="callout-19-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div id="sol6" class="cell" data-execution_count="23">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) Стьюдент vs Welch на рівних 50/50 зрізах</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>st <span class="op">=</span> thousand_aa_tests(log, equal_var<span class="op">=</span><span class="va">True</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>we <span class="op">=</span> thousand_aa_tests(log, equal_var<span class="op">=</span><span class="va">False</span>)[<span class="st">"rate"</span>]</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Історичні зрізи (50/50): Стьюдент=</span><span class="sc">{</span>st<span class="sc">:.4f}</span><span class="ss">  Welch=</span><span class="sc">{</span>we<span class="sc">:.4f}</span><span class="ss">  → близькі"</span>)</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a><span class="co"># (3) один зріз нічого не доводить</span></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>one <span class="op">=</span> log.groupby([<span class="st">"city"</span>, <span class="st">"cuisine"</span>]).get_group((<span class="st">"city_0"</span>, <span class="st">"pizza"</span>))[<span class="st">"arpu"</span>].to_numpy()</span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">0</span>)<span class="op">;</span> rej <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">2000</span>):</span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> rng.permutation(<span class="bu">len</span>(one))<span class="op">;</span> h <span class="op">=</span> <span class="bu">len</span>(one) <span class="op">//</span> <span class="dv">2</span></span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a>    rej <span class="op">+=</span> stats.ttest_ind(one[idx[h:<span class="dv">2</span><span class="op">*</span>h]], one[idx[:h]], equal_var<span class="op">=</span><span class="va">False</span>).pvalue <span class="op">&lt;</span> <span class="fl">0.05</span></span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"FPR на ОДНОМУ зрізі (2000 поділів): </span><span class="sc">{</span>rej<span class="op">/</span><span class="dv">2000</span><span class="sc">:.4f}</span><span class="ss"> "</span></span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"— оцінка по одному зрізу, з широким шумом"</span>)</span></code></pre></div><button title="Скопіювати текст" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Історичні зрізи (50/50): Стьюдент=0.0500  Welch=0.0500  → близькі
+FPR на ОДНОМУ зрізі (2000 поділів): 0.0520 — оцінка по одному зрізу, з широким шумом</code></pre>
+</div>
+</div>
+<p><strong>Інтерпретація.</strong> На <strong>рівних</strong> 50/50 зрізах Стьюдент і Welch майже збігаються (нерівність <span class="math inline">\(n\)</span> — головний тригер розбіжності). Один A/A-тест дає лише одне «так/ні» і нічого не каже про FPR — потрібна <strong>тисяча</strong> зрізів, щоб точно оцінити частоту помилок (саме тому метод і називається «тисяча A/A»). Додавання виміру «місяць» множить кількість зрізів і <strong>звужує</strong> CI — більше незалежних експериментів = точніша оцінка.</p>
+</div>
+</div>
+</div>
+<hr>
+</section>
+<section id="пастки-інтерпретації" class="level1" data-number="8">
+<h1 data-number="8"><span class="header-section-number">8</span> Пастки інтерпретації</h1>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Попередження</span>Точкова оцінка без CI
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>FPR <span class="math inline">\(= 0{,}047\)</span> ще <strong>не</strong> означає «валідний», а <span class="math inline">\(0{,}053\)</span> — «зламаний». Завжди дивіться, чи <span class="math inline">\(\alpha\)</span> <strong>всередині довірчого інтервалу</strong>. Без інтервалу ви читаєте шум.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Попередження</span>Велике <span class="math inline">\(n\)</span> рятує, а не «нормалізація даних»
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><span class="math inline">\(t\)</span>-тест на скошених ARPU стає коректним завдяки <strong>ЦГТ + Слуцького — лише за достатнього <span class="math inline">\(n\)</span></strong>. На малих різнорідних групах помиляється будь-який варіант; там — більше даних, вінзоризація китів або робастні метрики.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Важливо</span>Дефолт — Welch
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>За нерівних розмірів/дисперсій груп Стьюдент роздуває FPR. <code>equal_var=False</code> (Welch) — безпечний дефолт. Pooled-Стьюдент — лише коли є <strong>вагомі підстави</strong> вважати дисперсії рівними.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Важливо</span>Потужність порівнюють лише серед ВАЛІДНИХ критеріїв
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>«Більша потужність» зламаного критерію — ілюзія: він просто частіше відхиляє <span class="math inline">\(H_0\)</span>, зокрема <strong>хибно</strong>. Спершу перевірте FPR, і лише потім порівнюйте TPR.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Попередження</span>Один A/A-тест нічого не доводить
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Один прогін дає одне «так/ні». Корекатність інфраструктури показує лише <strong>сукупність</strong> (≈1000) незалежних A/A. І ділити користувачів треба <strong>незалежно</strong> в кожному — інакше тести стають залежними.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Попередження</span>Симулюйте реалістичний ефект
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Потужність залежить від того, <strong>який</strong> ефект ви закладаєте. Беріть ефект, схожий на той, що очікуєте на практиці (або порівнюйте критерії — тоді точний розмір ефекту менш важливий).</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="чек-лист-валідації-критерію" class="level1 unnumbered">
+<h1 class="unnumbered">Чек-лист валідації критерію</h1>
+<ul class="task-list">
+<li><label><input type="checkbox">Який <strong>критерій</strong> і на <strong>яких даних</strong> перевіряємо?</label></li>
+<li><label><input type="checkbox">Як згенерувати <span class="math inline">\(H_0\)</span> так, щоб вона була <strong>заведомо вірна</strong> (A/A)?</label></li>
+<li><label><input type="checkbox">Порахований <strong>FPR із довірчим інтервалом</strong> — і чи <span class="math inline">\(\alpha\)</span> всередині?</label></li>
+<li><label><input type="checkbox">Якщо дані скошені — перевірено <strong>мінімальне <span class="math inline">\(n\)</span></strong>, з якого тест валідний?</label></li>
+<li><label><input type="checkbox">Групи різного розміру/розкиду → взято <strong>Welch</strong>, а не pooled?</label></li>
+<li><label><input type="checkbox">Для вибору між критеріями — порівняна <strong>потужність</strong> (лише серед валідних)?</label></li>
+<li><label><input type="checkbox">Якщо є історичні логи — зроблено <strong>≈1000 A/A</strong> з <strong>незалежним</strong> поділом?</label></li>
+<li><label><input type="checkbox">Для потужності — ефект змодельований <strong>реалістично</strong>?</label></li>
+</ul>
+<p>Якщо хоч на одне «ні» — довіряти критерію <strong>зарано</strong>. ```</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Скопійовано!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Скопійовано!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
