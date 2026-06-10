@@ -1,0 +1,413 @@
+---
+title: "Lab 5"
+subtitle: "Auditing a Significance Criterion with Monte Carlo: the GreenBowl Platform"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+execute:
+  echo: true
+  warning: false
+---
+
+# Objective
+
+In **Lab 4** you were handed an A/B dataset and had to recover the right
+**business decision**. **Lab 5 is one level up: you audit the *tool* that
+makes those decisions.**
+
+The GreenBowl data-engineering team shipped a new significance criterion,
+`team_criterion`, and wired it into the experimentation platform — it now
+decides "ship / don't ship" on **every** A/B test in the company. Before you
+let it touch a single roll-out, your job is to **validate it with Monte
+Carlo**, exactly as the lecture taught: *generate many experiments with a
+known answer, run the criterion on each, and count how often it is right.*
+
+The twist, as in Lab 4: **you do not get to see what the criterion does.**
+`team_criterion` is keyed to your student id. Some students received a
+perfectly correct test; some received one that is correct **only under
+certain conditions**; some received one that is quietly **broken**. The only
+honest way to find out which one you hold is to simulate.
+
+You will:
+
+1. Confirm your tools on a known-good reference, then **generalize**
+   `simulate_rejections` so it can validate **any** criterion (not just
+   `scipy`'s `ttest_ind`).
+2. Measure your criterion's **false-positive rate (FPR)** under $H_0$ with a
+   Wilson confidence interval — the calibration check.
+3. Find the **minimum sample size** from which it is trustworthy (if ever) —
+   the "small new city" problem.
+4. Measure **power** under $H_1$ and **compare it head-to-head** with the
+   trusted Welch reference — is it valid *and* competitive?
+5. Run **≈1000 A/A tests on your historical log** and reconcile the result
+   with your synthetic findings.
+6. Deliver a one-page **go / no-go verdict** on the criterion to the platform
+   team.
+
+# General Requirements
+
+::: {.callout-important icon="false"}
+## The fixed context (same for everyone)
+
+- **Metric:** weekly **ARPU** per user, in UAH — continuous, positive,
+  right-skewed (lognormal).
+- **Baseline:** $\mu_0 = 250$ UAH.
+- **Significance level:** $\alpha = 0.05$.
+- **The criterion under audit:** `team_criterion` from `greenbowl_mc.py`,
+  keyed to *your* id.
+- **The trusted reference:** `reference_welch` from the same module — a
+  textbook two-sample Welch $t$-test you may treat as correct.
+- **Your "god" generator:** `arpu_sample(mean, n, sigma)` — you decide the
+  truth, so you always know the right answer.
+:::
+
+::: {.callout-important icon="false"}
+## Everyone's criterion is different — on purpose
+
+Your `team_criterion` is unique to your id. It might be the textbook Welch
+test, a variant that is valid only on large or balanced samples, or one that
+is anti-conservative at every sample size. **There is no single verdict shared
+across the class** — there is only the verdict your simulations support.
+Copying another student's conclusion will be obviously wrong for your
+criterion.
+:::
+
+::: {.callout-note icon="false"}
+## Report Format
+
+Submit the report in **one** of the following formats:
+
+- **Quarto → PDF** (`.qmd` → `.pdf`)
+- **Quarto → HTML** (`.qmd` → `.html`, hosted, e.g. on
+  [Quarto Pub](https://quartopub.com/),
+  [Posit Connect Cloud](https://connect.posit.cloud/))
+- **Jupyter Notebook** (`.ipynb`)
+- **Google Colab** (share the link with viewing permissions)
+
+The report must contain both code **and** narrative. Every section begins with
+a written explanation, not code.
+:::
+
+::: {.callout-warning icon="false"}
+## What you build vs. what you test
+
+The thing you **build** today is the **Monte Carlo validator**
+(`simulate_rejections`, `min_sample_size`, `thousand_aa_tests`) — grown step
+by step from Practice 5. The thing you **test** is taken ready-made: your
+hidden `team_criterion` and the `reference_welch`. You may use
+`statsmodels.stats.proportion.proportion_confint` for the Wilson interval and
+`scipy.stats` for the reference. You may **not** replace your validator with a
+library power/AA function — the simulation loop and the confidence-interval
+verdict must be **your own code**.
+:::
+
+::: {.callout-warning icon="false"}
+## Honour rule on the data platform
+
+`greenbowl_mc.py` contains the hidden truth in its source. **Do not read past
+the `# === instructor section ===` line, and do not call `_reveal`.** The
+point of the lab is to reach the verdict *by simulation*, not by reading the
+criterion's code. Any report that names the hidden criterion from the source
+instead of demonstrating its behaviour scores **zero** for interpretation.
+:::
+
+::: {.callout-warning icon="false"}
+## Deadline
+
+📅 **June 17, 2026, 23:59**
+:::
+
+# Tasks
+
+## Set Up and Sanity-Check Your Tools {#sec-setup}
+
+Download `greenbowl_mc.py` into your working folder and load **your**
+criterion and historical log. Use **one** id consistently — your KSE email is
+recommended.
+
+```{python}
+#| label: load
+#| eval: false
+
+from greenbowl_mc import (load_my_criterion, load_my_log,
+                          reference_welch, arpu_sample, BASELINE, ALPHA)
+import numpy as np
+from scipy import stats
+from statsmodels.stats.proportion import proportion_confint
+
+STUDENT_ID = "your.email@kse.org.ua"   # <-- put YOUR id here
+team_criterion = load_my_criterion(STUDENT_ID)
+log = load_my_log(STUDENT_ID)
+
+# both criteria share the same call signature:
+#   crit(test, control, alternative="two-sided") -> p_value
+demo_test    = arpu_sample(260, 200)
+demo_control = arpu_sample(250, 200)
+print("team   :", team_criterion(demo_test, demo_control, "greater"))
+print("welch  :", reference_welch(demo_test, demo_control, "greater"))
+print(f"baseline = {BASELINE}, alpha = {ALPHA}")
+```
+
+::: {.border}
+1. State your `STUDENT_ID`. Confirm both `team_criterion` and
+   `reference_welch` run and return a $p$-value on a sample you generate with
+   `arpu_sample`.
+2. In one sentence, confirm you understand that **what the criterion does is
+   hidden**, and your entire task is to characterise its behaviour by
+   simulation.
+3. **Do not** form any opinion yet from this single call — one $p$-value tells
+   you nothing about calibration. Say why.
+:::
+
+## A Universal `simulate_rejections()` {#sec-fn}
+
+In Practice 5 your validator hard-coded `scipy.stats.ttest_ind`. To audit an
+**arbitrary** criterion you must pass the criterion **in** as an argument.
+
+::: {.border}
+1. Implement
+
+   ```python
+   simulate_rejections(criterion, test_gen, control_gen, n_test,
+                       n_control=None, n_exps=10_000, alpha=0.05,
+                       alternative="two-sided", seed=...)
+   ```
+
+   that runs `n_exps` experiments, each time drawing `test = test_gen(n_test)`
+   and `control = control_gen(n_control)`, calling
+   `criterion(test, control, alternative)`, and counting rejections
+   ($p < \alpha$). It must **return** the rejection rate **and** its 95%
+   **Wilson** confidence interval (`proportion_confint(..., method="wilson")`).
+   - When the two generators have **equal means**, the rate is the **FPR**.
+   - When the test generator has a **higher** mean, the rate is the **power**.
+2. **Sanity-check the validator on the reference.** Run it with
+   `criterion=reference_welch`, both generators `arpu_sample(250, n)`, at a
+   comfortable $n$ (say 400). Confirm the FPR's CI contains $\alpha = 0.05$.
+   This proves your *loop* is correct before you point it at the mystery
+   criterion.
+:::
+
+::: {.callout-tip icon="false"}
+## Reproducibility
+Seed your RNG so every run of the report is identical, but **vary the seed**
+at least once (Practice 5, "Your turn 1") to see that the point estimate
+wobbles — that wobble is exactly why you always report the interval.
+:::
+
+## Is Your Criterion Calibrated? (FPR) {#sec-fpr}
+
+Now point the validator at `team_criterion`. Generate $H_0$ yourself (two
+groups from the **same** ARPU distribution, equal means) and read off the FPR.
+
+::: {.border}
+1. **Balanced, equal-variance, large $n$.** Run the FPR check for
+   `team_criterion` with both groups `arpu_sample(250, n, sigma=0.6)` at a
+   large $n$ (e.g. 800). Report the FPR and its CI. Is $\alpha = 0.05$ inside?
+2. **Small $n$.** Repeat at a small "new city" size — sweep
+   $n \in \{5, 10, 20, 50\}$. Does the verdict change as $n$ shrinks?
+3. **Unbalanced *and* unequal-variance.** Run the check with a **noisy,
+   smaller** test arm and a **tight, larger** control arm — e.g.
+   `test = arpu_sample(250, n, sigma=0.8)` with `n_test=200` and
+   `control = arpu_sample(250, n, sigma=0.4)` with `n_control=800`. (Means are
+   still equal, so $H_0$ holds.) Report the FPR and CI.
+4. **Side-by-side.** For each of the three settings above, run
+   `reference_welch` on the **same** generators and tabulate
+   `setting | team FPR (CI) | welch FPR (CI)`. Where, if anywhere, does your
+   criterion's FPR depart from both $\alpha$ **and** the reference?
+:::
+
+::: {.callout-note icon="false"}
+## Read the three settings as a diagnosis, not three numbers
+A criterion can be calibrated in one regime and broken in another. A bug that
+shows up **only** when the groups differ in size and spread points to a
+different fault than one that shows up **only** at small $n$ — and a criterion
+whose FPR is off in **every** setting is broken outright. Name what your
+pattern implies.
+:::
+
+## From What Sample Size Can You Trust It? {#sec-minn}
+
+If your criterion is miscalibrated at small $n$ but recovers as $n$ grows,
+there is a threshold worth knowing — the "this city is too small to conclude"
+line.
+
+::: {.border}
+1. Implement `min_sample_size(criterion, test_gen, control_gen, grid, ...)`
+   that **reuses** `simulate_rejections`, sweeps the sample sizes in `grid`,
+   and returns the smallest $n$ at which $\alpha$ **first** lands inside the
+   FPR's confidence interval (print each step, as in Practice 5).
+2. Run it for `team_criterion` on equal-mean generators across a sensible grid
+   (e.g. `range(5, 201, 5)` for a small-$n$ problem, or wider). Report the
+   threshold — or state clearly that **no $n$ in your grid fixes it** (some
+   criteria never become calibrated; that is itself a finding).
+3. Plot the FPR (with its Wilson band) against $n$, with a dashed line at
+   $\alpha = 0.05$. One figure should make your threshold (or its absence)
+   obvious.
+:::
+
+## Power — and the Head-to-Head vs. Welch {#sec-power}
+
+A criterion that is **valid** is not automatically **worth using**: among
+valid criteria you want the most **powerful** one. Generate $H_1$ (give the
+test group a real ARPU lift) and measure the true-positive rate.
+
+::: {.border}
+1. Using `simulate_rejections` with a **higher** test mean (e.g.
+   `arpu_sample(250 + lift, n)` vs `arpu_sample(250, n)`) and
+   `alternative="greater"`, measure the **power** of `team_criterion` for a
+   couple of (lift, $n$) settings — at least one realistic small lift
+   (e.g. +10 UAH) and one clear one (e.g. +25 UAH).
+2. **Head-to-head.** On the **same** generators and settings, measure the
+   power of `reference_welch`. Put both in a table with their CIs.
+3. Interpret **with the FPR in mind**:
+   - If your criterion is **valid** (from @sec-fpr–@sec-minn): is its power
+     **at least as high** as Welch's, or does it pay for something with lost
+     power?
+   - If your criterion is **anti-conservative** (FPR $> \alpha$): explain why
+     its "higher" power is **not** a real advantage. *(Hint: a criterion that
+     rejects too often under $H_0$ will also reject often under $H_1$ — the
+     power number is contaminated by the inflated FPR. Power may only be
+     compared among **valid** criteria.)*
+:::
+
+## ≈1000 A/A Tests on Your Historical Log {#sec-aa}
+
+Synthetic data are only as good as your guess about the distribution. The
+lecture's gold standard is to validate on **real logs**: slice them, and on
+each slice run an A/A (split users in half with **no** treatment, so $H_0$ is
+guaranteed true).
+
+```{python}
+#| label: aa-skeleton
+#| eval: false
+
+def thousand_aa_tests(log, criterion, alpha=0.05, lift=0.0,
+                      alternative="two-sided", seed=1):
+    rng, rej, k = np.random.default_rng(seed), 0, 0
+    for _, gdf in log.groupby(["city", "cuisine"]):
+        arpu = gdf["arpu"].to_numpy()
+        idx  = rng.permutation(len(arpu))      # INDEPENDENT split per slice
+        half = len(arpu) // 2
+        control = arpu[idx[:half]]
+        test    = arpu[idx[half:2 * half]] * (1 + lift)   # lift=0 -> A/A
+        rej += criterion(test, control, alternative) < alpha
+        k   += 1
+    lo, hi = proportion_confint(rej, k, alpha=0.05, method="wilson")
+    return {"rate": rej / k, "ci": (lo, hi), "k": k}
+```
+
+::: {.border}
+1. Run `thousand_aa_tests(log, team_criterion)` on **your** log. Report the
+   number of slices, the A/A FPR, and its Wilson CI. Is $\alpha$ inside?
+2. **Reconcile with @sec-fpr.** The historical split here is **balanced
+   (50/50)**. If your synthetic check flagged a problem **only** in the
+   unbalanced/unequal-variance or **only** in the small-$n$ setting, does the
+   balanced historical A/A reproduce it? Explain in one or two sentences why
+   the synthetic stress test can catch a fault the historical A/A **misses**
+   (and vice versa). *This reconciliation is the heart of the section.*
+3. **Power on a simulated effect.** There is no real effect in an A/A log, so
+   simulate one with `lift > 0` (e.g. +3%, +5%, +10%). Report power for
+   `team_criterion`, and — if it is valid — compare with `reference_welch`.
+4. **The independence trap.** Replace the per-slice `rng.permutation` with the
+   **same** fixed split reused on every slice (or sort by `arpu` before
+   splitting) and re-run the A/A. Show what happens to the FPR and explain why
+   a non-independent split breaks the validation regardless of how good the
+   criterion is.
+:::
+
+## Final Verdict {#sec-final}
+
+::: {.border}
+Write a **single-page memo** (≤ 400 words) to the GreenBowl **platform team**
+who shipped the criterion. It must contain:
+
+1. A one-line **verdict**: **APPROVE** / **APPROVE WITH CAVEAT** (state the
+   condition — e.g. "only for balanced designs", "only for $n \ge \dots$") /
+   **REJECT**.
+2. The **evidence** that forces it: the FPR (with CI) in each regime you
+   tested, the minimum-$n$ threshold if any, and the power comparison vs.
+   Welch — quoted as numbers, not adjectives.
+3. A concrete **recommendation**: should the platform adopt it, restrict it to
+   certain experiments, or keep using Welch? If you would reject it, say what
+   a correct criterion would have done differently.
+4. One honest **caveat or limitation** of your own audit (e.g. simulation
+   noise at the $n$ you used, reliance on a lognormal assumption, only 320
+   slices in the historical log).
+
+It must be readable by an engineer who has **not** taken this course. You are
+graded on whether the platform team could act on it without follow-up
+questions.
+:::
+
+# Grading {.unnumbered}
+
+| Criterion | Points |
+|---|:---:|
+| Correctness of methodology | 3 |
+| Interpretation of results | 3 |
+| Code quality and organization | 2 |
+| **Total** | **8** |
+
+::: {.callout-tip icon="false"}
+## Grading Details
+
+**Correctness of methodology (3 pts):**
+
+- `simulate_rejections` takes the criterion as an argument, runs $H_0$/$H_1$
+  correctly, and returns the rate **with** a Wilson CI; it is sanity-checked
+  on `reference_welch` (1 pt).
+- The FPR is measured in **all three** regimes (balanced large-$n$, small-$n$,
+  unbalanced unequal-variance) with correct CIs, and `min_sample_size` reuses
+  the validator correctly (1 pt).
+- Power is measured under $H_1$ and the ≈1000 A/A on the historical log uses
+  an **independent** per-slice split with a correct CI (1 pt).
+
+**Interpretation of results (3 pts):**
+
+- @sec-fpr reads the three regimes as a **diagnosis** (where, if anywhere, the
+  FPR departs from $\alpha$ *and* from Welch), not as three loose numbers.
+- The power section compares TPR **only after** establishing validity, and
+  correctly explains why an anti-conservative criterion's power is not a real
+  advantage.
+- @sec-aa **reconciles** the historical A/A with the synthetic findings
+  (why a 50/50 balanced A/A can miss a fault the synthetic stress test
+  catches), and the memo's verdict matches the evidence.
+
+**Code quality and organization (2 pts):**
+
+- `simulate_rejections`, `min_sample_size`, and `thousand_aa_tests` are single
+  reusable functions used across all sections (the criterion is always passed
+  in, never hard-coded).
+- Plots have axis labels, titles, a dashed $\alpha$ line, and legible CIs.
+- Narrative precedes every code block; each section reads as an argument, not
+  a dump of outputs.
+:::
+
+# Defense {.unnumbered}
+
+During the defense (5–7 minutes) you will be asked *"What if?"* questions that
+probe whether you understand **why** each piece exists, for example:
+
+- *"Your criterion's FPR came out at $0.058$ with CI $(0.053, 0.064)$. Is it
+  miscalibrated, or is that simulation noise? What single change settles it?"*
+- *"You measured higher power than Welch. Convince me that is a feature and
+  not a symptom. What must you check first?"*
+- *"Your synthetic check failed but the 1000 A/A passed (or vice versa).
+  Which do you trust, and why can the two disagree?"*
+- *"Show me — live — what happens to your A/A FPR if I split each slice the
+  **same** way every time instead of re-shuffling. Why?"*
+- *"From what $n$ would you let the platform run this criterion in a small new
+  city? Point to the number on your plot."*
+- *"Halve `n_exps` right now. What happens to your confidence intervals, and
+  could that flip one of your verdicts?"*
+
+You may also be asked to **change one parameter live** (flip `alternative`,
+shrink $n$, change the lift, swap in `reference_welch`) and explain the
+resulting shift.

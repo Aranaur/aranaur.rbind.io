@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Ihor Miroshnychenko">
+<meta name="dcterms.date" content="2026-06-10">
+
+<title>Lab 5</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src=".05-monte-carlo-lab_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".05-monte-carlo-lab_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src=".05-monte-carlo-lab_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src=".05-monte-carlo-lab_files/libs/quarto-html/popper.min.js"></script>
+<script src=".05-monte-carlo-lab_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src=".05-monte-carlo-lab_files/libs/quarto-html/anchor.min.js"></script>
+<link href=".05-monte-carlo-lab_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".05-monte-carlo-lab_files/libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".05-monte-carlo-lab_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href=".05-monte-carlo-lab_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href=".05-monte-carlo-lab_files/libs/bootstrap/bootstrap-09e35026b45fe6f219ffef6ea8e22102.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul class="collapse">
+  <li><a href="#objective" id="toc-objective" class="nav-link active" data-scroll-target="#objective"><span class="header-section-number">1</span> Objective</a></li>
+  <li><a href="#general-requirements" id="toc-general-requirements" class="nav-link" data-scroll-target="#general-requirements"><span class="header-section-number">2</span> General Requirements</a></li>
+  <li><a href="#tasks" id="toc-tasks" class="nav-link" data-scroll-target="#tasks"><span class="header-section-number">3</span> Tasks</a>
+  <ul class="collapse">
+  <li><a href="#sec-setup" id="toc-sec-setup" class="nav-link" data-scroll-target="#sec-setup"><span class="header-section-number">3.1</span> Set Up and Sanity-Check Your Tools</a></li>
+  <li><a href="#sec-fn" id="toc-sec-fn" class="nav-link" data-scroll-target="#sec-fn"><span class="header-section-number">3.2</span> A Universal <code>simulate_rejections()</code></a></li>
+  <li><a href="#sec-fpr" id="toc-sec-fpr" class="nav-link" data-scroll-target="#sec-fpr"><span class="header-section-number">3.3</span> Is Your Criterion Calibrated? (FPR)</a></li>
+  <li><a href="#sec-minn" id="toc-sec-minn" class="nav-link" data-scroll-target="#sec-minn"><span class="header-section-number">3.4</span> From What Sample Size Can You Trust It?</a></li>
+  <li><a href="#sec-power" id="toc-sec-power" class="nav-link" data-scroll-target="#sec-power"><span class="header-section-number">3.5</span> Power — and the Head-to-Head vs.&nbsp;Welch</a></li>
+  <li><a href="#sec-aa" id="toc-sec-aa" class="nav-link" data-scroll-target="#sec-aa"><span class="header-section-number">3.6</span> ≈1000 A/A Tests on Your Historical Log</a></li>
+  <li><a href="#sec-final" id="toc-sec-final" class="nav-link" data-scroll-target="#sec-final"><span class="header-section-number">3.7</span> Final Verdict</a></li>
+  </ul></li>
+  <li><a href="#grading" id="toc-grading" class="nav-link" data-scroll-target="#grading">Grading</a></li>
+  <li><a href="#defense" id="toc-defense" class="nav-link" data-scroll-target="#defense">Defense</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Lab 5</h1>
+<p class="subtitle lead">Auditing a Significance Criterion with Monte Carlo: the GreenBowl Platform</p>
+</div>
+
+
+<div class="quarto-title-meta-author">
+  <div class="quarto-title-meta-heading">Author</div>
+  <div class="quarto-title-meta-heading">Affiliation</div>
+  
+    <div class="quarto-title-meta-contents">
+    <p class="author">Ihor Miroshnychenko </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            Kyiv School of Economics
+          </p>
+      </div>
+  </div>
+
+<div class="quarto-title-meta">
+
+      
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">June 10, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="objective" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Objective</h1>
+<p>In <strong>Lab 4</strong> you were handed an A/B dataset and had to recover the right <strong>business decision</strong>. <strong>Lab 5 is one level up: you audit the <em>tool</em> that makes those decisions.</strong></p>
+<p>The GreenBowl data-engineering team shipped a new significance criterion, <code>team_criterion</code>, and wired it into the experimentation platform — it now decides “ship / don’t ship” on <strong>every</strong> A/B test in the company. Before you let it touch a single roll-out, your job is to <strong>validate it with Monte Carlo</strong>, exactly as the lecture taught: <em>generate many experiments with a known answer, run the criterion on each, and count how often it is right.</em></p>
+<p>The twist, as in Lab 4: <strong>you do not get to see what the criterion does.</strong> <code>team_criterion</code> is keyed to your student id. Some students received a perfectly correct test; some received one that is correct <strong>only under certain conditions</strong>; some received one that is quietly <strong>broken</strong>. The only honest way to find out which one you hold is to simulate.</p>
+<p>You will:</p>
+<ol type="1">
+<li>Confirm your tools on a known-good reference, then <strong>generalize</strong> <code>simulate_rejections</code> so it can validate <strong>any</strong> criterion (not just <code>scipy</code>’s <code>ttest_ind</code>).</li>
+<li>Measure your criterion’s <strong>false-positive rate (FPR)</strong> under <span class="math inline">\(H_0\)</span> with a Wilson confidence interval — the calibration check.</li>
+<li>Find the <strong>minimum sample size</strong> from which it is trustworthy (if ever) — the “small new city” problem.</li>
+<li>Measure <strong>power</strong> under <span class="math inline">\(H_1\)</span> and <strong>compare it head-to-head</strong> with the trusted Welch reference — is it valid <em>and</em> competitive?</li>
+<li>Run <strong>≈1000 A/A tests on your historical log</strong> and reconcile the result with your synthetic findings.</li>
+<li>Deliver a one-page <strong>go / no-go verdict</strong> on the criterion to the platform team.</li>
+</ol>
+</section>
+<section id="general-requirements" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> General Requirements</h1>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>The fixed context (same for everyone)
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong>Metric:</strong> weekly <strong>ARPU</strong> per user, in UAH — continuous, positive, right-skewed (lognormal).</li>
+<li><strong>Baseline:</strong> <span class="math inline">\(\mu_0 = 250\)</span> UAH.</li>
+<li><strong>Significance level:</strong> <span class="math inline">\(\alpha = 0.05\)</span>.</li>
+<li><strong>The criterion under audit:</strong> <code>team_criterion</code> from <code>greenbowl_mc.py</code>, keyed to <em>your</em> id.</li>
+<li><strong>The trusted reference:</strong> <code>reference_welch</code> from the same module — a textbook two-sample Welch <span class="math inline">\(t\)</span>-test you may treat as correct.</li>
+<li><strong>Your “god” generator:</strong> <code>arpu_sample(mean, n, sigma)</code> — you decide the truth, so you always know the right answer.</li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Everyone’s criterion is different — on purpose
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Your <code>team_criterion</code> is unique to your id. It might be the textbook Welch test, a variant that is valid only on large or balanced samples, or one that is anti-conservative at every sample size. <strong>There is no single verdict shared across the class</strong> — there is only the verdict your simulations support. Copying another student’s conclusion will be obviously wrong for your criterion.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Report Format
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Submit the report in <strong>one</strong> of the following formats:</p>
+<ul>
+<li><strong>Quarto → PDF</strong> (<code>.qmd</code> → <code>.pdf</code>)</li>
+<li><strong>Quarto → HTML</strong> (<code>.qmd</code> → <code>.html</code>, hosted, e.g.&nbsp;on <a href="https://quartopub.com/">Quarto Pub</a>, <a href="https://connect.posit.cloud/">Posit Connect Cloud</a>)</li>
+<li><strong>Jupyter Notebook</strong> (<code>.ipynb</code>)</li>
+<li><strong>Google Colab</strong> (share the link with viewing permissions)</li>
+</ul>
+<p>The report must contain both code <strong>and</strong> narrative. Every section begins with a written explanation, not code.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>What you build vs.&nbsp;what you test
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The thing you <strong>build</strong> today is the <strong>Monte Carlo validator</strong> (<code>simulate_rejections</code>, <code>min_sample_size</code>, <code>thousand_aa_tests</code>) — grown step by step from Practice 5. The thing you <strong>test</strong> is taken ready-made: your hidden <code>team_criterion</code> and the <code>reference_welch</code>. You may use <code>statsmodels.stats.proportion.proportion_confint</code> for the Wilson interval and <code>scipy.stats</code> for the reference. You may <strong>not</strong> replace your validator with a library power/AA function — the simulation loop and the confidence-interval verdict must be <strong>your own code</strong>.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Honour rule on the data platform
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>greenbowl_mc.py</code> contains the hidden truth in its source. <strong>Do not read past the <code># === instructor section ===</code> line, and do not call <code>_reveal</code>.</strong> The point of the lab is to reach the verdict <em>by simulation</em>, not by reading the criterion’s code. Any report that names the hidden criterion from the source instead of demonstrating its behaviour scores <strong>zero</strong> for interpretation.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Deadline
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>📅 <strong>June 17, 2026, 23:59</strong></p>
+</div>
+</div>
+</section>
+<section id="tasks" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Tasks</h1>
+<section id="sec-setup" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="sec-setup"><span class="header-section-number">3.1</span> Set Up and Sanity-Check Your Tools</h2>
+<p>Download <code>greenbowl_mc.py</code> into your working folder and load <strong>your</strong> criterion and historical log. Use <strong>one</strong> id consistently — your KSE email is recommended.</p>
+<div id="load" class="cell" data-execution_count="1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> greenbowl_mc <span class="im">import</span> (load_my_criterion, load_my_log,</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>                          reference_welch, arpu_sample, BASELINE, ALPHA)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy <span class="im">import</span> stats</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> statsmodels.stats.proportion <span class="im">import</span> proportion_confint</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>STUDENT_ID <span class="op">=</span> <span class="st">"your.email@kse.org.ua"</span>   <span class="co"># &lt;-- put YOUR id here</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>team_criterion <span class="op">=</span> load_my_criterion(STUDENT_ID)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>log <span class="op">=</span> load_my_log(STUDENT_ID)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># both criteria share the same call signature:</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="co">#   crit(test, control, alternative="two-sided") -&gt; p_value</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>demo_test    <span class="op">=</span> arpu_sample(<span class="dv">260</span>, <span class="dv">200</span>)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>demo_control <span class="op">=</span> arpu_sample(<span class="dv">250</span>, <span class="dv">200</span>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"team   :"</span>, team_criterion(demo_test, demo_control, <span class="st">"greater"</span>))</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"welch  :"</span>, reference_welch(demo_test, demo_control, <span class="st">"greater"</span>))</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"baseline = </span><span class="sc">{</span>BASELINE<span class="sc">}</span><span class="ss">, alpha = </span><span class="sc">{</span>ALPHA<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="border">
+<ol type="1">
+<li>State your <code>STUDENT_ID</code>. Confirm both <code>team_criterion</code> and <code>reference_welch</code> run and return a <span class="math inline">\(p\)</span>-value on a sample you generate with <code>arpu_sample</code>.</li>
+<li>In one sentence, confirm you understand that <strong>what the criterion does is hidden</strong>, and your entire task is to characterise its behaviour by simulation.</li>
+<li><strong>Do not</strong> form any opinion yet from this single call — one <span class="math inline">\(p\)</span>-value tells you nothing about calibration. Say why.</li>
+</ol>
+</div>
+</section>
+<section id="sec-fn" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="sec-fn"><span class="header-section-number">3.2</span> A Universal <code>simulate_rejections()</code></h2>
+<p>In Practice 5 your validator hard-coded <code>scipy.stats.ttest_ind</code>. To audit an <strong>arbitrary</strong> criterion you must pass the criterion <strong>in</strong> as an argument.</p>
+<div class="border">
+<ol type="1">
+<li><p>Implement</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>simulate_rejections(criterion, test_gen, control_gen, n_test,</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>                    n_control<span class="op">=</span><span class="va">None</span>, n_exps<span class="op">=</span><span class="dv">10_000</span>, alpha<span class="op">=</span><span class="fl">0.05</span>,</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>                    alternative<span class="op">=</span><span class="st">"two-sided"</span>, seed<span class="op">=</span>...)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>that runs <code>n_exps</code> experiments, each time drawing <code>test = test_gen(n_test)</code> and <code>control = control_gen(n_control)</code>, calling <code>criterion(test, control, alternative)</code>, and counting rejections (<span class="math inline">\(p &lt; \alpha\)</span>). It must <strong>return</strong> the rejection rate <strong>and</strong> its 95% <strong>Wilson</strong> confidence interval (<code>proportion_confint(..., method="wilson")</code>).</p>
+<ul>
+<li>When the two generators have <strong>equal means</strong>, the rate is the <strong>FPR</strong>.</li>
+<li>When the test generator has a <strong>higher</strong> mean, the rate is the <strong>power</strong>.</li>
+</ul></li>
+<li><p><strong>Sanity-check the validator on the reference.</strong> Run it with <code>criterion=reference_welch</code>, both generators <code>arpu_sample(250, n)</code>, at a comfortable <span class="math inline">\(n\)</span> (say 400). Confirm the FPR’s CI contains <span class="math inline">\(\alpha = 0.05\)</span>. This proves your <em>loop</em> is correct before you point it at the mystery criterion.</p></li>
+</ol>
+</div>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reproducibility
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Seed your RNG so every run of the report is identical, but <strong>vary the seed</strong> at least once (Practice 5, “Your turn 1”) to see that the point estimate wobbles — that wobble is exactly why you always report the interval.</p>
+</div>
+</div>
+</section>
+<section id="sec-fpr" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="sec-fpr"><span class="header-section-number">3.3</span> Is Your Criterion Calibrated? (FPR)</h2>
+<p>Now point the validator at <code>team_criterion</code>. Generate <span class="math inline">\(H_0\)</span> yourself (two groups from the <strong>same</strong> ARPU distribution, equal means) and read off the FPR.</p>
+<div class="border">
+<ol type="1">
+<li><strong>Balanced, equal-variance, large <span class="math inline">\(n\)</span>.</strong> Run the FPR check for <code>team_criterion</code> with both groups <code>arpu_sample(250, n, sigma=0.6)</code> at a large <span class="math inline">\(n\)</span> (e.g.&nbsp;800). Report the FPR and its CI. Is <span class="math inline">\(\alpha = 0.05\)</span> inside?</li>
+<li><strong>Small <span class="math inline">\(n\)</span>.</strong> Repeat at a small “new city” size — sweep <span class="math inline">\(n \in \{5, 10, 20, 50\}\)</span>. Does the verdict change as <span class="math inline">\(n\)</span> shrinks?</li>
+<li><strong>Unbalanced <em>and</em> unequal-variance.</strong> Run the check with a <strong>noisy, smaller</strong> test arm and a <strong>tight, larger</strong> control arm — e.g. <code>test = arpu_sample(250, n, sigma=0.8)</code> with <code>n_test=200</code> and <code>control = arpu_sample(250, n, sigma=0.4)</code> with <code>n_control=800</code>. (Means are still equal, so <span class="math inline">\(H_0\)</span> holds.) Report the FPR and CI.</li>
+<li><strong>Side-by-side.</strong> For each of the three settings above, run <code>reference_welch</code> on the <strong>same</strong> generators and tabulate <code>setting | team FPR (CI) | welch FPR (CI)</code>. Where, if anywhere, does your criterion’s FPR depart from both <span class="math inline">\(\alpha\)</span> <strong>and</strong> the reference?</li>
+</ol>
+</div>
+<div class="callout callout-style-default callout-note no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Read the three settings as a diagnosis, not three numbers
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>A criterion can be calibrated in one regime and broken in another. A bug that shows up <strong>only</strong> when the groups differ in size and spread points to a different fault than one that shows up <strong>only</strong> at small <span class="math inline">\(n\)</span> — and a criterion whose FPR is off in <strong>every</strong> setting is broken outright. Name what your pattern implies.</p>
+</div>
+</div>
+</section>
+<section id="sec-minn" class="level2" data-number="3.4">
+<h2 data-number="3.4" class="anchored" data-anchor-id="sec-minn"><span class="header-section-number">3.4</span> From What Sample Size Can You Trust It?</h2>
+<p>If your criterion is miscalibrated at small <span class="math inline">\(n\)</span> but recovers as <span class="math inline">\(n\)</span> grows, there is a threshold worth knowing — the “this city is too small to conclude” line.</p>
+<div class="border">
+<ol type="1">
+<li>Implement <code>min_sample_size(criterion, test_gen, control_gen, grid, ...)</code> that <strong>reuses</strong> <code>simulate_rejections</code>, sweeps the sample sizes in <code>grid</code>, and returns the smallest <span class="math inline">\(n\)</span> at which <span class="math inline">\(\alpha\)</span> <strong>first</strong> lands inside the FPR’s confidence interval (print each step, as in Practice 5).</li>
+<li>Run it for <code>team_criterion</code> on equal-mean generators across a sensible grid (e.g.&nbsp;<code>range(5, 201, 5)</code> for a small-<span class="math inline">\(n\)</span> problem, or wider). Report the threshold — or state clearly that <strong>no <span class="math inline">\(n\)</span> in your grid fixes it</strong> (some criteria never become calibrated; that is itself a finding).</li>
+<li>Plot the FPR (with its Wilson band) against <span class="math inline">\(n\)</span>, with a dashed line at <span class="math inline">\(\alpha = 0.05\)</span>. One figure should make your threshold (or its absence) obvious.</li>
+</ol>
+</div>
+</section>
+<section id="sec-power" class="level2" data-number="3.5">
+<h2 data-number="3.5" class="anchored" data-anchor-id="sec-power"><span class="header-section-number">3.5</span> Power — and the Head-to-Head vs.&nbsp;Welch</h2>
+<p>A criterion that is <strong>valid</strong> is not automatically <strong>worth using</strong>: among valid criteria you want the most <strong>powerful</strong> one. Generate <span class="math inline">\(H_1\)</span> (give the test group a real ARPU lift) and measure the true-positive rate.</p>
+<div class="border">
+<ol type="1">
+<li>Using <code>simulate_rejections</code> with a <strong>higher</strong> test mean (e.g. <code>arpu_sample(250 + lift, n)</code> vs <code>arpu_sample(250, n)</code>) and <code>alternative="greater"</code>, measure the <strong>power</strong> of <code>team_criterion</code> for a couple of (lift, <span class="math inline">\(n\)</span>) settings — at least one realistic small lift (e.g.&nbsp;+10 UAH) and one clear one (e.g.&nbsp;+25 UAH).</li>
+<li><strong>Head-to-head.</strong> On the <strong>same</strong> generators and settings, measure the power of <code>reference_welch</code>. Put both in a table with their CIs.</li>
+<li>Interpret <strong>with the FPR in mind</strong>:
+<ul>
+<li>If your criterion is <strong>valid</strong> (from <a href="#sec-fpr" class="quarto-xref">Section&nbsp;3.3</a>–<a href="#sec-minn" class="quarto-xref">Section&nbsp;3.4</a>): is its power <strong>at least as high</strong> as Welch’s, or does it pay for something with lost power?</li>
+<li>If your criterion is <strong>anti-conservative</strong> (FPR <span class="math inline">\(&gt; \alpha\)</span>): explain why its “higher” power is <strong>not</strong> a real advantage. <em>(Hint: a criterion that rejects too often under <span class="math inline">\(H_0\)</span> will also reject often under <span class="math inline">\(H_1\)</span> — the power number is contaminated by the inflated FPR. Power may only be compared among <strong>valid</strong> criteria.)</em></li>
+</ul></li>
+</ol>
+</div>
+</section>
+<section id="sec-aa" class="level2" data-number="3.6">
+<h2 data-number="3.6" class="anchored" data-anchor-id="sec-aa"><span class="header-section-number">3.6</span> ≈1000 A/A Tests on Your Historical Log</h2>
+<p>Synthetic data are only as good as your guess about the distribution. The lecture’s gold standard is to validate on <strong>real logs</strong>: slice them, and on each slice run an A/A (split users in half with <strong>no</strong> treatment, so <span class="math inline">\(H_0\)</span> is guaranteed true).</p>
+<div id="aa-skeleton" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> thousand_aa_tests(log, criterion, alpha<span class="op">=</span><span class="fl">0.05</span>, lift<span class="op">=</span><span class="fl">0.0</span>,</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>                      alternative<span class="op">=</span><span class="st">"two-sided"</span>, seed<span class="op">=</span><span class="dv">1</span>):</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    rng, rej, k <span class="op">=</span> np.random.default_rng(seed), <span class="dv">0</span>, <span class="dv">0</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _, gdf <span class="kw">in</span> log.groupby([<span class="st">"city"</span>, <span class="st">"cuisine"</span>]):</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>        arpu <span class="op">=</span> gdf[<span class="st">"arpu"</span>].to_numpy()</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>        idx  <span class="op">=</span> rng.permutation(<span class="bu">len</span>(arpu))      <span class="co"># INDEPENDENT split per slice</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>        half <span class="op">=</span> <span class="bu">len</span>(arpu) <span class="op">//</span> <span class="dv">2</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>        control <span class="op">=</span> arpu[idx[:half]]</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>        test    <span class="op">=</span> arpu[idx[half:<span class="dv">2</span> <span class="op">*</span> half]] <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> lift)   <span class="co"># lift=0 -&gt; A/A</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>        rej <span class="op">+=</span> criterion(test, control, alternative) <span class="op">&lt;</span> alpha</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>        k   <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> proportion_confint(rej, k, alpha<span class="op">=</span><span class="fl">0.05</span>, method<span class="op">=</span><span class="st">"wilson"</span>)</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"rate"</span>: rej <span class="op">/</span> k, <span class="st">"ci"</span>: (lo, hi), <span class="st">"k"</span>: k}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="border">
+<ol type="1">
+<li>Run <code>thousand_aa_tests(log, team_criterion)</code> on <strong>your</strong> log. Report the number of slices, the A/A FPR, and its Wilson CI. Is <span class="math inline">\(\alpha\)</span> inside?</li>
+<li><strong>Reconcile with <a href="#sec-fpr" class="quarto-xref">Section&nbsp;3.3</a>.</strong> The historical split here is <strong>balanced (50/50)</strong>. If your synthetic check flagged a problem <strong>only</strong> in the unbalanced/unequal-variance or <strong>only</strong> in the small-<span class="math inline">\(n\)</span> setting, does the balanced historical A/A reproduce it? Explain in one or two sentences why the synthetic stress test can catch a fault the historical A/A <strong>misses</strong> (and vice versa). <em>This reconciliation is the heart of the section.</em></li>
+<li><strong>Power on a simulated effect.</strong> There is no real effect in an A/A log, so simulate one with <code>lift &gt; 0</code> (e.g.&nbsp;+3%, +5%, +10%). Report power for <code>team_criterion</code>, and — if it is valid — compare with <code>reference_welch</code>.</li>
+<li><strong>The independence trap.</strong> Replace the per-slice <code>rng.permutation</code> with the <strong>same</strong> fixed split reused on every slice (or sort by <code>arpu</code> before splitting) and re-run the A/A. Show what happens to the FPR and explain why a non-independent split breaks the validation regardless of how good the criterion is.</li>
+</ol>
+</div>
+</section>
+<section id="sec-final" class="level2" data-number="3.7">
+<h2 data-number="3.7" class="anchored" data-anchor-id="sec-final"><span class="header-section-number">3.7</span> Final Verdict</h2>
+<div class="border">
+<p>Write a <strong>single-page memo</strong> (≤ 400 words) to the GreenBowl <strong>platform team</strong> who shipped the criterion. It must contain:</p>
+<ol type="1">
+<li>A one-line <strong>verdict</strong>: <strong>APPROVE</strong> / <strong>APPROVE WITH CAVEAT</strong> (state the condition — e.g.&nbsp;“only for balanced designs”, “only for <span class="math inline">\(n \ge \dots\)</span>”) / <strong>REJECT</strong>.</li>
+<li>The <strong>evidence</strong> that forces it: the FPR (with CI) in each regime you tested, the minimum-<span class="math inline">\(n\)</span> threshold if any, and the power comparison vs. Welch — quoted as numbers, not adjectives.</li>
+<li>A concrete <strong>recommendation</strong>: should the platform adopt it, restrict it to certain experiments, or keep using Welch? If you would reject it, say what a correct criterion would have done differently.</li>
+<li>One honest <strong>caveat or limitation</strong> of your own audit (e.g.&nbsp;simulation noise at the <span class="math inline">\(n\)</span> you used, reliance on a lognormal assumption, only 320 slices in the historical log).</li>
+</ol>
+<p>It must be readable by an engineer who has <strong>not</strong> taken this course. You are graded on whether the platform team could act on it without follow-up questions.</p>
+</div>
+</section>
+</section>
+<section id="grading" class="level1 unnumbered">
+<h1 class="unnumbered">Grading</h1>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Criterion</th>
+<th style="text-align: center;">Points</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Correctness of methodology</td>
+<td style="text-align: center;">3</td>
+</tr>
+<tr class="even">
+<td>Interpretation of results</td>
+<td style="text-align: center;">3</td>
+</tr>
+<tr class="odd">
+<td>Code quality and organization</td>
+<td style="text-align: center;">2</td>
+</tr>
+<tr class="even">
+<td><strong>Total</strong></td>
+<td style="text-align: center;"><strong>8</strong></td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Grading Details
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Correctness of methodology (3 pts):</strong></p>
+<ul>
+<li><code>simulate_rejections</code> takes the criterion as an argument, runs <span class="math inline">\(H_0\)</span>/<span class="math inline">\(H_1\)</span> correctly, and returns the rate <strong>with</strong> a Wilson CI; it is sanity-checked on <code>reference_welch</code> (1 pt).</li>
+<li>The FPR is measured in <strong>all three</strong> regimes (balanced large-<span class="math inline">\(n\)</span>, small-<span class="math inline">\(n\)</span>, unbalanced unequal-variance) with correct CIs, and <code>min_sample_size</code> reuses the validator correctly (1 pt).</li>
+<li>Power is measured under <span class="math inline">\(H_1\)</span> and the ≈1000 A/A on the historical log uses an <strong>independent</strong> per-slice split with a correct CI (1 pt).</li>
+</ul>
+<p><strong>Interpretation of results (3 pts):</strong></p>
+<ul>
+<li><a href="#sec-fpr" class="quarto-xref">Section&nbsp;3.3</a> reads the three regimes as a <strong>diagnosis</strong> (where, if anywhere, the FPR departs from <span class="math inline">\(\alpha\)</span> <em>and</em> from Welch), not as three loose numbers.</li>
+<li>The power section compares TPR <strong>only after</strong> establishing validity, and correctly explains why an anti-conservative criterion’s power is not a real advantage.</li>
+<li><a href="#sec-aa" class="quarto-xref">Section&nbsp;3.6</a> <strong>reconciles</strong> the historical A/A with the synthetic findings (why a 50/50 balanced A/A can miss a fault the synthetic stress test catches), and the memo’s verdict matches the evidence.</li>
+</ul>
+<p><strong>Code quality and organization (2 pts):</strong></p>
+<ul>
+<li><code>simulate_rejections</code>, <code>min_sample_size</code>, and <code>thousand_aa_tests</code> are single reusable functions used across all sections (the criterion is always passed in, never hard-coded).</li>
+<li>Plots have axis labels, titles, a dashed <span class="math inline">\(\alpha\)</span> line, and legible CIs.</li>
+<li>Narrative precedes every code block; each section reads as an argument, not a dump of outputs.</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="defense" class="level1 unnumbered">
+<h1 class="unnumbered">Defense</h1>
+<p>During the defense (5–7 minutes) you will be asked <em>“What if?”</em> questions that probe whether you understand <strong>why</strong> each piece exists, for example:</p>
+<ul>
+<li><em>“Your criterion’s FPR came out at <span class="math inline">\(0.058\)</span> with CI <span class="math inline">\((0.053, 0.064)\)</span>. Is it miscalibrated, or is that simulation noise? What single change settles it?”</em></li>
+<li><em>“You measured higher power than Welch. Convince me that is a feature and not a symptom. What must you check first?”</em></li>
+<li><em>“Your synthetic check failed but the 1000 A/A passed (or vice versa). Which do you trust, and why can the two disagree?”</em></li>
+<li><em>“Show me — live — what happens to your A/A FPR if I split each slice the <strong>same</strong> way every time instead of re-shuffling. Why?”</em></li>
+<li><em>“From what <span class="math inline">\(n\)</span> would you let the platform run this criterion in a small new city? Point to the number on your plot.”</em></li>
+<li><em>“Halve <code>n_exps</code> right now. What happens to your confidence intervals, and could that flip one of your verdicts?”</em></li>
+</ul>
+<p>You may also be asked to <strong>change one parameter live</strong> (flip <code>alternative</code>, shrink <span class="math inline">\(n\)</span>, change the lift, swap in <code>reference_welch</code>) and explain the resulting shift.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
