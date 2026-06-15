@@ -1,0 +1,942 @@
+---
+title: "Goodness-of-Fit"
+subtitle: "Applied Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .05-gof_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=4049">🔗Applied Statistics</a>
+format:
+  revealjs:
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+jupyter: python3
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+from scipy.stats import kstwobign
+from statsmodels.stats.diagnostic import lilliefors
+from statsmodels.stats.proportion import proportion_confint
+
+# Define colors (shared palette across the slides)
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+# Minimal theme defaults — close to ggplot2 theme_minimal()
+plt.rcParams.update({
+    "figure.facecolor": "white",
+    "axes.facecolor":   "white",
+    "axes.edgecolor":   slate,
+    "axes.labelcolor":  slate,
+    "axes.titlesize":   13,
+    "axes.spines.top":   False,
+    "axes.spines.right": False,
+    "axes.grid":        True,
+    "grid.color":       "#dddddd",
+    "grid.alpha":       0.6,
+    "xtick.color":      slate,
+    "ytick.color":      slate,
+    "font.size":        11,
+    "legend.frameon":   False,
+})
+
+
+def ecdf(sample, grid):
+    """Empirical CDF of `sample` evaluated on every point of `grid`."""
+    sample = np.sort(sample)
+    return np.searchsorted(sample, grid, side="right") / len(sample)
+```
+
+# Why look at the whole distribution? {background-iframe=".05-gof_files/libs/colored-particles/index.html"}
+
+## 🎯 The assumption we keep making {.smaller}
+
+For the $z$-test and the small-sample $t$-test we kept writing one magic line:
+
+> "$X$ comes from a **normal** distribution."
+
+We trusted it. Today we learn to [check distributional assumptions]{.hi} instead of assuming them.
+
+. . .
+
+Two flavours of the same question:
+
+- **Goodness-of-fit:** does my sample follow a *known* distribution $F_0$ (e.g. normal)?
+- **Homogeneity:** do *two* samples come from the **same** distribution?
+
+::: {.callout-tip icon=false}
+A mean is one number. A distribution is the whole story — two groups can share a mean yet differ everywhere else.
+:::
+
+::: {.notes}
+Уся попередня математика спиралась на «дані нормальні». Ми брали це на віру. Сьогодні навчимось перевіряти саме припущення про розподіл, а не лише про середнє. Два споріднені питання: чи моя вибірка з відомого розподілу (узгодженість/goodness-of-fit) і чи дві вибірки з одного розподілу (однорідність). Ключова думка: середнє — одне число, а розподіл — уся картина; дві групи можуть мати однакове середнє й бути різними скрізь інде.
+:::
+
+## 🏥 Our running case: a blood-pressure trial {.smaller}
+
+A pharma company tests a new blood-pressure drug.
+
+- **Control group** — patients on placebo.
+- **Test group** — patients on the drug.
+
+Along the way we will need to answer:
+
+1. Is the blood pressure **normally distributed**? (so the $t$-test is justified) → *goodness-of-fit*.
+2. Does the drug **change the distribution** of blood pressure, not only its mean? → *homogeneity*.
+
+. . .
+
+Same toolkit, one idea behind everything: [compare cumulative distribution functions]{.hi}.
+
+::: {.notes}
+Наскрізний бізнес-кейс на всю лекцію — клінічне випробування ліків від тиску: контроль (плацебо) і тест (ліки). Дві задачі: (1) чи тиск нормально розподілений, щоб виправдати t-тест — це узгодженість; (2) чи ліки змінюють РОЗПОДІЛ тиску, а не лише середнє — це однорідність. Під капотом усе зведеться до однієї ідеї: порівнювати функції розподілу (CDF).
+:::
+
+# Kolmogorov goodness-of-fit test {background-iframe=".05-gof_files/libs/colored-particles/index.html"}
+
+## 📈 The task {.smaller}
+
+> We want to check whether a data set follows a known distribution.
+
+- $X_1, \ldots, X_n$ — a sample from an **unknown** distribution $\mathcal{P}$.
+- $\mathcal{P}_0$ — a **known** reference distribution.
+
+. . .
+
+$$
+H_0: \mathcal{P} = \mathcal{P}_0 \qquad\text{vs.}\qquad H_1: \mathcal{P} \neq \mathcal{P}_0.
+$$
+
+::: {.callout-note icon=false}
+This is **non-parametric**: $\mathcal{P}_0$ is fully specified up front (e.g. $\mathcal{N}(120, 15^2)$), and we ask only "yes/no — does the data match it?"
+:::
+
+::: {.notes}
+Постановка: маємо вибірку з невідомого розподілу P і повністю заданий еталонний розподіл P0 (наприклад N(120,15²) для тиску). H0: P=P0 проти H1: P≠P0. Це непараметричний критерій — ми не оцінюємо параметри, P0 фіксований наперед, питання лише «так чи ні, дані з нього?».
+:::
+
+## 📊 Compare CDFs, not densities {.smaller}
+
+Comparing distributions directly is awkward. But a distribution is [uniquely defined by its CDF](https://stats.stackexchange.com/questions/136658/why-does-a-cumulative-distribution-function-cdf-uniquely-define-a-distribution), so we may instead compare **distribution functions**:
+
+$$
+H_0: F = F_0 \qquad\text{vs.}\qquad H_1: F \neq F_0,
+$$
+
+where $F$ is the unknown CDF and $F_0$ the reference CDF.
+
+. . .
+
+We do not know $F$, but we can **estimate** it from the sample — the [empirical CDF]{.hi}:
+
+$$
+\widehat{F}_n(x) = \frac{1}{n}\sum_{i=1}^n \mathbb{I}(X_i \leq x) = \frac{\#\{X_i \leq x\}}{n}.
+$$
+
+::: {.notes}
+Замість порівняння самих розподілів порівнюємо функції розподілу — бо CDF однозначно задає розподіл. Тож H0: F=F0. Справжню F не знаємо, але оцінюємо її з вибірки емпіричною функцією розподілу: частка спостережень ≤ x. Це сходинкова функція, що стрибає на 1/n у кожній точці вибірки.
+:::
+
+## 📊 The empirical CDF in one picture {.smaller}
+
+```{python}
+#| label: ecdf-demo
+#| code-fold: true
+#| fig-align: center
+
+rng = np.random.default_rng(1)
+sample = stats.norm(120, 15).rvs(15, random_state=rng)   # 15 patients
+grid = np.linspace(80, 165, 1000)
+
+fig, ax = plt.subplots(figsize=(11, 4.4))
+ax.plot(grid, stats.norm(120, 15).cdf(grid), color=orange, lw=2.5,
+        label=r"theoretical $F_0(x)$")
+ax.step(grid, ecdf(sample, grid), color=blue, lw=2, where="post",
+        label=r"empirical $\widehat{F}_n(x)$")
+ax.plot(sample, np.zeros_like(sample), "|", color=red_pink, markersize=12,
+        label="sample points")
+ax.set_title("Empirical vs theoretical CDF (n = 15)")
+ax.set_xlabel("Blood pressure")
+ax.set_ylabel("Cumulative probability")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+The staircase $\widehat{F}_n$ jumps by $1/n$ at each observation and tracks the smooth $F_0$.
+
+::: {.notes}
+Картинка: помаранчева гладка теоретична CDF проти синьої сходинки емпіричної на 15 пацієнтах. Сходинка стрибає на 1/n у кожній точці (рожеві риски знизу). Видно, що навіть на малій вибірці емпірична йде слідом за теоретичною. Питання — наскільки близько і як це виміряти одним числом.
+:::
+
+## 📐 Glivenko–Cantelli: the empirical CDF works {.smaller}
+
+How well does $\widehat{F}_n$ approximate $F$ as $n$ grows?
+
+::: {.callout-note icon=false}
+## Theorem (Glivenko–Cantelli)
+For an i.i.d. sample with CDF $F$,
+$$
+D_n = \sup_{x \in \mathbb{R}} \big|\widehat{F}_n(x) - F(x)\big| \;\longrightarrow\; 0 \quad\text{(a.s.)}.
+$$
+:::
+
+$D_n$ is the **largest vertical gap** between the empirical and the true CDF over all $x$ — and it vanishes as $n \to \infty$.
+
+::: {.notes}
+Теорема Глівенка–Кантеллі (фундаментальна теорема статистики): супремум модуля різниці між емпіричною і справжньою CDF по всіх x прямує до нуля майже напевно. Тобто емпірична функція рівномірно наближає справжню. D_n — найбільший вертикальний розрив між двома кривими. Саме цю величину покладемо в основу статистики критерію.
+:::
+
+## 📐 Glivenko–Cantelli, visually {.smaller}
+
+```{python}
+#| label: glivenko
+#| code-fold: true
+#| fig-align: center
+
+rng = np.random.default_rng(4)
+big = stats.expon().rvs(1000, random_state=rng)
+grid = np.linspace(0, 5, 1000)
+F = stats.expon().cdf(grid)
+
+fig, axes = plt.subplots(1, 2, figsize=(13, 4.6))
+for ax, n in zip(axes, [10, 100]):
+    Fn = ecdf(big[:n], grid)
+    gap = np.argmax(np.abs(Fn - F))
+    ax.plot(grid, F, color=orange, lw=2, label=r"$F(x)$")
+    ax.step(grid, Fn, color=blue, lw=2, where="post", label=r"$\widehat{F}_n(x)$")
+    ax.vlines(grid[gap], min(Fn[gap], F[gap]), max(Fn[gap], F[gap]),
+              color=red_pink, lw=3, label=r"$D_n$")
+    ax.set_title(f"n = {n}")
+    ax.set_xlabel("x"); ax.set_ylabel("CDF"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+Bigger $n$ → the staircase hugs $F$ everywhere, and the largest gap $D_n$ shrinks.
+
+::: {.notes}
+Зліва n=10, справа n=100. Рожевий відрізок — максимальний розрив D_n. При n=100 сходинка майже зливається з теоретичною кривою, і D_n помітно менший. Чим більша вибірка — тим точніше передбачаємо F на всій числовій прямій. Це й дозволяє будувати критерій на D_n.
+:::
+
+## 📊 The Kolmogorov statistic {.smaller}
+
+Replace the unknown $F$ with the **hypothesized** $F_0$. The test statistic is
+
+$$
+D_n = \sup_{x \in \mathbb{R}} \big|\widehat{F}_n(x) - F_0(x)\big|.
+$$
+
+- Under $H_0$ ($F = F_0$): $D_n$ is small.
+- Under $H_1$: the two CDFs differ → $D_n$ is large.
+
+. . .
+
+::: {.callout-note icon=false}
+## Theorem (Kolmogorov)
+For a **continuous** $F_0$, under $H_0$
+$$
+\sqrt{n}\,D_n \xrightarrow{d} \phi, \qquad
+F_\phi(x) = \sum_{k=-\infty}^{\infty} (-1)^k e^{-2k^2 x^2}, \quad x>0,
+$$
+the **Kolmogorov distribution** — and it does **not depend on $F_0$**.
+:::
+
+::: {.notes}
+Підставляємо замість невідомої F гіпотетичну F0 — отримуємо статистику D_n (найбільший розрив до еталона). При H0 вона мала, при H1 велика. Теорема Колмогорова: для НЕПЕРЕРВНОЇ F0 величина √n·D_n збігається за розподілом до розподілу Колмогорова, який НЕ ЗАЛЕЖИТЬ від F0. Це і є магія: одна універсальна таблиця критичних значень для будь-якого еталонного розподілу.
+:::
+
+## 📊 The limiting distribution, simulated {.smaller}
+
+```{python}
+#| label: kolmogorov-dist
+#| code-fold: true
+#| fig-align: center
+
+rng = np.random.default_rng(8)
+dist = stats.expon()
+fig, axes = plt.subplots(1, 2, figsize=(13, 4.6))
+for ax, n in zip(axes, [5, 100]):
+    stats_n = [np.sqrt(n) * stats.kstest(dist.rvs(n, random_state=rng), dist.cdf).statistic
+               for _ in range(5000)]
+    ax.hist(stats_n, bins=40, density=True, color=turquoise, alpha=0.6,
+            label=r"$\sqrt{n}\,D_n$")
+    xs = np.linspace(0, max(stats_n), 400)
+    ax.plot(xs, kstwobign.pdf(xs), color=red_pink, lw=2.5,
+            label="Kolmogorov pdf")
+    ax.set_title(f"n = {n}"); ax.set_xlabel("statistic"); ax.set_ylabel("density")
+    ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+Even at $n = 5$ the histogram already follows the Kolmogorov curve — the asymptotics kick in fast.
+
+::: {.notes}
+5000 експериментів: у кожному генеруємо вибірку, рахуємо √n·D_n, будуємо гістограму. Червона крива — теоретичний розподіл Колмогорова (kstwobign). Навіть при n=5 збіг уже добрий — асимптотика «вмикається» дуже швидко. Невеликий зсув вліво при малих n означає, що критерій трохи консервативний (помиляється рідше за α) — це безпечно.
+:::
+
+## 🧮 In practice: one line of SciPy {.smaller}
+
+Back to the trial. Are these blood-pressure readings consistent with $\mathcal{N}(120, 15^2)$?
+
+```{python}
+#| label: kstest-onesample
+#| output-location: column
+
+rng = np.random.default_rng(0)
+# data really generated from N(120, 15^2)  -> H0 is true
+bp = stats.norm(120, 15).rvs(200, random_state=rng)
+
+res = stats.kstest(bp, stats.norm(120, 15).cdf)
+print(f"D = {res.statistic:.4f}")
+print(f"p-value = {res.pvalue:.4f}")
+
+# data from a shifted distribution -> H0 is false
+bp_bad = stats.norm(128, 15).rvs(200, random_state=rng)
+res_bad = stats.kstest(bp_bad, stats.norm(120, 15).cdf)
+print(f"\nshifted: p-value = {res_bad.pvalue:.4f}")
+```
+
+. . .
+
+Large $p$ → no evidence against $F_0$. Tiny $p$ → the data clearly do **not** match the reference.
+
+::: {.notes}
+На практиці — один рядок: stats.kstest(вибірка, F0.cdf). Перший випадок: дані справді з N(120,15²) — велике p, не відхиляємо. Другий: дані зсунуті до середнього 128 — p крихітне, впевнено відхиляємо. Підкреслити: великий p — це НЕ доказ нормальності, а лише відсутність доказів проти неї.
+:::
+
+## ⚠️ The parameter-estimation trap {.smaller}
+
+A subtle, very common mistake: estimating $F_0$'s parameters **from the same sample**.
+
+```{python}
+#| label: ks-trap
+#| output-location: column
+
+rng = np.random.default_rng(3)
+# FPR of "KS against estimated normal", H0 true
+naive, lilli = 0, 0
+for _ in range(2000):
+    x = stats.norm(120, 15).rvs(40, random_state=rng)
+    # WRONG: plug in sample mean & sd
+    p_naive = stats.kstest(
+        x, stats.norm(x.mean(), x.std(ddof=1)).cdf).pvalue
+    # RIGHT: Lilliefors correction
+    p_lilli = lilliefors(x, dist="norm")[1]
+    naive += p_naive < 0.05
+    lilli += p_lilli < 0.05
+print(f"rejections, naive KS : {naive/2000:.3f}")
+print(f"rejections, Lilliefors: {lilli/2000:.3f}")
+```
+
+::: {.callout-important icon=false}
+Plugging in $\bar{x}, s$ makes $F_0$ hug the data → KS is far **too conservative** (rejects almost never, ~0%). To test normality with **unknown** parameters use the [Lilliefors test]{.hi} (≈ 5%, as promised).
+:::
+
+::: {.notes}
+Дуже поширена пастка: оцінити параметри еталона з ТІЄЇ Ж вибірки і підставити в kstest. Тоді F0 «підлаштовується» під дані, розрив штучно малий — критерій стає надто консервативним (майже ніколи не відхиляє, FPR ~0%), тобто некоректним. Якщо параметри невідомі й оцінюються — потрібна поправка Лілліефорса (lilliefors зі statsmodels), яка тримає чесні 5%. Це місток до тестів нормальності далі.
+:::
+
+# Visual check: the QQ-plot {background-iframe=".05-gof_files/libs/colored-particles/index.html"}
+
+## 📐 The idea {.smaller}
+
+A **QQ-plot** (quantile–quantile) shows how well a normal distribution describes the data — *visually*.
+
+- If $X \sim \mathcal{N}(\mu, \sigma^2)$, its quantiles are a **linear** function of the standard normal quantiles:
+$$
+Q_\alpha = \mu + \sigma\, Q'_\alpha.
+$$
+- Plot sample quantiles (Y) against standard-normal quantiles (X). Normal data → points fall on a **straight line**.
+- The slope estimates $\sigma$, the intercept estimates $\mu$.
+
+. . .
+
+::: {.callout-tip icon=false}
+The QQ-plot does not give a $p$-value — it shows you **how** and **where** the data deviate (tails? skew?), which a single number hides.
+:::
+
+::: {.notes}
+QQ-plot — візуальна перевірка нормальності. Якщо дані нормальні, їхні квантилі лінійно залежать від квантилів стандартного нормального: Q = μ + σ·Q'. Тож відкладаємо вибіркові квантилі проти теоретичних — нормальні дані лягають на пряму, нахил ≈ σ, зсув ≈ μ. На відміну від тесту, не дає p-value, зате показує ЯК і ДЕ дані відхиляються (хвости, асиметрія) — те, що одне число ховає.
+:::
+
+## ✅ QQ-plot on (truly) normal data {.smaller}
+
+```{python}
+#| label: qq-normal
+#| code-fold: true
+#| fig-align: center
+
+rng = np.random.default_rng(102)
+sample = stats.norm(120, 15).rvs(300, random_state=rng)
+
+fig, ax = plt.subplots(figsize=(10, 4.6))
+stats.probplot(sample, dist="norm", plot=ax)
+ax.get_lines()[0].set(marker="o", markersize=4, color=red_pink, alpha=0.6)
+ax.get_lines()[1].set(color=slate, lw=2)
+ax.set_title("QQ-plot — normal blood pressure")
+plt.tight_layout()
+plt.show()
+```
+
+Points sit tightly on the line → the normality assumption is reasonable. ✅
+
+::: {.notes}
+Справді нормальні дані (тиск ~N(120,15²)): точки щільно лягають на пряму, лише на самих кінцях трохи розходяться через випадковість у хвостах. Висновок — припущення про нормальність розумне, t-тест виправданий. Це еталонний вигляд «доброго» QQ-plot.
+:::
+
+## ⚠️ QQ-plot reveals heavy tails ($t$-distribution) {.smaller}
+
+```{python}
+#| label: qq-t
+#| code-fold: true
+#| fig-align: center
+
+rng = np.random.default_rng(102)
+heavy = stats.t(df=3).rvs(1000, random_state=rng)
+
+fig, ax = plt.subplots(figsize=(10, 4.6))
+stats.probplot(heavy, dist="norm", plot=ax)
+ax.get_lines()[0].set(marker="o", markersize=4, color=red_pink, alpha=0.5)
+ax.get_lines()[1].set(color=slate, lw=2)
+ax.set_title("QQ-plot — Student's t (df = 3): heavy tails")
+plt.tight_layout()
+plt.show()
+```
+
+The **S-shape** (points curve away at both ends) is the signature of **heavy tails** — more extreme values than a normal would produce.
+
+::: {.notes}
+Вибірка з t-розподілу (df=3) — симетрична, але з важкими хвостами. На QQ-plot це класична S-подібна форма: на кінцях точки відхиляються від прямої вгору/вниз, бо екстремальних значень більше, ніж дав би нормальний. Так оком ловлять важкі хвости — типова проблема фінансових і поведінкових даних.
+:::
+
+## 🌐 Small sample: site load time {.smaller}
+
+Even 20 points are enough to eyeball a gross departure.
+
+```{python}
+#| label: qq-load
+#| code-fold: true
+#| fig-align: center
+
+load = np.array([0.11, 0.07, 0.10, 0.09, 0.17, 0.14, 0.05, 0.05, 0.17, 0.07,
+                 0.06, 0.06, 0.12, 0.12, 0.08, 0.15, 0.07, 0.06, 0.13, 0.17])
+
+fig, ax = plt.subplots(figsize=(10, 4.4))
+stats.probplot(load, dist="norm", plot=ax)
+ax.get_lines()[0].set(marker="o", markersize=7, color=turquoise)
+ax.get_lines()[1].set(color=slate, lw=2)
+ax.set_title("QQ-plot — page load time (n = 20)")
+plt.tight_layout()
+plt.show()
+```
+
+With so few points the verdict is noisier — small samples wander off the line by chance alone.
+
+::: {.notes}
+20 значень часу завантаження сторінки. На малій вибірці QQ-plot шумніший — точки гуляють навколо прямої навіть для нормальних даних. Мораль: на малих n не варто робити різких висновків про форму; візуальний метод тут менш надійний, тому далі поєднуємо його з формальним тестом.
+:::
+
+# Formal normality: Shapiro–Wilk {background-iframe=".05-gof_files/libs/colored-particles/index.html"}
+
+## 🧪 The test {.smaller}
+
+- **Purpose:** test whether a sample is drawn from a normal distribution.
+- $H_0$: the sample **is** normal. $H_1$: it is **not**.
+
+$$
+W = \frac{\left(\sum_{i=1}^n a_i x_{(i)}\right)^2}{\sum_{i=1}^n (x_i - \bar{x})^2},
+$$
+
+where $x_{(i)}$ is the ordered sample and $a_i$ are tabulated constants. $W$ close to $1$ → normal.
+
+. . .
+
+::: {.callout-note icon=false}
+Shapiro–Wilk is usually the **most powerful** normality test for small-to-moderate $n$ — it is the default first choice.
+:::
+
+::: {.notes}
+Шапіро–Вілка — найпопулярніший формальний тест нормальності. H0: вибірка нормальна. Статистика W порівнює, наскільки впорядкована вибірка схожа на «ідеальну» нормальну; W близьке до 1 — нормально. На малих і середніх n це найпотужніший тест нормальності, тому — вибір за замовчуванням. Параметри оцінювати вручну не треба, тест це враховує (на відміну від наївного KS).
+:::
+
+## 🧪 Shapiro–Wilk in action {.smaller}
+
+$X \sim \mathcal{N}(100, 10^2)$, $\;Y \sim \mathcal{N}(-1000, 25^2)$. Is the **ratio** $X/Y$ normal?
+
+```{python}
+#| label: shapiro
+#| code-fold: true
+#| fig-align: center
+
+rng = np.random.default_rng(42)
+X = stats.norm(100, 10).rvs(1000, random_state=rng)
+Y = stats.norm(-1000, 25).rvs(1000, random_state=rng)
+ratio = X / Y
+
+fig, axes = plt.subplots(1, 3, figsize=(13, 3.8))
+for ax, data, name, c in zip(axes, [X, Y, ratio], ["X", "Y", "X / Y"],
+                             [red_pink, turquoise, purple]):
+    ax.hist(data, bins=40, density=True, color=c, alpha=0.7)
+    ax.set_title(f"{name}:  p = {stats.shapiro(data).pvalue:.3f}")
+plt.tight_layout()
+plt.show()
+```
+
+$X$ and $Y$ are normal (large $p$); their ratio $X/Y$ is **not** ($p \approx 0$) — a ratio of normals is generally non-normal.
+
+::: {.notes}
+X і Y — нормальні (p великі, не відхиляємо). А ось відношення X/Y — НЕ нормальне (p ≈ 0), хоча візуально гістограма схожа на дзвін. Урок: відношення/добутки нормальних, як правило, не нормальні; око обманює, тест ловить. Тому формальний тест доповнює QQ-plot.
+:::
+
+## ⚠️ The large-sample caveat {.smaller}
+
+A trap nobody warns you about: on **big** samples normality tests reject **everything**.
+
+```{python}
+#| label: shapiro-bign
+#| output-location: column
+
+rng = np.random.default_rng(7)
+# almost-normal data: a tiny contamination
+for n in [50, 500, 5000, 50_000]:
+    x = stats.norm(0, 1).rvs(n, random_state=rng)
+    x[0] += 0.001 * n         # microscopic skew
+    p = stats.shapiro(x).pvalue
+    print(f"n={n:6d}   p={p:.4f}   "
+          f"{'reject' if p < 0.05 else 'keep'}")
+```
+
+::: {.callout-important icon=false}
+Real data are **never exactly** normal. With huge $n$ even trivial, harmless deviations become "significant". Use normality tests on **small/medium** samples; on large ones rely on a **QQ-plot** + the **CLT** (which already rescues the $t$-test).
+:::
+
+::: {.notes}
+Найважливіше застереження: на великих вибірках тести нормальності відхиляють ВСЕ. Реальні дані ніколи не строго нормальні, тож за великого n навіть мізерне, нешкідливе відхилення стає «значущим» — тест каже «не нормально», хоча для практики це байдуже. Тому: формальні тести — для малих/середніх вибірок; на великих дивимось QQ-plot і покладаємось на ЦГТ, яка й так рятує t-тест. Не женіться за p-value там, де працює асимптотика.
+:::
+
+# Two samples: Kolmogorov–Smirnov {background-iframe=".05-gof_files/libs/colored-particles/index.html"}
+
+## 🏥 The homogeneity question {.smaller}
+
+> Control group — placebo. Test group — the drug. **Does the drug affect blood pressure at all?**
+
+- $x_1, \dots, x_n \sim \mathcal{P}_X$ (control),
+- $y_1, \dots, y_m \sim \mathcal{P}_Y$ (test).
+
+. . .
+
+$$
+H_0: \mathcal{P}_X = \mathcal{P}_Y \quad\Longleftrightarrow\quad H_0: F_X = F_Y.
+$$
+
+::: {.callout-note icon=false}
+The **Kolmogorov–Smirnov** two-sample test compares the two empirical CDFs. Unlike the $t$-test it reacts to **any** difference — mean, variance, or shape.
+:::
+
+::: {.notes}
+Тепер дві вибірки: контроль (плацебо) і тест (ліки). Питання ширше за t-тест: чи ліки взагалі впливають на тиск — не лише на середнє. H0: розподіли однакові ⇔ їхні CDF однакові. Двовибірковий критерій Колмогорова–Смирнова порівнює дві емпіричні CDF і реагує на БУДЬ-ЯКУ різницю — у середньому, дисперсії чи формі. Це його сила (чутливий) і слабкість (менш потужний на конкретну відмінність середніх, ніж t-тест).
+:::
+
+## 📊 The KS statistic {.smaller}
+
+$$
+D_{nm} = \sup_{x \in \mathbb{R}} \big|\widehat{F}_{X,n}(x) - \widehat{F}_{Y,m}(x)\big|
+$$
+
+— the largest vertical gap between the **two empirical CDFs**.
+
+```{python}
+#| label: ks-two-cdf
+#| code-fold: true
+#| fig-align: center
+
+rng = np.random.default_rng(0)
+control = stats.norm(120, 15).rvs(100, random_state=rng)
+treated = stats.norm(112, 15).rvs(100, random_state=rng)   # drug lowers BP
+grid = np.linspace(80, 165, 1000)
+Fx, Fy = ecdf(control, grid), ecdf(treated, grid)
+gap = np.argmax(np.abs(Fx - Fy))
+
+fig, ax = plt.subplots(figsize=(11, 4.4))
+ax.step(grid, Fx, color=red_pink, lw=2, where="post", label="control (placebo)")
+ax.step(grid, Fy, color=turquoise, lw=2, where="post", label="test (drug)")
+ax.vlines(grid[gap], min(Fx[gap], Fy[gap]), max(Fx[gap], Fy[gap]),
+          color=slate, lw=3, label=r"$D_{nm}$")
+ax.set_title("Two empirical CDFs"); ax.set_xlabel("Blood pressure")
+ax.set_ylabel("Cumulative probability"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+::: {.notes}
+Статистика D_nm — найбільший вертикальний розрив між ДВОМА емпіричними CDF (раніше одна з них була теоретичною). На графіку рожева — контроль, бірюзова — тест (ліки знизили тиск на ~8). Сірий відрізок — D_nm. Що більший розрив, то впевненіше кажемо, що розподіли різні.
+:::
+
+## 📋 Conditions & the limit law {.smaller}
+
+**Assumptions**
+
+1. $X_1, \dots, X_n$ i.i.d. with CDF $F_X$; $\;Y_1, \dots, Y_m$ i.i.d. with CDF $F_Y$.
+2. $F_X, F_Y$ are **continuous**.
+3. The whole vector $(X_1,\dots,X_n,Y_1,\dots,Y_m)$ is **independent** (the two samples are independent).
+
+. . .
+
+**Limit law.** Under $H_0: F_X = F_Y$,
+$$
+\sqrt{\frac{nm}{n+m}}\, D_{nm} \xrightarrow{d} \phi
+$$
+— the **same** Kolmogorov distribution as before. One table, two tests.
+
+::: {.notes}
+Умови: обидві вибірки i.i.d., розподіли неперервні, і — критично — увесь вектор спостережень незалежний (вибірки незалежні між собою). При H0 нормована √(nm/(n+m))·D_nm збігається до того ж розподілу Колмогорова, що й в одновибірковому випадку. Тобто одна універсальна гранична таблиця обслуговує обидва критерії. Зверніть увагу на умову незалежності — далі побачимо, що буде, коли вона порушена.
+:::
+
+## 🧪 A reusable Monte Carlo checker {.smaller}
+
+We will validate KS the same way we validated the $t$-test — with **Monte Carlo**.
+
+```{python}
+#| label: ks-mc-fn
+
+def ks_rejection_rate(dist_x, dist_y, n, m=None, n_exps=4000,
+                      alpha=0.05, seed=42):
+    """Run a two-sample KS test n_exps times; return rejection rate + 95% CI.
+
+    dist_x == dist_y  → H0 true  → the rate is the FPR.
+    dist_x != dist_y  → H1 true  → the rate is the power (TPR).
+    """
+    m = m or n
+    rng, rej = np.random.default_rng(seed), 0
+    for _ in range(n_exps):
+        x = dist_x.rvs(n, random_state=rng)
+        y = dist_y.rvs(m, random_state=rng)
+        rej += stats.ks_2samp(x, y).pvalue < alpha
+    ci = proportion_confint(rej, n_exps, alpha=0.05, method="wilson")
+    return rej / n_exps, ci
+```
+
+::: {.callout-tip icon=false}
+Same engine as the previous lecture: pass **equal** distributions to measure FPR, **different** ones to measure power.
+:::
+
+::: {.notes}
+Перевикористовуємо ідею минулої лекції — валідація критерію через Монте-Карло. Функція ks_rejection_rate: тисячі разів генерує дві вибірки, рахує частку відхилень + довірчий інтервал Уілсона. Однакові розподіли → міряємо FPR (A/A); різні → потужність. Той самий двигун, що й для t-тесту, лише всередині ks_2samp замість ttest_ind.
+:::
+
+## 📏 Does KS work for small samples? {.smaller}
+
+Folklore says "use KS only from $n, m \ge 20$". Let's **check** on an A/A test (drug has no effect).
+
+```{python}
+#| label: ks-small
+#| output-location: column
+
+bp_dist = stats.gamma(5, scale=110)   # realistic, skewed BP
+
+rate, (lo, hi) = ks_rejection_rate(
+    bp_dist, bp_dist, n=20, m=20,
+    n_exps=20_000)
+print(f"FPR (n=m=20): {rate:.4f}")
+print(f"95% CI: ({lo:.4f}, {hi:.4f})")
+print(f"5% inside CI? {lo < 0.05 < hi}")
+```
+
+::: {.callout-note icon=false}
+At $n=m=20$ the FPR is **below** $\alpha$ — KS is **conservative** on tiny samples (it errs less often than promised, which is *safe* but costs power). The discreteness of small ECDFs is the reason.
+:::
+
+::: {.notes}
+Перевіряємо фольклор «KS працює від n≥20» на A/A-тесті (ліки без ефекту), розподіл тиску — скошена гамма. При n=m=20 FPR НИЖЧИЙ за 5% — критерій консервативний на малих вибірках. Причина — дискретність емпіричних CDF на малих n (стрибки по 1/20). Це безпечно (рідше хибно відхиляємо), але платимо потужністю. Тобто 20 — радше нижня межа застосовності, ніж точка ідеальної каліброваності.
+:::
+
+## 📏 FPR vs sample size {.smaller}
+
+```{python}
+#| label: ks-fpr-grid
+#| code-fold: true
+#| fig-align: center
+
+sizes = np.unique(np.geomspace(10, 2000, 8).astype(int))
+rates, los, his = [], [], []
+for n in sizes:
+    r, (lo, hi) = ks_rejection_rate(stats.gamma(1, scale=2),
+                                    stats.gamma(1, scale=2),
+                                    n=n, n_exps=4000)
+    rates.append(r); los.append(lo); his.append(hi)
+
+fig, ax = plt.subplots(figsize=(11, 4.4))
+ax.plot(sizes, rates, color=turquoise, lw=2.5, marker="o", label="FPR")
+ax.fill_between(sizes, los, his, color=slate, alpha=0.25, label="95% CI")
+ax.axhline(0.05, color=red_pink, ls="--", lw=2, label=r"$\alpha = 0.05$")
+ax.set_xscale("log"); ax.set_ylim(bottom=0)
+ax.set_xlabel("Sample size (n = m)"); ax.set_ylabel("FPR")
+ax.set_title("FPR approaches α as the sample grows"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+Rule of thumb: $\ge 1000$ — spot on; $50$–$1000$ — fine; $< 50$ — conservative, use with care.
+
+::: {.notes}
+FPR як функція розміру вибірки (лог-вісь). На малих n крива нижча за α (консервативність), із ростом n підтягується до 5% і лягає на пунктир. Практичне правило: ~1000+ — ідеально; 50–1000 — цілком ок; менше 50 — критерій занижує FPR, обережно. Це і є емпірична відповідь на питання «з якого n можна довіряти KS».
+:::
+
+## 💪 Power grows with the sample {.smaller}
+
+Now the drug **does** shift the distribution. How often does KS catch it?
+
+```{python}
+#| label: ks-power
+#| code-fold: true
+#| fig-align: center
+
+sizes = np.unique(np.geomspace(50, 3000, 7).astype(int))
+tpr, los, his = [], [], []
+for n in sizes:
+    r, (lo, hi) = ks_rejection_rate(stats.gamma(1, scale=2),
+                                    stats.gamma(1.1, scale=2),
+                                    n=n, n_exps=4000)
+    tpr.append(r); los.append(lo); his.append(hi)
+
+fig, ax = plt.subplots(figsize=(11, 4.4))
+ax.plot(sizes, tpr, color=red_pink, lw=2.5, marker="o", label="power (TPR)")
+ax.fill_between(sizes, los, his, color=turquoise, alpha=0.3, label="95% CI")
+ax.axhline(0.8, color=slate, ls="--", lw=2, label="80% gold standard")
+ax.set_xscale("log"); ax.set_ylim(0, 1)
+ax.set_xlabel("Sample size (n = m)"); ax.set_ylabel("TPR")
+ax.set_title("Power of KS vs sample size"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+A small distributional difference needs a **large** sample to be detected reliably.
+
+::: {.notes}
+Тепер ліки реально зсувають розподіл (gamma 1 vs 1.1). Потужність росте з n і поступово перетинає золотий стандарт 80%. Маленька відмінність розподілів вимагає ВЕЛИКОЇ вибірки, щоб її надійно зловити — типова ціна універсальності KS. Це місток до планування розміру вибірки: знаючи очікуваний ефект, підбираємо n під потрібну потужність.
+:::
+
+# When samples are dependent {background-iframe=".05-gof_files/libs/colored-particles/index.html"}
+
+## 🔗 Two designs, one looks the same {.smaller}
+
+The KS test demands **independent** samples. Two trial designs:
+
+:::: {.columns}
+::: {.column width="50%"}
+**Independent (✅ KS is valid)**
+
+- control = placebo patients,
+- test = *different* drug patients.
+
+The two groups are unrelated.
+:::
+::: {.column width="50%"}
+**Dependent (⚠️ assumption broken)**
+
+- $X_i$ = patient $i$ **before** the drug,
+- $Y_i$ = the **same** patient $i$ **after**.
+
+$X_i$ and $Y_i$ share the person.
+:::
+::::
+
+. . .
+
+We model dependence with a shared "patient" component plus independent noise:
+$$
+X = \mathcal{P}_{\text{init}} + \mathcal{P}_{\text{noise}_X}, \qquad
+Y = \mathcal{P}_{\text{init}} + \mathcal{P}_{\text{noise}_Y}.
+$$
+
+::: {.notes}
+KS вимагає НЕЗАЛЕЖНІ вибірки. Два дизайни: незалежний (контроль = одні пацієнти, тест = інші) — KS валідний. Залежний (до/після на ТИХ САМИХ пацієнтах) — X_i і Y_i ділять спільну людину, незалежність порушена. Моделюємо це спільною компонентою P_init (індивідуальність пацієнта) + незалежний шум для кожного виміру. Якщо шум однаковий — H0 вірна (ефекту нема).
+:::
+
+## 🔗 Dependent-sample simulator {.smaller}
+
+```{python}
+#| label: ks-dep-fn
+
+def ks_rejection_rate_dependent(init_dist, noise_x, noise_y, n,
+                                n_exps=4000, alpha=0.05, seed=42):
+    """KS on paired (before/after) data sharing a common component."""
+    rng, rej = np.random.default_rng(seed), 0
+    for _ in range(n_exps):
+        base = init_dist.rvs(n, random_state=rng)   # the patient
+        x = base + noise_x.rvs(n, random_state=rng)  # before
+        y = base + noise_y.rvs(n, random_state=rng)  # after
+        rej += stats.ks_2samp(x, y).pvalue < alpha
+    ci = proportion_confint(rej, n_exps, alpha=0.05, method="wilson")
+    return rej / n_exps, ci
+
+# H0 true: same noise before and after (drug has no effect)
+rate, (lo, hi) = ks_rejection_rate_dependent(
+    stats.norm(0, 4), stats.norm(0, 3), stats.norm(0, 3),
+    n=600, n_exps=4000)
+print(f"FPR (dependent, n=600): {rate:.4f}   CI=({lo:.4f}, {hi:.4f})")
+```
+
+Same means and shapes for $X$ and $Y$ → $H_0$ holds, yet the FPR is **well below** 5%.
+
+::: {.notes}
+Симулятор залежних вибірок: спільна база (пацієнт) + свій шум до і після. При однаковому шумі H0 вірна. Запускаємо при n=600 — і FPR помітно НИЖЧИЙ за 5%. Тобто на залежних даних KS стає надмірно консервативним: майже не відхиляє навіть коли міг би. Причина — спільна компонента робить дві емпіричні CDF дуже схожими. Далі побачимо це на графіку і в порівнянні потужності.
+:::
+
+## 🔗 Why the FPR collapses {.smaller}
+
+```{python}
+#| label: ks-dep-cdf
+#| code-fold: true
+#| fig-align: center
+
+rng = np.random.default_rng(1)
+base = stats.norm(0, 4).rvs(600, random_state=rng)
+X = base + stats.norm(0, 3).rvs(600, random_state=rng)
+Y = base + stats.norm(0, 3).rvs(600, random_state=rng)
+grid = np.linspace(-15, 15, 1000)
+
+fig, ax = plt.subplots(figsize=(11, 4.4))
+ax.step(grid, ecdf(X, grid), color=red_pink, lw=2, where="post", label="before")
+ax.step(grid, ecdf(Y, grid), color=turquoise, lw=2, where="post", label="after")
+ax.set_title("Dependent samples: the shared component glues the CDFs together")
+ax.set_xlabel("x"); ax.set_ylabel("Cumulative probability"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+The common patient component makes the two empirical CDFs almost identical → KS rarely rejects → **the test is conservative and loses power**.
+
+::: {.notes}
+Графік пояснює, чому FPR падає: спільна компонента «склеює» дві емпіричні CDF — вони майже збігаються. KS бачить крихітний розрив і рідко відхиляє. Наслідок — критерій консервативний на залежних даних і втрачає потужність. Для парних даних потрібні спеціальні методи (парний t, перестановочні тести на різницях), а наївний двовибірковий KS недооцінює сигнал.
+:::
+
+## ⚖️ Dependent vs independent: power {.smaller}
+
+Now the drug **does** reduce the variance after treatment. Compare power under both designs.
+
+```{python}
+#| label: ks-dep-vs-indep
+#| code-fold: true
+#| fig-align: center
+
+import math
+sizes = np.unique(np.geomspace(50, 4000, 7).astype(int))
+indep, dep = [], []
+for n in sizes:
+    r_i, _ = ks_rejection_rate(stats.norm(0, 5), stats.norm(0, 2*math.sqrt(5)),
+                               n=n, n_exps=3000)
+    r_d, _ = ks_rejection_rate_dependent(stats.norm(0, 4), stats.norm(0, 3),
+                                         stats.norm(0, 2), n=n, n_exps=3000)
+    indep.append(r_i); dep.append(r_d)
+
+fig, ax = plt.subplots(figsize=(11, 4.4))
+ax.plot(sizes, indep, color=turquoise, lw=2.5, marker="o", label="independent")
+ax.plot(sizes, dep, color=red_pink, lw=2.5, marker="s", ls="--", label="dependent")
+ax.axhline(0.8, color=slate, ls=":", lw=2, label="80%")
+ax.set_xscale("log"); ax.set_ylim(0, 1)
+ax.set_xlabel("Sample size (n = m)"); ax.set_ylabel("Power (TPR)")
+ax.set_title("Treating paired data as independent throws away power"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+::: {.callout-important icon=false}
+On dependent data KS still works (power → 1 eventually), but it needs **far** larger samples. Match the test to the **design**: independent groups → two-sample KS; paired data → a paired method.
+:::
+
+::: {.notes}
+Порівняння потужності: незалежний дизайн (бірюзова) набирає потужність набагато швидше, ніж залежний (рожевий пунктир). Обидва зрештою прямують до 1, тож KS на залежних даних не «зламаний», але вимагає значно більших вибірок — ви просто викидаєте потужність, ігноруючи парність. Висновок: підбирайте критерій під ДИЗАЙН — незалежні групи → двовибірковий KS; парні дані (до/після) → парні методи.
+:::
+
+# Summary {background-iframe=".05-gof_files/libs/colored-particles/index.html"}
+
+## 🧾 The one idea {.smaller}
+
+Everything today reduced to: [compare cumulative distribution functions]{.hi}.
+
+- **Empirical CDF** $\widehat{F}_n$ estimates the truth (Glivenko–Cantelli).
+- **Kolmogorov** goodness-of-fit: largest gap to a *known* $F_0$ → universal Kolmogorov distribution.
+- **QQ-plot**: visual normality — shows *how* data deviate (tails, skew).
+- **Shapiro–Wilk**: formal normality — powerful on small $n$, over-sensitive on large $n$.
+- **Kolmogorov–Smirnov**: largest gap between *two* ECDFs — detects any difference in mean, variance or shape.
+
+::: {.notes}
+Підсумок: уся лекція — одна ідея, порівняння функцій розподілу. Емпірична CDF оцінює правду (Глівенко–Кантеллі). Колмогоров — узгодженість із відомим F0, універсальний граничний розподіл. QQ-plot — візуальна нормальність, показує ЯК відхиляються дані. Шапіро–Вілк — формальний тест, потужний на малих n, надчутливий на великих. Колмогоров–Смирнов — однорідність двох вибірок, ловить будь-яку різницю. Усе зведено до вертикального розриву між CDF.
+:::
+
+## 🧭 Which test, when? {.smaller}
+
+| Question | Tool | Watch out for |
+|---|---|---|
+| Does data match a **fully known** $F_0$? | KS one-sample (`stats.kstest`) | $F_0$ must be **fixed**, not estimated |
+| Is data **normal** (unknown $\mu,\sigma$)? | Lilliefors / Shapiro–Wilk | huge $n$ → rejects everything |
+| Normality — *how* does it fail? | QQ-plot | noisy on tiny $n$ |
+| Do **two independent** samples match? | KS two-sample (`stats.ks_2samp`) | needs $n \gtrsim 50$ |
+| **Paired** before/after data? | paired method (not two-sample KS) | shared component kills power |
+
+. . .
+
+::: {.callout-tip icon=false}
+And the meta-lesson from last lecture still holds: when in doubt, [validate the criterion with Monte Carlo]{.hi} on data that looks like yours.
+:::
+
+::: {.notes}
+Шпаргалка «який критерій коли»: повністю заданий F0 — одновибірковий KS (але F0 фіксований!); нормальність із невідомими параметрами — Лілліефорс/Шапіро (на великих n обережно); ЯК саме порушується нормальність — QQ-plot; дві незалежні вибірки — двовибірковий KS (від ~50); парні дані — парні методи, не наївний KS. Мета-урок із минулої лекції лишається: маєш сумнів — переваліруй критерій Монте-Карло на даних, схожих на твої.
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe=".05-gof_files/libs/colored-particles/index.html"}
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=4049)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

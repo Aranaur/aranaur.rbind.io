@@ -1,0 +1,460 @@
+---
+title: "Практичне заняття 6"
+subtitle: "STAT250: Теорія ймовірностей та статистика"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: uk
+format:
+  revealjs:
+    theme: default
+    slide-number: true
+    toc: false
+    chalkboard: true
+    preview-links: false
+    logo: ""
+    footer: "STAT250 · KSE · Практичне заняття 6"
+    highlight-style: github
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+#| include: false
+library(tidyverse)
+library(patchwork)
+library(scales)
+```
+
+# Статистичний висновок: ключові ідеї
+
+## Що ми вивчаємо сьогодні {.smaller}
+
+Економісти рідко спостерігають усю **сукупність** → беруть **вибірку** й роблять висновок.
+
+$$
+\text{Вибірка} \;\longrightarrow\; \text{Висновок про сукупність}
+$$
+
+| Інструмент | Питання | R |
+|------------|---------|---|
+| Довірчий інтервал | Який *діапазон* для $\mu$? | `t.test`, `qnorm` |
+| Одновибірковий t-тест | Чи $\mu \ne \mu_0$? | `t.test(x, mu=)` |
+| Двовибірковий / Welch | Чи $\mu_1 \ne \mu_2$? | `t.test(x, y)` |
+| Парний t-тест | Чи $\mu_D \ne 0$? | `t.test(paired=TRUE)` |
+| Тест пропорцій | Чи $p_1 \ne p_2$? | `prop.test` |
+
+## Дві базові формули {.smaller}
+
+**Довірчий інтервал** (загальна форма):
+
+$$
+\text{Оцінка} \pm \underbrace{\text{Критичне значення}}_{z \text{ або } t} \times \underbrace{\text{Стандартна похибка}}_{\sigma/\sqrt{n}\;\text{або}\;s/\sqrt{n}}
+$$
+
+**Статистика t-тесту:**
+
+$$
+t = \frac{\bar{X} - \mu_0}{s/\sqrt{n}} \sim t_{n-1}
+$$
+
+::: {.callout-tip appearance="simple"}
+**Відома $\sigma$ → $z$-розподіл.** **Невідома $\sigma$ → $t$-розподіл** (важчі хвости).
+Правило рішення: якщо $p < \alpha$ → відхиляємо $H_0$.
+:::
+
+# Довірчі інтервали
+
+## Задача 1: Середня зарплата (відома σ) {.smaller}
+
+Аналітик оцінює середню зарплату в IT. Відомо $\sigma = 18\,000$ грн. Вибірка $n = 100$ дала $\bar{X} = 62\,000$ грн.
+
+::: {.callout-note appearance="simple"}
+Побудуйте **95% довірчий інтервал** для справжньої середньої зарплати.
+:::
+
+<br>
+
+**Підказка:** оскільки $\sigma$ відома → $z$-інтервал:
+
+$$\bar{X} \pm z_{1-\alpha/2}\,\frac{\sigma}{\sqrt{n}}, \qquad z_{0.975} = 1.96$$
+
+## Задача 1: Аналітичне рішення {.smaller}
+
+**Стандартна похибка:**
+
+$$
+\text{SE} = \frac{\sigma}{\sqrt{n}} = \frac{18000}{\sqrt{100}} = 1800 \text{ грн}
+$$
+
+**Похибка (margin of error):**
+
+$$
+\text{ME} = z_{0.975}\cdot\text{SE} = 1.96 \times 1800 = 3528 \text{ грн}
+$$
+
+**Інтервал:**
+
+$$
+62000 \pm 3528 = (58\,472;\; 65\,528) \text{ грн}
+$$
+
+**Висновок:** з рівнем довіри 95% середня зарплата лежить у межах **58 472 – 65 528 грн**.
+
+## Задача 1: Розв'язання в R {.smaller}
+
+```{r}
+sigma <- 18000; n <- 100; x_bar <- 62000; alpha <- 0.05
+
+se <- sigma / sqrt(n)
+z  <- qnorm(1 - alpha / 2)
+me <- z * se
+ci <- c(x_bar - me, x_bar + me)
+
+cat(sprintf("SE = %.1f грн\n", se))
+cat(sprintf("z(0.975) = %.4f, ME = %.1f грн\n", z, me))
+cat(sprintf("95%% CI: (%.0f; %.0f) грн\n", ci[1], ci[2]))
+```
+
+## Задача 1: Візуалізація {.smaller}
+
+```{r}
+#| fig-width: 9
+#| fig-height: 4
+#| output-location: slide
+
+tibble(x = seq(x_bar - 4 * se, x_bar + 4 * se, length.out = 500)) |>
+  mutate(density = dnorm(x, x_bar, se),
+         in_ci   = x >= ci[1] & x <= ci[2]) |>
+  ggplot(aes(x = x, y = density)) +
+  geom_area(aes(fill = in_ci), alpha = 0.7, show.legend = FALSE) +
+  geom_line(color = "grey30", linewidth = 1) +
+  geom_vline(xintercept = ci, linetype = "dashed", color = "#d73027") +
+  geom_vline(xintercept = x_bar, color = "#2166ac", linewidth = 1) +
+  scale_fill_manual(values = c("TRUE" = "#4393c3", "FALSE" = "grey80")) +
+  scale_x_continuous(labels = label_number(big.mark = " ")) +
+  annotate("text", x = x_bar, y = dnorm(x_bar, x_bar, se) * 0.5,
+           label = "95% CI", color = "#08519c", size = 4.5) +
+  labs(title = "95% довірчий інтервал для середньої зарплати",
+       x = "Зарплата, грн", y = "Щільність") +
+  theme_minimal(base_size = 12)
+```
+
+## Задача 2: Час відгуку API (невідома σ) {.smaller}
+
+Стартап виміряв час відгуку API (мс) у 12 запитах:
+
+`118, 124, 131, 109, 127, 140, 115, 122, 133, 119, 126, 130`
+
+::: {.callout-note appearance="simple"}
+Побудуйте **97% довірчий інтервал** для середнього часу відгуку. Дисперсія сукупності **невідома**.
+:::
+
+<br>
+
+**Підказка:** мала вибірка + невідома $\sigma$ → $t$-розподіл з $n-1 = 11$ df:
+
+$$\bar{X} \pm t_{1-\alpha/2,\,n-1}\cdot\frac{s}{\sqrt{n}}$$
+
+## Задача 2: Розв'язання в R {.smaller}
+
+```{r}
+x <- c(118, 124, 131, 109, 127, 140, 115, 122, 133, 119, 126, 130)
+n <- length(x); alpha <- 0.03
+
+x_bar <- mean(x); s <- sd(x); se <- s / sqrt(n)
+t_crit <- qt(1 - alpha / 2, df = n - 1)
+ci <- c(x_bar - t_crit * se, x_bar + t_crit * se)
+
+cat(sprintf("n = %d, X̄ = %.2f мс, s = %.2f мс\n", n, x_bar, s))
+cat(sprintf("t(0.985, %d) = %.4f\n", n - 1, t_crit))
+cat(sprintf("97%% CI: (%.2f; %.2f) мс\n", ci[1], ci[2]))
+```
+
+**Перевірка через `t.test()`:**
+
+```{r}
+t.test(x, conf.level = 0.97)$conf.int
+```
+
+## Задача 2: Чому інтервал ширший? {.smaller}
+
+::: {.callout-important appearance="simple"}
+Критичне значення $t_{0.985,\,11} \approx 2.49$ **більше** за $z_{0.985} \approx 2.17$.
+:::
+
+```{r}
+#| fig-width: 9
+#| fig-height: 3.8
+#| output-location: slide
+
+tibble(t = seq(-4, 4, length.out = 500)) |>
+  mutate(Normal = dnorm(t), `t (df=11)` = dt(t, df = 11)) |>
+  pivot_longer(-t, names_to = "dist", values_to = "density") |>
+  ggplot(aes(t, density, color = dist)) +
+  geom_line(linewidth = 1) +
+  scale_color_manual(values = c("Normal" = "#2166ac", "t (df=11)" = "#d73027")) +
+  labs(title = "t-розподіл має важчі хвости за нормальний",
+       x = NULL, y = "Щільність", color = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top")
+```
+
+> Важчі хвости — «плата» за оцінювання $\sigma$ та малу вибірку.
+
+# Перевірка гіпотез: t-тести
+
+## Задача 3: Одновибірковий t-тест (`sleep`) {.smaller}
+
+Датасет `sleep` — приріст годин сну у 10 пацієнтів для двох препаратів. Беремо **Препарат 1**.
+
+::: {.callout-note appearance="simple"}
+Чи збільшує Препарат 1 тривалість сну більш ніж на 0 годин?
+$$H_0: \mu = 0 \quad\text{проти}\quad H_a: \mu > 0$$
+:::
+
+<br>
+
+**Підказка:** $t = \dfrac{\bar{X} - \mu_0}{s/\sqrt{n}}$, одностороння альтернатива → відхиляємо при $t > t_{1-\alpha,\,n-1}$.
+
+## Задача 3: Розв'язання в R {.smaller}
+
+```{r}
+data(sleep)
+drug1 <- sleep$extra[sleep$group == 1]
+drug1
+
+n <- length(drug1); x_bar <- mean(drug1); s <- sd(drug1)
+t_stat <- (x_bar - 0) / (s / sqrt(n))
+p_val  <- 1 - pt(t_stat, df = n - 1)   # one-sided (greater)
+cat(sprintf("X̄ = %.3f, s = %.3f, t = %.3f, p = %.4f\n", x_bar, s, t_stat, p_val))
+```
+
+```{r}
+t.test(drug1, mu = 0, alternative = "greater")
+```
+
+## Задача 3: Висновок {.smaller}
+
+::: {.callout-important appearance="simple"}
+$p \approx 0.11 > 0.05$ → **не відхиляємо** $H_0$.
+:::
+
+Хоча в середньому Препарат 1 трохи збільшує сон ($\bar{X} \approx 0.75$ год), доказів **статистично значущого** ефекту при $\alpha = 0.05$ недостатньо.
+
+> Відсутність значущості $\ne$ доказ відсутності ефекту — можливо, замала вибірка (низька потужність).
+
+## Задача 4: Парний t-тест (`sleep`) {.smaller}
+
+Кожен пацієнт отримав **обидва** препарати → спостереження **спарені**. Нехай $D = \text{Препарат 2} - \text{Препарат 1}$.
+
+::: {.callout-note appearance="simple"}
+Чи є значуща різниця в ефективності?
+$$H_0: \mu_D = 0 \quad\text{проти}\quad H_a: \mu_D \ne 0$$
+Побудуйте 95% довірчий інтервал.
+:::
+
+<br>
+
+**Підказка:** парний тест = одновибірковий на різницях $D_i$: $\;t = \dfrac{\bar{D}}{s_D/\sqrt{n}}$.
+
+## Задача 4: Розв'язання в R {.smaller}
+
+```{r}
+drug2 <- sleep$extra[sleep$group == 2]
+d <- drug2 - drug1
+
+n <- length(d); d_bar <- mean(d); s_d <- sd(d)
+t_stat <- d_bar / (s_d / sqrt(n))
+p_val  <- 2 * (1 - pt(abs(t_stat), df = n - 1))
+cat(sprintf("D̄ = %.3f, s_D = %.3f, t = %.3f, p = %.5f\n", d_bar, s_d, t_stat, p_val))
+```
+
+```{r}
+t.test(drug2, drug1, paired = TRUE, conf.level = 0.95)
+```
+
+## Задача 4: Візуалізація {.smaller}
+
+```{r}
+#| fig-width: 8
+#| fig-height: 4
+#| output-location: slide
+
+tibble(id = factor(1:n), Препарат1 = drug1, Препарат2 = drug2) |>
+  pivot_longer(-id, names_to = "drug", values_to = "extra") |>
+  ggplot(aes(x = drug, y = extra, group = id)) +
+  geom_line(color = "grey70") +
+  geom_point(aes(color = drug), size = 3, show.legend = FALSE) +
+  scale_color_manual(values = c("Препарат1" = "#4393c3", "Препарат2" = "#d73027")) +
+  labs(title = "Приріст сну: кожна лінія — один пацієнт",
+       x = NULL, y = "Додаткові години сну") +
+  theme_minimal(base_size = 12)
+```
+
+> $p \approx 0.003 < 0.05$ → **відхиляємо** $H_0$: Препарат 2 додає $\approx 1.58$ год; 95% CI не містить нуля.
+
+## Задача 5: Двовибірковий t-тест (`ToothGrowth`) {.smaller}
+
+Вплив вітаміну C на ріст зубів: **OJ** (сік) vs **VC** (аскорбінова кислота).
+
+::: {.callout-note appearance="simple"}
+Чи впливає спосіб доставки на довжину зубів? Рівень значущості $\alpha = 0.1$, 90% CI.
+$$H_0: \mu_{OJ} = \mu_{VC} \quad\text{проти}\quad H_a: \mu_{OJ} \ne \mu_{VC}$$
+:::
+
+```{r}
+#| echo: false
+#| fig-width: 8
+#| fig-height: 3.3
+
+data(ToothGrowth)
+ToothGrowth |>
+  ggplot(aes(x = supp, y = len, fill = supp)) +
+  geom_boxplot(alpha = 0.7, show.legend = FALSE) +
+  geom_jitter(width = 0.12, alpha = 0.5, size = 1.3) +
+  scale_fill_manual(values = c("OJ" = "#fdae61", "VC" = "#4393c3")) +
+  labs(x = "Спосіб доставки", y = "Довжина зуба") +
+  theme_minimal(base_size = 12)
+```
+
+## Задача 5: Розв'язання в R {.smaller}
+
+```{r}
+t.test(len ~ supp, data = ToothGrowth,
+       alternative = "two.sided", conf.level = 0.90)
+```
+
+## Задача 5: Welch vs Pooled {.smaller}
+
+```{r}
+welch  <- t.test(len ~ supp, data = ToothGrowth, var.equal = FALSE)
+pooled <- t.test(len ~ supp, data = ToothGrowth, var.equal = TRUE)
+
+tibble(
+  Тест    = c("Welch", "Pooled"),
+  t       = c(welch$statistic, pooled$statistic),
+  df      = c(welch$parameter, pooled$parameter),
+  p_value = c(welch$p.value, pooled$p.value)
+) |>
+  mutate(across(c(t, p_value), \(v) round(v, 4)), df = round(df, 2))
+```
+
+::: {.callout-important appearance="simple"}
+$p \approx 0.06$: при $\alpha = 0.1$ → **відхиляємо** $H_0$; при $\alpha = 0.05$ → **ні**.
+Рішення залежить від обраного рівня значущості!
+:::
+
+# Тест пропорцій (A/B)
+
+## Задача 6: A/B-тест конверсії {.smaller}
+
+Інтернет-магазин тестує новий дизайн сторінки:
+
+- **Контроль** (стара): $n_1 = 4\,800$, конверсій $x_1 = 528$
+- **Тест** (нова): $n_2 = 4\,750$, конверсій $x_2 = 593$
+
+::: {.callout-note appearance="simple"}
+Чи відрізняються конверсії? $\alpha = 0.05$.
+$$H_0: p_{control} = p_{treatment} \quad\text{проти}\quad H_a: p_{control} \ne p_{treatment}$$
+:::
+
+<br>
+
+**Підказка:** $\hat{p} = \dfrac{x_1+x_2}{n_1+n_2}, \quad Z = \dfrac{\hat{p}_1 - \hat{p}_2}{\sqrt{\hat{p}(1-\hat{p})\left(\frac{1}{n_1}+\frac{1}{n_2}\right)}}$
+
+## Задача 6: Аналітичне рішення {.smaller}
+
+**Вибіркові частки:**
+
+$$
+\hat{p}_1 = \frac{528}{4800} = 0.1100, \qquad \hat{p}_2 = \frac{593}{4750} = 0.1248
+$$
+
+**Об'єднана оцінка під $H_0$:**
+
+$$
+\hat{p} = \frac{528 + 593}{4800 + 4750} = \frac{1121}{9550} \approx 0.1174
+$$
+
+**Статистика:**
+
+$$
+Z = \frac{0.1100 - 0.1248}{\sqrt{0.1174 \cdot 0.8826 \left(\frac{1}{4800}+\frac{1}{4750}\right)}} \approx -2.37
+$$
+
+## Задача 6: Розв'язання в R {.smaller}
+
+```{r}
+successes <- c(control = 528, treatment = 593)
+trials    <- c(control = 4800, treatment = 4750)
+
+prop.test(successes, trials, alternative = "two.sided", correct = FALSE)
+```
+
+## Задача 6: Ручна перевірка Z {.smaller}
+
+```{r}
+p1 <- successes[1] / trials[1]
+p2 <- successes[2] / trials[2]
+p_pool <- sum(successes) / sum(trials)
+
+z <- (p1 - p2) / sqrt(p_pool * (1 - p_pool) * (1/trials[1] + 1/trials[2]))
+p_val <- 2 * (1 - pnorm(abs(z)))
+cat(sprintf("p̂1 = %.4f, p̂2 = %.4f, p̂_pool = %.4f\n", p1, p2, p_pool))
+cat(sprintf("Z = %.3f, Z² = %.3f, p-value = %.4f\n", z, z^2, p_val))
+```
+
+::: {.callout-important appearance="simple"}
+$p \approx 0.018 < 0.05$ → **відхиляємо** $H_0$: нова сторінка дає вищу конверсію.
+:::
+
+## Задача 6: Візуалізація {.smaller}
+
+```{r}
+#| fig-width: 8
+#| fig-height: 4
+
+tibble(
+  group = c("Контроль\n(стара)", "Тест\n(нова)"),
+  rate  = c(p1, p2)
+) |>
+  ggplot(aes(x = group, y = rate, fill = group)) +
+  geom_col(alpha = 0.8, width = 0.6, show.legend = FALSE) +
+  geom_text(aes(label = percent(rate, accuracy = 0.01)), vjust = -0.5, size = 4) +
+  scale_fill_manual(values = c("#4393c3", "#d73027")) +
+  scale_y_continuous(labels = percent_format(), expand = expansion(c(0, 0.15))) +
+  labs(title = "Конверсія: A/B-тест дизайну сторінки",
+       x = NULL, y = "Частка конверсій") +
+  theme_minimal(base_size = 12)
+```
+
+# Підсумок
+
+## Підсумкова таблиця {.smaller}
+
+| № | Тип задачі | Метод | R | Результат |
+|---|---|---|---|---|
+| 1 | CI, відома $\sigma$ | $z$-інтервал | `qnorm` | (58 472; 65 528) грн |
+| 2 | CI, невідома $\sigma$ | $t$-інтервал | `t.test` | ширший за $z$ |
+| 3 | Одновибірковий t-тест | $t_{n-1}$ | `t.test(mu=)` | $p\approx 0.11$ — не відхиляємо |
+| 4 | Парний t-тест | $t$ на різницях | `paired=TRUE` | $p\approx 0.003$ — значуще |
+| 5 | Двовибірковий t-тест | Welch / pooled | `t.test(~)` | $p\approx 0.06$ — залежить від $\alpha$ |
+| 6 | Дві пропорції (A/B) | $z$-тест | `prop.test` | $p\approx 0.018$ — нова краща |
+
+## Головні ідеї {.smaller}
+
+1. **Невідома $\sigma$ → $t$-розподіл** з важчими хвостами; при великому $n$ зливається з нормальним.
+2. **Правильна інтерпретація CI** — про процедуру, а не про конкретний інтервал.
+3. **Вибір тесту** залежить від структури даних: одна вибірка / дві незалежні / спарені / частки.
+4. **Welch — безпечне замовчування** для двох незалежних вибірок.
+5. **Рішення залежить від $\alpha$** (задача 5): той самий $p$-value → різні висновки.
+
+## Питання? {background-color="#2166ac"}
+
+::: {style="color: white; text-align: center; font-size: 1.5em; margin-top: 2em;"}
+Дякую за увагу!
+:::
