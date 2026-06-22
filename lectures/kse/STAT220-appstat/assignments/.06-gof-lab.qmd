@@ -1,0 +1,465 @@
+---
+title: "Lab 6"
+subtitle: "Distribution Forensics: What the Mean Hides in a GreenBowl A/B Test"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+execute:
+  echo: true
+  warning: false
+---
+
+# Objective
+
+In **Lab 4** you ran a two-sample $t$-test on ARPU and recovered a business
+decision. In **Lab 5** you went one level up and *audited the criterion*
+itself with Monte Carlo. **Lab 6 is forensics: a clean $t$-test verdict is not
+enough, because the $t$-test only ever looks at the mean.**
+
+The GreenBowl experimentation platform shipped you the results of a new-menu
+A/B test, and the automated report shows a tidy $t$-test "ship / don't ship"
+line. Your job is to decide whether you can **believe** it. The lecture gave
+you a toolkit where everything reduces to one idea — **compare cumulative
+distribution functions** — and several of those tools see things the mean
+cannot:
+
+- **Shapiro–Wilk + QQ-plot** — is the metric even *normal* enough to trust the
+  $t$-test on a small sample?
+- **Two-sample Kolmogorov–Smirnov** — was the **randomization honest** (the
+  A/A guardrail on the pre-period), and did the treatment change the
+  **distribution** where the mean stayed flat?
+- **Empirical CDF** — *where* and *how* do the two groups differ?
+- **Monte Carlo** — is your own guardrail actually calibrated on skewed money
+  data?
+
+The twist, as in Labs 4–5: **you do not get to see what is wrong.** Your
+experiment is pulled live from `greenbowl_gof.py`, keyed to your student id.
+Some students received an honest experiment with a real mean lift; some
+received one where the effect is hidden in the *shape*; some received a broken
+randomization, a wave of churned users, a metric that must be analysed on the
+log scale, or a *paired* design masquerading as two independent groups. **The
+only honest way to find out which one you hold is to run the diagnostics.**
+
+You will:
+
+1. Pull your experiment and **diagnose the metric's distribution** (Shapiro +
+   QQ), deciding whether to work on the raw or the log scale.
+2. Build a small, reusable `dist_guardrail` toolkit step by step and run the
+   **A/A guardrail** (two-sample KS on the pre-period) to test whether the
+   randomization is honest.
+3. Ask whether the effect lives in the **shape**, not the mean — comparing the
+   $t$-test against KS + the ECDF on the experiment period.
+4. Run the **independence check** and, if your data are paired, redo the
+   analysis the right way (per-user differences).
+5. **Validate your guardrail with Monte Carlo** — its FPR, the minimum $n$,
+   and its power on your kind of skewed data.
+6. Deliver a one-page **forensic verdict** that a non-statistician PM can act
+   on.
+
+# General Requirements
+
+::: {.callout-important icon="false"}
+## The fixed business context (same for everyone)
+
+- **Metric:** weekly **ARPU** per user, in UAH — continuous, positive,
+  right-skewed (lognormal).
+- **Baseline:** $\mu_0 = 250$ UAH.
+- **Cohorts:** `control` = old menu, `test` = new menu. Each arm also has a
+  **pre-period** sample (`pre_control`, `pre_test`) from *before* the treatment
+  started — when, by construction, no effect can exist.
+- **Direction of interest:** we would ship only if the new menu is *better* →
+  one-sided thinking, $H_1: \mu_{\text{test}} > \mu_{\text{control}}$, but
+  distributional effects can go any way.
+- **Significance level:** $\alpha = 0.05$.
+:::
+
+::: {.callout-important icon="false"}
+## Everyone's experiment is different — on purpose
+
+Your experiment is unique to your id. It might contain a clean mean lift, an
+effect hidden in the shape, a randomization bug, zero-inflation (churn), a
+small-sample non-normal metric, or a paired design. **There is no single
+"right answer" shared across the class** — there is only the diagnosis your
+diagnostics support. Copying another student's conclusion will be obviously
+wrong for your experiment.
+:::
+
+::: {.callout-note icon="false"}
+## Report Format
+
+Submit the report in **one** of the following formats:
+
+- **Quarto → PDF** (`.qmd` → `.pdf`)
+- **Quarto → HTML** (`.qmd` → `.html`, hosted, e.g. on
+  [Quarto Pub](https://quartopub.com/),
+  [Posit Connect Cloud](https://connect.posit.cloud/))
+- **Jupyter Notebook** (`.ipynb`)
+- **Google Colab** (share the link with viewing permissions)
+
+The report must contain both code **and** narrative. Every section begins with
+a written explanation, not code.
+:::
+
+::: {.callout-warning icon="false"}
+## What you build vs. what you use ready-made
+
+The thing you **build** today is the **`dist_guardrail` toolkit**
+(`check_normality`, `same_distribution`, and the Monte-Carlo validators) —
+grown step by step from Practice 6. The **criteria** themselves you take
+ready-made: `scipy.stats.shapiro`, `scipy.stats.ks_2samp`,
+`scipy.stats.kstest`, `scipy.stats.probplot`, and
+`statsmodels.stats.proportion.proportion_confint` for the Wilson interval. You
+may **not** replace your validators with a library power/AA function — the
+simulation loop and the confidence-interval verdict must be **your own code**.
+:::
+
+::: {.callout-warning icon="false"}
+## Honour rule on the data platform
+
+`greenbowl_gof.py` contains the hidden truth in its source. **Do not read past
+the `# === instructor section ===` line, and do not call `_reveal`.** The point
+of the lab is to reach the diagnosis *by running the diagnostics*, not by
+reading the answer. Any report that names the hidden pathology from the source
+instead of demonstrating it with the toolkit scores **zero** for
+interpretation.
+:::
+
+::: {.callout-warning icon="false"}
+## Deadline
+
+📅 **June 24, 2026, 23:59**
+:::
+
+# Tasks
+
+## Get Your Experiment {#sec-data}
+
+Download `greenbowl_gof.py` (provided with the lab) into your working folder
+and load **your** experiment. Use **one** id consistently — your KSE email is
+recommended.
+
+```{python}
+#| label: load
+#| eval: false
+
+from greenbowl_gof import load_my_experiment, load_my_log, arpu_sample, BASELINE, ALPHA
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+from statsmodels.stats.proportion import proportion_confint
+
+STUDENT_ID = "your.email@kse.org.ua"   # <-- put YOUR id here
+exp = load_my_experiment(STUDENT_ID)
+
+print(exp)                                  # arm sizes
+print(f"control mean = {exp.control.mean():.1f} ₴,  test mean = {exp.test.mean():.1f} ₴")
+print(f"observed lift = {exp.test.mean() - exp.control.mean():+.1f} ₴")
+print(f"baseline = {BASELINE} ₴,  alpha = {ALPHA}")
+```
+
+::: {.border}
+1. State your `STUDENT_ID`. Report $n_{\text{control}}$, $n_{\text{test}}$, the
+   two means, and the observed **lift**
+   $\overline{\text{test}} - \overline{\text{control}}$.
+2. Plot overlaid histograms of `control` and `test`, with vertical lines at the
+   baseline $\mu_0 = 250$ and each sample mean. In one sentence, describe the
+   shape you see.
+3. Run the platform's **naive $t$-test**
+   (`scipy.stats.ttest_ind(exp.test, exp.control, equal_var=False)`) and write
+   down the "headline" verdict it would print. **This is the verdict you are
+   about to put on trial** — do not believe it yet.
+4. Confirm in one sentence that you understand the experiment's true nature is
+   **hidden**, and your task is to *diagnose* it with goodness-of-fit tools.
+:::
+
+## Is the Metric Normal? (`check_normality`) {#sec-normal}
+
+On a small sample the $t$-test relies on the **normality of the data** (a
+large $n$ is rescued by the CLT). Before trusting any mean-based verdict, the
+metric must be **checked** — and a QQ-plot shows *how* it deviates, which a
+single $p$-value hides.
+
+::: {.border}
+1. Implement **Version 1** of your toolkit,
+   `check_normality(sample, alpha=0.05)`, returning the Shapiro–Wilk $W$, its
+   $p$-value, and a human-readable verdict (mirror Practice 6).
+2. Run `check_normality` **and** a QQ-plot (`scipy.stats.probplot`) on your
+   `control` arm, on the **raw** scale and on the **log** scale
+   (`np.log`). Read the QQ-plots: where do the points leave the line?
+3. **Mind the sample size.** If your $n$ is **large** (hundreds+), do *not*
+   chase the Shapiro $p$-value — explain, in one sentence, why a normality test
+   rejects "everything" at large $n$ and why you judge normality by **QQ + the
+   CLT** here. If your $n$ is **small** (a few dozen), the test is meaningful —
+   say what it tells you.
+4. **Decide the scale.** Based on 2–3, state whether you will analyse this
+   metric on the **raw** or the **log** scale, and what changes about the
+   meaning of "the effect" if you log it (arithmetic vs. geometric mean). If
+   your sample is small, **do not stop at the QQ-plot** — a non-normal shape
+   does not by itself break the $t$-test (a balanced two-sample test is
+   surprisingly robust to skew). Treat the scale choice as a *hypothesis* and
+   confirm it in @sec-mc by checking whether the raw vs. log test is actually
+   calibrated at **your** $n$ and **your** arm balance.
+:::
+
+::: {.callout-tip icon="false"}
+## Research hook
+The log transform is the analyst's standard move for skewed money/time
+metrics. If `check_normality` flips from "reject" on the raw scale to "do not
+reject" on the log scale, that is a finding — but the QQ-plot alone does not
+prove the raw test is broken. Skew bites hardest on a **small** *and*
+**unbalanced** sample; on a balanced one the $t$-test largely shrugs it off.
+Earn the log-scale verdict with the calibration check in @sec-mc, don't assume
+it.
+:::
+
+## The A/A Guardrail: Was the Randomization Honest? (`same_distribution`) {#sec-aa}
+
+Before believing **any** effect, check that the split itself was clean: an
+honest randomization makes control and test share the **whole distribution**,
+not just the mean. This is a **homogeneity** question — the two-sample KS — and
+the right place to ask it is the **pre-period**, where no treatment effect can
+exist yet.
+
+::: {.border}
+1. Implement **Version 2**, `same_distribution(x, y, alpha=0.05)`, using
+   `scipy.stats.ks_2samp`, returning $D$, the $p$-value, and a verdict
+   (mirror Practice 6).
+2. Run it on the **pre-period**: `same_distribution(exp.pre_control,
+   exp.pre_test)`. Plot the two empirical CDFs on one axis.
+3. **Interpret as a guardrail.** A rejection on the pre-period is an alarm —
+   no effect can exist there, so it means the groups were **not** comparable to
+   begin with (a splitter / SRM-by-shape bug). State clearly: **does your
+   pre-period A/A pass or fail**, and what that means for whether the
+   experiment result can be trusted at all.
+:::
+
+::: {.callout-important icon="false"}
+## Stop-the-line rule
+If the **pre-period A/A fails**, the experiment-period comparison is
+**meaningless** until the randomization is fixed — a difference you see later
+cannot be attributed to the treatment. If it fails, say so plainly: the rest of
+your analysis becomes "here is the bug", not "here is the effect".
+:::
+
+## Does the Effect Live in the Shape, Not the Mean? {#sec-shape}
+
+The lecture's central thesis: the $t$-test answers only "**did the mean
+move?**". An effect in **variance, tails, or the share of zeros** is invisible
+to it but caught by **KS** + the **ECDF**. (Run this section only if your
+pre-period A/A from @sec-aa **passed** — otherwise note that a broken split
+makes the experiment comparison void, and treat the differences below as
+evidence of the bug, not of an effect.)
+
+::: {.border}
+1. On the **experiment period**, run **both** criteria on the same arms:
+   - the $t$-test on the mean
+     (`scipy.stats.ttest_ind(..., equal_var=False)`), and
+   - `same_distribution(exp.control, exp.test)` (KS on the whole CDF).
+   Tabulate the two $p$-values.
+2. Plot the two **empirical CDFs** of `control` vs. `test`. Annotate *where*
+   they differ (a location shift? a fan-out at the tail? a jump at zero?).
+3. **Diagnose the four possible patterns** and say which one you are in, with
+   the evidence:
+   - **$t$ rejects *and* KS rejects** → a genuine shift that also moves the
+     mean (a clean win/loss);
+   - **$t$ silent but KS rejects** → the effect is in the **shape** (variance /
+     tails / zeros), not the mean — the mean-only report would miss it;
+   - **$t$ rejects but KS does not** → a small mean shift on otherwise-identical
+     shapes (rare here);
+   - **both silent** → no detectable distributional change.
+4. **Zero-inflation probe.** Compute the **share of zero-spend users** in each
+   arm. If they differ, explain why the right tool for "share of zeros" is a
+   **$z$-test for proportions** (run it), and why an ARPU mean can stay flat
+   while users churn underneath it.
+:::
+
+## The Independence Check (Research) {#sec-paired}
+
+The two-sample KS — and the whole "two groups" framing — assumes the arms are
+**independent**. A classic A/B anti-pattern compares a metric **before** and
+**after** on the **same** users, which makes the samples dependent and the
+two-sample KS conservative and weak.
+
+::: {.border}
+1. **Check it.** Compare the user ids of the two arms: how many users appear in
+   **both** `exp.uid_control` and `exp.uid_test`
+   (`np.intersect1d`)? State whether your arms are **independent** (disjoint
+   users) or **paired** (shared users).
+2. **If independent:** confirm in one sentence that the two-sample KS in
+   @sec-aa–@sec-shape was the right tool, and move on.
+3. **If paired:** the two-sample KS was the **wrong** method. Redo the analysis
+   on the **per-user differences** $d_i = \text{after}_i - \text{before}_i$
+   (i.e. `exp.test - exp.control`, since the rows are aligned by user):
+   - run `check_normality(d)` (or on $\log$ differences) and a one-sample test
+     of $d$ against $0$;
+   - show, side by side, that the naive two-sample KS **missed** the effect
+     while the paired analysis **finds** it, and explain *why* (the shared
+     user component glues the two CDFs together).
+:::
+
+::: {.callout-tip icon="false"}
+## Research hook
+This is the part you must *discover*, not assume. Most ids are independent;
+some are not. Reporting "I checked the user ids and they are disjoint, so the
+two-sample test is valid" is a real finding — and skipping the check on a
+paired dataset is a real mistake.
+:::
+
+## Validate Your Guardrail with Monte Carlo {#sec-mc}
+
+Your KS guardrail is itself a **criterion**, so validate it as in Practice
+6 / Lab 5: does it keep the promised 5% false positives on **skewed** ARPU
+data, and **from what $n$**? Use `arpu_sample` as your "god" generator — you
+set the truth, so you always know the right answer.
+
+::: {.border}
+1. Implement `ks_fpr(gen, n, n_exps=2000, alpha=0.05, seed=...)` that runs an
+   **A/A** ($H_0$ true: both groups from the **same** `gen`) `n_exps` times and
+   returns the FPR **with** a 95% **Wilson** CI
+   (`proportion_confint(method="wilson")`).
+2. **Calibration.** Run it for `arpu_sample(250, n)` at a small, a medium, and
+   a large $n$ (e.g. 20 / 100 / 1000). Report each FPR with its CI and whether
+   $\alpha = 0.05$ is inside. Plot FPR (with the Wilson band) vs. $n$ with a
+   dashed line at $0.05$. Explain the small-$n$ behaviour you see (conservative?
+   why?).
+3. **Power for *your* effect.** Implement `ks_power(gen_c, gen_t, n, ...)` and
+   measure the power of the KS guardrail to detect an effect **like the one in
+   your experiment** (a mean shift, a shape/variance change, or a zero-spike —
+   whichever matches your diagnosis from @sec-shape). How large an $n$ would you
+   need for power $\ge 0.8$?
+4. **Real-log A/A (optional but encouraged).** Load `load_my_log(STUDENT_ID)`,
+   split each `(city, cuisine)` slice in half with an **independent** random
+   permutation (no treatment → $H_0$ true), run your `same_distribution` on
+   each, and report the A/A FPR with a Wilson CI. Does it match your synthetic
+   calibration?
+:::
+
+::: {.callout-important icon="false"}
+## Match the validation to *your* diagnosis
+The criterion you validate must be the one your verdict rests on:
+
+- **Small / skewed sample (the "new city" case):** your verdict may hinge on
+  the **$t$-test**, not KS — so validate *that*. Run the A/A FPR of the
+  $t$-test on **raw vs. log** ARPU at **your $n$ and your arm balance**
+  (`scipy.stats.ttest_ind`). On a small, *unbalanced* skewed design the raw
+  test can be miscalibrated (FPR off $\alpha$) while the log-scale test is on
+  target — that calibration gap, not just the QQ-plot, is what *justifies*
+  working on the log scale. (Note: a *balanced* raw $t$-test is far more robust
+  to skew — so check your own balance before concluding.)
+- **Paired design (shared users):** the two-sample KS is the **wrong**
+  guardrail here, so do not validate it as if it were right — validate the
+  **paired** criterion you actually used in @sec-paired (a one-sample test on
+  the differences $d_i$), and show it recovers power the naive two-sample KS
+  throws away.
+:::
+
+::: {.callout-note icon="false"}
+## Why this matters
+Whatever you conclude in @sec-aa–@sec-shape rests on the criterion being
+trustworthy at *your* sample size. If your $n$ is small and the guardrail is
+conservative there, a "pass" is weaker than it looks — say so. "Conservative"
+(FPR below $\alpha$) is **safe but underpowered**; "invalid" (FPR above
+$\alpha$) is **not**. Keep that distinction from Lab 5.
+:::
+
+## Final Forensic Verdict {#sec-final}
+
+::: {.border}
+Write a **single-page memo** (≤ 400 words) to a **non-technical** GreenBowl PM
+who has only seen the platform's headline $t$-test line. It must contain:
+
+1. The **headline $t$-test verdict** (what the automated report claimed) and
+   your **one-line forensic verdict** — one of: a real mean win/loss; an effect
+   hidden in the **shape**; a **broken randomization** (don't trust it); a
+   **churn / zero-inflation** problem under a flat mean; a metric that must be
+   read on the **log scale**; or a **paired** design analysed the wrong way.
+2. The **evidence** that forces it, quoted as numbers, not adjectives: the
+   normality decision (raw vs. log), the pre-period A/A result, the
+   $t$-vs-KS comparison with the ECDF, the independence check, and the share of
+   zeros if relevant.
+3. A concrete **recommendation**: ship / don't ship / fix the splitter / report
+   the distribution (not just the mean) / re-analyse as paired / collect more
+   data — whichever your diagnosis demands.
+4. One honest **caveat or limitation** of your own audit (e.g. KS is
+   conservative at your $n$; KS is sensitive to *everything* and does not tell
+   you whether the difference is business-significant; simulation noise at the
+   `n_exps` you used).
+
+It must be readable by someone who has never heard the words "Kolmogorov" or
+"$p$-value". You are graded on whether the PM could act on it without
+follow-up questions.
+:::
+
+# Grading {.unnumbered}
+
+| Criterion | Points |
+|---|:---:|
+| Correctness of methodology | 3 |
+| Interpretation of results | 3 |
+| Code quality and organization | 2 |
+| **Total** | **8** |
+
+::: {.callout-tip icon="false"}
+## Grading Details
+
+**Correctness of methodology (3 pts):**
+
+- `check_normality` and `same_distribution` are correct, and the
+  normality / scale decision in @sec-normal is justified by the QQ-plot and the
+  sample size (1 pt).
+- The pre-period A/A guardrail and the experiment-period $t$-vs-KS comparison
+  are run correctly with ECDF plots; the independence check in @sec-paired is
+  performed and acted on (1 pt).
+- The Monte-Carlo validation returns the FPR/power **with** a Wilson CI from a
+  correct simulation loop, and is read for calibration vs. power (1 pt).
+
+**Interpretation of results (3 pts):**
+
+- @sec-normal correctly reads the large-$n$ vs. small-$n$ normality situation
+  (CLT vs. log transform) instead of blindly trusting the Shapiro $p$-value.
+- @sec-aa–@sec-shape reach the correct diagnosis (honest split vs. SRM; mean
+  effect vs. shape effect vs. zero-inflation) with the right evidence, and the
+  independence trap is handled correctly when present.
+- The memo's forensic verdict **matches the evidence** and overturns or
+  confirms the headline $t$-test for the right reason.
+
+**Code quality and organization (2 pts):**
+
+- `check_normality`, `same_distribution`, and the Monte-Carlo validators are
+  single reusable functions used across all sections (built step by step, not
+  re-implemented inline).
+- Plots (histograms, QQ-plots, ECDFs, the FPR-vs-$n$ curve) have axis labels,
+  titles, legends, and a dashed $\alpha$ line where relevant.
+- Narrative precedes every code block; each section reads as an argument, not a
+  dump of outputs.
+:::
+
+# Defense {.unnumbered}
+
+During the defense (5–7 minutes) you will be asked *"What if?"* questions that
+probe whether you understand **why** each piece exists, for example:
+
+- *"Shapiro rejected normality on your data. Does that kill the $t$-test, or
+  not? What single thing settles it — the $p$-value or something else?"*
+- *"Your $t$-test said 'no effect' but your KS rejected. Explain to the PM, in
+  one sentence, what changed in the experiment."*
+- *"Your pre-period A/A failed. Why does that make the experiment-period result
+  meaningless, no matter how small the $p$-value there is?"*
+- *"Show me — live — how many users your two arms share. If they overlap, what
+  must you do differently, and why does the two-sample KS mislead you here?"*
+- *"Your KS guardrail's FPR came out at $0.032$ with CI $(0.026, 0.040)$ at
+  $n=20$. Is it broken, conservative, or just noisy? Which, and how do you
+  know?"*
+- *"Your ARPU mean is flat but 8% of the test group spent zero. Why is a
+  $z$-test for proportions the right tool there, and not KS?"*
+
+You may also be asked to **change one thing live** (switch raw ↔ log, swap the
+pre-period for the experiment period, shrink $n$ in the Monte-Carlo, reshuffle
+the A/A split) and explain the resulting shift.
