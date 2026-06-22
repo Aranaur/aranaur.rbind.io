@@ -1,12 +1,14 @@
 ---
-title: "$\\chi^2$"
+title: "$\\chi^2$ tests for categorical data"
 subtitle: "Applied Statistics"
 author: "Ihor Miroshnychenko"
 institute: Kyiv School of Economics
 from: markdown+emoji
-footer: "Applied Statistics"
+title-slide-attributes:
+    data-background-iframe: .06-chi_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=4049">🔗Applied Statistics</a>
 format:
-  revealjs: 
+  revealjs:
     code-line-numbers: false
     navigation-mode: vertical
     transition: fade
@@ -14,24 +16,22 @@ format:
     chalkboard: true
     logo: img/kse.png
     slide-number: true
-    # toc: true
-    # toc-depth: 1
+    toc: true
+    toc-depth: 1
     mouse-wheel: true
-    width: 1350  
+    width: 1350
     height: 759.375
-    # fig-height: 9
-    # fig-width: 16
     highlight-style: github
     fig-format: svg
+    fig-align: center
     theme: [default, custom.scss]
     mermaid:
       theme: forest
 preload-iframes: true
-execute: 
+execute:
   echo: true
   warning: false
-editor_options: 
-  chunk_output_type: console
+jupyter: python3
 
 revealjs-plugins:
   - verticator
@@ -41,540 +41,806 @@ revealjs-plugins:
 #| label: setup
 #| include: false
 
-from matplotlib import pyplot
-import numpy
-import math
-from tqdm import tqdm
-from collections import namedtuple
-
-from scipy.stats import binom, chi2, chisquare, chi2_contingency, \
-                        randint, kstest, norm, poisson
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import chi2, chisquare, chi2_contingency, binom, fisher_exact
 from statsmodels.stats.proportion import proportion_confint
 
-numpy.random.seed(42)
-
-import warnings
-warnings.filterwarnings("ignore")
-
-# Define colors
+# Define colors (shared palette across the slides)
 red_pink   = "#e64173"
 turquoise  = "#20B2AA"
 orange     = "#FFA500"
 red        = "#fb6107"
 blue       = "#181485"
-navy       = "#150E37FF"
+navy       = "#150E37"
 green      = "#8bb174"
 yellow     = "#D8BD44"
 purple     = "#6A5ACD"
 slate      = "#314f4f"
+
+# Minimal theme defaults — close to ggplot2 theme_minimal()
+plt.rcParams.update({
+    "figure.facecolor": "white",
+    "axes.facecolor":   "white",
+    "axes.edgecolor":   slate,
+    "axes.labelcolor":  slate,
+    "axes.titlesize":   13,
+    "axes.spines.top":   False,
+    "axes.spines.right": False,
+    "axes.grid":        True,
+    "grid.color":       "#dddddd",
+    "grid.alpha":       0.6,
+    "xtick.color":      slate,
+    "ytick.color":      slate,
+    "font.size":        11,
+    "legend.frameon":   False,
+})
 ```
 
-# $\chi^2$-test {.smaller}
+# Why count categories? {background-iframe=".06-chi_files/libs/colored-particles/index.html"}
 
-## {{< iconify ion dice >}} Experiment {.smaller}
+## 🎯 The questions we keep asking {.smaller}
 
-- $\mathcal{P}$ --- the distribution of probabilities of cube. 
-- $p_i$ --- the probability that $i$ faces fall out on the cube.
+The $z$-, $t$- and Kolmogorov tests all needed a **numeric** measurement. But a huge share of product data is just **counts in categories**:
 
-$$
-H_0: p_1 = p_2 = p_3 = p_4 = p_5 = p_6 = \frac{1}{6}
-$$
+- which weekday a user signed up on,
+- which subscription plan they chose,
+- how many sessions they had this week (0, 1, 2, 3+).
 
-$$
-H_1: H_0\text{ incorrect}
-$$
+. . .
 
-- $n$ --- the number of experiments, $n = 60$.
+Three flavours of the **same** question — *do the observed counts match what we expected?*
 
-|$a_i$| {{< iconify mdi dice-1 >}} | {{< iconify mdi dice-2 >}} | {{< iconify mdi dice-3 >}} | {{< iconify mdi dice-4 >}} | {{< iconify mdi dice-5 >}} | {{< iconify mdi dice-6 >}} |
-|---|---|---|---|---|---|---|
-|$n_i$|5|8|9|8|10|20|
+- **Goodness-of-fit:** does one categorical variable follow a *known* distribution?
+- **Independence:** are *two* categorical variables related?
+- **Homogeneity:** do *several groups* share the same category distribution?
 
-<center>🤔</center>
-
-## Statistics
-
-- We have [empirical frequencies]{.hi} $n_i$ and [theoretical probabilities]{.hi-slate} $p_i$.
-- We need to compare them.
-
-$$
-\sum_i\frac{\left( \frac{n_i}{n}-p_i \right) ^2}{p_i}
-$$
-
-## Statistics distribution {.tiny}
-
-Consider the simplest case: when we have only two elementary outcomes $a_1$ and $a_2$ with probabilities $p_1 = p$ and $p_2 = 1 - p$ respectively:
-
-:::: {.columns}
-
-::: {.column width="40%"}
-$$\sum_{i=1}^{2}\frac{\left(\frac{n_i}{n}-p_i\right)^2}{p_i} = $$
-
-$$= \frac{\left(\frac{n_1}{n}-p\right)^2}{p} + \frac{\left(\frac{n - n_1}{n} - (1 - p)\right)^2}{1 - p} = $$
-
-$$= \frac{\left(\frac{n_1}{n}-p\right)^2 (1-p)+ \left(\frac{n_1}{n} - p\right)^2 p}{p (1 - p)} = $$ 
-
-$$= \frac{(n_1-n p)^2}{p (1 - p) n^2} \stackrel{[1]}{\sim} $$
-
-$$ \sim \frac{\left(Binom(n, p)-n p\right)^2}{p (1 - p) n^2}  \stackrel{[2]}{\sim}$$
-
-$$ \sim \frac{\left(\mathcal{N}\left(np, np(1-p)\right) - n p\right)^2}{p (1 - p) n^2} \stackrel{[3]}{=} $$
-
-$$ = \frac{\mathcal{N}(0, 1)^2}{n}$$
+::: {.notes}
+Усі попередні критерії (z, t, Колмогоров) вимагали ЧИСЛОВОГО виміру. Але величезна частка продуктових даних — це просто підрахунки за категоріями: день тижня реєстрації, обраний тариф, кількість сесій. Сьогодні — інструмент саме для такого. Три різновиди одного питання: чи спостережувані частоти збігаються з очікуваними. Goodness-of-fit — одна змінна проти відомого розподілу; незалежність — дві змінні пов'язані?; однорідність — кілька груп мають однаковий розподіл за категоріями. Усе зведеться до однієї статистики.
 :::
 
-::: {.column width="60%"}
+## 🎧 Our running case: a streaming-app growth team {.smaller}
 
-<br><br>
-1. We see that the only random variable in the expression is $n_1$. If the null hypothesis is true, it is distributed according to the binomial law as $Binom(n, p)$.
+A music-streaming startup. The growth team brings three categorical questions:
 
-2. Recall the CLT: for large $n$, a random variable distributed as $Binom(n, p)$ is equivalent to a normal distribution $\mathcal{N}\left(np, \sqrt{np(1-p)}\right)$.
+1. New signups arrive every day — **are they spread evenly across weekdays**, or is some day special? → *goodness-of-fit*.
+2. Is a user's **engagement level** (visits per month) **independent** of how long they've been registered? → *independence*.
+3. A new onboarding flow is A/B-tested — does it **change the mix** of plans users pick? → *homogeneity*.
 
-3. Using the property of normal distribution $N(a, b) = a + \sqrt b \mathcal{N}(0,1)$, we realize that our statistic is distributed as $\frac{\mathcal{N}(0, 1)^2}{n}$.
+. . .
 
-$$\tau = n\sum_{i=1}^{2}\frac{(\frac{n_i}{n}-p)^2}{p} \sim \mathcal{N}(0, 1)^2$$
+One idea behind all three: [compare observed counts $O$ with expected counts $E$]{.hi}.
 
-Recall that the standard normal distribution's square is equivalent to a $\chi^2$ distribution with one degree of freedom: $\chi^2_{1}$.
+$$
+\tau = \sum_{\text{cells}} \frac{(O - E)^2}{E}.
+$$
 
-$$\tau = n\sum_{i=1}^k\frac{(\frac{n_i}{n}-p_i)^2}{p_i}  \sim \chi^2_{k-1}$$
-
+::: {.notes}
+Наскрізний кейс на всю лекцію — growth-команда стримінгового застосунку, три категоріальні питання: (1) чи рівномірно реєстрації за днями тижня — узгодженість; (2) чи незалежний рівень активності від давності реєстрації — незалежність; (3) чи змінює новий онбординг розподіл обраних тарифів — однорідність. Під капотом усе зведеться до однієї статистики: сума по клітинках (O−E)²/E, де O — спостережені частоти, E — очікувані за гіпотезою. Велика сума → дані далеко від гіпотези.
 :::
 
-::::
+# Goodness-of-fit test {background-iframe=".06-chi_files/libs/colored-particles/index.html"}
 
-[Proof](https://arxiv.org/pdf/1808.09171.pdf)
+## 🎲 Intuition: is the die fair? {.smaller}
 
-## $\chi^2$ Distribution {.smaller}
+Before signups, the textbook intuition — a die rolled $n = 60$ times.
+
+$$
+H_0: p_1 = p_2 = \dots = p_6 = \tfrac{1}{6}
+\qquad\text{vs.}\qquad
+H_1: H_0 \text{ is false}.
+$$
 
 ```{python}
-#| label: chi2_distribution
-#| echo: false
+#| label: die-observed-expected
+#| code-fold: true
 #| fig-align: center
 
-x_axis = numpy.arange(start=0.001, stop=10, step=0.001)
+faces    = np.arange(1, 7)
+observed = np.array([5, 8, 9, 8, 10, 20])
+n        = observed.sum()
+expected = np.full(6, n / 6)            # 10 per face under H0
 
-pyplot.figure(figsize=(16, 8))
-
-pyplot.plot(x_axis, chi2.pdf(x=x_axis, df=1), red_pink, 
-            linewidth=2.0, label='df = 1')
-pyplot.plot(x_axis, chi2.pdf(x=x_axis, df=2), blue,
-            linewidth=2.0, label='df = 2')
-pyplot.plot(x_axis, chi2.pdf(x=x_axis, df=3), slate,
-            linewidth=2.0, label='df = 3')
-pyplot.plot(x_axis, chi2.pdf(x=x_axis, df=5), green, 
-            linewidth=2.0, label='df = 5')
-pyplot.plot(x_axis, chi2.pdf(x=x_axis, df=10), orange,
-            linewidth=2.0, label='df = 10')
-
-pyplot.gca().set_ylim(bottom=0, top=1)
-
-pyplot.legend(loc='best', frameon=True)
-pyplot.title("chi-squared distribution pdf")
-pyplot.xlabel("x")
-pyplot.ylabel("p")
-
-pyplot.show()
+fig, ax = plt.subplots(figsize=(10, 4.2))
+ax.bar(faces - 0.18, observed, width=0.36, color=red_pink, label="observed $O$")
+ax.bar(faces + 0.18, expected, width=0.36, color=slate,   label="expected $E$")
+ax.set_title("A die rolled 60 times"); ax.set_xlabel("face"); ax.set_ylabel("count")
+ax.set_xticks(faces); ax.legend()
+plt.tight_layout()
+plt.show()
 ```
 
-## Algorithm {.smaller}
+Face **6** shows up far more often than $H_0$ predicts. Is that surprising, or just luck?
 
-1. Fix a significance level of $\alpha$.
-2. Fix the discrete distribution $\mathcal{P}$, for which we want to test our sample.
-3. Record the sample with $k$ outcomes in a frequency table.
-4. If the number <5 (or <10 in the case of frequency table 2x1) is in a cell of the table, then combine the outcomes until this condition is met.
-5. Calculate the statistics $$\tau = n\sum_{i=1}^k\frac{\left(\frac{n_i}{n}-p_i\right)^2}{p_i},$$
-where $n$ is the sample size, $k$ is the number of different outcomes, $n_i$ is the number of occurrences of outcome $i$, $p_i$ is the probability of outcome $i$ according to the distribution $\mathcal{P}$.
-6. Consider $\it{\text{p-value}}$ as $P(X \geq \tau)$, where $X \sim \chi^2_{k-1}$.
-7. If $\it{\text{p-value}} \leq \alpha$, then we reject the hypothesis.
+::: {.notes}
+Класична інтуїція перед бізнес-кейсом — кубик, кинутий 60 разів. H0: усі грані рівноймовірні (по 1/6), тобто очікувано по 10 на грань. На графіку: рожеві стовпчики — спостережено, сірі — очікувано. Грань «6» випала 20 разів замість ~10. Питання критерію: це здивування чи звичайна випадковість? Щоб відповісти, потрібна одна міра відхилення спостереженого від очікуваного.
+:::
 
-## Experiment and $\chi^2$-test {.smaller}
+## 📊 The $\chi^2$ statistic {.smaller}
 
-n = 60
+We have **empirical frequencies** $n_i$ and **theoretical probabilities** $p_i$. Measure the total mismatch:
 
-|$a_i$| {{< iconify mdi dice-1 >}} | {{< iconify mdi dice-2 >}} | {{< iconify mdi dice-3 >}} | {{< iconify mdi dice-4 >}} | {{< iconify mdi dice-5 >}} | {{< iconify mdi dice-6 >}} |
-|---|---|---|---|---|---|---|
-|$n_i$|5|8|9|8|10|20|
+$$
+\tau = n\sum_{i=1}^{k}\frac{\left(\frac{n_i}{n}-p_i\right)^2}{p_i}
+     = \sum_{i=1}^{k}\frac{(O_i - E_i)^2}{E_i},
+\qquad E_i = n\,p_i.
+$$
 
-$$H_0: p_1 = p_2 = p_3 = p_4 = p_5 = p_6 = \frac{1}{6}$$
+. . .
 
-$$\tau = 60\sum_{i=1}^6\frac{\left(\frac{n_i}{60}-\frac{1}{6}\right)^2}{\frac{1}{6}} = 13.4$$
+::: {.callout-note icon=false}
+Each term is a **squared, standardized** gap between observed and expected. Dividing by $E_i$ puts rare and common categories on the same scale — a gap of 5 means more for an expected count of 10 than for 1000.
+:::
 
-$p$-value = $P(X \geq 13.4)$ = `{python} 1 - chi2.cdf(13.4, df=5)`
+::: {.notes}
+Будуємо міру: для кожної категорії беремо (спостережено − очікувано)², ділимо на очікувано і сумуємо. Ділення на E_i — ключове: воно стандартизує, ставить рідкісні й часті категорії на одну шкалу (розрив 5 при очікуваних 10 важить більше, ніж при 1000). Дві еквівалентні форми: через частки n_i/n і ймовірності p_i, або коротко Σ(O−E)²/E. Далі — який розподіл має ця статистика при H0.
+:::
 
-# $\chi^2$-test for Independence
-
-## Task
-
-> We have decided to conduct a study to **understand** our user **profile** better.
-
-> As part of this research, we will study user **activity** regarding **how long** a user has used our products.
-
-> The goal is to determine whether an [active user's frequent visits]{.hi} to the site are **independent** of [how long the user has been registered]{.hi-slate}.
-
-## Metrics {.smaller}
+## 🧮 Where does $\chi^2$ come from? {.tiny}
 
 :::: {.columns}
 
-::: {.column width="50%"}
-We will consider the number of visits to the site by the user as a discrete random variable $\eta$, which takes the following values:
+::: {.column width="48%"}
+Take the simplest case — two outcomes, $p_1 = p$, $p_2 = 1-p$:
 
-- $<10$ visits (with probability $q_1$);
-- $10-20$ visits (with probability $q_2$);
-- $20-30$ visits (with probability $q_3$);
-- $30+$ visits (with probability $q_4$).
+$$\tau = \frac{(n_1 - np)^2}{p(1-p)\,n} \stackrel{[1]}{\sim} \frac{(\text{Binom}(n,p)-np)^2}{p(1-p)\,n}$$
+
+$$\stackrel{[2]}{\sim} \frac{\left(\mathcal{N}(np,\,np(1-p)) - np\right)^2}{p(1-p)\,n} \stackrel{[3]}{=} \mathcal{N}(0,1)^2$$
 :::
 
-::: {.column width="50%"}
-Let's consider the user registration period as a discrete random variable $\psi$, taking values:
+::: {.column width="52%"}
+1. The only random quantity is $n_1$; under $H_0$ it is $\text{Binom}(n,p)$.
+2. **CLT:** for large $n$, $\text{Binom}(n,p) \approx \mathcal{N}\!\big(np,\,np(1-p)\big)$.
+3. Standardising gives $\mathcal{N}(0,1)$, and the square of a standard normal is a $\chi^2$ with **one** degree of freedom.
 
-- $<1$ years (with probability $p_1$);
-- $1-2$ years (with probability $p_2$);
-- $2-3$ years (with probability $p_3$);
-- $3-4$ years (with probability $p_4$);
-- $4-5$ years (with probability $p_5$);
-- $5+$ years (with probability $p_6$).
+$$\tau \sim \chi^2_1 \;\Longrightarrow\; \tau = \sum_{i=1}^{k}\frac{(O_i-E_i)^2}{E_i} \sim \chi^2_{k-1}.$$
 :::
 
 ::::
 
-$$H_0: \text{ random variables } \eta \text{ and } \psi \text{ are independent}$$
+[Full proof](https://arxiv.org/pdf/1808.09171.pdf) · $k$ categories → $k-1$ degrees of freedom (the counts must sum to $n$).
 
-## Contingency table {.tiny}
+::: {.notes}
+Звідки χ²? Розглядаємо найпростіший випадок — дві категорії. Алгебра зводить статистику до (n₁−np)²/(p(1−p)n). Далі три кроки: [1] єдина випадкова величина n₁ при H0 біноміальна; [2] ЦГТ — біном ≈ нормальний; [3] стандартизуємо й отримуємо квадрат стандартного нормального, тобто χ² з одним ступенем свободи. Для k категорій узагальнюється до χ² з k−1 ступенями: один ступінь «з'їдає» умова, що частоти сумуються в n. Деталі — за посиланням; студентам важлива логіка, не повне доведення.
+:::
 
-| |$$<1 \text{ years}$$|$$1 - 2 \text{ years}$$|$$2-3 \text{ years}$$|$$3-4 \text{ years}$$|$$4-5 \text{ years}$$|$$5+ \text{ years}$$|
-|---|---|---|---|---|---|---|
-|$\leq 9 \text{ visits}$|$n_{11}$|$n_{12}$|$n_{13}$|$n_{14}$|$n_{15}$|$n_{16}$|
-|$10-19 \text{ visits}$|$n_{21}$|$n_{22}$|$n_{23}$|$n_{24}$|$n_{25}$|$n_{26}$|
-|$20-29 \text{ visits}$|$n_{31}$|$n_{32}$|$n_{33}$|$n_{34}$|$n_{35}$|$n_{36}$|
-|$30+ \text{ visits}$|$n_{41}$|$n_{42}$|$n_{43}$|$n_{44}$|$n_{45}$|$n_{46}$|
-
-<br>
-
-| |$$<1 \text{ years}$$|$$1 - 2 \text{ years}$$|$$2-3 \text{ years}$$|$$3-4 \text{ years}$$|$$4-5 \text{ years}$$|$$5+ \text{ years}$$|
-|---|---|---|---|---|---|---|
-|$\leq 9 \text{ visits}$|932299|680684|794884|585978|470660|397554|
-|$10-19 \text{ visits}$|490658|519094|648085|416680|347016|315555|
-|$20-29 \text{ visits}$|223166|347325|306182|219092|254512|237701|
-|$30+ \text{ visits}$|204310|426824|277656|127961|237965|220446|
-
-$$H_0: P\left(\it{\text{get into cell } (i,j)}\right) = q_i p_j\text{, for any }i,j$$
-
-## How do we estimate the parameters? {.tiny}
-
-$$p_1 = \frac{n_{11} + n_{21} + n_{31} + n_{41}}{n}$$
-
-$$\cdots$$
-
-$$p_6 = \frac{n_{16} + n_{26} + n_{36} + n_{46}}{n}$$
-
-$$q_1 = \frac{n_{11} + n_{12} + n_{13} + n_{14} + n_{15} + n_{16}}{n}$$
-
-$$\cdots$$
-
-$$q_4 = \frac{n_{41} + n_{42} + n_{43} + n_{44} + n_{45} + n_{46}}{n},$$
-
-where $n = \sum n_{ij}$.
-
-$$\tau = n\sum_{i=1, j=1}^{i=m, j=k}\frac{\left(\frac{n_{ji}}{n}-q_i p_j\right)^2}{q_i p_j} \sim \chi^2_{mk-(m-1)-(k-1)-1} = \chi^2_{(m-1)(k-1)},$$
-
-where $m$ is the number of samples, $k$ is the number of outcomes in them, and $q_i$ and $p_i$ are estimated as described above.
-
-## Algorithm {.smaller}
-
-1. Fix a significance level of $\alpha$.
-2. Record $m$ samples with $k$ outcomes in a contingency table.
-3. If a cell in the table contains a number <5 (or <10 for contingency table 2x2), then we combine the outcomes until this condition is met.
-4. Calculate the statistic $$\tau = n\sum_{i=1, j=1}^{i=m, j=k}\frac{\left(\frac{n_{ji}}{n}-q_i p_j\right)^2}{q_i p_j} = \sum \frac{(O - E)^2}{E},$$
-where $m$ is the number of samples, $k$ is the number of outcomes in them, and $q_i$ and $p_i$ are estimated as described above.
-5. We compute *p-value* as $P(X \geq \tau)$, where $X \sim \chi^2_{(m-1)(k-1)}$.
-6. If *p-value* $\leq \alpha$, we reject the hypothesis.
-
-## Experiment and $\chi^2$-test {.tiny}
-
-| |$$<1 \text{ years}$$|$$1 - 2 \text{ years}$$|$$2-3 \text{ years}$$|$$3-4 \text{ years}$$|$$4-5 \text{ years}$$|$$5+ \text{ years}$$|
-|---|---|---|---|---|---|---|
-|$\leq 9 \text{ visits}$|932299|680684|794884|585978|470660|397554|
-|$10-19 \text{ visits}$|490658|519094|648085|416680|347016|315555|
-|$20-29 \text{ visits}$|223166|347325|306182|219092|254512|237701|
-|$30+ \text{ visits}$|204310|426824|277656|127961|237965|220446|
+## 📈 The $\chi^2$ distribution {.smaller}
 
 ```{python}
-#| include: false
+#| label: chi2-distribution
+#| code-fold: true
+#| fig-align: center
 
-table = [[932299, 680684, 794884, 585978, 470660, 397554], [490658, 519094, 648085, 416680, 347016, 315555], [223166, 347325, 306182, 219092, 254512, 237701], [204310, 426824, 277656, 127961, 237965, 220446]]
+x = np.linspace(0.001, 15, 1000)
+
+fig, ax = plt.subplots(figsize=(11, 4.6))
+for df, c in [(1, red_pink), (2, blue), (3, slate), (5, green), (10, orange)]:
+    ax.plot(x, chi2.pdf(x, df=df), color=c, lw=2.2, label=f"df = {df}")
+ax.set_ylim(0, 0.5)
+ax.set_title(r"$\chi^2$ probability density"); ax.set_xlabel("x"); ax.set_ylabel("density")
+ax.legend()
+plt.tight_layout()
+plt.show()
 ```
 
-<br>
+Right-skewed, lives on $[0, \infty)$, and **shifts right** as the degrees of freedom grow.
 
-$\chi^2$ = `{python} chi2_contingency(table)[0]`
+::: {.notes}
+Сімейство χ² для різних ступенів свободи. Ключові риси: визначений лише на невід'ємних значеннях (статистика — сума квадратів), скошений вправо, із ростом df зсувається праворуч і стає більш симетричним (наближається до нормального). Саме за цим розподілом рахуємо p-value: чим більша статистика, тим далі у правому хвості, тим менший p. Потрібен правильний df — для goodness-of-fit це k−1.
+:::
 
-$p$-value = `{python} chi2_contingency(table)[1]`
+## 🧭 Algorithm {.smaller}
 
-df = `{python} chi2_contingency(table)[2]`
+1. Fix a significance level $\alpha$.
+2. Fix the discrete distribution $\mathcal{P}$ you want to test the sample against.
+3. Record the sample of $k$ outcomes in a **frequency table**.
+4. If any **expected** cell count is $< 5$ (or $< 10$ for a $2\times1$ table), **merge** categories until the rule holds.
+5. Compute $\tau = \sum_{i=1}^k \dfrac{(O_i - E_i)^2}{E_i}$.
+6. The $p$-value is $P(X \geq \tau)$ with $X \sim \chi^2_{k-1}$.
+7. Reject $H_0$ if $p\text{-value} \leq \alpha$.
 
-We see that the hypothesis is rejected at the significance level of $5\%$: we cannot consider the frequency of site visits by an active user to be independent of the year of registration. 
+::: {.notes}
+Покроковий рецепт goodness-of-fit. Зверніть особливу увагу на крок 4 — правило очікуваних частот ≥5: χ² спирається на нормальне наближення (ЦГТ), яке ламається на малих очікуваних частотах. Якщо клітинка занадто рідкісна — об'єднуємо категорії. Решта механічна: рахуємо статистику, беремо праву хвостову ймовірність χ² з k−1 ступенями, порівнюємо з α. df тут саме k−1, а не k.
+:::
 
-# $\chi^2$-test for Homogeneity
+## 🎲 Back to the die {.smaller}
 
-## Task {.smaller}
+```{python}
+#| label: die-chisquare
 
-> We want to test the **effect of the drug** on the incidence of **syncope** in patients. 
+# chisquare() compares observed counts to a uniform expectation by default
+res = chisquare(observed)
+k   = len(observed)
 
-> The first sample is the frequency of syncope in the **control group** (a set of patients who received placebo). 
+print(f"chi2      = {res.statistic:.2f}")
+print(f"df        = {k - 1}")
+print(f"p-value   = {res.pvalue:.4f}")
+print("reject H0" if res.pvalue < 0.05
+      else "keep H0")
+```
 
-> The second sample is the rate of syncope in the **test group** (the set of patients who were given the drug). 
+. . .
 
-> We need to test whether the **drug** administered affects the **frequency of syncope**?
+$\chi^2 = 13.4$ on $5$ df gives $p\text{-value} = P(X \geq 13.4) =$ `{python} round(float(1 - chi2.cdf(13.4, df=5)), 4)`. At $\alpha = 5\%$ we **reject** fairness — face 6 was too much.
 
-## Frequencies table {.tiny}
+::: {.notes}
+Застосовуємо до кубика. scipy.stats.chisquare за замовчуванням порівнює спостережені частоти з рівномірним розподілом — рівно наш H0. Отримуємо χ²≈13.4, df=5, p≈0.02 < 0.05 → відхиляємо гіпотезу про чесність кубика. Тобто грань «6» справді випадала надто часто, це не випадковість. Підкреслити: один рядок коду, але за ним уся побудована теорія.
+:::
 
-| |$$0 $$|$$1 $$|$$2 $$|$${3+}$$|
+## 🎧 Apply: signups by weekday {.smaller}
+
+Are 700 new signups spread evenly across the week, or do weekends spike?
+
+```{python}
+#| label: signups-gof
+#| output-location: column
+
+days    = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+signups = np.array([92, 88, 95, 90, 110, 130, 95])
+
+res = chisquare(signups)        # H0: uniform over 7 days
+print(f"n         = {signups.sum()}")
+print(f"chi2      = {res.statistic:.2f}")
+print(f"df        = {len(days) - 1}")
+print(f"p-value   = {res.pvalue:.4f}")
+```
+
+```{python}
+#| label: signups-plot
+#| code-fold: true
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(6.6, 3.0))
+ax.bar(days, signups, color=turquoise, label="observed")
+ax.axhline(signups.mean(), color=red_pink, ls="--", lw=2, label="expected (uniform)")
+ax.set_ylabel("signups"); ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+The weekend bump pushes $p$ below $5\%$ → signups are **not** uniform. Schedule campaigns accordingly.
+
+::: {.notes}
+Перший бізнес-вихід: 700 реєстрацій за тиждень. H0 — рівномірно по 7 днях (по 100). chisquare ловить сплеск у п'ятницю–суботу, p<0.05 → відхиляємо рівномірність. Практичний висновок для growth-команди: трафік не рівномірний, кампанії й бюджет варто планувати під вихідні. Той самий критерій, що й для кубика, лише замість граней — дні тижня. Це і є сила узагальнення.
+:::
+
+## ⚠️ The expected-count rule {.smaller}
+
+::: {.callout-important icon=false}
+The $\chi^2$ approximation relies on the CLT, which **breaks for rare categories**. Rule of thumb: every **expected** count should be $\geq 5$.
+:::
+
+If, say, "Sun" had an expected count of 2, you would **merge** it with a neighbour, or switch to an **exact** test (`scipy.stats.fisher_exact` for $2\times2$, or a Monte-Carlo $p$-value).
+
+. . .
+
+Note the rule is about **expected** counts $E_i$, not the observed ones — a category can be empty in the sample yet still have a large $E_i$.
+
+::: {.notes}
+Найчастіша помилка студентів — правило стосується ОЧІКУВАНИХ частот, а не спостережених. χ² — асимптотичний критерій (через ЦГТ), і на рідкісних категоріях наближення χ² погане, p-value перекошений. Тому: усі E_i ≥ 5; якщо ні — об'єднуємо категорії або беремо точний критерій (Фішера для 2×2, або Монте-Карло p-value). Спостережена клітинка може бути нульовою — це нормально, поки очікувана достатньо велика.
+:::
+
+## 🧪 Does the test hold its promises? {.smaller}
+
+Same Monte-Carlo habit as for the $t$- and KS-tests: simulate, count rejections, add a Wilson CI.
+
+```{python}
+#| label: gof-mc-fn
+#| output-location: column
+
+def gof_rejection_rate(p_true, p_null, n, n_exps=2000,
+                       alpha=0.05, seed=1):
+    """Goodness-of-fit chi-square via Monte Carlo.
+
+    p_true == p_null -> H0 true  -> the rate is the FPR.
+    p_true != p_null -> H1 true  -> the rate is the power.
+    """
+    rng, rej = np.random.default_rng(seed), 0
+    p_null = np.asarray(p_null)
+    for _ in range(n_exps):
+        counts = rng.multinomial(n, p_true)
+        rej += chisquare(counts, f_exp=n * p_null).pvalue <= alpha
+    ci = proportion_confint(rej, n_exps, alpha=0.05, method="wilson")
+    return rej / n_exps, ci
+
+uniform = np.full(6, 1 / 6)
+fpr, ci = gof_rejection_rate(uniform, uniform, n=60)
+print(f"FPR (fair die, n=60): {fpr:.3f}")
+print(f"95% CI: ({ci[0]:.3f}, {ci[1]:.3f})")
+```
+
+::: {.callout-note icon=false}
+At $n=60$ the FPR already sits on $\alpha$ — the $\chi^2$ approximation is well calibrated even on a small sample, as long as expected counts $\geq 5$ (here $10$).
+:::
+
+::: {.notes}
+Перевикористовуємо звичку валідувати критерій Монте-Карло — як для t- і KS-тестів. Функція gof_rejection_rate: тисячі разів генерує частоти з мультиноміального розподілу, проганяє chisquare і рахує частку відхилень + інтервал Уілсона. Однакові ймовірності p_true=p_null → H0 вірна → міряємо FPR. На чесному кубику при n=60 FPR уже лягає на 5% — χ²-наближення добре каліброване навіть на малій вибірці, поки очікувані частоти ≥5 (тут по 10). Тобто правило ≥5 — це саме та межа, за якою критерій тримає обіцянку.
+:::
+
+## 🧪 Power: catching a loaded die {.smaller}
+
+A subtly loaded die — face 6 has probability $0.20$ instead of $\tfrac{1}{6}$. How large a sample do we need to notice?
+
+```{python}
+#| label: gof-power
+#| code-fold: true
+#| fig-align: center
+
+loaded = np.array([0.12, 0.17, 0.17, 0.17, 0.17, 0.20])   # sums to 1
+sizes  = np.array([30, 60, 120, 240, 480, 960])
+tpr, lo, hi = [], [], []
+for nn in sizes:
+    r, (l, h) = gof_rejection_rate(loaded, uniform, n=int(nn))
+    tpr.append(r); lo.append(l); hi.append(h)
+
+fig, ax = plt.subplots(figsize=(11, 4.4))
+ax.plot(sizes, tpr, color=red_pink, lw=2.5, marker="o", label="power (TPR)")
+ax.fill_between(sizes, lo, hi, color=turquoise, alpha=0.3, label="95% CI")
+ax.axhline(0.8, color=slate, ls="--", lw=2, label="80% gold standard")
+ax.set_ylim(0, 1)
+ax.set_xlabel("number of rolls n"); ax.set_ylabel("power")
+ax.set_title("Power of the goodness-of-fit test vs sample size"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+A small distortion needs a **large** sample to be caught reliably — the same power–sample-size trade-off as every other test.
+
+::: {.notes}
+Тепер кубик трохи підроблений: грань «6» має ймовірність 0.20 замість 1/6, решта злегка занижені. Потужність росте з кількістю кидків і лише на кількох сотнях перетинає золотий стандарт 80%. Мораль та сама, що в усіх критеріях: маленьке відхилення вимагає ВЕЛИКОЇ вибірки, щоб його надійно зловити. Це місток до планування розміру вибірки — знаючи очікуваний ефект, підбираємо n під потрібну потужність.
+:::
+
+# Test of independence {background-iframe=".06-chi_files/libs/colored-particles/index.html"}
+
+## 🔗 The task {.smaller}
+
+> The growth team wants to understand the **user profile** better.
+
+> We study **engagement** — how many times a month a user visits — against **how long** they have been registered.
+
+> Question: is an [active user's visit frequency]{.hi} **independent** of [how long they have been registered]{.hi-slate}?
+
+. . .
+
+Two categorical variables on the **same** users → a **contingency table**.
+
+::: {.notes}
+Друге питання кейсу: вивчаємо профіль користувача — зв'язок між активністю (скільки відвідувань на місяць) і давністю реєстрації. Питання незалежності: чи частота візитів активного користувача не залежить від того, скільки він уже зареєстрований? Це ДВІ категоріальні змінні, виміряні на ТИХ САМИХ користувачах — тому дані лягають у таблицю спряженості (contingency table), а не в один частотний ряд.
+:::
+
+## 📋 The contingency table {.smaller}
+
+$\eta$ = visits per month; $\psi$ = registration tenure. We count users in each combination.
+
+| visits \\ tenure | $<1$y | $1\text{–}2$y | $2\text{–}3$y | $3\text{–}4$y | $4\text{–}5$y | $5\text{+}$y |
+|---|---|---|---|---|---|---|
+| $\leq 9$   | 932299 | 680684 | 794884 | 585978 | 470660 | 397554 |
+| $10\text{–}19$ | 490658 | 519094 | 648085 | 416680 | 347016 | 315555 |
+| $20\text{–}29$ | 223166 | 347325 | 306182 | 219092 | 254512 | 237701 |
+| $30\text{+}$   | 204310 | 426824 | 277656 | 127961 | 237965 | 220446 |
+
+$$
+H_0: P\big(\text{cell }(i,j)\big) = q_i\, p_j \quad\text{for all } i, j
+\qquad\text{(visits } \perp \text{ tenure).}
+$$
+
+::: {.notes}
+Таблиця спряженості: рядки — рівень активності (≤9, 10–19, 20–29, 30+ візитів), стовпці — давність реєстрації (від <1 до 5+ років), у клітинках — кількість користувачів. H0 незалежності каже: ймовірність потрапити в клітинку (i,j) дорівнює добутку маргінальних ймовірностей q_i·p_j — тобто рядок і стовпець не «знають» один про одного. Якщо так, очікувані частоти легко порахувати з маргінальних сум.
+:::
+
+## 🧩 Expected counts under independence {.smaller}
+
+If the variables are independent, the expected probability of a cell is the **product of marginals**:
+
+$$
+\hat{p}_j = \frac{\text{column }j\text{ total}}{n}, \qquad
+\hat{q}_i = \frac{\text{row }i\text{ total}}{n}, \qquad
+E_{ij} = n\,\hat{q}_i\,\hat{p}_j = \frac{(\text{row}_i)(\text{col}_j)}{n}.
+$$
+
+. . .
+
+Estimating $m$ row + $k$ column probabilities (each set sums to 1) costs degrees of freedom:
+
+$$
+\text{df} = mk - (m-1) - (k-1) - 1 = (m-1)(k-1).
+$$
+
+::: {.notes}
+Як знайти очікувані частоти, не знаючи q_i і p_j? Оцінюємо їх з маргінальних сум: частка стовпця і частка рядка. Тоді E_ij = (сума рядка × сума стовпця)/n — знайома формула. За ступені свободи: маємо mk клітинок, але оцінили (m−1) незалежних рядкових і (k−1) стовпцевих ймовірностей плюс загальне обмеження — лишається (m−1)(k−1). Для таблиці 4×6 це 15 ступенів свободи. Це df, з яким беремо χ² хвіст.
+:::
+
+## 🧭 Algorithm {.smaller}
+
+1. Fix a significance level $\alpha$.
+2. Record the two variables in an $m \times k$ contingency table.
+3. If any **expected** cell count is $< 5$ (or $< 10$ for a $2\times2$ table), merge categories.
+4. Compute
+$$
+\tau = \sum_{i,j}\frac{(O_{ij} - E_{ij})^2}{E_{ij}}, \qquad E_{ij}=\frac{(\text{row}_i)(\text{col}_j)}{n}.
+$$
+5. The $p$-value is $P(X \geq \tau)$ with $X \sim \chi^2_{(m-1)(k-1)}$.
+6. Reject $H_0$ if $p\text{-value} \leq \alpha$.
+
+::: {.notes}
+Алгоритм майже той самий, що й для узгодженості — змінюється лише спосіб рахувати очікувані частоти (з маргіналів) і ступені свободи ((m−1)(k−1) замість k−1). Те саме правило ≥5 на очікувані клітинки. Та сама статистика Σ(O−E)²/E і та сама права хвостова ймовірність χ². Тобто незалежність — це goodness-of-fit, де «відома» гіпотеза будується з самих даних через незалежність.
+:::
+
+## 🎧 Run the test {.tiny}
+
+```{python}
+#| label: independence-test
+#| output-location: column
+
+table = np.array([
+    [932299, 680684, 794884, 585978, 470660, 397554],
+    [490658, 519094, 648085, 416680, 347016, 315555],
+    [223166, 347325, 306182, 219092, 254512, 237701],
+    [204310, 426824, 277656, 127961, 237965, 220446],
+])
+
+chi2_stat, p, dof, expected = chi2_contingency(table)
+print(f"chi2    = {chi2_stat:,.0f}")
+print(f"df      = {dof}")
+print(f"p-value = {p:.3g}")
+```
+
+. . .
+
+```{python}
+#| label: residuals
+#| code-fold: true
+#| fig-align: center
+
+resid = (table - expected) / np.sqrt(expected)   # standardized residuals
+
+fig, ax = plt.subplots(figsize=(6.6, 3.2))
+im = ax.imshow(resid, cmap="RdBu_r", vmin=-40, vmax=40, aspect="auto")
+ax.set_xticks(range(6)); ax.set_xticklabels(["<1", "1-2", "2-3", "3-4", "4-5", "5+"])
+ax.set_yticks(range(4)); ax.set_yticklabels(["<=9", "10-19", "20-29", "30+"])
+ax.set_xlabel("tenure (years)"); ax.set_ylabel("visits")
+ax.set_title("Standardized residuals  (O - E)/$\\sqrt{E}$")
+fig.colorbar(im, ax=ax, shrink=0.8)
+plt.tight_layout()
+plt.show()
+```
+
+$H_0$ is rejected at $5\%$: visit frequency is **not** independent of tenure. The residual map shows **where** — newer users skew low-visit, veterans skew high.
+
+::: {.notes}
+chi2_contingency повертає статистику, p-value, df і матрицю очікуваних частот одним рядком. p мізерний → відхиляємо незалежність: активність ПОВ'ЯЗАНА з давністю реєстрації. Але χ² каже лише «так/ні». Карта стандартизованих залишків (O−E)/√E показує ДЕ саме зв'язок: червоне — більше за очікуване, синє — менше. Видно патерн: нові користувачі тяжіють до низької активності, «ветерани» — до високої. Це той самий хід, що з QQ-plot у минулій лекції: не лише «чи відрізняється», а «як саме».
+:::
+
+## 📏 Significant ≠ strong: Cramér's V {.smaller}
+
+This table holds almost **10 million** users. With $n$ that large, $p \approx 0$ for *any* departure — significance is **guaranteed**, not informative.
+
+Measure the **strength** of association with **Cramér's V**:
+
+$$
+V = \sqrt{\frac{\chi^2}{n\,(\min(m,k)-1)}} \in [0, 1].
+$$
+
+```{python}
+#| label: cramers-v
+#| output-location: column
+
+chi2_stat, p, dof, _ = chi2_contingency(table)
+n = table.sum()
+V = np.sqrt(chi2_stat / (n * (min(table.shape) - 1)))
+
+print(f"chi2     = {chi2_stat:,.0f}")
+print(f"p-value  = {p:.1g}")
+print(f"n        = {n:,}")
+print(f"Cramer V = {V:.3f}")
+```
+
+::: {.callout-important icon=false}
+The $p$-value screams "reject", yet $V \approx 0.10$ says the association is **weak**. Rules of thumb: $V \approx 0.1$ small, $0.3$ medium, $0.5$ large. On big data, **always** pair a $\chi^2$ $p$-value with an effect size.
+:::
+
+::: {.notes}
+Найважливіше застереження секції — прямий аналог «large-sample caveat» з минулої лекції (Шапіро відхиляє все на великих n). Тут таблиця містить майже 10 млн користувачів, тож p≈0 при БУДЬ-ЯКОМУ відхиленні — значущість гарантована й нічого не каже про силу зв'язку. Cramér's V нормує χ² на n і розмір таблиці, даючи число в [0,1]. Тут V≈0.10 — зв'язок СЛАБКИЙ, хоча p=0. Орієнтири: 0.1 слабкий, 0.3 середній, 0.5 сильний. Урок: на великих даних p-value майже завжди «значущий», тож завжди супроводжуйте його розміром ефекту, інакше зробите висновок про «сильний зв'язок» там, де його практично немає.
+:::
+
+# Test of homogeneity {background-iframe=".06-chi_files/libs/colored-particles/index.html"}
+
+## 🧪 The task {.smaller}
+
+> The growth team A/B-tests a new **onboarding flow**.
+
+> **Control** users see the old flow; **test** users see the new one.
+
+> For each user we record how many **playlists** they create in week 1: $0$, $1$, $2$, $3{+}$.
+
+> Does the new onboarding **change the distribution** of playlists created?
+
+::: {.notes}
+Третє питання кейсу — однорідність. A/B-тест нового онбордингу: контроль бачить старий потік, тест — новий. Для кожного користувача рахуємо, скільки плейлистів він створив за перший тиждень (0,1,2,3+). Питання: чи змінює новий онбординг РОЗПОДІЛ цієї категоріальної величини між групами? Це вже не одна змінна (узгодженість) і не дві змінні на одних людях (незалежність), а порівняння розподілу однієї величини у ДВОХ групах.
+:::
+
+## 🔁 Homogeneity ≡ independence {.smaller}
+
+| group \\ playlists | $0$ | $1$ | $2$ | $3{+}$ |
 |---|---|---|---|---|
-|Test group|3243|432|108|66|
-|Control group|3045|421|128|83|
+| **Test** (new flow)  | 3243 | 432 | 108 | 66 |
+| **Control** (old)    | 3045 | 421 | 128 | 83 |
 
-But now, let's look at this table from another perspective: consider the patient group as a random variable. Then we have two random variables:
+Read the table differently: treat the **group** itself as a second categorical variable.
 
-- $\psi:$ the frequency of syncopal states ($0$, $1$, $2$, $3+$);
-- $\eta:$ which group the patient is in (test, control).
+- $\psi$ = playlists created ($0, 1, 2, 3{+}$),
+- $\eta$ = which group the user is in (test / control).
 
-That is, our frequency table is **identical** to the contingency table! And testing the homogeneity hypothesis is equivalent to testing the independence hypothesis!
+. . .
+
+::: {.callout-tip icon=false}
+The table is **identical** to a contingency table → testing homogeneity is *mechanically* the same as testing independence. Same statistic, same $\chi^2_{(m-1)(k-1)}$, same `chi2_contingency`.
+:::
+
+::: {.notes}
+Ключовий інсайт лекції: однорідність і незалежність — це механічно ОДНЕ І ТЕ САМЕ. Якщо подивитися на таблицю по-іншому — вважати саму групу (тест/контроль) другою категоріальною змінною — отримаємо звичайну таблицю спряженості. Тому формула, статистика, ступені свободи та функція ідентичні. Філософська різниця лише в дизайні: при однорідності маргінали груп фіксовані наперед (ми самі набрали тест і контроль), при незалежності — випадкові. На обчислення це не впливає.
+:::
+
+## 🎧 Run the test {.smaller}
 
 ```{python}
-#| include: false
+#| label: homogeneity-test
+#| output-location: column
 
-table = [[3243, 432, 108, 66], [3045, 421, 128, 83]]
+ab = np.array([
+    [3243, 432, 108, 66],   # test  (new flow)
+    [3045, 421, 128, 83],   # control (old flow)
+])
+
+chi2_stat, p, dof, _ = chi2_contingency(ab)
+print(f"chi2    = {chi2_stat:.3f}")
+print(f"df      = {dof}")
+print(f"p-value = {p:.4f}")
+print("reject H0" if p < 0.05 else "keep H0")
 ```
 
-$\chi^2$ = `{python} chi2_contingency(table)[0]`
+. . .
 
-$p$-value = `{python} chi2_contingency(table)[1]`
+$p\text{-value} > 5\%$ → we **cannot** claim the new onboarding changed the playlist distribution. The redesign is *not* moving this metric — ship it only if it helps something else.
 
-The hypothesis of homogeneity is not rejected at a significance level of $5\%$: we cannot claim that the distribution of syncopal frequency is different in the test and control groups.
+::: {.notes}
+Запускаємо той самий chi2_contingency на таблиці 2×4. p>0.05 → НЕ відхиляємо однорідність: немає підстав стверджувати, що новий онбординг змінив розподіл створених плейлистів. Важливий урок про нульовий результат: це не «доказ, що ефекту немає», а «ми не виявили ефекту». Практичний висновок для команди — за цією метрикою редизайн нейтральний; викочувати варто лише якщо він покращує щось інше. Не відхилена H0 ≠ підтверджена H0.
+:::
 
-# Yates' Correction
+# Yates' correction {background-iframe=".06-chi_files/libs/colored-particles/index.html"}
 
-## Yates' Correction {.smaller}
+## ✂️ When the table is small {.smaller}
 
- - the number of observations in each cell is higher than 5;
- - for the case of **frequency table** 2x1 the number of observations in each cell is **higher than 10**;
- - for the  **contingency table** 2x2 case, the number of observations in each cell is **higher than 10**.
+For a $2\times2$ table with **small** counts, the continuous $\chi^2$ over-rejects (inflated Type I error). **Yates' continuity correction** shrinks each gap by $0.5$:
 
-$$\tau = n\sum_{i=1, j=1}^{i=2, j=2}\frac{(\frac{n_{ji}}{n}-q_i p_j - 0.5)^2}{q_i p_j},$$
+$$
+\tau_{\text{Yates}} = \sum_{i,j}\frac{\big(|O_{ij} - E_{ij}| - 0.5\big)^2}{E_{ij}}.
+$$
 
-This correction is used to **reduce** the probability of a **Type I error** in the case of a **small number of observations** in the cells of the table.
+. . .
 
-## Example {.smaller}
+Use it when expected counts are modest. Rules of thumb for **not** needing it:
 
-|  | A | B | Total |
+- every cell expected count $> 5$ (general table);
+- $> 10$ per cell for a $2\times1$ frequency table or a $2\times2$ contingency table.
+
+::: {.notes}
+Поправка Йейтса — для малих таблиць 2×2. Проблема: χ² неперервний, а частоти дискретні; на малих вибірках це робить критерій надто «нетерплячим» — він відхиляє H0 частіше за номінальні 5% (роздута помилка I роду). Поправка Йейтса віднімає 0.5 від кожного |O−E| перед піднесенням у квадрат, роблячи критерій консервативнішим. Коли НЕ потрібна: очікувані частоти >5 (загалом) або >10 для 2×2. У scipy chi2_contingency застосовує її за замовчуванням для 2×2.
+:::
+
+## 🔬 With and without the correction {.smaller}
+
+| | A | B | Total |
 |---|---|---|-------|
-| 1 | 15 | 18 | 33 |
-| 2 | 15 | 13 | 28 |
-| Total | 30 | 31 | 61 |
-
+| **1** | 15 | 18 | 33 |
+| **2** | 15 | 13 | 28 |
+| **Total** | 30 | 31 | 61 |
 
 ```{python}
-#| include: false
+#| label: yates-example
+#| output-location: column
 
-table = [[15, 18], [15, 13]]
+table = np.array([[15, 18], [15, 13]])
+
+raw  = chi2_contingency(table, correction=False)
+yate = chi2_contingency(table, correction=True)   # scipy default for 2x2
+
+print("no correction:")
+print(f"  chi2 = {raw[0]:.3f}   p = {raw[1]:.3f}")
+print("Yates' correction:")
+print(f"  chi2 = {yate[0]:.3f}   p = {yate[1]:.3f}")
 ```
 
-<br><br>
+. . .
 
-:::: {.columns}
+The correction **lowers** $\chi^2$ and **raises** the $p$-value — more conservative, as intended.
 
-::: {.column width="50%"}
-[No correction:]{.hi-slate}
-
-$\chi^2$ = `{python} chi2_contingency(table, correction=False)[0]`
-
-$p$-value = `{python} chi2_contingency(table, correction=False)[1]`
-
+::: {.notes}
+Той самий 2×2 з обома підходами. correction=False — «сирий» χ²; correction=True — з поправкою Йейтса (це дефолт scipy для 2×2). Поправка зменшує статистику і збільшує p-value — критерій стає обережнішим. На цьому прикладі різниця помітна. Але чи справді поправка тримає 5%? Це твердження не варто брати на віру — перевіримо його Монте-Карло, як ми робили з усіма критеріями.
 :::
 
-::: {.column width="50%"}
-[Yates' correction:]{.hi}
+## 🧪 A reusable Monte-Carlo checker {.smaller}
 
-$\chi^2$ = `{python} chi2_contingency(table)[0]`
-
-$p$-value = `{python} chi2_contingency(table)[1]`
-:::
-
-::::
-
-## FPR and Yates' Correction
+Same engine as for the $t$- and KS-tests: simulate, count rejections, add a Wilson CI.
 
 ```{python}
-#| include: false
+#| label: chi2-mc-fn
 
-MonteCarloResults= namedtuple('MonteCarloResults', ['positive_rate',
-                                                    'confint_left_bound',
-                                                    'confint_right_bound'])
+def chi2_rejection_rate(n, p1, p2, correction, alpha=0.05,
+                        n_exps=3000, seed=42):
+    """2x2 chi-square homogeneity test via Monte Carlo.
 
-def gen_monte_carlo_exp_for_chi_sq_homogenity(n, p1, p2, correction, alpha, N_runs):
+    p1 == p2  -> H0 true  -> the rate is the FPR.
+    p1 != p2  -> H1 true  -> the rate is the power (TPR).
     """
-        Функция для проверки критерия однородности хи-квадрат 
-            с помощью метода Монте-Карло
-        
-        Возвращает долю отвержений гипотезы и доверительный интервал для этой доли
-    
-        Параметры:
-            - n: параметр биномиального распределения общий для двух распределений, 
-                    объем выборки
-            - p1: параметр первого биномиального распределения, 
-                    вероятность успеха в испытании
-            - p2: параметр второго биномиального распределения, 
-                    вероятность успеха в испытании
-            - correction: применяем ли поправку Йейтса
-            - alpha: уровень значимости
-            - N_runs: число экспериментов в методе Монте-Карло
-    """
-    
-    positive = 0
-    
-    for _ in range(N_runs): 
-
-        n_1_1 = binom.rvs(n, p1)
-        n_1_2 = n - n_1_1
-        n_2_1 = binom.rvs(n, p2)
-        n_2_2 = n - n_2_1
-        
-        if (n_1_1+n_2_1 != 0) and (n_1_2+n_2_2 != 0):
-            pvalue = chi2_contingency(observed=[[n_1_1, n_1_2], [n_2_1, n_2_2]],
-                                      correction = correction)[1]
+    rng, rej = np.random.default_rng(seed), 0
+    for _ in range(n_exps):
+        a = binom.rvs(n, p1, random_state=rng); b = n - a   # group 1
+        c = binom.rvs(n, p2, random_state=rng); d = n - c   # group 2
+        if (a + c) and (b + d):                             # avoid empty column
+            p = chi2_contingency([[a, b], [c, d]],
+                                 correction=correction)[1]
         else:
-            pvalue = 1
-    
-        if pvalue<=alpha:
-            positive+=1
-            
-    positive_rate = positive/N_runs
-    confint = proportion_confint(count = positive, nobs = N_runs,
-                                 alpha = 0.05, method='wilson')
-        
-    return MonteCarloResults(**{'positive_rate': positive_rate,
-                                'confint_left_bound': confint[0],
-                                'confint_right_bound': confint[1]})
-
-FPR_list_w_yates = []
-FPR_list_wo_yates = []
-
-# перебираем размер выборки n
-for i in tqdm(numpy.arange(2, 30, 2, dtype = int)):  
-    mmk_res_w_yates = gen_monte_carlo_exp_for_chi_sq_homogenity(n = i, 
-                                                                p1 = 0.3,
-                                                                p2 = 0.3, 
-                                                                correction = True,
-                                                                alpha = 0.05, 
-                                                                N_runs = 10000)
-    FPR_list_w_yates.append([i, mmk_res_w_yates])
-    
-    mmk_res_wo_yates = gen_monte_carlo_exp_for_chi_sq_homogenity(n = i, 
-                                                                 p1 = 0.3,
-                                                                 p2 = 0.3, 
-                                                                 correction = False,
-                                                                 alpha = 0.05, 
-                                                                 N_runs = 10000)
-    FPR_list_wo_yates.append([i, mmk_res_wo_yates])
+            p = 1.0
+        rej += p <= alpha
+    ci = proportion_confint(rej, n_exps, alpha=0.05, method="wilson")
+    return rej / n_exps, ci
 ```
 
+::: {.callout-tip icon=false}
+Pass **equal** probabilities ($p_1 = p_2$) to measure the FPR, **different** ones to measure power.
+:::
+
+::: {.notes}
+Перевикористовуємо ту саму ідею валідації, що для t- і KS-критеріїв. Функція chi2_rejection_rate: тисячі разів генерує дві біноміальні вибірки розміру n, складає таблицю 2×2, рахує частку відхилень + довірчий інтервал Уілсона. Однакові ймовірності p1=p2 → H0 вірна → міряємо FPR (хибнопозитивні). Різні → потужність. Прапорець correction перемикає поправку Йейтса. Той самий двигун, лише всередині chi2_contingency.
+:::
+
+## 📉 Yates' correction controls the FPR {.smaller}
 
 ```{python}
-#| echo: false
+#| label: yates-fpr
+#| code-fold: true
 #| fig-align: center
 
-pyplot.figure(figsize=(16, 8))
+sizes = np.arange(4, 40, 3)
+with_y  = [chi2_rejection_rate(n, 0.3, 0.3, correction=True)  for n in sizes]
+no_y    = [chi2_rejection_rate(n, 0.3, 0.3, correction=False) for n in sizes]
 
-
-pyplot.plot([elem[0] for elem in FPR_list_w_yates],
-            [elem[1].positive_rate for elem in FPR_list_w_yates],
-            color = red_pink, linewidth=3.0, label='FPR w/ Yates')
-pyplot.fill_between([elem[0] for elem in FPR_list_w_yates],
-                    [elem[1].confint_left_bound for elem in FPR_list_w_yates],
-                    [elem[1].confint_right_bound for elem in FPR_list_w_yates],
-                    color = 'violet', alpha = 0.3, label='FPR w/ Yates confint')
-
-
-pyplot.plot([elem[0] for elem in FPR_list_wo_yates],
-            [elem[1].positive_rate for elem in FPR_list_wo_yates],
-            color = blue, linestyle = 'dashed', 
-            linewidth=3.0, label='FPR w/o Yates')
-pyplot.fill_between([elem[0] for elem in FPR_list_wo_yates],
-                    [elem[1].confint_left_bound for elem in FPR_list_wo_yates],
-                    [elem[1].confint_right_bound for elem in FPR_list_wo_yates],
-                    color = 'skyblue', alpha = 0.3, 
-                    label='FPR w/o Yates confint')
-
-pyplot.plot([elem[0] for elem in FPR_list_w_yates],
-            numpy.array([0.05]*len(FPR_list_w_yates)),
-            color = orange, linestyle = 'dashed', linewidth=3.0, label='alpha')
-
-pyplot.legend(loc='best')
-pyplot.title("FPR dependence on sample size n")
-pyplot.xlabel("sample size n")
-pyplot.ylabel("FPR")
-
-pyplot.show()
+fig, ax = plt.subplots(figsize=(11, 4.4))
+ax.plot(sizes, [r for r, _ in with_y], color=red_pink, lw=2.5, marker="o",
+        label="with Yates")
+ax.fill_between(sizes, [ci[0] for _, ci in with_y], [ci[1] for _, ci in with_y],
+                color=red_pink, alpha=0.15)
+ax.plot(sizes, [r for r, _ in no_y], color=blue, lw=2.5, ls="--", marker="s",
+        label="no correction")
+ax.fill_between(sizes, [ci[0] for _, ci in no_y], [ci[1] for _, ci in no_y],
+                color=blue, alpha=0.12)
+ax.axhline(0.05, color=orange, ls=":", lw=2, label=r"$\alpha = 0.05$")
+ax.set_xlabel("group size n"); ax.set_ylabel("FPR")
+ax.set_title("FPR vs sample size (H0 true)"); ax.legend()
+plt.tight_layout()
+plt.show()
 ```
 
-Yates correction reduces the FPR.
+Without correction the FPR sits **above** $\alpha$ on small samples; Yates pulls it back down (often below $\alpha$ — slightly conservative).
 
-## Power and Yates' Correction {.smaller}
+::: {.notes}
+A/A-експеримент: p1=p2=0.3, H0 вірна, тож будь-яке відхилення — хибне. Без поправки (синій пунктир) FPR на малих n помітно ВИЩИЙ за 5% — критерій бреше частіше, ніж обіцяв. З поправкою Йейтса (рожевий) FPR притиснутий до α, часто навіть нижче — критерій стає консервативним. Це підтверджує теорію емпірично: на малих 2×2 поправка потрібна, щоб тримати помилку I роду під контролем. Ось чому scipy вмикає її за замовчуванням.
+:::
 
-```{python}
-#| include: false
+## ⚖️ The price: a little power {.smaller}
 
-TPR_list_w_yates = []
-TPR_list_wo_yates = []
-
-# перебираем размер выборки n
-for i in tqdm(numpy.arange(10, 2000, 200, dtype = int)):  
-    mmk_res_w_yates = gen_monte_carlo_exp_for_chi_sq_homogenity(n = i, 
-                                                                p1 = 0.3,
-                                                                p2 = 0.35, 
-                                                                correction = True,
-                                                                alpha = 0.05, 
-                                                                N_runs = 10000)
-    TPR_list_w_yates.append([i, mmk_res_w_yates])
-    
-    mmk_res_wo_yates = gen_monte_carlo_exp_for_chi_sq_homogenity(n = i, 
-                                                                 p1 = 0.3,
-                                                                 p2 = 0.35,
-                                                                 correction = False,
-                                                                 alpha = 0.05,
-                                                                 N_runs = 10000)
-    TPR_list_wo_yates.append([i, mmk_res_wo_yates])
-```
-
+Now the groups truly differ ($p_1 = 0.30$ vs $p_2 = 0.35$). How often does each version detect it?
 
 ```{python}
-#| echo: false
+#| label: yates-power
+#| code-fold: true
 #| fig-align: center
 
-pyplot.figure(figsize=(16, 8))
+sizes = np.arange(50, 2001, 250)
+with_y = [chi2_rejection_rate(n, 0.30, 0.35, correction=True)  for n in sizes]
+no_y   = [chi2_rejection_rate(n, 0.30, 0.35, correction=False) for n in sizes]
 
-
-pyplot.plot([elem[0] for elem in TPR_list_w_yates],
-            [elem[1].positive_rate for elem in TPR_list_w_yates],
-            color = purple, linewidth=3.0, label='TPR w/ Yates')
-pyplot.fill_between([elem[0] for elem in TPR_list_w_yates],
-                    [elem[1].confint_left_bound for elem in TPR_list_w_yates],
-                    [elem[1].confint_right_bound for elem in TPR_list_w_yates],
-                    color = 'violet', alpha = 0.3, label='TPR w/ Yates confint')
-
-
-pyplot.plot([elem[0] for elem in TPR_list_wo_yates],
-            [elem[1].positive_rate for elem in TPR_list_wo_yates],
-            color = blue, linestyle = 'dashed', linewidth=3.0, label='TPR w/o Yates')
-pyplot.fill_between([elem[0] for elem in TPR_list_wo_yates],
-                    [elem[1].confint_left_bound for elem in TPR_list_wo_yates],
-                    [elem[1].confint_right_bound for elem in TPR_list_wo_yates],
-                    color = 'skyblue', alpha = 0.3, label='TPR w/o Yates confint')
-
-pyplot.legend(loc='best')
-pyplot.title("TPR dependence on sample size n")
-pyplot.xlabel("sample size n")
-pyplot.ylabel("TPR")
-
-pyplot.show()
+fig, ax = plt.subplots(figsize=(11, 4.4))
+ax.plot(sizes, [r for r, _ in with_y], color=purple, lw=2.5, marker="o",
+        label="with Yates")
+ax.plot(sizes, [r for r, _ in no_y], color=blue, lw=2.5, ls="--", marker="s",
+        label="no correction")
+ax.axhline(0.8, color=slate, ls=":", lw=2, label="80% gold standard")
+ax.set_ylim(0, 1)
+ax.set_xlabel("group size n"); ax.set_ylabel("power (TPR)")
+ax.set_title("Power vs sample size (H1 true)"); ax.legend()
+plt.tight_layout()
+plt.show()
 ```
+
+::: {.callout-important icon=false}
+Yates' correction trades a sliver of **power** for an honest **FPR**. On large samples the two curves meet — the correction stops mattering once counts are big.
+:::
+
+::: {.notes}
+Тепер групи реально різні (0.30 vs 0.35). Потужність обох версій росте з n і перетинає золотий стандарт 80%. Версія з поправкою (фіолетова) трохи нижча — це плата: за чесний FPR ми віддаємо дрібку потужності. На великих вибірках криві сходяться — поправка перестає мати значення, бо χ² і так добре наближений. Мета-висновок: поправка Йейтса критична на малих 2×2 і практично нешкідлива на великих, тож дефолт scipy розумний.
+:::
+
+## 🎯 Exact alternative: Fisher's exact test {.smaller}
+
+When counts are tiny, skip the approximation entirely. **Fisher's exact test** computes the $p$-value directly from the **hypergeometric** distribution — no $\chi^2$ limit, valid for *any* cell size.
+
+```{python}
+#| label: fisher
+#| output-location: column
+
+table_2x2 = np.array([[15, 18], [15, 13]])
+
+odds, p_fisher = fisher_exact(table_2x2)
+p_yates = chi2_contingency(table_2x2)[1]
+
+print(f"Fisher odds ratio = {odds:.3f}")
+print(f"Fisher p-value    = {p_fisher:.4f}")
+print(f"Yates  p-value    = {p_yates:.4f}")
+```
+
+. . .
+
+::: {.callout-tip icon=false}
+Fisher is **exact** for any table; $\chi^2$-with-Yates is its large-sample *approximation*. Here they agree (both $\approx 0.6$–$0.7$ → no association). Use Fisher as the safe default for small $2\times2$ tables; $\chi^2$ scales better to large or bigger-than-$2\times2$ tables.
+:::
+
+::: {.notes}
+Альтернатива поправці Йейтса на малих таблицях — точний критерій Фішера. Він рахує p-value напряму з гіпергеометричного розподілу (перебирає всі таблиці з тими ж маргіналами), без жодного асимптотичного наближення — тому коректний за будь-яких частот. На нашому 2×2: Fisher p≈0.61, Yates p≈0.71 — обидва великі, зв'язку немає, висновки збігаються. Правило вибору: Фішер — безпечний дефолт для малих 2×2; χ² краще масштабується на великі таблиці й таблиці більші за 2×2 (Фішер там обчислювально дорогий). Тобто Йейтс — це швидке наближення до Фішера.
+:::
+
+# Summary {background-iframe=".06-chi_files/libs/colored-particles/index.html"}
+
+## 🧾 The one idea {.smaller}
+
+Everything today reduced to one statistic: [compare observed and expected counts]{.hi}.
+
+$$
+\tau = \sum_{\text{cells}} \frac{(O - E)^2}{E} \sim \chi^2_{\text{df}}.
+$$
+
+- **Goodness-of-fit** — one variable vs a known distribution; $\text{df} = k-1$.
+- **Independence** — two variables on the same units; $E_{ij} = \tfrac{\text{row}\cdot\text{col}}{n}$, $\text{df} = (m-1)(k-1)$.
+- **Homogeneity** — same distribution across groups; *mechanically identical* to independence.
+- **Yates' correction / Fisher** — small $2\times2$ tables; trade power for an honest FPR, or go exact.
+- **Cramér's V** — on big $n$ everything is "significant"; report the **effect size** too.
+
+::: {.notes}
+Підсумок: уся лекція — одна статистика Σ(O−E)²/E, що при H0 розподілена за χ². Три задачі відрізняються лише тим, як рахувати E і df: узгодженість (одна змінна, df=k−1); незалежність (дві змінні, E з маргіналів, df=(m−1)(k−1)); однорідність (групи) — механічно те саме, що незалежність. На малих 2×2 — поправка Йейтса або точний Фішер. І ключове застереження для великих даних: p майже завжди значущий, тож завжди додавайте розмір ефекту (Cramér's V). Усе зведено до підрахунку відхилень спостереженого від очікуваного.
+:::
+
+## 🧭 Which $\chi^2$ test, when? {.smaller}
+
+| Question | Tool | df | Watch out for |
+|---|---|---|---|
+| One variable vs a **known** distribution? | `chisquare` | $k-1$ | distribution fixed up front |
+| Are **two** categorical variables related? | `chi2_contingency` | $(m-1)(k-1)$ | expected count $\geq 5$ |
+| Do **groups** share a distribution? | `chi2_contingency` | $(m-1)(k-1)$ | same math as independence |
+| Small $2\times2$ table? | `chi2_contingency` (Yates on) / `fisher_exact` | $1$ | $\chi^2$ over-rejects |
+
+. . .
+
+::: {.callout-tip icon=false}
+The meta-lesson still holds: when in doubt, [validate the criterion with Monte Carlo]{.hi} on data that looks like yours.
+:::
+
+::: {.notes}
+Шпаргалка «який χ² коли»: відома гіпотеза про один ряд частот — chisquare, df=k−1; дві категоріальні змінні — chi2_contingency, df=(m−1)(k−1), стежте за очікуваними ≥5; групи — той самий chi2_contingency; малі 2×2 — поправка Йейтса або точний критерій Фішера, бо χ² переоцінює. І наскрізний мета-урок усього курсу: маєш сумнів щодо каліброваності критерію — переваліруй його Монте-Карло на даних, схожих на твої. Саме так ми перевірили й поправку Йейтса.
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe=".06-chi_files/libs/colored-particles/index.html"}
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=4049)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

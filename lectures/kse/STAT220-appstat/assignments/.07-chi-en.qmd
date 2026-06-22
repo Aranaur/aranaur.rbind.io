@@ -1,0 +1,787 @@
+---
+title: "Practice 7"
+subtitle: "χ² tests for categorical data"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: en
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+from scipy.stats import chi2, chisquare, chi2_contingency, fisher_exact
+from statsmodels.stats.proportion import proportion_confint
+
+np.random.seed(73)
+
+turquoise = "#20B2AA"
+red       = "#fb6107"
+blue      = "#181485"
+green     = "#8bb174"
+gray      = "#A0A0A0"
+red_pink  = "#e64173"
+orange    = "#FFA500"
+slate     = "#314f4f"
+```
+
+# What we do today {.unnumbered}
+
+Previous practices worked with **numeric** metrics (ARPU, time-to-event).
+But half of product data is **counts in categories**: day of week, chosen
+cuisine, city, "converted / not". Today's tool is exactly for that, and all
+its flavours reduce to **one** statistic:
+
+$$
+\tau = \sum_{\text{cells}} \frac{(O - E)^2}{E},
+$$
+
+where $O$ are observed counts and $E$ are the counts expected under the
+hypothesis.
+
+We build **guardrails for categorical A/B testing and analytics** of the
+**GreenBowl** delivery app (the same one from Practices 4–6) and answer
+four applied questions:
+
+1. Is demand **uniform** across weekdays (planning cook shifts)?
+2. Does the **choice of cuisine depend on the city** (region-specific menu)?
+3. Did an A/B **menu redesign** change the distribution of order categories?
+4. Did a **promo pilot** in a new city work on a **small** sample?
+
+::: {.callout-note icon="false"}
+## Rules of the game
+- We **build** the tool `gof_test → assoc_test → assoc_report →
+  safe_assoc` step by step; the tests themselves are off-the-shelf
+  (`scipy.stats.chisquare`, `chi2_contingency`, `fisher_exact`).
+- Each version **extends** the previous one and **reuses** it.
+- Before each case there is a **🔮 "Guess first"** block --- write down
+  your answer before running the code.
+- After each one --- a **"Your turn"** block with a mini-task and a
+  collapsible solution, plus one applied **case** with a business decision.
+- Where we must check the *criterion itself*, we return to **Monte Carlo**
+  from Practice 5.
+:::
+
+---
+
+# Case: GreenBowl categorical data
+
+We **generate** all the data ourselves --- that way we always know the
+"truth" and can check whether the criterion catches it. Base categories:
+
+```{python}
+#| label: categories
+
+DAYS     = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+CUISINES = ["Pizza", "Sushi", "Burgers", "Salads", "Desserts"]
+CITIES   = ["Kyiv", "Lviv", "Odesa", "Kharkiv"]
+
+def order_counts(probs, n, seed=None):
+    """n orders spread across categories with probabilities `probs`."""
+    probs = np.asarray(probs, float)
+    probs = probs / probs.sum()
+    return np.random.default_rng(seed).multinomial(n, probs)
+```
+
+A single function `order_counts` is our "log generator": we set the
+**true** category probabilities and it returns observed counts.
+
+---
+
+# Part I --- Goodness-of-fit: is demand uniform?
+
+> **Case.** The operations manager schedules the same number of cooks every
+> day of the week. An analyst suspects demand is **non-uniform** and shifts
+> should be reallocated. Over a week --- 1400 orders.
+
+::: {.callout-tip icon="false"}
+## 🔮 Guess first
+Look at the by-day counts below (Mon…Sun). **Without computing anything**,
+write down: will you reject the hypothesis "demand is uniform" at the 5%
+level? Yes or no?
+:::
+
+## Version 1 --- a goodness-of-fit verdict
+
+```{python}
+#| label: v1
+
+def gof_test(observed, p0=None, alpha=0.05):
+    """Version 1. Chi-square goodness-of-fit test.
+
+    observed --- observed counts over k categories.
+    p0       --- expected probabilities (None → uniform distribution).
+    """
+    observed = np.asarray(observed, float)
+    n, k = observed.sum(), len(observed)
+    if p0 is None:
+        p0 = np.full(k, 1 / k)
+    expected = n * np.asarray(p0, float)
+    res = chisquare(observed, f_exp=expected)
+    verdict = ("⛔ reject H0 → the distribution is NOT what we assumed"
+               if res.pvalue <= alpha else
+               "✅ do not reject H0 → data are consistent with the hypothesis")
+    return {"chi2": res.statistic, "df": k - 1, "p": res.pvalue,
+            "min_expected": expected.min(), "verdict": verdict}
+```
+
+Apply it to demand by day. H0: demand is uniform ($1/7$ per day).
+
+```{python}
+#| label: v1-demo
+#| fig-align: center
+
+orders = order_counts([0.13, 0.12, 0.13, 0.13, 0.15, 0.18, 0.16],
+                       n=1400, seed=7)
+
+r = gof_test(orders)            # p0=None → testing uniformity
+print("Orders by day:", dict(zip(DAYS, orders)))
+print(f"chi2 = {r['chi2']:.2f},  df = {r['df']},  p = {r['p']:.4f}")
+print(r["verdict"])
+
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.bar(DAYS, orders, color=turquoise, label="observed")
+ax.axhline(orders.mean(), color=red, ls="--", lw=2,
+           label="expected (uniform)")
+ax.set_ylabel("orders"); ax.set_title("Demand by weekday (n = 1400)")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+The Friday–Saturday–Sunday spike "pulls" the statistic: $p < 0.05$, demand
+is **not** uniform. Recommendation to ops: reinforce weekend shifts.
+
+::: {.callout-tip icon="false"}
+## Your turn 1
+1. Generate a week with **truly** uniform demand
+   (`order_counts([1]*7, 1400, seed=3)`) and run `gof_test`. Does the
+   criterion keep its promise (large $p$)?
+2. The manager says: "But the difference is pennies!". Compute by **how
+   much %** the busiest day exceeds the quietest. Is it worth moving shifts?
+3. **Case.** Marketing expected a cuisine mix of
+   $[0.30, 0.20, 0.25, 0.15, 0.10]$ (Pizza…Desserts), but over a week saw
+   `[640, 290, 500, 240, 130]`. Run `gof_test(obs, p0=...)`: does the
+   assortment match expectations?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 1
+
+```{python}
+#| label: sol1
+
+# (1) truly uniform demand
+uni = order_counts([1] * 7, 1400, seed=3)
+print("Uniform:", gof_test(uni)["verdict"], f"(p={gof_test(uni)['p']:.3f})")
+
+# (2) load range
+print(f"Peak/minimum: +{(orders.max()/orders.min() - 1):.0%}")
+
+# (3) assortment vs plan
+obs = np.array([640, 290, 500, 240, 130])
+r = gof_test(obs, p0=[0.30, 0.20, 0.25, 0.15, 0.10])
+print(f"\nCuisines vs plan: chi2={r['chi2']:.2f}, p={r['p']:.4f} → {r['verdict']}")
+```
+
+**Interpretation.** A uniform week gives a large $p$ --- the criterion does
+not raise a false alarm. The peak is ~60% above the minimum, which is
+already operationally meaningful, so here statistical significance coincides
+with practical significance. For cuisines, $p$ tells us whether the deviation
+from plan is noise or a real demand shift.
+:::
+
+---
+
+# The expected-count rule --- and why it exists
+
+Chi-square relies on a normal approximation (CLT), which **breaks for rare
+categories**. The rule: every **expected** count $E_i \ge 5$. Let's check
+this not on faith but with **Monte Carlo**: does the criterion hold 5% false
+alarms when one category is very rare?
+
+```{python}
+#| label: expected-rule
+
+def gof_fpr(probs, n, n_exps=4000, seed=73):
+    """FPR of the goodness-of-fit test under H0 (data from the same probs)."""
+    rng = np.random.default_rng(seed)
+    expected = n * np.asarray(probs, float)
+    rej = sum(chisquare(rng.multinomial(n, probs), f_exp=expected).pvalue < 0.05
+              for _ in range(n_exps))
+    lo, hi = proportion_confint(rej, n_exps, alpha=0.05, method="wilson")
+    return {"fpr": rej / n_exps, "ci": (lo, hi), "min_expected": expected.min()}
+
+healthy = [0.20, 0.20, 0.20, 0.20, 0.20]      # all categories "fat"
+rare    = [0.485, 0.485, 0.01, 0.01, 0.01]    # three rare categories
+
+for probs, name in [(healthy, "healthy categories"), (rare, "has rare ones")]:
+    r = gof_fpr(probs, n=60)
+    print(f"{name:18s}: FPR={r['fpr']:.3f}  "
+          f"CI=({r['ci'][0]:.3f},{r['ci'][1]:.3f})  "
+          f"E_min={r['min_expected']:.1f}")
+```
+
+::: {.callout-warning icon="false"}
+## What Monte Carlo showed
+With "healthy" categories the FPR sits on $5\%$. The moment a category with
+$E < 5$ appears (here $E \approx 0.6$), the criterion **exceeds** $\alpha$
+--- it raises false alarms more often than promised. So **merge** rare
+categories or use an exact test. The rule is about **expected** counts, not
+observed ones.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 2
+1. Find roughly the $n$ from which the FPR for `rare` returns to $\approx
+   5\%$ (hint: for $E \ge 5$ with a category of $p=0.01$ you need $n \ge
+   500$). Check `gof_fpr(rare, n)`.
+2. Merge the three rare categories into one (`[0.485, 0.485, 0.03]`) and
+   repeat at $n=60$. Is the FPR back under control?
+3. **Case.** In GreenBowl logs the "Vegan" category is only $1\%$ of orders.
+   How do you correctly include it in `gof_test` over cuisines without
+   breaking the rule?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 2
+
+```{python}
+#| label: sol2
+
+# (1) FPR recovers as n grows
+for n in (60, 300, 800):
+    r = gof_fpr(rare, n)
+    print(f"rare, n={n:>3d}: FPR={r['fpr']:.3f}  E_min={r['min_expected']:.1f}")
+
+# (2) merged rare categories
+r = gof_fpr([0.485, 0.485, 0.03], n=60)
+print(f"\nmerged categories, n=60: FPR={r['fpr']:.3f}  "
+      f"E_min={r['min_expected']:.1f}")
+```
+
+**Interpretation.** Increasing $n$ or merging rare categories lifts $E_i$
+above 5 --- and the FPR returns to an honest 5%. For "Vegan" ($1\%$) on
+weekly data it is worth either merging it with "Salads" or accumulating more
+weeks so that $E \ge 5$.
+:::
+
+---
+
+# Part II --- Independence: cuisine × city
+
+> **Case.** The product team wants to know whether to **localize the
+> assortment**: does the cuisine choice depend on the city? If not --- one
+> menu for all; if yes --- regional selections.
+
+Now we have **two** categorical variables on the same orders → a
+**contingency table**. Let's generate logs where cuisine **depends** on the
+city:
+
+```{python}
+#| label: cuisine-city-data
+
+def cuisine_city_table(seed=7):
+    rng = np.random.default_rng(seed)
+    base = np.array([0.30, 0.20, 0.25, 0.15, 0.10])     # Pizza…Desserts
+    mods = {                                            # city tastes
+        0: [1.0, 1.0, 1.0, 1.0, 1.0],   # Kyiv — the "baseline"
+        1: [0.8, 0.7, 0.9, 1.4, 1.6],   # Lviv — salads/desserts
+        2: [0.9, 1.8, 0.8, 1.0, 0.9],   # Odesa — sushi
+        3: [1.3, 0.7, 1.4, 0.8, 0.8],   # Kharkiv — pizza/burgers
+    }
+    nper = [2500, 1800, 1500, 2000]
+    rows = [rng.multinomial(nper[c], base * np.array(mods[c]) /
+                            (base * np.array(mods[c])).sum()) for c in range(4)]
+    return np.array(rows)
+
+table = cuisine_city_table()
+print("       " + "  ".join(f"{c:>7s}" for c in CUISINES))
+for city, row in zip(CITIES, table):
+    print(f"{city:>7s} " + "  ".join(f"{v:>7d}" for v in row))
+```
+
+## Version 2 --- an association verdict
+
+```{python}
+#| label: v2
+
+def assoc_test(table, alpha=0.05):
+    """Version 2. Chi-square independence / homogeneity test for a table."""
+    table = np.asarray(table, float)
+    chi2_stat, p, dof, expected = chi2_contingency(table)
+    verdict = ("⛔ reject independence → the variables ARE related"
+               if p <= alpha else
+               "✅ do not reject → no association visible")
+    return {"chi2": chi2_stat, "df": dof, "p": p,
+            "min_expected": expected.min(), "expected": expected,
+            "verdict": verdict}
+```
+
+```{python}
+#| label: v2-demo
+#| fig-align: center
+
+r = assoc_test(table)
+print(f"chi2 = {r['chi2']:.0f},  df = {r['df']},  p = {r['p']:.2g}")
+print(f"E_min = {r['min_expected']:.0f}  (rule ≥5 satisfied)")
+print(r["verdict"])
+
+# Where exactly is the association? — standardized residuals (O−E)/√E
+resid = (table - r["expected"]) / np.sqrt(r["expected"])
+
+fig, ax = plt.subplots(figsize=(7.5, 3.6))
+im = ax.imshow(resid, cmap="RdBu_r", vmin=-12, vmax=12, aspect="auto")
+ax.set_xticks(range(5)); ax.set_xticklabels(CUISINES)
+ax.set_yticks(range(4)); ax.set_yticklabels(CITIES)
+ax.set_title("Standardized residuals (O−E)/√E")
+for i in range(4):
+    for j in range(5):
+        ax.text(j, i, f"{resid[i, j]:+.0f}", ha="center", va="center",
+                fontsize=8, color="black")
+fig.colorbar(im, ax=ax, shrink=0.8)
+plt.tight_layout()
+plt.show()
+```
+
+$p \approx 0$ → cuisine **depends** on the city. But chi-square only says
+"yes/no". The residual map shows **where**: Odesa --- red on "Sushi", Lviv
+--- on "Desserts/Salads", Kharkiv --- on "Pizza/Burgers". That is a
+**ready-made hint for menu localization**.
+
+::: {.callout-tip icon="false"}
+## Your turn 3
+1. Explain in business terms the **two** brightest cells of the residual
+   map. Which cuisine in which city should be promoted to the top of the app?
+2. Select only **two** cuisines from the table (`table[:, [1, 2]]` --- Sushi,
+   Burgers) and run `assoc_test`. Does the link with city persist?
+3. **Case.** If `assoc_test` returned a **large** $p$ (no association), what
+   decision would the product team make about the menu --- and how much would
+   it save?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 3
+
+```{python}
+#| label: sol3
+
+# (2) only Sushi and Burgers
+sub = table[:, [1, 2]]
+r = assoc_test(sub)
+print("Sushi+Burgers vs city:", r["verdict"], f"(p={r['p']:.2g})")
+```
+
+**Interpretation.** The brightest cells are Odesa×Sushi and Lviv×Desserts:
+exactly those should be highlighted in local selections. The link persists on
+the sub-table. If $p$ were large --- one global menu, no spending on regional
+assortments and separate procurement; the "do not localize" decision is also
+valuable, since it saves on operations.
+:::
+
+---
+
+# Big data: significant ≠ strong (Cramér's V)
+
+On large $n$ the $p$-value is **almost always** tiny --- significance is
+guaranteed and says nothing about the **strength** of the association. We
+need an **effect size**: Cramér's V.
+
+## Version 3 --- association + effect size
+
+```{python}
+#| label: v3
+
+def assoc_report(table, alpha=0.05):
+    """Version 3. assoc_test + Cramér's V and a verbal strength label."""
+    r = assoc_test(table, alpha)                 # ← reused Version 2
+    table = np.asarray(table, float)
+    n = table.sum()
+    V = np.sqrt(r["chi2"] / (n * (min(table.shape) - 1)))
+    strength = ("practically none" if V < 0.1 else
+                "weak"     if V < 0.2 else
+                "moderate" if V < 0.4 else "strong")
+    r.update({"n": int(n), "cramer_v": V, "strength": strength})
+    return r
+```
+
+```{python}
+#| label: v3-demo
+
+r = assoc_report(table)
+print(f"Cuisine × city:  n={r['n']},  p={r['p']:.2g},  "
+      f"Cramér's V={r['cramer_v']:.3f} → association is {r['strength']}")
+```
+
+Now --- the big-data trap. Imagine we compare the reorder rate of two
+cohorts of a **million** users each, where the real difference is only $50\%$
+vs $51\%$:
+
+```{python}
+#| label: v3-bigdata
+
+rng = np.random.default_rng(1)
+big = np.array([rng.multinomial(1_000_000, [0.50, 0.50]),
+                rng.multinomial(1_000_000, [0.49, 0.51])])
+r = assoc_report(big)
+print(f"Mega-table: n={r['n']:,}")
+print(f"  p = {r['p']:.2g}   → {r['verdict']}")
+print(f"  Cramér's V = {r['cramer_v']:.4f} → association is {r['strength']}")
+```
+
+::: {.callout-important icon="false"}
+## Catch the mistake 🕵️
+**Analyst A:** "$p < 10^{-20}$ --- the redesign had a powerful effect on
+reorders, roll it out to everyone!"
+**Analyst B:** "$V = 0.01$ --- the effect is microscopic, a difference of
+$50$ vs $51\%$. Significant, but not worth the development."
+**Who is right?** On large $n$, **B** is right: $p$ measures "is there a
+difference", not "is it large". Always report $p$ **and** the effect size.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 4
+1. Increase the real difference (`[0.45, 0.55]`, then `[0.40, 0.60]`) at the
+   same $n$. How does Cramér's V grow and when does the association become
+   "moderate"?
+2. Reduce $n$ of each cohort to $2000$ at a $50$ vs $51\%$ difference. What
+   does $p$ say now --- and did Cramér's V change? What is the conclusion
+   about the role of $n$?
+3. **Case.** The manager demands a "statistically significant result".
+   Explain on this example why this is **not** the right requirement, and
+   what to ask for instead.
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 4
+
+```{python}
+#| label: sol4
+
+rng = np.random.default_rng(2)
+# (1) effect grows at fixed n
+for q in (0.51, 0.55, 0.60):
+    t = np.array([rng.multinomial(1_000_000, [0.50, 0.50]),
+                  rng.multinomial(1_000_000, [1 - q, q])])
+    r = assoc_report(t)
+    print(f"difference 50 vs {q*100:.0f}%:  V={r['cramer_v']:.3f} → {r['strength']}")
+
+# (2) same weak effect, but small n
+small = np.array([rng.multinomial(2000, [0.50, 0.50]),
+                  rng.multinomial(2000, [0.49, 0.51])])
+r = assoc_report(small)
+print(f"\ndifference 50 vs 51%, n=2000:  p={r['p']:.3f} → {r['verdict']}")
+print(f"  Cramér's V={r['cramer_v']:.4f} (the same weak effect)")
+```
+
+**Interpretation.** Cramér's V grows with the **real** difference and does
+**not** depend on $n$ --- that is the property of an effect size. But $p$
+depends on $n$: at $2000$ the same weak association is **no longer**
+significant. So "give me a significant result" is a wrong requirement: on big
+data anything becomes significant. What to ask for is the **effect size** +
+whether it exceeds a business threshold.
+:::
+
+---
+
+# Part III --- Homogeneity: A/B menu
+
+> **Case.** An A/B test of a new **menu layout**. Control sees the old one,
+> test --- the new one. For each order we record the **basket category**:
+> Economy / Standard / Large / Premium. Did the redesign **change** the
+> distribution across categories?
+
+The key idea from the lecture: if we treat the **group** (test/control) as a
+second variable, a homogeneity table is just a contingency table. So the same
+`assoc_report` works unchanged.
+
+::: {.callout-tip icon="false"}
+## 🔮 Guess first
+First we run an **A/A** test (both groups from the same pool, no effect).
+What, in your view, should the verdict be --- reject or not?
+:::
+
+```{python}
+#| label: v3-homogeneity-aa
+
+rng = np.random.default_rng(11)
+basket_p = [0.45, 0.30, 0.18, 0.07]          # Economy/Standard/Large/Premium
+N = 6000
+cats = rng.choice(4, size=N, p=basket_p)
+perm = rng.permutation(N)
+A = np.bincount(cats[perm[:N // 2]], minlength=4)   # fair random split
+B = np.bincount(cats[perm[N // 2:]], minlength=4)
+
+r = assoc_report(np.array([A, B]))
+print("A/A (no effect):", r["verdict"], f"(p={r['p']:.3f})")
+```
+
+The A/A test is not rejected --- the randomization guardrail is clean. Now a
+**real** effect: the new layout shifts some baskets toward "Large/Premium".
+
+```{python}
+#| label: v3-homogeneity-ab
+#| fig-align: center
+
+shift_cats = rng.choice(4, size=N // 2, p=[0.40, 0.30, 0.21, 0.09])
+B2 = np.bincount(shift_cats, minlength=4)
+
+r = assoc_report(np.array([A, B2]))
+print(f"A/B (new layout):  p={r['p']:.4f},  "
+      f"Cramér's V={r['cramer_v']:.3f} → {r['verdict']}")
+
+labels = ["Economy", "Standard", "Large", "Premium"]
+x = np.arange(4)
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.bar(x - 0.2, A / A.sum(), 0.4, color=turquoise, label="control")
+ax.bar(x + 0.2, B2 / B2.sum(), 0.4, color=red_pink, label="test")
+ax.set_xticks(x); ax.set_xticklabels(labels)
+ax.set_ylabel("share of orders")
+ax.set_title("New menu layout shifts baskets toward Large/Premium")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+::: {.callout-important icon="false"}
+## Why not a t-test?
+Here the metric is a **category**, not a number. A t-test on the "average
+category" makes no sense. Chi-square homogeneity compares the **whole
+distribution** across categories --- exactly what we need for a shift in the
+order structure.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 5
+1. Compute the **Premium share** in control and test. By how many percentage
+   points did it grow? Is such a change worth rolling out?
+2. Make the effect **very weak** (`[0.44, 0.30, 0.18, 0.08]`) and look at $p$
+   and Cramér's V at $N=6000$. And at $N=60000$? Where is the familiar trap?
+3. **Case.** Besides the category shift, the team wants to know whether the
+   **Premium share** specifically grew. Which criterion is more precise here
+   than chi-square --- and why?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 5
+
+```{python}
+#| label: sol5
+
+# (1) Premium share growth
+print(f"Premium: control={A[3]/A.sum():.1%}, test={B2[3]/B2.sum():.1%} "
+      f"(+{(B2[3]/B2.sum() - A[3]/A.sum())*100:.1f} pp)")
+
+# (2) weak effect at different n
+rng = np.random.default_rng(12)
+for size in (6000, 60000):
+    a = np.bincount(rng.choice(4, size, p=basket_p), minlength=4)
+    b = np.bincount(rng.choice(4, size, p=[0.44, 0.30, 0.18, 0.08]), minlength=4)
+    r = assoc_report(np.array([a, b]))
+    print(f"N={size:>6d}: p={r['p']:.3f}, V={r['cramer_v']:.3f} → {r['verdict']}")
+```
+
+**Interpretation.** A weak effect at $N=6000$ is often not significant, while
+at $N=60000$ it is, even though Cramér's V stays tiny: the big-$n$ trap again.
+For the **Premium share** (one binary metric) a $z$-test for proportions is
+more precise: it targets a single parameter, whereas chi-square homogeneity
+"smears" sensitivity across all four categories.
+:::
+
+---
+
+# Part IV --- Small samples: a promo pilot (Yates / Fisher)
+
+> **Case.** Before launching in a new city, GreenBowl runs a **micro-pilot**:
+> $15$ users in control and test each, the metric is "made a reorder / not".
+> In the test (with a promo code) $6$ reordered, in control --- $1$. Did the
+> promo work?
+
+At such small counts the ordinary chi-square **lies** (it inflates
+significance). So the final version of the tool switches to an exact test
+itself.
+
+## Version 4 --- safe choice of test
+
+```{python}
+#| label: v4
+
+def safe_assoc(table, alpha=0.05):
+    """Version 4. Small expected counts in a 2×2 → Fisher's exact test."""
+    table = np.asarray(table, float)
+    expected = chi2_contingency(table)[3]
+    if table.shape == (2, 2) and expected.min() < 5:
+        odds, p = fisher_exact(table)
+        verdict = ("⛔ reject (Fisher)" if p <= alpha
+                   else "✅ do not reject (Fisher)")
+        return {"test": "Fisher exact", "p": p, "odds_ratio": odds,
+                "min_expected": expected.min(), "verdict": verdict}
+    return {"test": "chi2", **assoc_report(table, alpha)}  # ← reused V3
+```
+
+```{python}
+#| label: v4-demo
+
+pilot = np.array([[6, 9],     # test:    6 reordered, 9 not
+                  [1, 14]])   # control: 1 reordered, 14 not
+
+print("Naive chi2 without correction: p =",
+      f"{chi2_contingency(pilot, correction=False)[1]:.4f}  ⛔ 'significant!'")
+print("chi2 with Yates' correction:   p =",
+      f"{chi2_contingency(pilot)[1]:.4f}")
+
+r = safe_assoc(pilot)
+print(f"\nsafe_assoc → {r['test']}: p={r['p']:.4f}  "
+      f"(E_min={r['min_expected']:.1f})")
+print(r["verdict"])
+```
+
+::: {.callout-warning icon="false"}
+## What happened
+The naive chi-square gave $p = 0.031$ --- "there is an effect, roll it out!".
+But the expected counts are $< 5$, so the approximation is invalid. **Fisher's
+exact test** gives $p = 0.08$: the evidence is **insufficient**. On $15+15$
+users, $6$ vs $1$ reorder can still be chance. Decision: do **not** conclude,
+**collect a larger sample**.
+:::
+
+Let's verify this with **Monte Carlo**: on small 2×2 tables under H0 (no
+effect) compare the FPR without correction and with Yates.
+
+```{python}
+#| label: yates-mc
+
+def fpr_2x2(n, correction, p=0.3, n_exps=4000, seed=73):
+    """FPR of chi-square for a 2×2 under H0 (both groups with the same p)."""
+    rng = np.random.default_rng(seed)
+    rej = 0
+    for _ in range(n_exps):
+        a, c = rng.binomial(n, p), rng.binomial(n, p)
+        t = [[a, n - a], [c, n - c]]
+        if (a + c) and (2 * n - a - c):
+            rej += chi2_contingency(t, correction=correction)[1] < 0.05
+    return rej / n_exps
+
+for n in (8, 15, 30):
+    print(f"n={n:>2d} per group:  no correction FPR={fpr_2x2(n, False):.3f}   "
+          f"Yates FPR={fpr_2x2(n, True):.3f}")
+```
+
+::: {.callout-note icon="false"}
+## Monte Carlo conclusion
+Yates' correction makes the criterion **conservative** (FPR noticeably below
+$5\%$) --- safe, at the cost of a little power. At very small counts **Fisher's
+exact** test is the most reliable default; chi-square we keep for large tables.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 6
+1. How many reorders in the test (with $1$ in control and $n=15$) are needed
+   for Fisher to give $p < 0.05$? Iterate over `[[k, 15-k], [1, 14]]`.
+2. Scale the pilot to $60+60$ keeping the **proportions** (test $24/60$,
+   control $4/60$). Now does `safe_assoc` use chi-square or Fisher --- and
+   what is the verdict?
+3. **Case.** Why is "naive chi-square said significant" a more dangerous
+   mistake for the business than "Fisher said not significant"? What happens
+   if you roll out the promo on a false signal?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 6
+
+```{python}
+#| label: sol6
+
+# (1) reorder threshold for significance by Fisher
+print("Test k reorders out of 15 (control 1/15):")
+for k in range(4, 12):
+    p = fisher_exact([[k, 15 - k], [1, 14]])[1]
+    print(f"  k={k:>2d}: Fisher p={p:.4f} {'✅ significant' if p < 0.05 else ''}")
+
+# (2) same effect, larger sample
+big_pilot = np.array([[24, 36], [4, 56]])
+r = safe_assoc(big_pilot)
+print(f"\nPilot 60+60: {r['test']}, p={r['p']:.4f} → {r['verdict']}")
+```
+
+**Interpretation.** At $n=15$ you need ~$8$+ reorders against $1$ for Fisher
+to reject H0 --- a small sample simply does not give confidence. Scaling the
+pilot while keeping proportions pushes the expected counts $\ge 5$,
+`safe_assoc` switches to chi-square, and the same effect becomes significant.
+The false positive ("naive chi-square said significant") is **worse**: the
+team rolls out the promo, incurs discount costs --- yet there is no real
+effect. The conservative mistake merely forces collecting more data.
+:::
+
+---
+
+# Interpretation pitfalls
+
+::: {.callout-warning icon="false"}
+## The $E \ge 5$ rule --- about expected, not observed
+Rare categories inflate the FPR. Merge categories or use an exact test; check
+`min_expected`, not the zeros you happen to see.
+:::
+
+::: {.callout-important icon="false"}
+## Significant ≠ strong
+On large $n$ the $p$ is almost always tiny. Always accompany chi-square with
+an **effect size** (Cramér's V) and a business threshold.
+:::
+
+::: {.callout-warning icon="false"}
+## Small 2×2 → Fisher, not naive chi-square
+Without correction chi-square **overstates** significance at small counts. The
+default is Fisher (exact); Yates is a quick approximation, but conservative.
+:::
+
+::: {.callout-important icon="false"}
+## Chi-square says "whether", residuals say "where"
+By itself chi-square does not show the **structure** of the association. Look
+at standardized residuals $(O-E)/\sqrt{E}$ --- these are ready-made product
+insights.
+:::
+
+::: {.callout-warning icon="false"}
+## Not rejecting ≠ proof of independence
+A large $p$ means "no association found", not "there is no association". On a
+small sample the criterion is simply weak.
+:::
+
+---
+
+# Categorical diagnostics checklist {.unnumbered}
+
+- [ ] Are all **expected** counts $\ge 5$? (rare categories merged)
+- [ ] Is the question **goodness-of-fit** (one variable), **independence**
+  (two variables), or **homogeneity** (groups)? Right df chosen?
+- [ ] Large $n$ → is **Cramér's V** and a business threshold reported next to
+  $p$?
+- [ ] Looked at the **standardized residuals** --- where exactly is the
+  association?
+- [ ] A **2×2 table with small counts** → used **Fisher** rather than naive
+  chi-square?
+- [ ] Was the criterion itself validated with **Monte Carlo** (FPR under H0)
+  where its calibration is in doubt?
+- [ ] Is the metric really **categorical**? (and not a number, where a
+  $t$/$z$-test is more appropriate)
+
+If even one answer is "no" --- it is **too early** to trust the conclusion.
