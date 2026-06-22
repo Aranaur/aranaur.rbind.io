@@ -1,0 +1,493 @@
+---
+title: "Практичне заняття 7"
+subtitle: "STAT250: Теорія ймовірностей та статистика"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: uk
+format:
+  revealjs:
+    theme: default
+    slide-number: true
+    toc: false
+    chalkboard: true
+    preview-links: false
+    logo: ""
+    footer: "STAT250 · KSE · Практичне заняття 7"
+    highlight-style: github
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+#| include: false
+library(tidyverse)
+library(patchwork)
+library(scales)
+library(palmerpenguins)
+```
+
+# Перевірка узгодженості: ключові ідеї
+
+## Що ми вивчаємо сьогодні {.smaller}
+
+Минулого разу ми порівнювали **середні** ($t$-тести). Сьогодні питання інше:
+чи **узгоджуються** дані з певним розподілом або чи **пов'язані** дві ознаки?
+
+| Інструмент | Питання | R |
+|------------|---------|---|
+| Шапіро–Вілка | Чи $X \sim$ нормальний? | `shapiro.test` |
+| Колмогорова–Смирнова | Чи $F(x) = F_0(x)$? | `ks.test` |
+| $\chi^2$ узгодженості | Чи частоти $=$ очікуваним? | `chisq.test(x, p=)` |
+| $\chi^2$ незалежності | Чи дві ознаки незалежні? | `chisq.test(table)` |
+
+::: {.callout-tip appearance="simple"}
+**Перші два** перевіряють форму неперервного розподілу. **Останні два** працюють із
+**частотами** категорій.
+:::
+
+## Розподіли, пов'язані з нормальним {.smaller}
+
+Усі сьогоднішні тести спираються на три «похідні» від нормального розподілу:
+
+$$
+\chi^2_n = \sum_{i=1}^{n} Z_i^2, \qquad
+t_n = \frac{Z}{\sqrt{U/n}}, \qquad
+F_{d_1,d_2} = \frac{U/d_1}{V/d_2}
+$$
+
+де $Z, Z_i \sim \mathcal{N}(0,1)$, а $U \sim \chi^2_{d_1}$, $V \sim \chi^2_{d_2}$ — незалежні.
+
+```{r}
+#| echo: false
+#| fig-width: 9
+#| fig-height: 3.2
+
+tibble(x = seq(0, 25, length.out = 500)) |>
+  mutate(`df = 3` = dchisq(x, 3),
+         `df = 5` = dchisq(x, 5),
+         `df = 10` = dchisq(x, 10)) |>
+  pivot_longer(-x, names_to = "df", values_to = "density") |>
+  ggplot(aes(x, density, color = df)) +
+  geom_line(linewidth = 1) +
+  scale_color_manual(values = c("df = 3" = "#2166ac", "df = 5" = "#4393c3", "df = 10" = "#d73027")) +
+  labs(title = expression(paste("Розподіл ", chi^2, " зі зростанням ступенів свободи")),
+       x = NULL, y = "Щільність", color = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top")
+```
+
+> Статистика $\chi^2$ невід'ємна й **праворуч скошена**; великі значення → сильна розбіжність.
+
+## Загальна логіка {.smaller}
+
+Усі чотири тести мають однакову структуру:
+
+$$
+\text{Статистика} \;\xrightarrow{H_0}\; \text{відомий розподіл} \;\Rightarrow\; p\text{-value}
+$$
+
+| Крок | Тести нормальності | Тести $\chi^2$ |
+|------|--------------------|----------------|
+| $H_0$ | дані нормальні | частоти $=$ очікуваним / ознаки незалежні |
+| Статистика | $W$ або $D_n$ | $\hat{\chi}^2 = \sum \frac{(O_i - E_i)^2}{E_i}$ |
+| Рішення | $p < \alpha \Rightarrow$ відхиляємо $H_0$ | $p < \alpha \Rightarrow$ відхиляємо $H_0$ |
+
+::: {.callout-important appearance="simple"}
+Для $\chi^2$-тестів **очікувані частоти** $E_i$ мають бути $\geq 5$ у кожній категорії.
+:::
+
+# Перевірка нормальності
+
+## Задача 1: Тест Шапіро–Вілка (`iris`) {.smaller}
+
+Датасет `iris` — виміри 150 квіток трьох видів. Розглянемо **довжину чашолистка**
+(`Sepal.Length`) лише для виду **Setosa** ($n = 50$).
+
+::: {.callout-note appearance="simple"}
+Чи можна вважати довжину чашолистка Setosa нормально розподіленою? $\alpha = 0.05$.
+$$H_0: X \sim \mathcal{N}(\mu, \sigma^2) \quad\text{проти}\quad H_a: X \nsim \mathcal{N}(\mu, \sigma^2)$$
+:::
+
+<br>
+
+**Підказка:** статистика Шапіро–Вілка $W \in (0, 1]$; значення **близькі до 1** свідчать на
+користь нормальності. Малий $p$-value → відхиляємо $H_0$.
+
+## Задача 1: Діагностичні графіки {.smaller}
+
+```{r}
+#| fig-width: 9
+#| fig-height: 3.8
+#| output-location: slide
+
+setosa <- iris$Sepal.Length[iris$Species == "setosa"]
+
+p_hist <- tibble(x = setosa) |>
+  ggplot(aes(x)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 10,
+                 fill = "#4393c3", color = "white", alpha = 0.8) +
+  stat_function(fun = dnorm, args = list(mean = mean(setosa), sd = sd(setosa)),
+                color = "#d73027", linewidth = 1) +
+  labs(title = "Гістограма + нормальна крива", x = "Sepal.Length", y = "Щільність") +
+  theme_minimal(base_size = 12)
+
+p_qq <- tibble(x = setosa) |>
+  ggplot(aes(sample = x)) +
+  stat_qq(color = "#2166ac") +
+  stat_qq_line(color = "#d73027", linewidth = 1) +
+  labs(title = "Q–Q графік", x = "Теоретичні квантилі", y = "Вибіркові квантилі") +
+  theme_minimal(base_size = 12)
+
+p_hist + p_qq
+```
+
+## Задача 1: Розв'язання в R {.smaller}
+
+```{r}
+shapiro.test(setosa)
+```
+
+<br>
+
+::: {.callout-important appearance="simple"}
+$W \approx 0.978$, $p \approx 0.46 > 0.05$ → **не відхиляємо** $H_0$.
+:::
+
+Точки на Q–Q графіку лягають близько до діагоналі, гістограма симетрична — припущення про
+**нормальність виправдане**. Це означає, що для цих даних коректно застосовувати $t$-тести.
+
+## Задача 2: Тест Колмогорова–Смирнова (`penguins`) {.smaller}
+
+Датасет `palmerpenguins::penguins` — виміри пінгвінів Антарктики. Візьмемо **масу тіла**
+(`body_mass_g`) виду **Adelie**, прибравши пропуски ($n = 151$).
+
+::: {.callout-note appearance="simple"}
+Чи відповідає **стандартизована** маса тіла Adelie стандартному нормальному розподілу?
+$$H_0: F(x) = \Phi(x) \quad\text{проти}\quad H_a: F(x) \ne \Phi(x)$$
+:::
+
+<br>
+
+**Підказка:** статистика $D_n = \sup_x |\hat{F}_n(x) - F_0(x)|$ — максимальна відстань між
+**емпіричною** та теоретичною функціями розподілу.
+
+## Задача 2: Розв'язання в R {.smaller}
+
+```{r}
+adelie <- penguins |>
+  filter(species == "Adelie", !is.na(body_mass_g))
+
+z <- as.numeric(scale(adelie$body_mass_g))   # стандартизація: (x - x̄) / s
+
+ks.test(z, "pnorm", mean = 0, sd = 1)
+```
+
+::: {.callout-warning appearance="simple"}
+Якщо у даних є **повтори** (ties), $p$-value наближений → R видає попередження.
+Коли $\mu, \sigma$ оцінено з тієї ж вибірки, формально точніший — тест **Ліллієфорса**
+(`nortest::lillie.test`).
+:::
+
+## Задача 2: ECDF проти теоретичної CDF {.smaller}
+
+```{r}
+#| fig-width: 9
+#| fig-height: 3.8
+#| output-location: slide
+
+grid <- seq(min(z), max(z), length.out = 200)
+
+tibble(x = grid, theoretical = pnorm(grid)) |>
+  ggplot() +
+  stat_ecdf(data = tibble(z = z), aes(z, color = "Емпірична (F̂n)"),
+            geom = "step", linewidth = 1) +
+  geom_line(aes(x, theoretical, color = "Теоретична (Φ)"), linewidth = 1) +
+  scale_color_manual(values = c("Емпірична (F̂n)" = "#2166ac", "Теоретична (Φ)" = "#d73027")) +
+  labs(title = "ECDF маси тіла Adelie vs стандартна нормальна CDF",
+       x = "Стандартизована маса тіла", y = "F(x)", color = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top")
+```
+
+## Задача 2: Порівняння з Шапіро–Вілка {.smaller}
+
+```{r}
+shapiro.test(adelie$body_mass_g)$p.value
+```
+
+::: {.callout-important appearance="simple"}
+KS: $D \approx 0.07$, $p \approx 0.41$ → **не відхиляємо** $H_0$.
+Шапіро–Вілка: $p \approx 0.032 < 0.05$ → **відхиляє** $H_0$. Висновки **різні**!
+:::
+
+> Шапіро–Вілка **потужніший**: при $n = 151$ він уловлює незначне відхилення від нормальності,
+> якого KS не помічає. KS універсальніший (будь-яке $F_0$), але менш чутливий. На практиці для
+> нормальності надають перевагу Шапіро–Вілка, доповнюючи його Q–Q графіком.
+
+# Хі-квадрат: тест узгодженості
+
+## Задача 3: Чи чесна гральна кістка? {.smaller}
+
+Шестигранну кістку кинули **60 разів** і отримали такі частоти граней:
+
+| Грань | 1 | 2 | 3 | 4 | 5 | 6 |
+|-------|---|---|---|---|---|---|
+| $O_i$ | 13 | 8 | 12 | 10 | 7 | 10 |
+
+::: {.callout-note appearance="simple"}
+На рівні $\alpha = 0.05$ перевірте, чи кістка чесна (рівномірний розподіл).
+$$H_0:\; p_i = \tfrac{1}{6}\;\;\forall i \quad\text{проти}\quad H_a:\; \text{хоча б одне } p_i \ne \tfrac{1}{6}$$
+:::
+
+**Підказка:** $\hat{\chi}^2 = \sum_{i=1}^{k} \dfrac{(O_i - E_i)^2}{E_i}$, де $E_i = n p_i$, $df = k - 1$.
+
+## Задача 3: Аналітичне рішення {.smaller}
+
+**Очікувана частота** (однакова для всіх граней):
+
+$$
+E_i = n p_i = 60 \cdot \frac{1}{6} = 10
+$$
+
+**Статистика:**
+
+$$
+\hat{\chi}^2 = \frac{(13-10)^2 + (8-10)^2 + (12-10)^2 + (10-10)^2 + (7-10)^2 + (10-10)^2}{10}
+$$
+
+$$
+\hat{\chi}^2 = \frac{9 + 4 + 4 + 0 + 9 + 0}{10} = 2.6, \qquad df = 6 - 1 = 5
+$$
+
+**Критичне значення:** $\chi^2_{0.95,\,5} \approx 11.07$. Оскільки $2.6 < 11.07$ → **не відхиляємо** $H_0$.
+
+## Задача 3: Розв'язання в R {.smaller}
+
+```{r}
+observed <- c(13, 8, 12, 10, 7, 10)
+chisq.test(observed, p = rep(1/6, 6))
+```
+
+<br>
+
+::: {.callout-important appearance="simple"}
+$\hat{\chi}^2 = 2.6$, $p \approx 0.76 \gg 0.05$ → даних **недостатньо**, щоб засумніватися в
+чесності кістки.
+:::
+
+```{r}
+#| echo: false
+#| fig-width: 8
+#| fig-height: 2.6
+
+tibble(face = factor(1:6), Observed = observed, Expected = 10) |>
+  pivot_longer(-face) |>
+  ggplot(aes(face, value, fill = name)) +
+  geom_col(position = "dodge", alpha = 0.85) +
+  scale_fill_manual(values = c("Observed" = "#4393c3", "Expected" = "grey60")) +
+  labs(x = "Грань", y = "Частота", fill = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top")
+```
+
+## Задача 4: Чи однаково поширені огранки? (`diamonds`) {.smaller}
+
+Датасет `diamonds` (≈ 54 000 діамантів) містить категорію огранки `cut`:
+Fair, Good, Very Good, Premium, Ideal.
+
+::: {.callout-note appearance="simple"}
+Чи трапляються всі п'ять огранок **однаково часто**? $\alpha = 0.05$.
+$$H_0:\; p_i = \tfrac{1}{5}\;\;\forall i \quad\text{проти}\quad H_a:\; \text{принаймні одне } p_i \ne \tfrac{1}{5}$$
+:::
+
+```{r}
+table(diamonds$cut)
+```
+
+## Задача 4: Розв'язання в R {.smaller}
+
+```{r}
+counts <- table(diamonds$cut)
+chisq.test(counts, p = rep(1/5, 5))
+```
+
+<br>
+
+::: {.callout-important appearance="simple"}
+$\hat{\chi}^2 \approx 22\,745$, $df = 4$, $p < 2.2\times10^{-16}$ → **рішуче відхиляємо** $H_0$.
+:::
+
+> На відміну від кістки, тут **величезна вибірка** робить навіть помірні відхилення
+> статистично значущими. Огранки розподілені **далеко не рівномірно**: Ideal зустрічається
+> у ~13 разів частіше за Fair.
+
+## Задача 4: Спостережене проти очікуваного {.smaller}
+
+```{r}
+#| fig-width: 9
+#| fig-height: 4
+#| output-location: slide
+
+n <- sum(counts)
+tibble(cut = names(counts),
+       Спостережено = as.integer(counts),
+       Очікувано = n / 5) |>
+  mutate(cut = factor(cut, levels = names(counts))) |>
+  pivot_longer(-cut, names_to = "type", values_to = "freq") |>
+  ggplot(aes(cut, freq, fill = type)) +
+  geom_col(position = "dodge", alpha = 0.85) +
+  geom_hline(yintercept = n / 5, linetype = "dashed", color = "grey40") +
+  scale_fill_manual(values = c("Спостережено" = "#d73027", "Очікувано" = "grey60")) +
+  scale_y_continuous(labels = label_number(big.mark = " ")) +
+  labs(title = "Огранки діамантів: рівномірність відкинуто",
+       x = "Огранка", y = "Кількість", fill = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top")
+```
+
+# Хі-квадрат: тест незалежності
+
+## Задача 5: Стать і вид спорту {.smaller}
+
+Дослідження зв'язку між статтю та вподобанням виду спорту (футбол чи теніс), $n = 60$:
+
+| | Футбол | Теніс | Разом |
+|--------|--------|-------|-------|
+| Чоловіки | 20 | 10 | 30 |
+| Жінки | 10 | 20 | 30 |
+| **Разом** | 30 | 30 | 60 |
+
+::: {.callout-note appearance="simple"}
+Чи пов'язані стать і вподобання спорту? $\alpha = 0.05$.
+$$H_0:\; \text{ознаки незалежні} \quad\text{проти}\quad H_a:\; \text{ознаки пов'язані}$$
+:::
+
+**Підказка:** $E_{il} = \dfrac{O_{i\cdot}\,O_{\cdot l}}{n}$, $\;df = (k-1)(m-1)$.
+
+## Задача 5: Аналітичне рішення {.smaller}
+
+**Очікувані частоти** (за незалежності всі $E_{il} = \tfrac{30 \cdot 30}{60} = 15$):
+
+$$
+\hat{\chi}^2 = 2 \cdot \frac{(20 - 15)^2}{15} + 2 \cdot \frac{(10 - 15)^2}{15}
+= 2 \cdot \frac{25}{15} + 2 \cdot \frac{25}{15} = 6.667
+$$
+
+$$
+df = (2-1)(2-1) = 1, \qquad \chi^2_{0.95,\,1} = 3.84
+$$
+
+Оскільки $6.667 > 3.84$ → **відхиляємо** $H_0$.
+
+::: {.callout-tip appearance="simple"}
+Для таблиць $2\times2$ часто застосовують **поправку Єйтса** на неперервність —
+R робить це **за замовчуванням**.
+:::
+
+## Задача 5: Розв'язання в R {.smaller}
+
+```{r}
+tbl <- matrix(c(20, 10, 10, 20), nrow = 2, byrow = TRUE,
+              dimnames = list(Стать = c("Чоловіки", "Жінки"),
+                              Спорт = c("Футбол", "Теніс")))
+
+chisq.test(tbl, correct = FALSE)   # без поправки Єйтса — як у ручному розрахунку
+```
+
+```{r}
+chisq.test(tbl)$p.value            # з поправкою Єйтса (за замовчуванням)
+```
+
+::: {.callout-important appearance="simple"}
+Без поправки: $\hat{\chi}^2 = 6.67$, $p \approx 0.010$; з поправкою Єйтса: $p \approx 0.020$.
+**Обидва** $< 0.05$ → стать і спорт **пов'язані**.
+:::
+
+## Задача 6: Куріння і стать (`MASS::survey`) {.smaller}
+
+Датасет `MASS::survey` — опитування студентів університету. Перевіримо, чи пов'язані
+**стать** (`Sex`) та **звичка курити** (`Smoke`).
+
+::: {.callout-note appearance="simple"}
+Чи залежить інтенсивність куріння від статі? $\alpha = 0.05$.
+$$H_0:\; \text{Sex та Smoke незалежні} \quad\text{проти}\quad H_a:\; \text{пов'язані}$$
+:::
+
+```{r}
+data(survey, package = "MASS")
+tab <- table(survey$Sex, survey$Smoke)
+tab
+```
+
+## Задача 6: Тест і очікувані частоти {.smaller}
+
+```{r}
+test <- chisq.test(tab)
+test
+```
+
+```{r}
+test$expected           # очікувані частоти за H0
+```
+
+::: {.callout-important appearance="simple"}
+$\hat{\chi}^2 = 3.55$, $df = 3$, $p \approx 0.31 > 0.05$ → **не відхиляємо** $H_0$:
+звичка курити **не пов'язана** зі статтю. Усі $E_{il} \geq 5$ — умова застосовності виконана.
+:::
+
+## Задача 6: Внесок у статистику {.smaller}
+
+Який «осередок» найбільше відхиляється від незалежності? Дивимось на квадрати
+**стандартизованих залишків** Пірсона ($r_{il}^2$, сума $= \hat{\chi}^2$):
+
+```{r}
+#| fig-width: 9
+#| fig-height: 3.6
+#| output-location: slide
+
+as.data.frame(test$residuals^2) |>
+  set_names(c("Sex", "Smoke", "contrib")) |>
+  ggplot(aes(Smoke, Sex, fill = contrib)) +
+  geom_tile(color = "white", linewidth = 1) +
+  geom_text(aes(label = round(contrib, 2)), color = "grey15", size = 5) +
+  scale_fill_gradient(low = "white", high = "#d73027") +
+  labs(title = "Внесок осередків у χ² (r²)",
+       x = "Звичка курити", y = "Стать", fill = "r²") +
+  theme_minimal(base_size = 12)
+```
+
+> Найбільший внесок дає категорія **Regul** (регулярне куріння): серед чоловіків його більше,
+> ніж очікувалося. Але сумарно цього **недостатньо** для значущості.
+
+# Підсумок
+
+## Підсумкова таблиця {.smaller}
+
+| № | Задача | Метод | R | Результат |
+|---|--------|-------|---|-----------|
+| 1 | Нормальність Setosa | Шапіро–Вілка | `shapiro.test` | $p\approx0.46$ — нормальний |
+| 2 | Нормальність Adelie | Колмогоров–Смирнов | `ks.test` | KS $p\approx0.41$ vs Шапіро $0.03$ |
+| 3 | Чесність кістки | $\chi^2$ узгодженості | `chisq.test(p=)` | $p\approx0.76$ — чесна |
+| 4 | Огранки діамантів | $\chi^2$ узгодженості | `chisq.test(p=)` | $p<10^{-15}$ — нерівномірно |
+| 5 | Стать × спорт | $\chi^2$ незалежності | `chisq.test(2×2)` | $p\approx0.01$ — пов'язані |
+| 6 | Стать × куріння | $\chi^2$ незалежності | `chisq.test(table)` | $p\approx0.31$ — незалежні |
+
+## Головні ідеї {.smaller}
+
+1. **Тести нормальності** (Шапіро, KS) перевіряють *форму* неперервного розподілу; Шапіро —
+   потужніший, KS — універсальніший (будь-яке $F_0$).
+2. **$\chi^2$-тести** працюють із *частотами*: узгодженість (один вимір) чи незалежність (таблиця).
+3. **Розмір вибірки вирішує**: великий $n$ (діаманти) робить значущим навіть малий ефект —
+   завжди дивіться на **розмір** відхилення, а не лише на $p$-value.
+4. **Умова застосовності**: очікувані частоти $E_i \geq 5$; для $2\times2$ — поправка Єйтса.
+5. **Стандартизовані залишки** показують, які категорії *найбільше* порушують $H_0$.
+
+## Питання? {background-color="#2166ac"}
+
+::: {style="color: white; text-align: center; font-size: 1.5em; margin-top: 2em;"}
+Дякую за увагу!
+:::
