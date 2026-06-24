@@ -195,8 +195,17 @@ def _norm(p):
     return p / p.sum()
 
 
+# A per-lab salt makes THIS lab's world assignment statistically INDEPENDENT of
+# every other lab's. Without it, world = hash(id) % 6 is identical across any
+# two labs that share the hash and have 6 worlds (e.g. Lab 6 / greenbowl_gof),
+# so a student who lands on a "hard" index stays on it in every lab — the
+# "some people always get the hard scenario" complaint. EACH NEW LAB MUST USE
+# ITS OWN DISTINCT SALT so luck does not carry over across the course.
+_LAB_SALT = "stat220-lab7-chi-v1"
+
+
 def _seed_from_id(student_id):
-    """Deterministic 32-bit seed from a normalised id."""
+    """Deterministic 32-bit seed from a normalised id (drives the DATA sample)."""
     norm = student_id.strip().lower().encode("utf-8")
     return int(hashlib.sha256(norm).hexdigest()[:8], 16)
 
@@ -210,8 +219,14 @@ def _jit(n, rng, frac=0.03):
 
 
 def _world(student_id):
-    """Pick the hidden experiment world for this id."""
-    return _WORLDS[_seed_from_id(student_id) % len(_WORLDS)]
+    """Pick the hidden experiment world for this id.
+
+    Salted with ``_LAB_SALT`` so the world drawn here does NOT correlate with
+    the world drawn in any other lab — no student is consistently lucky or
+    unlucky across the course."""
+    norm = (student_id.strip().lower() + "|" + _LAB_SALT).encode("utf-8")
+    h = int(hashlib.sha256(norm).hexdigest()[:8], 16)
+    return _WORLDS[h % len(_WORLDS)]
 
 
 def _draw_arm(n, arm, basket_by_city, city_p, rng):
@@ -375,12 +390,30 @@ _EXPECTED = {
 }
 
 
+# Rough effort tier per world. The worlds are NOT equally hard: a clean "win"
+# is a short, direct ship verdict, whereas "pilot" (sparse table -> collapse to
+# 2x2 -> Fisher -> small-n caveats) and "confound" (independence + stratify +
+# multiplicity) take materially more work. Surfaced by grade_chi.py so the
+# verdict can be graded **difficulty-aware** — the salt removes cross-lab
+# correlation, but within a single lab the draws still differ in effort, and an
+# equal-points rubric should account for that.
+_DIFFICULTY = {
+    "win": "easy",
+    "trivial": "medium",
+    "srm": "medium",
+    "rare": "medium",
+    "pilot": "hard",
+    "confound": "hard",
+}
+
+
 def _reveal(student_id):
     """INSTRUCTOR ONLY. Return the hidden ground truth for ``student_id``."""
     world = _world(student_id)
     decision, evidence = _EXPECTED[world]
     return {
         "world": world,
+        "difficulty": _DIFFICULTY[world],
         "decision": decision,
         "evidence": evidence,
     }

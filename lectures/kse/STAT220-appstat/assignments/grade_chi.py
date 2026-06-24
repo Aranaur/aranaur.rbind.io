@@ -32,6 +32,7 @@ header — the first column. Blank lines are skipped.
 """
 
 import argparse
+import collections
 import csv
 import sys
 
@@ -168,17 +169,29 @@ def main(argv=None):
 
     w = max((len(r["email"]) for r in results), default=5)
     for r in results:
-        print(f"{r['email']:{w}s}  {r['world']:8s}  -> {r['decision']}")
+        print(f"{r['email']:{w}s}  {r['world']:8s} [{r['difficulty']:6s}]  -> {r['decision']}")
         print(f"{'':{w}s}  evidence: {r['evidence']}")
         print(f"{'':{w}s}  realized: {_fmt_realized(r['realized'])}")
         if r["flags"]:
             print(f"{'':{w}s}  ⚠ realized data contradicts the intended world: "
                   + "; ".join(r["flags"]))
 
+    if len(results) > 1:
+        tally = collections.Counter(r["difficulty"] for r in results)
+        worlds = collections.Counter(r["world"] for r in results)
+        print(f"\nroster difficulty mix: "
+              + ", ".join(f"{k}={tally.get(k, 0)}"
+                          for k in ("easy", "medium", "hard")))
+        print("roster world mix:      "
+              + ", ".join(f"{wd}={worlds.get(wd, 0)}" for wd in g._WORLDS))
+        print("(grade difficulty-aware: a clean 'win' is less work than a "
+              "'pilot'/'confound'.)")
+
     if args.out:
-        cols = ["email", "world", "decision", "evidence", "n_control", "n_test",
-                "srm_p", "raw_p", "raw_V", "raw_minE", "merged_p", "merged_V",
-                "fisher_p", "armcity_p", "within_reject", "flags"]
+        cols = ["email", "world", "difficulty", "decision", "evidence",
+                "n_control", "n_test", "srm_p", "raw_p", "raw_V", "raw_minE",
+                "merged_p", "merged_V", "fisher_p", "armcity_p",
+                "within_reject", "flags"]
         with open(args.out, "w", newline="", encoding="utf-8-sig") as f:
             wr = csv.DictWriter(f, fieldnames=cols)
             wr.writeheader()
@@ -186,6 +199,7 @@ def main(argv=None):
                 d = r["realized"]
                 wr.writerow({
                     "email": r["email"], "world": r["world"],
+                    "difficulty": r["difficulty"],
                     "decision": r["decision"], "evidence": r["evidence"],
                     "n_control": d["n_c"], "n_test": d["n_t"],
                     "srm_p": d["srm_p"],
