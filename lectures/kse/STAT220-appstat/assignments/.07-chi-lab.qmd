@@ -1,0 +1,509 @@
+---
+title: "Lab 7"
+subtitle: "Categorical A/B Forensics: When \"p < 0.05\" Is a Trap"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+execute:
+  echo: true
+  warning: false
+---
+
+# Objective
+
+In **Lab 6** you learned that a clean $t$-test verdict is not enough, because
+the $t$-test only ever looks at the **mean**. **Lab 7 moves to the other half
+of product data — counts in categories — and the lesson sharpens: a single
+"the chi-square is significant, ship it" line is, more often than not, a
+trap.**
+
+The GreenBowl experimentation platform A/B-tested a new **menu layout**. For
+every order it logged the **basket tier** the user landed in — *Economy /
+Standard / Large / Premium / VIP* — and the **city** the order came from. The
+automated report prints a tidy chi-square line claiming the redesign *changed
+the basket mix*. Your job is to decide whether you can **believe** it.
+
+The lecture gave you a toolkit where everything reduces to one idea — **compare
+observed counts $O$ with the counts $E$ expected under a hypothesis**,
+$\tau = \sum (O-E)^2/E$ — and several guardrails that the headline number
+quietly skips:
+
+- **Goodness-of-fit as an SRM check** — was the **randomization** itself
+  honest (did the arms arrive in the intended 50/50 split)?
+- **The expected-count rule ($E \ge 5$)** — is the table even *dense enough*
+  for the chi-square approximation to be valid?
+- **Chi-square homogeneity + standardized residuals** — did the distribution
+  move, and *where*?
+- **Cramér's V** — on big $n$ everything is "significant"; is the effect
+  actually **strong**?
+- **Yates / Fisher** — on a tiny pilot, does the exact test agree with the
+  approximation?
+- **Test of independence** — is an apparent win really driven by a
+  **confounding covariate** (the city)?
+- **Monte Carlo** — is your own guardrail calibrated at *your* sample size?
+
+The twist, as in Labs 4–6: **you do not get to see what is wrong.** Your
+experiment is pulled live from `greenbowl_chi.py`, keyed to your student id.
+Some students received a genuine, business-meaningful shift; some a difference
+that is statistically "significant" yet microscopic; some a **broken split**;
+some a **micro-pilot** too small for the chi-square approximation; some a
+**rare category** that quietly invalidates the test; and some an apparent win
+that is really a **city confound**. **The only honest way to find out which one
+you hold is to run the diagnostics.**
+
+You will:
+
+1. Pull your experiment and read the platform's **headline chi-square verdict**
+   — the one you are about to put on trial.
+2. Run the **SRM guardrail** (a goodness-of-fit test of the delivered split
+   against the intended 50/50) — the categorical A/A.
+3. Enforce the **expected-count rule** and build a `safe_homogeneity` tool that
+   refuses to trust a sparse table.
+4. Run the **homogeneity test**, read the **standardized residuals**, and pair
+   the $p$-value with **Cramér's V** to separate "significant" from "strong".
+5. Run the **independence check** (`arm × city`) and, if your covariate is
+   imbalanced, **stratify** to expose a confound.
+6. **Validate your guardrail with Monte Carlo** — its FPR, the minimum $n$, and
+   its power for *your* kind of effect.
+7. Deliver a one-page **forensic verdict** a non-statistician PM can act on.
+
+# General Requirements
+
+::: {.callout-important icon="false"}
+## The fixed business context (same for everyone)
+
+- **Unit:** one order.
+- **Metric:** the **basket tier** — `Economy`, `Standard`, `Large`,
+  `Premium`, `VIP` (ordered from cheapest to most expensive). The business
+  cares about users moving **up** into `Large`/`Premium`/`VIP`.
+- **Covariate:** the **city** (`Kyiv`, `Lviv`, `Odesa`, `Kharkiv`), logged for
+  every order.
+- **Arms:** `control` = old menu layout, `test` = new layout.
+- **Intended split:** **50 / 50**. Whether it was *delivered* 50/50 is
+  something you must check.
+- **Significance level:** $\alpha = 0.05$.
+:::
+
+::: {.callout-important icon="false"}
+## Everyone's experiment is different — on purpose
+
+Your experiment is unique to your id. It might be a clean win, a significant-
+but-trivial change, a broken randomization (SRM), a micro-pilot too small to
+trust, a table with a rare category that breaks the approximation, or an
+apparent win driven by a city confound. **There is no single "right answer"
+shared across the class** — there is only the diagnosis your diagnostics
+support. Copying another student's conclusion will be obviously wrong for your
+experiment.
+:::
+
+::: {.callout-note icon="false"}
+## Report Format
+
+Submit the report in **one** of the following formats:
+
+- **Quarto → PDF** (`.qmd` → `.pdf`)
+- **Quarto → HTML** (`.qmd` → `.html`, hosted, e.g. on
+  [Quarto Pub](https://quartopub.com/),
+  [Posit Connect Cloud](https://connect.posit.cloud/))
+- **Jupyter Notebook** (`.ipynb`)
+- **Google Colab** (share the link with viewing permissions)
+
+The report must contain both code **and** narrative. Every section begins with
+a written explanation, not code.
+:::
+
+::: {.callout-warning icon="false"}
+## What you build vs. what you use ready-made
+
+The thing you **build** today is the **categorical guardrail toolkit** —
+`srm_check`, `homogeneity_test` → `homogeneity_report` → `safe_homogeneity`,
+and the Monte-Carlo validators — grown step by step from Practice 7, each
+version **reusing** the previous one. The **criteria** themselves you take
+ready-made: `scipy.stats.chisquare`, `scipy.stats.chi2_contingency`,
+`scipy.stats.fisher_exact`, and
+`statsmodels.stats.proportion.proportion_confint` for the Wilson interval. You
+may **not** replace your validators with a library power/AA function — the
+simulation loop and the confidence-interval verdict must be **your own code**.
+:::
+
+::: {.callout-warning icon="false"}
+## Honour rule on the data platform
+
+`greenbowl_chi.py` contains the hidden truth in its source. **Do not read past
+the `# === instructor section ===` line, and do not call `_reveal`.** The point
+of the lab is to reach the diagnosis *by running the diagnostics*, not by
+reading the answer. Any report that names the hidden pathology from the source
+instead of demonstrating it with the toolkit scores **zero** for
+interpretation.
+:::
+
+::: {.callout-warning icon="false"}
+## Deadline
+
+📅 **July 1, 2026, 23:59**
+:::
+
+# Tasks
+
+## Get Your Experiment {#sec-data}
+
+Download `greenbowl_chi.py` (provided with the lab) into your working folder
+and load **your** experiment. Use **one** id consistently — your KSE email is
+recommended.
+
+```{python}
+#| label: load
+#| eval: false
+
+from greenbowl_chi import (load_my_experiment, BASKETS, CITIES,
+                           INTENDED_SPLIT, ALPHA)
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import chisquare, chi2_contingency, fisher_exact
+from statsmodels.stats.proportion import proportion_confint
+
+STUDENT_ID = "your.email@kse.org.ua"   # <-- put YOUR id here
+exp = load_my_experiment(STUDENT_ID)
+
+print(exp)                                  # arm sizes + intended split
+print(exp.data.head())                      # one row per order: arm, basket, city
+table = exp.table()                         # 2 x 5 counts: rows control/test
+print("rows = [control, test], cols =", BASKETS)
+print(table)
+```
+
+::: {.border}
+1. State your `STUDENT_ID`. Report $n_{\text{control}}$, $n_{\text{test}}$, and
+   the $2\times 5$ **basket table** (rows `control`/`test`, columns
+   `BASKETS`).
+2. Plot the basket distribution of each arm as **shares** (grouped bars), so
+   the two arms are comparable despite any size difference. In one sentence,
+   describe what you see.
+3. Run the platform's **headline test** — a naive
+   `chi2_contingency(table)` over the full $2\times 5$ table — and write down
+   the "ship / don't ship" line it would print. **This is the verdict you are
+   about to put on trial** — do not believe it yet.
+4. Confirm in one sentence that you understand the experiment's true nature is
+   **hidden**, and your task is to *diagnose* it with the categorical toolkit.
+:::
+
+## The SRM Guardrail: Was the Split Honest? (`srm_check`) {#sec-srm}
+
+Before believing **any** effect, check that the experiment was allocated the
+way it was designed. A **Sample-Ratio Mismatch (SRM)** — the delivered arm
+sizes drifting from the intended 50/50 — is the categorical A/B world's
+equivalent of a broken randomization: if the split is biased, *who* is in each
+arm is biased too, and every downstream comparison is contaminated. The right
+tool is a **goodness-of-fit** test of the two arm counts against the intended
+ratio.
+
+::: {.border}
+1. Implement **Version 1** of your toolkit,
+   `srm_check(n_control, n_test, intended=INTENDED_SPLIT, alpha=0.05)`, using
+   `scipy.stats.chisquare` with `f_exp` set to the intended split, returning
+   the $\chi^2$, the $p$-value, and a human-readable verdict. (This is a $k=2$
+   goodness-of-fit test — recall the lecture's "$<10$ for a $2\times1$ table"
+   note on expected counts.)
+2. Run it on **your** arm sizes. State plainly: **does the split pass or fail
+   SRM**, and by how many percentage points the realized ratio differs from
+   50/50.
+3. **Interpret as a guardrail.** A rejection here means the assignment / logging
+   is broken — *not* that the feature did anything. Explain, in one sentence,
+   why a difference you later see in the basket mix **cannot** be attributed to
+   the layout if the SRM check fails.
+:::
+
+::: {.callout-important icon="false"}
+## Stop-the-line rule
+If the **SRM check fails**, the basket comparison is **void** until the
+allocation is fixed — a "win" on a biased split is most likely **differential
+dropout** (e.g. low-spenders silently missing from one arm), not a real effect.
+If it fails, say so plainly: the rest of your analysis becomes "here is the
+bug", not "here is the effect".
+:::
+
+## Expected-Count Hygiene (`safe_homogeneity`) {#sec-expected}
+
+The chi-square test relies on a normal approximation (the CLT) that **breaks
+for rare categories**. The rule: every **expected** count $E_{ij} \ge 5$
+(and $\ge 10$ for a $2\times 2$). A table can *look* fine — non-zero
+everywhere — yet have an expected count below 5 hiding in a rare column, and
+then the $p$-value is not to be trusted.
+
+::: {.border}
+1. Implement **Version 2**, `homogeneity_test(table, alpha=0.05)`, using
+   `scipy.stats.chi2_contingency`, returning $\chi^2$, the degrees of freedom,
+   the $p$-value, **`min_expected`** (the smallest expected count), and a
+   verdict (mirror Practice 7's `assoc_test`).
+2. Run `homogeneity_test` on your full $2\times 5$ table and report
+   `min_expected`. **Is the rule satisfied?** If `min_expected < 5` (look at
+   the rare `VIP` tier especially), **merge** `VIP` into `Premium` and re-run.
+   Did the verdict change? (If your table is so small that `chi2_contingency`
+   cannot even run — an all-zero column — that itself is a verdict: the table
+   is too sparse for this test.)
+3. You will turn this guard into a reusable tool (`safe_homogeneity`) in
+   @sec-report, once the report version exists for it to fall back on.
+:::
+
+::: {.callout-warning icon="false"}
+## The rule is about *expected*, not *observed*
+A category can have a healthy observed count yet a tiny expected one, or vice
+versa. Always read `min_expected` from `chi2_contingency`, not the zeros you
+happen to see in the table.
+:::
+
+## Did the Mix Move, and Is It Strong? (`homogeneity_report`) {#sec-report}
+
+Now the headline question — but answered honestly. The chi-square homogeneity
+test says **whether** the basket distribution differs between arms; the
+**standardized residuals** say **where**; and **Cramér's V** says **how
+strongly** — which the $p$-value, on a large sample, cannot.
+
+::: {.border}
+1. Implement **Version 3**, `homogeneity_report(table, alpha=0.05)`, that
+   **reuses** `homogeneity_test` (Version 2) and adds **Cramér's V**,
+   $V = \sqrt{\chi^2 / (n\,(\min(m,k)-1))}$, plus a verbal strength label
+   (`practically none` $<0.1$, `weak` $<0.2$, `moderate` $<0.4$, else
+   `strong`).
+2. Implement **Version 4**, `safe_homogeneity(table, alpha=0.05)`, your
+   all-in-one entry point, that **reuses** `homogeneity_report` and adds a
+   guard: if the table is $2\times 2$ **and** `min_expected < 10` (the
+   stricter $2\times 2$ threshold from the lecture), switch to `fisher_exact`;
+   otherwise, if any `min_expected < 5`, **refuse to trust the raw chi-square**
+   and flag that a category must be merged (mirror Practice 7's `safe_assoc`).
+   Use `safe_homogeneity` from here on.
+3. Run it on the table you judged **valid** in @sec-expected (raw or merged).
+   Report $p$, $V$, and the strength label.
+4. **If your full table was too sparse for a valid 5-tier test** (every
+   $E < 5$, or `chi2_contingency` would not even run on an all-zero column —
+   the micro-pilot case), do **not** report a 5-tier verdict. Collapse to the
+   business-critical $2\times 2$ — `Premium`+`VIP` ("upmarket") vs the rest —
+   and run `safe_homogeneity` on it: with small expected counts it will route
+   to **Fisher's exact test**. Report the exact $p$ and treat *that* as your
+   verdict for this experiment.
+5. Plot the **standardized residuals** $(O-E)/\sqrt{E}$ as a heatmap
+   (`imshow`, diverging colormap, annotated). Read it in business terms: *which
+   basket tiers gained or lost in the test arm?* Is the movement **upward**
+   (toward `Premium`/`VIP`) or not?
+6. **Significant ≠ strong.** State explicitly: if your $n$ is very large and
+   $p \approx 0$ but $V$ is tiny, the change is **real but trivial** — quote
+   the actual shift in the `Premium`+`Large`+`VIP` **share** in percentage
+   points and judge whether it clears a business threshold. Conversely, a
+   non-trivial $V$ with an upward residual pattern is a genuine candidate to
+   ship.
+:::
+
+::: {.callout-warning icon="false"}
+## Cramér's V is biased **upward** on small samples
+$V$ is inflated when $n$ is small. Under $H_0$,
+$\mathbb{E}[V^2] = \dfrac{(m-1)(k-1)}{n\,(\min(m,k)-1)}$, so
+$$
+\mathbb{E}[V] \lesssim \sqrt{\frac{(m-1)(k-1)}{n\,(\min(m,k)-1)}}
+\;\xrightarrow[n\to\infty]{}\; 0 .
+$$
+The bias **shrinks as $n$ grows** — that is the whole point. For a $2\times 5$
+table at $n=30$ this floor is $\sqrt{4/30}\approx 0.37$, which is exactly why a
+15-vs-15 pilot shows $V\approx 0.3$ with **no** real effect. Do **not** read
+that as a "moderate" association: a large $V$ only means something at a healthy
+$n$; at tiny $n$, trust the exact-test $p$-value, not $V$. (For an honest
+number, use the **bias-corrected** Cramér's V, e.g. Bergsma's.)
+:::
+
+::: {.callout-tip icon="false"}
+## Research hook
+Two of the hidden worlds both **reject** the homogeneity test — but one is a
+real win and the other is a microscopic difference inflated by an enormous
+sample. The chi-square $p$-value **cannot** tell them apart. Cramér's V and the
+percentage-point shift can. This is exactly the big-$n$ trap from the lecture.
+:::
+
+## The Confound Check: Is the "Win" Really the City? {#sec-confound}
+
+Homogeneity assumes the arms differ **only** by the treatment. But if the split
+accidentally over-sampled one **city** in the test arm — and that city has
+different basket tastes — the pooled table can show a "shift" that is pure
+**covariate imbalance**, not the layout. This is a **test of independence**
+question, and the fix is to **stratify**.
+
+::: {.border}
+1. **Check the covariate balance.** Build the `arm × city` table
+   (`exp.table(by="arm_city")`) and run `homogeneity_test` on it. Is the
+   **city distribution independent of the arm**, or did the test arm
+   over-/under-sample some city?
+2. **If `arm × city` is balanced:** confirm in one sentence that the city is
+   not confounding your basket comparison, and your @sec-report verdict stands.
+3. **If `arm × city` is imbalanced:** the pooled basket result is **suspect**.
+   **Stratify** — run `homogeneity_test` on the basket table *within each city*
+   (`exp.table(by="city")`) and compare. If the within-city tables **stop
+   rejecting** while the pooled one rejected, the apparent effect is a **city
+   confound** (a Simpson-style reversal): report the layout as **not** the
+   cause, and recommend fixing the split / controlling for city. Read the four
+   within-city $p$-values with **multiplicity** in mind (a single $p$ just
+   under $0.05$ across four cities is expected by chance — think Bonferroni).
+:::
+
+::: {.callout-tip icon="false"}
+## Research hook
+This is the part you must *discover*, not assume. Most ids have a balanced
+`arm × city`; some do not. "I checked `arm × city`, it is independent, so city
+is not confounding the result" is a real finding — and skipping the check when
+the covariate *is* imbalanced is a real mistake that ships a non-effect.
+:::
+
+## Validate Your Guardrail with Monte Carlo {#sec-mc}
+
+Your homogeneity test is itself a **criterion**, so validate it as in Practice
+7 / Lab 5: does it keep the promised 5% false positives at **your** table
+shape and sample size, and **from what $n$** can it detect an effect like
+yours? You set the truth, so you always know the right answer.
+
+::: {.border}
+1. Implement `homogeneity_fpr(probs, n_per_arm, n_exps=2000, alpha=0.05,
+   seed=...)` that runs an **A/A** ($H_0$ true: **both** arms drawn from the
+   same `probs` with `np.random.default_rng(...).multinomial`) and returns the
+   FPR **with** a 95% **Wilson** CI (`proportion_confint(method="wilson")`).
+2. **Calibration.** Run it for the GreenBowl base mix at a small, a medium and
+   a large $n$ (e.g. 30 / 200 / 2000). Report each FPR with its CI and whether
+   $\alpha = 0.05$ is inside. **Then make a category rare** (push `VIP` toward
+   $\approx 0.01$) at small $n$ and show the FPR **leave** $\alpha$ — the
+   Monte-Carlo proof of the $E \ge 5$ rule from @sec-expected. Plot FPR (with
+   the Wilson band) vs. $n$ with a dashed line at $0.05$.
+3. **Power for *your* effect.** Implement
+   `homogeneity_power(p_control, p_test, n_per_arm, ...)` and measure the power
+   to detect an effect **like the one in your experiment** (the basket shift,
+   or — if your world is the trivial / null one — a deliberately small shift,
+   to show how much $n$ a tiny effect needs). How large an $n$ per arm would
+   you need for power $\ge 0.8$?
+:::
+
+::: {.callout-important icon="false"}
+## Match the validation to *your* diagnosis
+Validate the criterion your verdict actually rests on:
+
+- **Micro-pilot (the 15-vs-15 case):** your decision hinges on a small
+  $2\times 2$, so validate **that** — run the A/A FPR of the $2\times 2$
+  chi-square **with and without Yates' correction** at small $n$ (reuse the
+  Practice-7 `chi2_rejection_rate` idea), and show that without correction it
+  **over-rejects** while Fisher / Yates holds $\alpha$. That over-rejection is
+  *why* you trusted Fisher over the naive chi-square.
+- **Rare-category world:** validate the $E \ge 5$ rule directly (step 2) and
+  show that **merging** restores an honest FPR.
+- **Big-$n$ trap (trivial world):** the criterion is calibrated fine — the
+  point is **power**, not FPR. Show that at your $n$ even a microscopic effect
+  is detected with power $\approx 1$, which is exactly why $p$ is uninformative
+  about strength.
+:::
+
+::: {.callout-note icon="false"}
+## Why this matters
+Whatever you conclude rests on the criterion being trustworthy at *your* table
+shape and size. "Conservative" (FPR below $\alpha$) is **safe but
+underpowered**; "invalid" (FPR above $\alpha$, e.g. from a rare cell) is **not**
+— a rejection from an invalid test is worth nothing. Keep that distinction from
+Lab 5.
+:::
+
+## Final Forensic Verdict {#sec-final}
+
+::: {.border}
+Write a **single-page memo** (≤ 400 words) to a **non-technical** GreenBowl PM
+who has only seen the platform's headline chi-square line. It must contain:
+
+1. The **headline verdict** (what the automated report claimed) and your
+   **one-line forensic verdict** — one of: a real, business-meaningful basket
+   shift (**ship**); a **significant-but-trivial** change (**don't ship**); a
+   **broken split / SRM** (**fix the splitter**, result void); an
+   **underpowered micro-pilot** (**collect more**); a table invalidated by a
+   **rare category** (**fix the test**, no effect); or an apparent win that is
+   a **city confound** (**don't trust it**, control for city).
+2. The **evidence** that forces it, quoted as numbers, not adjectives: the SRM
+   check, `min_expected` and any merge, the homogeneity $p$ **and** Cramér's V,
+   the residual pattern, the `arm × city` independence check (with stratified
+   results if relevant), and the Monte-Carlo calibration/power at your $n$.
+3. A concrete **recommendation**: ship / don't ship / fix the splitter / merge
+   and re-test / collect more / control for city — whichever your diagnosis
+   demands.
+4. One honest **caveat** of your own audit (e.g. chi-square tells you *whether*,
+   not whether it is business-significant; a single stratified $p$ near $0.05$
+   across four cities is multiplicity, not signal; simulation noise at the
+   `n_exps` you used).
+
+It must be readable by someone who has never heard the words "chi-square" or
+"$p$-value". You are graded on whether the PM could act on it without
+follow-up questions.
+:::
+
+# Grading {.unnumbered}
+
+| Criterion | Points |
+|---|:---:|
+| Correctness of methodology | 3 |
+| Interpretation of results | 3 |
+| Code quality and organization | 2 |
+| **Total** | **8** |
+
+::: {.callout-tip icon="false"}
+## Grading Details
+
+**Correctness of methodology (3 pts):**
+
+- `srm_check` and `homogeneity_test`/`homogeneity_report`/`safe_homogeneity`
+  are correct, built step by step (each version reusing the previous), and
+  `min_expected` / the merge rule is enforced (1 pt).
+- The SRM guardrail, the homogeneity test with residuals + Cramér's V, and the
+  `arm × city` independence/stratification check are all run correctly with the
+  right tables and df (1 pt).
+- The Monte-Carlo validation returns the FPR/power **with** a Wilson CI from a
+  correct simulation loop, and is read for calibration vs. power (1 pt).
+
+**Interpretation of results (3 pts):**
+
+- @sec-srm and @sec-expected correctly gate the analysis (a failed SRM or a
+  sub-5 expected count is treated as disqualifying, not ignored).
+- @sec-report separates **significant** from **strong** (Cramér's V + the
+  percentage-point shift), and @sec-confound handles the city confound
+  correctly when present.
+- The memo's forensic verdict **matches the evidence** and overturns or
+  confirms the headline chi-square for the right reason.
+
+**Code quality and organization (2 pts):**
+
+- `srm_check`, the homogeneity tools, and the Monte-Carlo validators are single
+  reusable functions used across all sections (built step by step, not
+  re-implemented inline).
+- Plots (share bars, residual heatmap, the FPR-vs-$n$ curve) have axis labels,
+  titles, legends, and a dashed $\alpha$ line where relevant.
+- Narrative precedes every code block; each section reads as an argument, not a
+  dump of outputs.
+:::
+
+# Defense {.unnumbered}
+
+During the defense (5–7 minutes) you will be asked *"What if?"* questions that
+probe whether you understand **why** each piece exists, for example:
+
+- *"Your chi-square $p$ is below $10^{-20}$. Does that mean the redesign had a
+  big effect? What single number settles it — the $p$-value or something
+  else?"*
+- *"Your arms came in 4000 vs 3700. Why does that one fact make the basket
+  'win' untrustworthy, no matter how small the homogeneity $p$ is?"*
+- *"Your `VIP` column has an expected count of 3. Show me — live — what you do
+  about it and why a $p$-value off the raw table would be misleading."*
+- *"Your pooled table rejects but the within-city tables don't. Explain to the
+  PM, in one sentence, what actually happened."*
+- *"On 15 vs 15 orders the naive chi-square said 'significant' but Fisher said
+  no. Which do you believe, and what does your Monte-Carlo FPR at $n=15$ tell
+  you about the naive test?"*
+- *"Your Cramér's V is $0.01$ with $p \approx 0$. Is that a contradiction? What
+  do you tell the PM?"*
+
+You may also be asked to **change one thing live** (merge a category, swap the
+pooled table for a stratified one, shrink $n$ in the Monte-Carlo, toggle Yates'
+correction) and explain the resulting shift.
