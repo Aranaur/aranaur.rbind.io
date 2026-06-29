@@ -1,0 +1,1075 @@
+---
+title: "Nonparametric tests for A/B"
+subtitle: "Applied Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .07-mu_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=4049">🔗Applied Statistics</a>
+format:
+  revealjs:
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+jupyter: python3
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import (
+    mannwhitneyu, ttest_ind, norm, rankdata, lognorm,
+    binomtest, wilcoxon, ttest_rel, ttest_1samp, binom,
+)
+from statsmodels.stats.proportion import proportion_confint
+
+# Define colors (shared palette across the slides)
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+# Minimal theme defaults — close to ggplot2 theme_minimal()
+plt.rcParams.update({
+    "figure.facecolor": "white",
+    "axes.facecolor":   "white",
+    "axes.edgecolor":   slate,
+    "axes.labelcolor":  slate,
+    "axes.titlesize":   13,
+    "axes.spines.top":   False,
+    "axes.spines.right": False,
+    "axes.grid":        True,
+    "grid.color":       "#dddddd",
+    "grid.alpha":       0.6,
+    "xtick.color":      slate,
+    "ytick.color":      slate,
+    "font.size":        11,
+    "legend.frameon":   False,
+})
+
+# ---- Running case: streaming-app A/B test on daily listening minutes ----
+# Control = old recommender, Test = new recommender. Listening time is
+# heavily right-skewed (a few super-fans, many casual users) -> lognormal.
+rng     = np.random.default_rng(42)
+control = rng.lognormal(mean=3.4, sigma=0.6, size=80)   # old recsys
+test    = rng.lognormal(mean=3.8, sigma=0.6, size=80)   # new recsys (shifted up)
+
+
+def calculate_U(a, b):
+    """U = number of pairs where an element of A is smaller than one of B."""
+    a = np.asarray(a)[:, None]
+    b = np.asarray(b)[None, :]
+    return int(np.sum(a < b))
+
+
+# ---- Paired (crossover) A/B: each user tries OLD then NEW recommender ----
+# Within-subject design -> compare per-user listening minutes, not two groups.
+rng_p  = np.random.default_rng(7)
+n_pair = 30
+old_u  = rng_p.lognormal(mean=3.4, sigma=0.6, size=n_pair)            # old recsys
+new_u  = old_u * rng_p.lognormal(mean=0.18, sigma=0.25, size=n_pair)  # new recsys
+d_u    = new_u - old_u                                                # per-user diff
+
+# One-sample case: a single sample vs a target KPI (median session length).
+sess_min   = rng_p.lognormal(mean=3.45, sigma=0.5, size=40)
+target_min = 30
+```
+
+# Why nonparametric? {background-iframe=".07-mu_files/libs/colored-particles/index.html"}
+
+## 🎧 The plan: three tests, simplest first {.smaller}
+
+The streaming-app growth team keeps shipping A/B experiments on **daily listening minutes** — a metric with a long right tail and the odd binge outlier. The $t$-test leans on normality, so instead we build tests that read only the **direction** or the **order** of the data.
+
+. . .
+
+We go from simplest to most general:
+
+1. **Sign test** — keep only the *direction* of each change (binomial).
+2. **Wilcoxon signed-rank** — rank the *sizes* of paired changes.
+3. **Mann–Whitney U** — compare *two independent groups* by ranks.
+
+::: {.callout-note icon=false}
+Engagement metrics (minutes, revenue, orders) are almost never normal: a long right tail of super-users, a floor at zero, and the odd outlier who streamed all night.
+:::
+
+::: {.notes}
+Повертаємось до наскрізного кейсу — growth-команда стримінгу A/B-тестує продуктові метрики (хвилини прослуховування на день) із довгим правим хвостом і поодинокими «binge»-викидами. t-тест спирається на нормальність, тож натомість будуємо критерії, що читають лише НАПРЯМОК або ПОРЯДОК даних. Ідемо від найпростішого до найзагальнішого: (1) знаковий критерій — лише напрямок кожної зміни (біном); (2) знаково-ранговий Вілкоксон — ранжуємо РОЗМІРИ парних змін; (3) Манн–Уітні — порівнюємо дві НЕЗАЛЕЖНІ групи за рангами. Спершу — чому середнє тут поганий орієнтир.
+:::
+
+## 📉 Why the $t$-test gets nervous {.smaller}
+
+```{python}
+#| label: skew-picture
+#| code-fold: true
+#| fig-align: center
+
+fig, ax = plt.subplots(1, 2, figsize=(11, 3.8))
+
+ax[0].hist(control, bins=18, color=turquoise, alpha=0.9)
+ax[0].axvline(np.mean(control),   color=red_pink, lw=2.5, label="mean")
+ax[0].axvline(np.median(control), color=slate,  ls="--", lw=2.5, label="median")
+ax[0].set_title("Daily listening minutes (control)")
+ax[0].set_xlabel("minutes"); ax[0].set_ylabel("users"); ax[0].legend(fontsize=8)
+
+# one whale joins the sample -> watch the mean move, the median barely flinch
+spiked = np.append(control, 600)
+ax[1].axhline(np.mean(control),    color=slate,    ls=":",  lw=2, label="mean, before")
+ax[1].axhline(np.mean(spiked),     color=red_pink, lw=2.5,        label="mean, after outlier")
+ax[1].axhline(np.median(spiked),   color=blue,     ls="--", lw=2.5, label="median, after")
+ax[1].set_title("One outlier drags the mean"); ax[1].set_xlabel(""); ax[1].set_ylabel("minutes")
+ax[1].set_xticks([]); ax[1].legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+The $t$-test compares **means**, and the mean is hostage to the tail. The **median** — and order in general — barely moves. We want a test that listens to **order**, not magnitude.
+
+::: {.notes}
+Лівий графік — реальна форма метрики: сильно скошена вправо, довгий хвіст. Правий — що робить ОДИН викид (користувач на 600 хв): середнє стрибає, медіана майже не ворушиться. t-тест порівнює саме середні, а середнє — заручник хвоста й викидів. На малих/скошених вибірках це й роздуває дисперсію, і робить нормальне наближення сумнівним. Звідси ідея: будувати критерій на ПОРЯДКУ (рангах), а не на величинах. Порядок стійкий до викидів і не вимагає нормальності.
+:::
+
+# The sign test {background-iframe=".07-mu_files/libs/colored-particles/index.html"}
+
+## 🔁 When the A/B is paired {.smaller}
+
+:::: {.columns}
+
+::: {.column width="46%"}
+The cleanest A/B splits users into **two independent groups**. But many experiments instead measure the **same user twice**:
+
+- **crossover** — each user gets the old recsys one week, the new one the next;
+- **before / after** a rollout;
+- **matched pairs**.
+
+Now the two columns are **not independent**, so an independent-samples test (`ttest_ind`, or the Mann–Whitney we build at the end) does **not** apply. Collapse each pair to its **difference** $d_i = \text{new}_i - \text{old}_i$ and test *that*.
+:::
+
+::: {.column width="54%"}
+```{python}
+#| echo: false
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(8.5, 4.6))
+lim = [0, max(old_u.max(), new_u.max()) * 1.05]
+ax.plot(lim, lim, color=slate, ls="--", lw=1.5, label="no change")
+up = new_u >= old_u
+ax.scatter(old_u[up],  new_u[up],  s=70, color=red_pink,  label="improved", zorder=3)
+ax.scatter(old_u[~up], new_u[~up], s=70, color=turquoise, label="dropped",  zorder=3)
+ax.set_xlim(lim); ax.set_ylim(lim)
+ax.set_xlabel("old recsys (min/user)"); ax.set_ylabel("new recsys (min/user)")
+ax.set_title("Each point is one user, seen twice"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+:::
+
+::::
+
+A single sample also fits here: test one group's median against a fixed **target / KPI**.
+
+::: {.notes}
+Найчистіший A/B ділить користувачів на ДВІ НЕЗАЛЕЖНІ групи. Але часто експеримент натомість міряє того самого користувача двічі: крос-овер (тиждень стара система, тиждень нова), до/після розкочування, метчовані пари. Тоді два стовпці ВЖЕ не незалежні — тести для незалежних груп (ttest_ind чи Манн–Уітні, який будуємо в кінці) не підходять. Розв'язок: згорнути кожну пару в РІЗНИЦЮ d_i = new_i − old_i і тестувати вже її. На графіку кожна точка — один користувач, видимий двічі; вище діагоналі — покращився, нижче — впав. Сюди ж лягає й одновибірковий випадок: перевірити медіану однієї вибірки проти фіксованого цільового KPI. Далі — два критерії саме для цього: знаковий і знаково-ранговий Вілкоксона.
+:::
+
+## ✍️ The sign test: direction only {.smaller}
+
+The simplest idea: throw away the magnitude, keep only the **sign** of each difference. The count of "+" is then pure coin-flipping under $H_0$:
+
+$$
+T = \#\{\,d_i > 0\,\} \overset{H_0}{\sim} \text{Binom}\!\left(n, \tfrac12\right).
+$$
+
+:::: {.columns}
+
+::: {.column width="50%"}
+**Paired** $H_0:\ P(\text{new} > \text{old}) = \tfrac12$ — the new recsys helps as often as it hurts ("no effect").
+:::
+
+::: {.column width="50%"}
+**One-sample** $H_0:\ \text{median} = m_0$, scoring $d_i = x_i - m_0$.
+:::
+
+::::
+
+::: {.callout-note icon=false}
+**Zero distributional assumptions** — just independence and a continuous-ish metric. The price: ignoring *how big* each change was, so it is the **least powerful** of the three. Run it with `scipy.stats.binomtest`.
+:::
+
+::: {.notes}
+Найпростіша ідея — викинути величину, лишити тільки ЗНАК кожної різниці. Кількість плюсів при H0 — це чисте підкидання монетки: T = #{d_i>0} ~ Binom(n, 1/2). Парний варіант: H0 — P(new>old)=1/2, тобто нова система допомагає так само часто, як і шкодить (ефекту немає). Одновибірковий: H0 — медіана = m0, рахуємо d_i = x_i − m0. Головна перевага — НУЛЬ припущень про розподіл (лише незалежність і неперервна метрика). Ціна — ігноруємо, наскільки великою була кожна зміна, тому це НАЙМЕНШ потужний із трьох критеріїв. У scipy — binomtest. Це місток від біноміального тесту (перша лекція) до парних дизайнів.
+:::
+
+## 🎧 Sign test on the crossover A/B {.smaller}
+
+```{python}
+#| label: sign-test
+#| output-location: column
+
+k   = int((d_u > 0).sum())          # users who improved
+res = binomtest(k, n_pair, 0.5, alternative="greater")
+
+print(f"improved   : {k}/{n_pair}")
+print(f"sign-test p : {res.pvalue:.4f}")
+print("reject H0" if res.pvalue < 0.05 else "keep H0")
+```
+
+```{python}
+#| label: sign-test-plot
+#| code-fold: true
+#| fig-align: center
+
+xs   = np.arange(0, n_pair + 1)
+crit = binom.ppf(0.95, n_pair, 0.5)          # one-sided cutoff
+cols = [red_pink if x >= crit else turquoise for x in xs]
+
+fig, ax = plt.subplots(figsize=(6.6, 3.2))
+ax.bar(xs, binom.pmf(xs, n_pair, 0.5), color=cols)
+ax.axvline(k, color=slate, lw=2.5, label=f"observed = {k}")
+ax.set_title("$H_0$: Binom(30, ½) — pink = rejection region")
+ax.set_xlabel("# improved users"); ax.set_ylabel("prob"); ax.legend(fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+$23/30$ users improved — well inside the right tail of the coin-flip null, so the new recsys **helps more often than not**.
+
+::: {.notes}
+Застосовуємо до крос-овер A/B. Рахуємо, скільки користувачів покращилося: k = #{d>0} = 23 з 30. binomtest(23, 30, 0.5, alternative='greater') дає p≈0.003 — відхиляємо H0. Графік: нульовий розподіл — Binom(30, ½), рожевим позначено критичну область (права засічка на рівні 0.95). Спостережені 23 лежать глибоко в правому хвості, тож висновок: нова система допомагає частіше, ніж шкодить. Зверніть увагу — ми НЕ використали, наскільки саме зросли хвилини, лише напрямок зміни. Це й робить критерій таким невибагливим до припущень.
+:::
+
+## 🎯 One-sample: median vs a target KPI {.smaller}
+
+Same machinery, one sample against a fixed target. *Is the median session length on the $30$-minute KPI?*
+
+```{python}
+#| label: sign-onesample
+#| output-location: column
+
+above = int((sess_min > target_min).sum())
+res   = binomtest(above, len(sess_min), 0.5, alternative="two-sided")
+
+print(f"above {target_min} min : {above}/{len(sess_min)}")
+print(f"sample median  : {np.median(sess_min):.1f} min")
+print(f"sign-test p    : {res.pvalue:.4f}")
+print("reject H0" if res.pvalue < 0.05 else "keep H0")
+```
+
+. . .
+
+The split is close to $50/50$ and $p$ is large → the median is **statistically consistent with the $30$-minute target**. A "non-rejection" we are happy to report: we are hitting the KPI, not missing it.
+
+::: {.notes}
+Та сама механіка, але одна вибірка проти фіксованого цільового KPI: чи медіана тривалості сесії дорівнює цільовим 30 хвилинам? Рахуємо, скільки спостережень вище за 30 (тут 19 із 40), і робимо двосторонній binomtest проти 0.5. Розбиття близьке до 50/50, p великий → медіана статистично узгоджена з 30-хвилинною ціллю. Це той рідкий випадок, коли «не відхилили H0» — приємний результат: ми тримаємо KPI, а не промахуємось. Нагадайте студентам: не відхилили ≠ довели рівність, але для моніторингу KPI це адекватний інструмент.
+:::
+
+# Wilcoxon signed-rank {background-iframe=".07-mu_files/libs/colored-particles/index.html"}
+
+## 🏅 Wilcoxon signed-rank: keep the magnitude {.smaller}
+
+:::: {.columns}
+
+::: {.column width="48%"}
+The sign test wastes *how big* each change was. Wilcoxon **ranks the absolute differences**, then re-attaches their signs:
+
+$$
+W = \sum_{i=1}^{n} \text{rank}\big(|d_i|\big)\cdot \text{sign}(d_i).
+$$
+
+A few large improvements now outweigh many tiny dips. Distribution is tabulated, $\to$ normal for large $n$.
+:::
+
+::: {.column width="52%"}
+```{python}
+#| label: signed-rank
+#| output-location: column
+
+absrank = rankdata(np.abs(d_u))
+W = np.sum(absrank * np.sign(d_u))     # by hand
+
+p_sr = wilcoxon(new_u, old_u,
+                alternative="greater").pvalue
+print(f"signed-rank W = {W:.0f}")
+print(f"scipy p-value = {p_sr:.4f}")
+```
+:::
+
+::::
+
+::: {.callout-important icon=false}
+Extra assumption: the differences $d_i$ are **symmetric** about their center. Milder than full normality, but not free — check a histogram of $d_i$ first. (`scipy.stats.wilcoxon`.)
+:::
+
+::: {.notes}
+Знаковий критерій марнує інформацію про РОЗМІР кожної зміни. Вілкоксон ранжує модулі різниць |d_i|, а потім повертає їм знаки: W = Σ rank(|d_i|)·sign(d_i). Тепер кілька великих покращень переважують багато дрібних просідань — критерій чутливіший, тобто потужніший за знаковий. Розподіл статистики табличний і прямує до нормального на великих n. У коді рахуємо W вручну через rankdata і звіряємо зі scipy.stats.wilcoxon — p≈0.0003. Важлива ДОДАТКОВА умова: різниці d_i мають бути СИМЕТРИЧНІ відносно свого центру. Це слабше за повну нормальність, але не безкоштовно — спершу гляньте на гістограму d_i. Якщо симетрії немає, повертайтесь до знакового критерію.
+:::
+
+## ⚔️ Same crossover, three tests {.smaller}
+
+```{python}
+#| label: three-paired-tests
+#| output-location: column
+
+def paired_pvals(new, old, n):
+    d = new - old
+    return {
+        "sign":        binomtest(int((d > 0).sum()), n, 0.5,
+                                 alternative="greater").pvalue,
+        "signed-rank": wilcoxon(new, old, alternative="greater").pvalue,
+        "paired t":    ttest_rel(new, old, alternative="greater").pvalue,
+    }
+
+clean = paired_pvals(new_u, old_u, n_pair)
+
+# one binge-on-old user joins the experiment
+new_o = np.append(new_u, 60.0)
+old_o = np.append(old_u, 500.0)
+out   = paired_pvals(new_o, old_o, n_pair + 1)
+
+for name in clean:
+    print(f"{name:12s} clean={clean[name]:.4f}  +outlier={out[name]:.4f}")
+```
+
+::: {.callout-important icon=false}
+On clean data the **signed-rank** $p$ tracks the paired $t$-test. Add one extreme user and the $t$-test's $p$ jumps to $\approx 0.72$ — its verdict flips — while the **sign** and **signed-rank** tests barely move. Magnitude buys power; ranks buy robustness.
+:::
+
+::: {.notes}
+Двобій трьох парних критеріїв на одних даних. На чистих даних signed-rank іде пліч-о-пліч із парним t-тестом (обидва p≈0.0003–0.0006), знаковий трохи слабший (≈0.003), але теж значущий. Потім додаємо одного користувача-«binge», який на старій системі наслухав 500 хв, а на новій лише 60 (величезна від'ємна різниця). p парного t-тесту підскакує до ≈0.72 — вердикт перевертається, бо різниця середніх стає заручником одного викиду. А знаковий і знаково-ранговий майже не ворухнулися (≈0.005 і ≈0.002). Мораль: величина дає потужність (signed-rank > sign), а ранги/знаки дають робастність до викидів (обидва > t). Це і є компроміс, який ми обираємо свідомо.
+:::
+
+## 🧪 How much does magnitude buy? {.smaller}
+
+Power on **heavy-tailed** per-user differences (Student-$t$, $df=2$) with a real shift — exactly where outliers live.
+
+```{python}
+#| label: paired-power
+#| code-fold: true
+#| fig-align: center
+
+def paired_rejection_rate(shift, n, test, df=2, n_exps=1500, alpha=0.05, seed=1):
+    """Differences ~ shift + Student-t(df).  shift=0 -> FPR, else power."""
+    rng, rej = np.random.default_rng(seed), 0
+    for _ in range(n_exps):
+        d = shift + rng.standard_t(df, n)
+        if test == "sign":
+            p = binomtest(int((d > 0).sum()), n, 0.5).pvalue
+        elif test == "sr":
+            p = wilcoxon(d).pvalue
+        else:
+            p = ttest_1samp(d, 0).pvalue
+        rej += p <= alpha
+    return rej / n_exps
+
+sizes = [10, 20, 40, 80]
+curves = {t: [paired_rejection_rate(0.7, n, t) for n in sizes]
+          for t in ("sr", "sign", "t")}
+
+fig, ax = plt.subplots(figsize=(11, 4.2))
+ax.plot(sizes, curves["sr"],   color=red_pink, lw=2.5, marker="o", label="signed-rank")
+ax.plot(sizes, curves["sign"], color=green,    lw=2.5, marker="^", label="sign")
+ax.plot(sizes, curves["t"],    color=blue,     lw=2.5, marker="s", ls="--", label="paired t")
+ax.axhline(0.8, color=slate, ls=":", lw=2, label="80% gold standard")
+ax.set_ylim(0, 1)
+ax.set_xlabel("# users n"); ax.set_ylabel("power (TPR)")
+ax.set_title("Heavy-tailed differences: ranks beat the paired t-test"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+Signed-rank leads throughout, the sign test is close behind, and the paired $t$-test **trails badly** — its variance is wrecked by the tails. With outlier-prone metrics, the nonparametric pair is both safer *and* stronger.
+
+::: {.notes}
+Перевіряємо потужність на ВАЖКОХВОСТИХ різницях (розподіл Стьюдента з df=2) зі справжнім зсувом — саме там, де живуть викиди. Функція paired_rejection_rate генерує різниці shift + t(df) і проганяє обраний критерій; shift=0 дав би FPR, ненульовий — потужність. На графіку: знаково-ранговий лідирує на всіх n, знаковий трохи позаду, а парний t-тест ПЛЕНТАЄТЬСЯ — його дисперсію руйнують важкі хвости. Висновок для продуктових метрик із викидами: непараметрична пара (sign / signed-rank) одночасно й безпечніша (тримає FPR без нормальності), і потужніша за t. Це дзеркальний аргумент до того, що ми побачимо для незалежних вибірок із Манном–Уітні.
+:::
+
+# Mann–Whitney U-test {background-iframe=".07-mu_files/libs/colored-particles/index.html"}
+
+## 🎯 Two independent groups again {.smaller}
+
+:::: {.columns}
+
+::: {.column width="42%"}
+Now the classic A/B — **independent** control and test groups, no pairing. We drop the assumption of a specific shape; the homogeneity null compares the **whole distributions**:
+
+$$
+H_0: F = G \qquad\text{vs.}\qquad H_1: F \neq G,
+$$
+
+where $F$, $G$ are the distribution functions of the two groups.
+
+The most useful alternative is a [location shift]{.hi}: the test group is *stochastically larger*.
+:::
+
+::: {.column width="58%"}
+```{python}
+#| echo: false
+#| fig-align: center
+
+x = np.linspace(-1, 9, 1000)
+a = norm(loc=2, scale=1)
+b = norm(loc=4, scale=1)
+
+fig, ax = plt.subplots(figsize=(9, 4.6))
+ax.plot(x, a.pdf(x), color=turquoise, lw=2.5, label="control $F$")
+ax.plot(x, b.pdf(x), color=red_pink,  lw=2.5, label="test $G$ (shifted)")
+ax.fill_between(x, a.pdf(x), color=turquoise, alpha=0.15)
+ax.fill_between(x, b.pdf(x), color=red_pink,  alpha=0.15)
+ax.set_title("A location shift: same shape, moved right")
+ax.set_xlabel("metric"); ax.set_ylabel("density"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+:::
+
+::::
+
+Previously we relied on the **values** of the sample items; this time we look not at the values themselves but at their [order]{.hi-slate} relative to each other.
+
+::: {.notes}
+Тепер класичний A/B — дві НЕЗАЛЕЖНІ групи (контроль і тест), без пар. Відмовляємось від припущення про конкретну форму розподілу. Нульова гіпотеза однорідності порівнює РОЗПОДІЛИ цілком: H0: F=G проти H1: F≠G. Найкорисніша альтернатива — зсув положення (location shift): тестова група «стохастично більша», тобто типово видає більші значення. Графік показує саме цей сценарій: та сама форма, зсунута праворуч. Ключова зміна мислення проти z/t/КС: дивимось не на самі значення, а на їхній взаємний ПОРЯДОК. Це і є фундамент непараметричних рангових критеріїв.
+:::
+
+## 🔢 Idea: count the pairs {.smaller}
+
+:::: {.columns}
+
+::: {.column width="55%"}
+Take every control user and every test user and ask: *did the test user listen longer?* **Count the winning pairs.**
+
+$$
+U = \sum_{i=1}^{N}\sum_{j=1}^{M} I\big[A_i < B_j\big],
+$$
+
+where $A_1,\dots,A_N$ is the control sample, $B_1,\dots,B_M$ is the test sample, and $I[\cdot]$ is $1$ when the condition holds, else $0$.
+:::
+
+::: {.column width="45%"}
+::: {.callout-tip icon=false}
+If the groups are alike, the test user wins about **half** the time:
+$$
+\mathbb{E}_{H_0}\,U = \frac{NM}{2}.
+$$
+Far more (or far fewer) winning pairs $\Rightarrow$ one group is shifted.
+:::
+:::
+
+::::
+
+```{python}
+#| label: U-observed
+#| output-location: column
+
+N, M = len(control), len(test)
+U_obs = calculate_U(control, test)   # pairs with control < test
+
+print(f"N x M       = {N * M}")
+print(f"E[U] under H0 = {N * M / 2:.0f}")
+print(f"observed U    = {U_obs}")
+```
+
+`U` $=$ `{python} U_obs` against an expected `{python} int(N*M/2)`. Is that gap big or just noise?
+
+::: {.notes}
+Винаходимо критерій з нуля. Беремо КОЖНУ пару (контрольний користувач, тестовий) і питаємо: чи тестовий слухав довше? Рахуємо «виграшні» пари: U = Σ_i Σ_j I[A_i<B_j]. Якщо групи однакові, тестовий виграє приблизно половину пар, тож E[U]=NM/2. Сильне відхилення вгору чи вниз — ознака зсуву. На наших даних U помітно більший за NM/2 — нова система ніби піднімає прослуховування. Але «помітно» поки на око: треба знати розподіл U при H0, щоб сказати, велике це відхилення чи звичайний шум.
+:::
+
+## 📊 What does $U$ look like under $H_0$? {.smaller}
+
+Simulate the null — both groups drawn from the **same** control distribution — and watch where $U$ lands.
+
+```{python}
+#| label: U-null-dist
+#| code-fold: true
+#| fig-align: center
+
+null_dist = lognorm(s=0.6, scale=np.exp(3.4))   # the control law
+
+stats = np.array([
+    calculate_U(null_dist.rvs(N, random_state=rng),
+                null_dist.rvs(M, random_state=rng))
+    for _ in range(2000)
+])
+lo, hi = np.quantile(stats, [0.025, 0.975])
+
+fig, ax = plt.subplots(figsize=(11, 4.2))
+ax.hist(stats, bins="auto", color=turquoise, alpha=0.9, label="$U$ under $H_0$")
+ax.axvline(N * M / 2, color=slate,   lw=2.5, label=r"$\mathbb{E}_{H_0}U$")
+ax.axvline(U_obs,     color=red_pink, lw=3,   label=f"observed U = {U_obs}")
+ax.axvspan(lo, hi, color=yellow, alpha=0.15, label="95% central band")
+ax.set_title("Null distribution of U vs the observed value")
+ax.set_xlabel("U"); ax.set_ylabel("count"); ax.legend(fontsize=9)
+plt.tight_layout()
+plt.show()
+```
+
+95% central band: `{python} int(lo)`–`{python} int(hi)`. The observed $U$ sits **outside** it $\Rightarrow$ we reject $H_0$ — but this band was tailor-made for this case. We need a *general* yardstick.
+
+::: {.notes}
+Будуємо нульовий розподіл емпірично: 2000 разів генеруємо ОБИДВІ групи з однакового (контрольного) розподілу й щоразу рахуємо U. Гістограма центрована на NM/2, як і обіцяла теорія. Жовта смуга — центральні 95%. Спостережене U лежить ПОЗА нею — отже, відхиляємо H0. Це той самий хід, що з Монте-Карло раніше. Проблема: ця смуга підігнана під конкретний цей кейс і розмір вибірки. Потрібен універсальний орієнтир — теоретичний розподіл U, щоб не симулювати щоразу.
+:::
+
+## 🔔 Normal approximation {.smaller}
+
+:::: {.columns}
+
+::: {.column width="42%"}
+$U$ is a sum of many indicators, so the **CLT** kicks in. Under $H_0$:
+
+$$
+\begin{aligned}
+U &\overset{H_0}{\longrightarrow} \mathcal{N}\big(\mathbb{E}U,\ \mathbb{D}U\big),\\[4pt]
+\mathbb{E}U &= \frac{NM}{2},\\[4pt]
+\mathbb{D}U &= \frac{NM\,(N + M + 1)}{12}.
+\end{aligned}
+$$
+
+Standardise and read a $p$-value off $\mathcal{N}(0,1)$ — no simulation needed.
+:::
+
+::: {.column width="58%"}
+```{python}
+#| label: U-normal
+#| code-fold: true
+#| fig-align: center
+
+EU = N * M / 2
+DU = N * M * (N + M + 1) / 12
+approx = norm(loc=EU, scale=np.sqrt(DU))
+
+xs = np.linspace(stats.min(), stats.max(), 400)
+fig, ax = plt.subplots(figsize=(9, 4.4))
+ax.hist(stats, bins="auto", density=True, color=turquoise, alpha=0.8,
+        label="simulated $U$")
+ax.plot(xs, approx.pdf(xs), color=blue, lw=2.8, label="normal approx.")
+ax.axvline(EU, color=slate, lw=2, label=r"$\mathbb{E}_{H_0}U$")
+ax.set_title("Theory matches the simulation")
+ax.set_xlabel("U"); ax.set_ylabel("density"); ax.legend(fontsize=9)
+plt.tight_layout()
+plt.show()
+```
+:::
+
+::::
+
+The bell fits. But computing $U$ by the double loop is $O(NM)$ — slow on millions of users. There is a shortcut.
+
+::: {.notes}
+U — сума багатьох індикаторів, тож за ЦГТ при H0 вона прямує до нормального з матсподіванням NM/2 і дисперсією NM(N+M+1)/12. Це дає аналітичний орієнтир: стандартизуємо U і читаємо p-value з N(0,1), без жодних симуляцій. Графік: теоретична крива чудово лягає на симульовану гістограму. Єдина вада — рахувати U подвійним циклом це O(NM), на мільйонах користувачів задорого. Далі покажемо трюк через ранги, що зводить обчислення до сортування.
+:::
+
+# Ranks: the shortcut {background-iframe=".07-mu_files/libs/colored-particles/index.html"}
+
+## 🏁 Pool everyone and number them {.smaller}
+
+:::: {.columns}
+
+::: {.column width="42%"}
+Throw both samples into one line, sort ascending, and hand out positions — **ranks**.
+
+$A = \color{#20B2AA}{[1, 5, 8, 20]}$
+
+$B = \color{#e64173}{[2, 3, 6]}$
+
+$A \cup B = [\color{#20B2AA}1, \color{#e64173}2, \color{#e64173}3, \color{#20B2AA}5, \color{#e64173}6, \color{#20B2AA}8, \color{#20B2AA}{20}]$
+
+Ranks of $B$: $2, 3, 5$.
+:::
+
+::: {.column width="58%"}
+```{python}
+#| echo: false
+#| fig-align: center
+
+sample_a = np.array([1, 5, 8, 20])
+sample_b = np.array([2, 3, 6])
+all_ranks = rankdata(np.concatenate([sample_a, sample_b]))
+ranks_b = all_ranks[len(sample_a):]
+
+fig, ax = plt.subplots(figsize=(9, 3.2))
+ax.scatter(sample_a, [0] * len(sample_a), s=120, color=turquoise, label="A", zorder=3)
+ax.scatter(sample_b, [0] * len(sample_b), s=120, color=red_pink,  label="B", zorder=3)
+for elem, r in zip(sample_b, ranks_b):
+    ax.text(elem, 0.04, int(r), ha="center", color=red_pink, fontweight="bold")
+ax.set_ylim(-0.1, 0.15); ax.set_yticks([])
+ax.set_xlabel("value"); ax.set_title("Ranks of the pooled sample"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+:::
+
+::::
+
+<br>
+
+Let $R_j$ be the rank of $B_j$ in the pooled list and $V = R_1 + \dots + R_M$. The more one group is shifted, the larger (or smaller) its rank sum. The link to our pair count:
+
+$$
+U = V - \frac{M(M + 1)}{2}.
+$$
+
+::: {.notes}
+Прискорення: замість перебору пар об'єднуємо обидві вибірки, сортуємо за зростанням і присвоюємо позиції — ранги. На прикладі ранги групи B: 2, 3, 5. Сума рангів V = R_1+...+R_M. Інтуїція: що сильніше група зсунута вгору, то більша її сума рангів (і навпаки). Магічний місток до підрахунку пар: U = V − M(M+1)/2. Тобто замість O(NM) перебору достатньо відсортувати (O((N+M)log(N+M))) і скласти ранги. Це та сама статистика, лише пораховано розумно.
+:::
+
+## 🤝 Ties: share the rank {.smaller}
+
+When several users have **equal** values (very common with rounded minutes), they would compete for the same positions. The fix: give every tied value the **average** of the positions it spans.
+
+```{python}
+#| label: ties
+#| output-location: column
+
+vals = np.array([10, 12, 12, 12, 15])
+print("values:", vals)
+print("ranks :", rankdata(vals))   # 1, 3, 3, 3, 5
+```
+
+. . .
+
+This also patches our pair count: a tie is **half** a win, so the general statistic is
+$$
+U = \sum_{i}^{N}\sum_{j}^{M}\Big(I[A_i < B_j] + \tfrac12\,I[A_i = B_j]\Big),
+$$
+which is *exactly* what the average-rank formula $V - \tfrac{M(M+1)}{2}$ computes.
+
+Ties also **shrink** the variance $\mathbb{D}U$; `scipy` applies the correction automatically. `rankdata` already does the averaging for us.
+
+::: {.callout-note icon=false}
+Heavy ties (many identical values) make the normal approximation rougher — `scipy` then prefers an exact/corrected $p$-value. We rarely compute ranks by hand.
+:::
+
+::: {.notes}
+Зв'язки (ties) — коли кілька спостережень мають однакове значення (а з округленими хвилинами це постійно). Якби давали їм різні позиції, результат залежав би від випадкового порядку. Розв'язок: усім однаковим значенням — СЕРЕДНІЙ ранг позицій, які вони займають (тут три 12-ки отримують ранг 3). Це заодно лагодить і наш підрахунок пар: зв'язок — це «пів-перемоги», тож загальна статистика U = ΣΣ(I[A<B] + ½·I[A=B]), і це РІВНО те, що дає формула середніх рангів V−M(M+1)/2. Зв'язки ще й зменшують дисперсію U, тому в нормальне наближення вводять поправку на зв'язки — scipy робить це сам. rankdata теж усереднює автоматично. За сильних зв'язків наближення грубіше, і scipy перемикається на точний/скоригований p-value. Руками ранги майже ніколи не рахуємо.
+:::
+
+# Running the test {background-iframe=".07-mu_files/libs/colored-particles/index.html"}
+
+## 🧭 Algorithm {.smaller}
+
+Testing $H_0: F = G$ vs $H_1: F \neq G$:
+
+1. Fix a significance level $\alpha$.
+2. **Pool** both samples and assign ranks $1, \dots, N+M$ (average ranks for ties).
+3. Sum the ranks of group $B$: $V = R_1 + \dots + R_M$, then $U = V - \dfrac{M(M+1)}{2}$.
+4. Under $H_0$ use $\mathbb{E}U = \dfrac{NM}{2}$, $\mathbb{D}U = \dfrac{NM(N+M+1)}{12}$ and
+$$
+Z = \frac{U - \mathbb{E}U}{\sqrt{\mathbb{D}U}} \overset{H_0}{\longrightarrow} \mathcal{N}(0, 1).
+$$
+5. Read the $p$-value from $\mathcal{N}(0,1)$ (or use the **exact** distribution for small samples).
+6. Reject $H_0$ if $p\text{-value} \leq \alpha$.
+
+<br>
+
+<center>**It does not depend on the magnitude of the values — only their order.**</center>
+
+::: {.notes}
+Покроковий рецепт. Перевіряємо H0: F=G. (1) Фіксуємо α. (2) Об'єднуємо вибірки і присвоюємо ранги, для зв'язків — середні. (3) Сумуємо ранги групи B → V, далі U=V−M(M+1)/2. (4) При H0 беремо E[U] і D[U], стандартизуємо в Z. (5) p-value з N(0,1), а на малих вибірках — з точного розподілу U. (6) Порівнюємо з α. Головна теза слайда: критерій залежить лише від ПОРЯДКУ значень, а не від їхньої величини — тому стійкий до викидів і не вимагає нормальності. Це його суперсила.
+:::
+
+## 📋 What the test assumes {.smaller}
+
+Distribution-free is *not* assumption-free. Mann–Whitney still needs:
+
+1. **Independence** — observations independent *within* each group and *between* the two groups. No pairing, no repeated measures on the same user.
+2. **At least an ordinal scale** — values must be rankable (minutes, ratings, ranks). Nominal categories don't qualify.
+3. **Same shape**, for the *median/shift* reading — if $F$ and $G$ differ only by a **location shift**, the test is a clean test of the median difference. Differ in **spread or shape** and it still validly detects whether one group is *stochastically larger*, just not "the medians differ".
+
+. . .
+
+::: {.callout-important icon=false}
+Samples **paired** (same user before/after, matched pairs)? Independence breaks → that's exactly the **sign** and **Wilcoxon signed-rank** tests we built first, run on the within-pair differences.
+:::
+
+::: {.notes}
+Distribution-free ≠ assumption-free. Три припущення критерію Манна–Уітні. (1) Незалежність — спостереження незалежні і всередині кожної групи, і між групами; жодних пар чи повторних вимірів на тому самому користувачі. (2) Щонайменше порядкова шкала — значення мають бути ранжовними (хвилини, оцінки, ранги), номінальні категорії не годяться. (3) Однакова форма — САМЕ для трактування як тесту медіан/зсуву: якщо F і G різняться лише положенням, це чистий тест різниці медіан; якщо ж формою чи розкидом — критерій усе одно коректно виявляє «чи одна група стохастично більша», але вже не «медіани різні». І ключове: якщо вибірки ПАРНІ (той самий користувач до/після, метчовані пари), незалежність ламається — тоді беремо парний критерій (знаковий або signed-rank Вілкоксона) на різницях усередині пар, саме ті, що ми розглянули на початку лекції.
+:::
+
+## 🐍 `mannwhitneyu` in one line {.smaller}
+
+```{python}
+#| label: scipy-mw
+#| output-location: column
+
+res = mannwhitneyu(control, test, alternative="two-sided")
+
+print(f"U (control) = {res.statistic:.0f}")
+print(f"p-value     = {res.pvalue:.4f}")
+print("reject H0" if res.pvalue < 0.05 else "keep H0")
+```
+
+. . .
+
+`scipy` reports $U$ for the **first** argument; the two are complementary, $U_A + U_B = NM$, so `mannwhitneyu(test, control).statistic` equals our pair count `{python} U_obs`.
+
+- `alternative="greater"` / `"less"` give the **one-sided** tests ("did the new recsys *increase* listening?").
+- `method="auto"` picks the **exact** distribution for small $n$ and the **normal** approximation (with a tie correction) otherwise.
+- `use_continuity=True` (default) shaves $0.5$ off the gap before standardising, so a hand-computed $Z$ won't match scipy exactly on small samples.
+
+::: {.callout-tip icon=false}
+Same test, second name: **Wilcoxon rank-sum test**. `scipy.stats.ranksums` runs it via the normal approximation (here $p \approx 0.0014$, identical). Don't confuse it with the *paired* **Wilcoxon signed-rank** test — that one is for dependent samples (covered earlier).
+:::
+
+::: {.notes}
+Уся побудована теорія — один виклик mannwhitneyu. Повертає статистику U (для ПЕРШОГО аргументу) і p-value. Важлива деталь: scipy рахує U для першого аргументу, а він доповнює наш: U_A+U_B=NM, тож mannwhitneyu(test, control) дасть саме наш підрахунок пар. alternative='greater'/'less' — односторонні гіпотези (наприклад, «нова система ЗБІЛЬШИЛА прослуховування»). method='auto' сам обирає точний розподіл на малих вибірках і нормальне наближення з поправкою на зв'язки на великих. use_continuity=True (дефолт) віднімає 0.5 перед стандартизацією, тож ручний Z не збіжиться зі scipy на малих вибірках — це нормально. Окремо наголосіть на двох назвах: критерій Манна–Уітні = критерій суми рангів Вілкоксона (scipy.stats.ranksums, через нормальне наближення), і його НЕ можна плутати з парним signed-rank Вілкоксона для залежних вибірок. Практично студенту достатньо знати, що передати й як прочитати p-value.
+:::
+
+## ⚔️ Same data, two tests {.smaller}
+
+Run the parametric $t$-test and the rank test on the **identical** listening data:
+
+```{python}
+#| label: t-vs-mw
+#| output-location: column
+
+p_t  = ttest_ind(control, test).pvalue
+p_mw = mannwhitneyu(control, test, alternative="two-sided").pvalue
+
+print(f"Welch/t-test p-value      = {p_t:.4f}")
+print(f"Mann-Whitney p-value      = {p_mw:.4f}")
+
+# now drop in one all-night listener into control
+control_out = np.append(control, 1500)
+p_t2  = ttest_ind(control_out, test).pvalue
+p_mw2 = mannwhitneyu(control_out, test).pvalue
+print(f"\n+1 outlier in control:")
+print(f"  t-test p-value  = {p_t2:.4f}")
+print(f"  Mann-Whitney p  = {p_mw2:.4f}")
+```
+
+::: {.callout-important icon=false}
+A single outlier inflates the control mean and **rescues** the $t$-test's null, flipping its verdict. The rank test barely notices — its decision rests on **order**, which one extreme value cannot bend.
+:::
+
+::: {.notes}
+Прямий двобій на ОДНИХ І ТИХ САМИХ даних. Спочатку обидва тести бачать ефект. Потім додаємо одного користувача-«сову» на 1500 хв у контроль: середнє контролю підскакує, різниця середніх тане — і t-тест втрачає значущість, перевертаючи висновок. Манн–Уітні майже не реагує: його рішення спирається на порядок, а один екстремум не зрушить ранги. Це наочна демонстрація робастності рангового критерію до викидів і скошеності. Мораль: на продуктових метриках з хвостами ранговий тест часто чесніший за t-тест.
+:::
+
+# Does it hold its promises? {background-iframe=".07-mu_files/libs/colored-particles/index.html"}
+
+## 🧪 A reusable Monte-Carlo checker {.smaller}
+
+Same habit as for the $t$-, KS- and $\chi^2$-tests: simulate, count rejections, add a Wilson CI.
+
+```{python}
+#| label: mw-mc-fn
+
+def rejection_rate(dist_a, dist_b, n, test="mw", alpha=0.05,
+                   n_exps=1500, seed=1):
+    """Two-sample rejection rate via Monte Carlo.
+
+    dist_a == dist_b -> H0 true  -> the rate is the FPR.
+    dist_a != dist_b -> H1 true  -> the rate is the power (TPR).
+    test = 'mw' (Mann-Whitney) or 't' (two-sample t-test).
+    """
+    rng, rej = np.random.default_rng(seed), 0
+    for _ in range(n_exps):
+        a = dist_a.rvs(n, random_state=rng)
+        b = dist_b.rvs(n, random_state=rng)
+        p = (mannwhitneyu(a, b, alternative="two-sided").pvalue
+             if test == "mw" else ttest_ind(a, b).pvalue)
+        rej += p <= alpha
+    ci = proportion_confint(rej, n_exps, alpha=0.05, method="wilson")
+    return rej / n_exps, ci
+```
+
+::: {.callout-tip icon=false}
+Pass the **same** distribution twice to measure the FPR, **different** ones to measure power.
+:::
+
+::: {.notes}
+Перевикористовуємо звичку валідувати критерій Монте-Карло — як для t-, KS- і χ²-тестів. Функція rejection_rate: тисячі разів генерує дві вибірки, проганяє обраний тест ('mw' або 't') і рахує частку відхилень + інтервал Уілсона. Однаковий розподіл двічі → H0 вірна → міряємо FPR (хибнопозитивні). Різні розподіли → потужність. Один двигун обслуговує і перевірку каліброваності, і порівняння потужності — далі застосуємо його до скошених і нормальних даних.
+:::
+
+## ✅ FPR: calibrated without normality {.smaller}
+
+Draw both groups from the **same skewed** law (lognormal) — any rejection is a false positive.
+
+```{python}
+#| label: mw-fpr
+#| code-fold: true
+#| fig-align: center
+
+null = lognorm(s=0.6, scale=np.exp(3.4))
+sizes = [10, 20, 40, 80, 160]
+mw = [rejection_rate(null, null, n, test="mw") for n in sizes]
+
+fig, ax = plt.subplots(figsize=(11, 4.2))
+ax.plot(sizes, [r for r, _ in mw], color=red_pink, lw=2.5, marker="o",
+        label="Mann–Whitney FPR")
+ax.fill_between(sizes, [c[0] for _, c in mw], [c[1] for _, c in mw],
+                color=turquoise, alpha=0.3, label="95% CI")
+ax.axhline(0.05, color=slate, ls="--", lw=2, label=r"$\alpha = 0.05$")
+ax.set_ylim(0, 0.15)
+ax.set_xlabel("group size n"); ax.set_ylabel("FPR")
+ax.set_title("False-positive rate on skewed null data"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+The FPR sits on $\alpha$ at every sample size — the rank test is **distribution-free**: it never relied on normality to begin with.
+
+::: {.notes}
+A/A-перевірка: обидві групи з ОДНОГО скошеного (логнормального) розподілу, тож будь-яке відхилення — хибне. Крива FPR Манна–Уітні лягає на 5% за всіх розмірів вибірки, інтервал Уілсона накриває α. Це й означає «distribution-free»: критерій не спирався на нормальність, тому скошеність його не псує. Контраст із t-тестом тут не драматичний за рівних вибірок, головна перевага рангового тесту проявиться в ПОТУЖНОСТІ на скошених даних — це наступні слайди. Висновок: Манн–Уітні чесно тримає обіцяний рівень помилки I роду на реальних продуктових даних.
+:::
+
+## ⚖️ Power on normal data: the cost of ranks {.smaller}
+
+When the data **are** normal, throwing away magnitudes for ranks costs a little power.
+
+```{python}
+#| label: power-normal
+#| code-fold: true
+#| fig-align: center
+
+a_norm = norm(0, 1)
+b_norm = norm(0.4, 1)        # a genuine shift
+sizes  = [10, 20, 40, 80, 160]
+mw = [rejection_rate(a_norm, b_norm, n, test="mw") for n in sizes]
+tt = [rejection_rate(a_norm, b_norm, n, test="t")  for n in sizes]
+
+fig, ax = plt.subplots(figsize=(11, 4.2))
+ax.plot(sizes, [r for r, _ in tt], color=blue,    lw=2.5, marker="s",
+        label="t-test")
+ax.plot(sizes, [r for r, _ in mw], color=red_pink, lw=2.5, marker="o",
+        label="Mann–Whitney")
+ax.axhline(0.8, color=slate, ls=":", lw=2, label="80% gold standard")
+ax.set_ylim(0, 1)
+ax.set_xlabel("group size n"); ax.set_ylabel("power (TPR)")
+ax.set_title("Normal data: t-test slightly ahead"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+The $t$-test wins — but only by a hair (the asymptotic efficiency of Mann–Whitney under normality is $\approx 95\%$). You give up almost nothing for the insurance.
+
+::: {.notes}
+Чесна ціна рангів: коли дані СПРАВДІ нормальні, відмова від величин на користь рангів коштує трохи потужності. На графіку t-тест трохи вище за Манна–Уітні, обидва перетинають золоті 80% десь поряд. Але розрив крихітний — асимптотична ефективність Манна–Уітні за нормальності ≈95%, тобто втрачаємо близько 5%. Інакше кажучи, страховка від скошеності й викидів майже безкоштовна навіть у «найкращому для t-тесту» світі. Це знімає головний контраргумент проти непараметрики.
+:::
+
+## 🚀 Power on skewed data: ranks win big {.smaller}
+
+Now the realistic case — a **multiplicative** lift on a heavy right tail (the new recsys lifts everyone ~35%).
+
+```{python}
+#| label: power-skewed
+#| code-fold: true
+#| fig-align: center
+
+a_sk = lognorm(s=0.9, scale=np.exp(3.4))
+b_sk = lognorm(s=0.9, scale=np.exp(3.4) * 1.35)   # 35% lift, same shape
+sizes = [10, 20, 40, 80, 160]
+mw = [rejection_rate(a_sk, b_sk, n, test="mw") for n in sizes]
+tt = [rejection_rate(a_sk, b_sk, n, test="t")  for n in sizes]
+
+fig, ax = plt.subplots(figsize=(11, 4.2))
+ax.plot(sizes, [r for r, _ in mw], color=red_pink, lw=2.5, marker="o",
+        label="Mann–Whitney")
+ax.plot(sizes, [r for r, _ in tt], color=blue,    lw=2.5, marker="s",
+        label="t-test")
+ax.axhline(0.8, color=slate, ls=":", lw=2, label="80% gold standard")
+ax.set_ylim(0, 1)
+ax.set_xlabel("group size n"); ax.set_ylabel("power (TPR)")
+ax.set_title("Skewed data: Mann–Whitney detects the lift sooner"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+::: {.callout-important icon=false}
+On heavy-tailed metrics the rank test reaches 80% power at a **much smaller** sample — the tail that bloats the $t$-test's variance simply doesn't reach the ranks.
+:::
+
+::: {.notes}
+Реалістичний кейс: мультиплікативний приріст на важкому правому хвості — нова система піднімає прослуховування приблизно на 35% (та сама форма, більший масштаб). Тепер Манн–Уітні ВПЕВНЕНО випереджає t-тест: досягає 80% потужності на значно меншій вибірці. Причина — хвіст, що роздуває дисперсію t-тесту, просто не «дотягується» до рангів, бо ранг найбільшого значення завжди N+M незалежно від того, наскільки воно велике. Підсумок порівняння: на нормальних даних втрачаємо ~5% потужності, на скошених — виграємо багато. Для продуктових метрик вибір очевидний.
+:::
+
+# Effect size & caveats {background-iframe=".07-mu_files/libs/colored-particles/index.html"}
+
+## 📐 Significant ≠ large {.smaller}
+
+A $p$-value says *whether* the groups differ; it never says *by how much*. As with Cramér's $V$ for $\chi^2$, report an **effect size**.
+
+:::: {.columns}
+
+::: {.column width="50%"}
+**Probability of superiority** (common-language effect size):
+$$
+\hat{P}(A < B) = \frac{U}{NM} \in [0, 1].
+$$
+"A random test user beats a random control user $\hat P$ of the time." $0.5$ means no effect.
+:::
+
+::: {.column width="50%"}
+**Rank-biserial correlation:**
+$$
+r_{rb} = 2\,\hat{P}(A<B) - 1 \in [-1, 1].
+$$
+$0$ = no effect, $\pm 1$ = complete separation.
+:::
+
+::::
+
+```{python}
+#| label: effect-size
+#| output-location: column
+
+U = calculate_U(control, test)      # pairs control < test
+P_sup = U / (N * M)
+r_rb  = 2 * P_sup - 1
+
+print(f"P(control < test) = {P_sup:.3f}")
+print(f"rank-biserial r   = {r_rb:.3f}")
+```
+
+::: {.callout-important icon=false}
+On millions of users **any** shift is "significant". Always pair the $p$-value with $\hat P(A<B)$ to judge whether the lift is worth shipping.
+:::
+
+::: {.notes}
+p-value каже ЧИ є різниця, але не НАСКІЛЬКИ вона велика — точно як з Cramér's V для χ². Тому додаємо розмір ефекту. Перший і найзрозноміліший — ймовірність переваги P(A<B)=U/NM: «випадковий тестовий користувач переграє випадкового контрольного у частці P випадків»; 0.5 — ефекту немає. Другий — рангово-бісеріальна кореляція r=2P−1 в діапазоні [−1,1]. На наших даних P помітно більше за 0.5. Ключове застереження (як і для χ² на великих n): на мільйонах користувачів значущим стає будь-який зсув, тож завжди супроводжуйте p-value розміром ефекту, щоб вирішити, чи варто викочувати зміну.
+:::
+
+## 📏 Hodges–Lehmann: a shift *with* a CI {.smaller}
+
+$\hat P(A<B)$ gives the *size* of the effect but no interval. The **Hodges–Lehmann** estimator gives the shift **in minutes** — the median of all pairwise differences — plus a **distribution-free** confidence interval (the inversion of the U-test).
+
+```{python}
+#| label: hodges-lehmann
+#| output-location: column
+
+diffs = np.subtract.outer(test, control).ravel()  # all B - A pairs
+hl    = np.median(diffs)                           # HL shift estimate
+
+ds = np.sort(diffs)
+z  = norm.ppf(1 - 0.05 / 2)
+k  = int(np.floor(N * M / 2 - z * np.sqrt(N * M * (N + M + 1) / 12)))
+ci_low, ci_high = ds[k], ds[N * M - 1 - k]
+
+print(f"HL shift   = {hl:.1f} min")
+print(f"95% CI     = ({ci_low:.1f}, {ci_high:.1f}) min")
+```
+
+. . .
+
+::: {.callout-tip icon=false}
+The interval excludes $0$ — consistent with the rejected $H_0$ — and, unlike a mean difference, neither the estimate nor its CI is dragged around by the all-night outlier.
+:::
+
+::: {.notes}
+P(A<B) дає величину ефекту, але без інтервалу. Оцінювач Ходжеса–Лемана повертає зсув У ХВИЛИНАХ — це медіана ВСІХ попарних різниць (B−A) — плюс distribution-free довірчий інтервал, який є інверсією U-критерію (ті самі квантилі впорядкованих різниць, що відповідають критичному значенню рангової статистики). На наших даних зсув ≈8.7 хв, 95% ДІ ≈ (3.3, 14.6). Інтервал не накриває 0 — узгоджено з відхиленою H0. Головна перевага перед різницею середніх: ні точкова оцінка, ні її ДІ не «тягнуться» за викидом-«совою». Це природне доповнення до слайда про розмір ефекту: тепер маємо і величину, і невизначеність, і все це робастно.
+:::
+
+## ⚠️ What $H_0$ really claims {.smaller}
+
+The strict null is $F = G$ — the **whole** distributions match, not just the medians.
+
+- Under a pure **location shift** (same shape), Mann–Whitney *is* a clean test of medians/shift. This is the case to aim for.
+- If the groups differ in **shape or spread** (e.g. the new recsys helps casual users but bores super-fans), a "non-significant" result can still hide a real, *re-shaping* effect — and a significant one need not mean "B is larger".
+
+. . .
+
+::: {.callout-tip icon=false}
+Plot the two distributions before interpreting. Mann–Whitney answers "is one group stochastically larger?", **not** "are the means equal?".
+:::
+
+::: {.notes}
+Тонкість, яку студенти часто плутають: строга H0 — це F=G, тобто збіг РОЗПОДІЛІВ цілком, а не лише медіан. Якщо форма однакова й різниця тільки в положенні (location shift) — Манн–Уітні чисто тестує зсув/медіану, і саме до цього сценарію варто прагнути. Але якщо групи різняться ФОРМОЮ чи розкидом (нова система допомагає casual-користувачам, але набридає фанатам), то «незначущий» результат може ховати реальний перерозподіл, а значущий — не обов'язково означати «B більше». Порада: спершу намалюйте обидва розподіли. Манн–Уітні відповідає на «чи одна група стохастично більша?», а не «чи рівні середні?».
+:::
+
+# Summary {background-iframe=".07-mu_files/libs/colored-particles/index.html"}
+
+## 🧾 The one idea {.smaller}
+
+Replace **values** with their [order]{.hi}, and the test stops caring about shape or outliers.
+
+$$
+U = \sum_{i}^{N}\sum_{j}^{M} I[A_i < B_j] = V - \frac{M(M+1)}{2},
+\qquad
+U \overset{H_0}{\longrightarrow} \mathcal{N}\!\left(\frac{NM}{2},\ \frac{NM(N+M+1)}{12}\right).
+$$
+
+- **Pool & rank** the two samples; the rank sum drives the statistic.
+- **Distribution-free** — calibrated FPR with no normality assumption.
+- **Robust** — one outlier cannot bend an order.
+- **Power** — a touch below the $t$-test on normal data, well above it on skewed/heavy-tailed data.
+- **Effect size** — report $\hat P(A<B) = U/NM$ alongside the $p$-value, especially on big $n$.
+
+. . .
+
+The same trick spans the whole family — keep only [direction]{.hi-slate} (sign test) or [order]{.hi} (rank tests):
+
+- **Independent groups** → **Mann–Whitney**.
+- **Paired / one-sample** → **sign** (direction) or **Wilcoxon signed-rank** (magnitude).
+
+::: {.notes}
+Підсумок однією думкою: замініть значення їхнім ПОРЯДКОМ — і критерій перестає залежати від форми розподілу й викидів. Статистика U рахується або як кількість пар, або через суму рангів V, і при H0 прямує до нормального з відомими E і D. Чотири тези: pool & rank — об'єднуємо й ранжуємо; distribution-free — калібрований FPR без нормальності; робастність — один викид не зрушить порядок; потужність — трохи нижча за t на нормальних даних, помітно вища на скошених. І завжди додавайте розмір ефекту P(A<B)=U/NM поряд із p-value, особливо на великих вибірках. Той самий принцип охоплює всю родину критеріїв: лишаємо або НАПРЯМОК (знаковий критерій), або ПОРЯДОК (рангові). Незалежні групи — Манн–Уітні; парні чи одновибіркові — знаковий або знаково-ранговий Вілкоксон.
+:::
+
+## 🧭 Which test, when? {.tiny}
+
+| Your situation | Reach for | Watch out for |
+|---|---|---|
+| Two **independent** groups, ~normal, no outliers | two-sample **$t$-test** (`ttest_ind`) | normality, equal-ish variance |
+| Two **independent** groups, skewed / outliers / ordinal | **Mann–Whitney** (`mannwhitneyu`) | what $H_0$ means ($F=G$); ties |
+| **Paired** / crossover, magnitude matters | **Wilcoxon signed-rank** (`wilcoxon`) | differences symmetric |
+| **Paired** / crossover, assumption-free | **sign test** (`binomtest`) | least powerful (direction only) |
+| **One sample** vs a target median/KPI | **sign** / **signed-rank** | symmetry for signed-rank |
+| Need a magnitude, not just a verdict | **Hodges–Lehmann** shift + CI, or **$\hat P(A<B)$** | significant $\neq$ large on big $n$ |
+
+. . .
+
+::: {.callout-tip icon=false}
+The meta-lesson of the course still holds: when in doubt, [validate the test with Monte Carlo]{.hi} on data that looks like yours.
+:::
+
+::: {.notes}
+Шпаргалка «який критерій коли», згрупована за ДИЗАЙНОМ. Дві НЕЗАЛЕЖНІ групи, приблизно нормальні без викидів — двовибірковий t-тест; скошені/важкохвості/порядкові — Манн–Уітні (H0 — це F=G цілком, стежте за зв'язками). ПАРНІ/крос-овер: якщо величина зміни важлива — знаково-ранговий Вілкоксон (різниці мають бути симетричні); якщо хочемо нуль припущень — знаковий критерій (найслабший, лише напрямок). ОДНА вибірка проти цільового KPI/медіани — знаковий або знаково-ранговий. Потрібен розмір, а не лише вердикт — Ходжес–Леман з ДІ або P(A<B), бо на великих n значуще ≠ велике. І наскрізний мета-урок курсу: маєте сумнів щодо каліброваності — переваліруйте критерій Монте-Карло на даних, схожих на ваші.
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe=".07-mu_files/libs/colored-particles/index.html"}
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=4049)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

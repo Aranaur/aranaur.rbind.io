@@ -1,0 +1,558 @@
+---
+title: "Практика 8"
+subtitle: "Непараметричні критерії для A/B"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: ua
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import (
+    mannwhitneyu, wilcoxon, binomtest, ttest_ind, ttest_rel, ttest_1samp,
+    brunnermunzel, rankdata,
+)
+from statsmodels.stats.proportion import proportion_confint
+
+np.random.seed(73)
+
+turquoise = "#20B2AA"
+red       = "#fb6107"
+blue      = "#181485"
+green     = "#8bb174"
+gray      = "#A0A0A0"
+red_pink  = "#e64173"
+orange    = "#FFA500"
+slate     = "#314f4f"
+
+
+def delivery(median, sigma, n, rng):
+    """Час доставки (хв) — правоскошений: lognormal із заданою медіаною."""
+    return rng.lognormal(np.log(median), sigma, n)
+
+
+def rate(gen_a, gen_b, nx, ny, test="mw", n_exps=2000, alpha=0.05, seed=1):
+    """Частка відхилень H0 для ДВОХ НЕЗАЛЕЖНИХ вибірок (+ інтервал Уілсона).
+
+    gen_a(n, rng), gen_b(n, rng) -> вибірки.
+    Однакові генератори -> H0 вірна -> rate = FPR; різні -> потужність.
+    test: 'mw' (Манн–Уітні), 'welch' (t Велча), 'bm' (Брюннер–Мунцель).
+    """
+    rng, rej = np.random.default_rng(seed), 0
+    for _ in range(n_exps):
+        a, b = gen_a(nx, rng), gen_b(ny, rng)
+        p = (mannwhitneyu(a, b).pvalue if test == "mw"
+             else ttest_ind(a, b, equal_var=False).pvalue if test == "welch"
+             else brunnermunzel(a, b).pvalue)
+        rej += p < alpha
+    lo, hi = proportion_confint(rej, n_exps, alpha=0.05, method="wilson")
+    return {"rate": rej / n_exps, "ci": (lo, hi)}
+
+
+def prate(gen_d, n, test="sr", n_exps=2000, alpha=0.05, seed=1):
+    """Частка відхилень H0 для ПАРНИХ різниць d (+ інтервал Уілсона).
+
+    gen_d(n, rng) -> вектор різниць d. Центровані на 0 -> FPR; зсунуті -> потужність.
+    test: 'sign' (знаковий), 'sr' (знаково-ранговий), 'pt' (парний t).
+    """
+    rng, rej = np.random.default_rng(seed), 0
+    for _ in range(n_exps):
+        d = gen_d(n, rng)
+        if test == "sign":
+            p = binomtest(int((d > 0).sum()), n, 0.5).pvalue
+        elif test == "sr":
+            p = wilcoxon(d).pvalue
+        else:
+            p = ttest_1samp(d, 0).pvalue
+        rej += p < alpha
+    lo, hi = proportion_confint(rej, n_exps, alpha=0.05, method="wilson")
+    return {"rate": rej / n_exps, "ci": (lo, hi)}
+```
+
+# Що ми робимо сьогодні {.unnumbered}
+
+Минулі практики порівнювали групи через **середні** ($z$-, $t$-тести) або
+через **категорії** ($\chi^2$). Але продуктові метрики — час доставки, виторг,
+тривалість сесії — майже завжди **скошені** й мають **викиди**, тож середнє
+підводить. Сьогодні — родина **непараметричних** критеріїв, що дивляться на
+**напрямок** і **порядок**, а не на величину:
+
+- **знаковий критерій** — лише напрямок зміни (біном);
+- **знаково-ранговий Вілкоксон** — ранжує розміри парних змін;
+- **критерій Манна–Уітні** — порівнює дві незалежні групи за рангами.
+
+Будуємо **гардрейли для A/B** застосунку доставки **GreenBowl** (той самий, що
+в Практиках 4–7) і окремо розбираємо **головну пастку** Манна–Уітні: що буде,
+якщо **медіани рівні, а форми розподілів — ні**.
+
+::: {.callout-note icon="false"}
+## Правила гри
+- Для кожного дизайну **будуємо свій інструмент** (`sign_test`,
+  `signed_rank`, `mw_report`); самі критерії беремо готові зі `scipy.stats`.
+- Дані **генеруємо самі** — так ми знаємо «правду» і перевіряємо, чи критерій
+  її ловить.
+- Перед кожним кейсом — блок **🔮 «Спершу вгадайте»**: запишіть відповідь до
+  запуску коду.
+- Після — **«Ваша черга»** з мінізадачами і згорнутим розв'язанням.
+- Каліброваність критерію (FPR/потужність) перевіряємо **Монте-Карло** (двигуни
+  `rate` і `prate` зі сетапу) — звичка з Практики 5.
+:::
+
+---
+
+# Частина I — Знаковий критерій: чи стало швидше? {#sec-sign}
+
+> **Кейс.** GreenBowl увімкнув **оптимізацію маршрутів**. Кожен із 24 кур'єрів
+> відпрацював тиждень **до** і тиждень **після**. Це **парний** (крос-овер)
+> дизайн: ті самі кур'єри двічі, тож групи **не незалежні** — `ttest_ind` чи
+> Манн–Уітні тут не підходять. Дивимось на різницю $d_i$ всередині пари.
+
+```{python}
+#| label: sign-data
+
+rng = np.random.default_rng(1)
+n_c    = 24
+before = delivery(median=38, sigma=0.25, n=n_c, rng=rng)          # хв до
+after  = before * rng.lognormal(np.log(0.93), 0.10, n_c)          # ~7% швидше
+```
+
+::: {.callout-tip icon="false"}
+## 🔮 Спершу вгадайте
+Більшість кур'єрів стали возити швидше. Чи відхилить знаковий критерій
+гіпотезу «зміни немає» на рівні 5%? І чи знадобилося нам знати, **на скільки
+хвилин** швидше?
+:::
+
+## Інструмент: `sign_test`
+
+Найпростіша ідея — викинути величину, лишити **знак** різниці. Кількість
+покращень при $H_0$ поводиться як підкидання чесної монетки:
+$T = \#\{d_i > 0\} \sim \text{Binom}(n, \tfrac12)$.
+
+```{python}
+#| label: sign-test
+
+def sign_test(before, after, alpha=0.05):
+    """Знаковий критерій: чи зменшився показник (after < before)?"""
+    d = np.asarray(before, float) - np.asarray(after, float)   # >0 => стало швидше
+    d = d[d != 0]                                              # нулі відкидаємо
+    n, k = len(d), int((d > 0).sum())
+    p = binomtest(k, n, 0.5, alternative="greater").pvalue
+    return {"k": k, "n": n, "p": p,
+            "verdict": "відхиляємо H0" if p < alpha else "не відхиляємо H0"}
+
+r = sign_test(before, after)
+print(f"покращилось {r['k']}/{r['n']} кур'єрів,  p = {r['p']:.4f}  →  {r['verdict']}")
+```
+
+Жодного припущення про розподіл — лише незалежність кур'єрів. Ціна: ми
+**ігноруємо**, наскільки саме швидше, тож критерій найслабший із трьох.
+
+::: {.callout-tip icon="false"}
+## Ваша черга 1
+1. Згенеруйте **нульовий** тиждень, де оптимізація нічого не змінює
+   (`after = before * rng.lognormal(0, 0.10, n_c)`), і прогоніть `sign_test`.
+   Чи тримає критерій обіцянку (великий $p$)?
+2. **SLA.** Контракт обіцяє **медіану ≤ 30 хв**. Для вибірки
+   `delivery(33, 0.4, 40, rng)` перевірте односторонню гіпотезу «медіана > 30»
+   через `binomtest`. Порушуємо SLA?
+3. **Викид.** Додайте одного кур'єра, який «після» застряг у заторі
+   (`after[0] *= 6`). Як зміниться $p$ знакового критерію? Поясніть, чому майже
+   ніяк.
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 1
+
+```{python}
+#| label: sol1
+
+rng = np.random.default_rng(11)
+
+# (1) нульовий тиждень — H0 вірна
+b0 = delivery(38, 0.25, n_c, rng)
+a0 = b0 * rng.lognormal(0, 0.10, n_c)
+print("(1) H0:", sign_test(b0, a0))
+
+# (2) SLA: медіана > 30 хв?
+x = delivery(33, 0.4, 40, rng)
+above = int((x > 30).sum())
+p_sla = binomtest(above, len(x), 0.5, alternative="greater").pvalue
+print(f"(2) понад 30 хв: {above}/{len(x)}, медіана={np.median(x):.1f}, p={p_sla:.4f}")
+
+# (3) один викид майже не впливає — знак не «згинається»
+b3, a3 = before.copy(), after.copy()
+a3[0] *= 6
+print("(3) з викидом:", sign_test(b3, a3))
+```
+
+**Інтерпретація.** (1) На нульовому тижні $p$ великий — критерій не вигадує
+ефекту. (2) Якщо понад половини замовлень довші за 30 хв, SLA під загрозою. (3)
+$p$ майже не змінюється: викид перевертає лише **один** знак, а не «тягне»
+середнє, як у $t$-тесті.
+:::
+
+```{python}
+#| label: sign-fpr
+#| code-fold: true
+
+# Монте-Карло: FPR знакового критерію під H0 (різниці симетричні навколо 0)
+fpr = prate(lambda n, r: r.normal(0, 1, n), n=n_c, test="sign")
+print(f"FPR знакового критерію (n={n_c}): {fpr['rate']:.3f}  "
+      f"CI={tuple(round(c, 3) for c in fpr['ci'])}")
+```
+
+::: {.callout-warning icon="false"}
+## Що показав Монте-Карло
+FPR лягає на 5% — знаковий критерій **тримає рівень** без жодних припущень про
+форму. Платимо за це потужністю: дізнаємось у Частині II.
+:::
+
+---
+
+# Частина II — Знаково-ранговий Вілкоксон: додаємо величину {#sec-sr}
+
+Знаковий критерій викидає інформацію про **розмір** кожної зміни. Вілкоксон
+ранжує модулі різниць і повертає їм знаки:
+$W = \sum_i \text{rank}(|d_i|)\cdot\text{sign}(d_i)$. Кілька великих покращень
+тепер переважують багато дрібних — критерій **потужніший**.
+
+```{python}
+#| label: signed-rank
+
+def signed_rank(before, after, alpha=0.05):
+    """Знаково-ранговий критерій Вілкоксона (парний)."""
+    d = np.asarray(before, float) - np.asarray(after, float)
+    nz = d[d != 0]
+    W = float(np.sum(rankdata(np.abs(nz)) * np.sign(nz)))
+    p = wilcoxon(before, after, alternative="greater").pvalue
+    return {"W": W, "p": p,
+            "verdict": "відхиляємо H0" if p < alpha else "не відхиляємо H0"}
+
+print("знаковий      :", sign_test(before, after))
+print("знаково-ранговий:", signed_rank(before, after))
+```
+
+::: {.callout-important icon="false"}
+Додаткова умова Вілкоксона: різниці $d_i$ **симетричні** відносно свого центру.
+Це слабше за повну нормальність, але не безкоштовно — спершу гляньте на
+гістограму $d_i$. Якщо симетрії немає, повертайтесь до знакового критерію.
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 2
+1. Порівняйте `sign_test`, `signed_rank` і **парний** `ttest_rel(before, after,
+   alternative='greater')` на наших даних. Хто дає найменший $p$?
+2. **Викид.** Зробіть `after[0] *= 6` і перерахуйте всі три. Який критерій
+   «зламався»? Чому саме парний $t$?
+3. Побудуйте гістограму різниць `before - after`. Чи виглядає вона достатньо
+   **симетричною**, щоб довіряти Вілкоксону?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 2
+
+```{python}
+#| label: sol2
+#| fig-align: center
+
+p_pt = ttest_rel(before, after, alternative="greater").pvalue
+print(f"(1) sign={sign_test(before, after)['p']:.4f}  "
+      f"sr={signed_rank(before, after)['p']:.4f}  paired-t={p_pt:.4f}")
+
+b3, a3 = before.copy(), after.copy(); a3[0] *= 6
+print(f"(2) з викидом: sign={sign_test(b3, a3)['p']:.4f}  "
+      f"sr={signed_rank(b3, a3)['p']:.4f}  "
+      f"paired-t={ttest_rel(b3, a3, alternative='greater').pvalue:.4f}")
+
+fig, ax = plt.subplots(figsize=(7, 3))
+ax.hist(before - after, bins=10, color=turquoise)
+ax.axvline(0, color=slate, ls="--"); ax.set_xlabel("before - after, хв")
+ax.set_title("Розподіл парних різниць"); plt.tight_layout(); plt.show()
+```
+
+**Інтерпретація.** (1) На чистих даних знаково-ранговий іде пліч-о-пліч із
+парним $t$ і випереджає знаковий. (2) Викид «ламає» саме парний $t$ (його $p$
+підскакує) — середнє різниць стає заручником одного значення; рангові майже не
+реагують. (3) Якщо різниці грубо симетричні — Вілкоксон доречний.
+:::
+
+```{python}
+#| label: sr-power
+#| code-fold: true
+#| fig-align: center
+
+# Потужність на ВАЖКОХВОСТИХ різницях (Стьюдент, df=2) зі зсувом
+sizes = [10, 20, 40, 80]
+curves = {t: [prate(lambda n, r: 0.7 + r.standard_t(2, n), nn, test=t)["rate"]
+              for nn in sizes] for t in ("sr", "sign", "pt")}
+
+fig, ax = plt.subplots(figsize=(8, 3.6))
+ax.plot(sizes, curves["sr"],   "o-", color=red_pink, lw=2.3, label="знаково-ранговий")
+ax.plot(sizes, curves["sign"], "^-", color=green,    lw=2.3, label="знаковий")
+ax.plot(sizes, curves["pt"],   "s--", color=blue,    lw=2.3, label="парний t")
+ax.axhline(0.8, color=slate, ls=":", lw=2, label="80%")
+ax.set_xlabel("кількість кур'єрів n"); ax.set_ylabel("потужність")
+ax.set_ylim(0, 1); ax.legend(); ax.set_title("Важкі хвости: ранги б'ють парний t")
+plt.tight_layout(); plt.show()
+```
+
+::: {.callout-warning icon="false"}
+## Що показав Монте-Карло
+На важкохвостих різницях знаково-ранговий лідирує, знаковий трохи позаду, а
+парний $t$ **відстає** — його дисперсію руйнують хвости. Величина дає
+потужність, ранги дають робастність.
+:::
+
+---
+
+# Частина III — Манн–Уітні: дві незалежні групи {#sec-mw}
+
+> **Кейс.** Класичний A/B: половина замовлень іде через **старий** диспетчер
+> (контроль), половина — через **новий** (тест). Метрика — **час доставки, хв**,
+> сильно скошена. Групи **незалежні** (різні замовлення), тож працює Манн–Уітні.
+
+```{python}
+#| label: mw-data
+
+rng     = np.random.default_rng(3)
+control = delivery(median=40, sigma=0.5, n=120, rng=rng)
+testg   = delivery(median=35, sigma=0.5, n=120, rng=rng)   # новий швидший
+```
+
+::: {.callout-tip icon="false"}
+## 🔮 Спершу вгадайте
+Новий диспетчер зсуває медіану з 40 до 35 хв. Чи зловить це Манн–Уітні? І чи
+буде його $p$ меншим або більшим за звичайний $t$-тест на цих скошених даних?
+:::
+
+## Інструмент: `mw_report`
+
+```{python}
+#| label: mw-report
+
+def mw_report(a, b, alpha=0.05):
+    """Манн–Уітні для двох незалежних груп + розмір ефекту P(a<b)."""
+    res = mannwhitneyu(a, b, alternative="two-sided")
+    na, nb = len(a), len(b)
+    p_a_lt_b = 1 - res.statistic / (na * nb)   # P(a<b): a швидший за b
+    return {"U": float(res.statistic), "p": res.pvalue, "P(a<b)": p_a_lt_b,
+            "verdict": "відхиляємо H0" if res.pvalue < alpha else "не відхиляємо H0"}
+
+print(mw_report(control, testg))
+```
+
+`P(a<b)` — «ймовірність переваги»: частка пар, де контрольне замовлення довше за
+тестове. $0.5$ означає «ефекту немає».
+
+::: {.callout-tip icon="false"}
+## Ваша черга 3
+1. Порівняйте $p$ від `mw_report` і від `ttest_ind(control, testg)`. На скошених
+   даних обидва бачать ефект?
+2. **Викид.** Додайте до контролю одне «нічне» замовлення
+   (`control = np.append(control, 1500)`). Перерахуйте Манн–Уітні і $t$-тест.
+   Хто стійкіший?
+3. **Розмір ефекту.** Виведіть `P(a<b)` і поясніть менеджеру одним реченням, що
+   це число означає для клієнта.
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 3
+
+```{python}
+#| label: sol3
+
+print(f"(1) MW p={mw_report(control, testg)['p']:.4g}  "
+      f"t p={ttest_ind(control, testg).pvalue:.4g}")
+
+c_out = np.append(control, 1500)
+print(f"(2) з викидом: MW p={mannwhitneyu(c_out, testg).pvalue:.4g}  "
+      f"t p={ttest_ind(c_out, testg).pvalue:.4g}")
+
+ps = mw_report(control, testg)["P(a<b)"]
+print(f"(3) P(контроль повільніший за тест) = {ps:.2f} → "
+      f"у ~{ps:.0%} випадкових пар нове замовлення приїде раніше")
+```
+
+**Інтерпретація.** (1) Обидва ловлять зсув. (2) Один викид роздуває середнє й
+**рятує** нульову для $t$-тесту, а Манн–Уітні майже не реагує. (3) `P(a<b)`
+зрозуміла бізнесу без статистичного жаргону.
+:::
+
+```{python}
+#| label: mw-fpr-power
+#| code-fold: true
+
+skew = lambda n, r: delivery(40, 0.6, n, r)              # один скошений закон
+fpr  = rate(skew, skew, 80, 80, test="mw")               # H0: однакові групи
+pw_mw = rate(lambda n, r: delivery(40, 0.6, n, r),
+             lambda n, r: delivery(34, 0.6, n, r), 80, 80, test="mw")["rate"]
+pw_t  = rate(lambda n, r: delivery(40, 0.6, n, r),
+             lambda n, r: delivery(34, 0.6, n, r), 80, 80, test="welch")["rate"]
+print(f"FPR MW на скошених рівних групах: {fpr['rate']:.3f} "
+      f"CI={tuple(round(c, 3) for c in fpr['ci'])}")
+print(f"потужність (медіана 40 vs 34): MW={pw_mw:.2f}  t(Велча)={pw_t:.2f}")
+```
+
+::: {.callout-warning icon="false"}
+## Що показав Монте-Карло
+Коли групи мають **однакову форму**, Манн–Уітні тримає FPR на 5% і на скошених
+даних випереджає $t$ за потужністю. Але «однакова форма» — критична умова.
+Перевіримо, що буде без неї.
+:::
+
+---
+
+# Частина IV — Пастка форми: рівні медіани, різні форми {#sec-trap}
+
+> **Кейс.** Новий диспетчер тримає **ту саму медіану** часу доставки, але робить
+> його **набагато мінливішим**: частина замовлень приїздить дуже рано, частина —
+> дуже пізно. Модель відхилень від планового часу (хв):
+> $A \sim U(-10, 10)$ (контроль, рівно), $B \sim U(-100, 100)$ (новий, «гойдалка»).
+
+```{python}
+#| label: trap-data
+#| fig-align: center
+
+rng = np.random.default_rng(5)
+A = rng.uniform(-10, 10, 100_000)
+B = rng.uniform(-100, 100, 100_000)
+print(f"медіана A = {np.median(A):.2f},  медіана B = {np.median(B):.2f}")
+print(f"P(A < B) ≈ {np.mean(A < B):.3f}")
+
+fig, ax = plt.subplots(figsize=(8, 3))
+ax.hist(A, bins=40, density=True, color=turquoise, alpha=0.8, label="A: U(-10,10)")
+ax.hist(B, bins=40, density=True, color=red_pink, alpha=0.5, label="B: U(-100,100)")
+ax.axvline(0, color=slate, ls="--"); ax.set_xlabel("відхилення від плану, хв")
+ax.legend(); ax.set_title("Рівні медіани (0), різні форми"); plt.tight_layout(); plt.show()
+```
+
+::: {.callout-tip icon="false"}
+## 🔮 Спершу вгадайте
+Медіани однакові, $P(A<B)=0.5$. Запишіть **до запуску**: яким буде FPR
+Манна–Уітні при рівних вибірках ($n=30+30$)? А якщо вибірки **нерівні**?
+:::
+
+## Рівні вибірки: чи тримає Манн–Уітні рівень?
+
+```{python}
+#| label: trap-equal
+
+gA = lambda n, r: r.uniform(-10, 10, n)
+gB = lambda n, r: r.uniform(-100, 100, n)
+
+eq = rate(gA, gB, 30, 30, test="mw", n_exps=3000)
+print(f"FPR Манна–Уітні, n=30+30:  {eq['rate']:.3f}  "
+      f"CI={tuple(round(c, 3) for c in eq['ci'])}")
+```
+
+Медіани рівні, а FPR — близько **10%**, удвічі більший за обіцяні 5%. Критерій
+**хибно** оголошує різницю, хоча її (за положенням) немає.
+
+## Нерівні вибірки: стає ще гірше
+
+```{python}
+#| label: trap-unbalanced
+
+print("nx   ny    MW     t(Велча)   Брюннер–Мунцель")
+for nx, ny in [(30, 30), (10, 100), (100, 10), (20, 200), (200, 20)]:
+    mw = rate(gA, gB, nx, ny, test="mw",    n_exps=3000)["rate"]
+    tt = rate(gA, gB, nx, ny, test="welch", n_exps=3000)["rate"]
+    bm = rate(gA, gB, nx, ny, test="bm",    n_exps=3000)["rate"]
+    print(f"{nx:<4d} {ny:<4d}  {mw:5.3f}    {tt:5.3f}      {bm:5.3f}")
+```
+
+::: {.callout-warning icon="false"}
+## Що показав Монте-Карло
+FPR Манна–Уітні «гуляє» від **0.00** до **~0.28** залежно від балансу: коли
+**менша** група взята з **ширшого** розподілу — критерій ліберальний (надто
+часто відхиляє); коли з **вужчого** — консервативний. Натомість **t Велча** і
+**Брюннер–Мунцель** тримають ~5% за всіх конфігурацій.
+:::
+
+::: {.callout-important icon="false"}
+## Спіймай помилку 🕵️
+Нульова гіпотеза Манна–Уітні — це **$F = G$** (однакові розподіли), а **не**
+«рівні медіани». Коли форми різні, тест змішує **положення** і **розкид**, і
+його каліброваність ламається. Тож:
+
+- читайте Манн–Уітні як тест **стохастичної переваги** $P(A<B)=\tfrac12$ за
+  **однакової форми**;
+- якщо форми різняться, а питання саме про **положення/медіану** — беріть
+  **Брюннер–Мунцель** (`scipy.stats.brunnermunzel`, ранговий і стійкий до
+  різних дисперсій) або **t Велча** для середніх.
+:::
+
+::: {.callout-tip icon="false"}
+## Ваша черга 4
+1. Поясніть **напрямок** перекосу: чому `(100, 10)` дає ліберальний FPR, а
+   `(10, 100)` — консервативний? (підказка: яка група вужча/ширша?)
+2. Поверніть **справжній зсув** у B (`r.uniform(-100, 100, n) + 8`) і порівняйте
+   **потужність** Манна–Уітні і Брюннера–Мунцеля при `n=40+40`. Хто кращий, коли
+   ефект таки є?
+3. **Висновок для команди.** Сформулюйте одне речення: коли «непараметричний»
+   ще не означає «можна не дивитись на форму».
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 4
+
+```{python}
+#| label: sol4
+
+# (1) діагностика напрямку через дисперсію меншої групи — див. таблицю вище
+print("(1) менша група з ширшого закону → ліберально; з вужчого → консервативно")
+
+# (2) потужність за справжнього зсуву +8 хв у B
+gB_shift = lambda n, r: r.uniform(-100, 100, n) + 8
+pw_mw = rate(gA, gB_shift, 40, 40, test="mw", n_exps=3000)["rate"]
+pw_bm = rate(gA, gB_shift, 40, 40, test="bm", n_exps=3000)["rate"]
+print(f"(2) потужність зі зсувом: MW={pw_mw:.2f}  Брюннер–Мунцель={pw_bm:.2f}")
+
+print("(3) непараметричний ≠ вільний від припущень: різні форми ламають MW")
+```
+
+**Інтерпретація.** (1) Формула дисперсії $U$ припускає $F=G$; коли менша група
+ширша, справжня дисперсія $U$ більша за номінальну — $Z$ роздутий, FPR зростає.
+(2) За реального зсуву обидва мають пристойну потужність, але Брюннер–Мунцель
+ще й чесний щодо FPR. (3) Перед Манном–Уітні дивіться на форму/розкид.
+:::
+
+---
+
+# Чек-лист непараметричного A/B {.unnumbered}
+
+- [ ] Дизайн визначено: **парний** (той самий об'єкт двічі) → знаковий /
+  знаково-ранговий; **незалежні** групи → Манн–Уітні; **одна вибірка проти KPI**
+  → знаковий / знаково-ранговий.
+- [ ] Для парних різниць перевірено **симетрію** перед Вілкоксоном (інакше —
+  знаковий критерій).
+- [ ] Поряд із $p$ показано **розмір ефекту** ($P(A<B)$, медіанна різниця), бо на
+  великих $n$ значуще $\neq$ велике.
+- [ ] Перед читанням Манна–Уітні як «тесту медіан» перевірено **форму/розкид**
+  груп; за різних форм узято **Брюннер–Мунцель** або **t Велча**.
+- [ ] Каліброваність критерію провалідовано **Монте-Карло** (FPR під $H_0$) там,
+  де є сумнів.
+- [ ] Метрика справді **числова/порядкова** (а не категоріальна, де доречніший
+  $\chi^2$).
+
+Якщо хоч на одне «ні» — довіряти висновку **зарано**.

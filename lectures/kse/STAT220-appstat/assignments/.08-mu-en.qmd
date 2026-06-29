@@ -1,0 +1,560 @@
+---
+title: "Practice 8"
+subtitle: "Nonparametric tests for A/B"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: en
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import (
+    mannwhitneyu, wilcoxon, binomtest, ttest_ind, ttest_rel, ttest_1samp,
+    brunnermunzel, rankdata,
+)
+from statsmodels.stats.proportion import proportion_confint
+
+np.random.seed(73)
+
+turquoise = "#20B2AA"
+red       = "#fb6107"
+blue      = "#181485"
+green     = "#8bb174"
+gray      = "#A0A0A0"
+red_pink  = "#e64173"
+orange    = "#FFA500"
+slate     = "#314f4f"
+
+
+def delivery(median, sigma, n, rng):
+    """Delivery time (min) — right-skewed: lognormal with a given median."""
+    return rng.lognormal(np.log(median), sigma, n)
+
+
+def rate(gen_a, gen_b, nx, ny, test="mw", n_exps=2000, alpha=0.05, seed=1):
+    """Rejection rate for TWO INDEPENDENT samples (+ Wilson CI).
+
+    gen_a(n, rng), gen_b(n, rng) -> samples.
+    Same generators -> H0 true -> rate = FPR; different -> power.
+    test: 'mw' (Mann-Whitney), 'welch' (Welch t), 'bm' (Brunner-Munzel).
+    """
+    rng, rej = np.random.default_rng(seed), 0
+    for _ in range(n_exps):
+        a, b = gen_a(nx, rng), gen_b(ny, rng)
+        p = (mannwhitneyu(a, b).pvalue if test == "mw"
+             else ttest_ind(a, b, equal_var=False).pvalue if test == "welch"
+             else brunnermunzel(a, b).pvalue)
+        rej += p < alpha
+    lo, hi = proportion_confint(rej, n_exps, alpha=0.05, method="wilson")
+    return {"rate": rej / n_exps, "ci": (lo, hi)}
+
+
+def prate(gen_d, n, test="sr", n_exps=2000, alpha=0.05, seed=1):
+    """Rejection rate for PAIRED differences d (+ Wilson CI).
+
+    gen_d(n, rng) -> vector of differences d. Centered at 0 -> FPR; shifted -> power.
+    test: 'sign' (sign test), 'sr' (signed-rank), 'pt' (paired t).
+    """
+    rng, rej = np.random.default_rng(seed), 0
+    for _ in range(n_exps):
+        d = gen_d(n, rng)
+        if test == "sign":
+            p = binomtest(int((d > 0).sum()), n, 0.5).pvalue
+        elif test == "sr":
+            p = wilcoxon(d).pvalue
+        else:
+            p = ttest_1samp(d, 0).pvalue
+        rej += p < alpha
+    lo, hi = proportion_confint(rej, n_exps, alpha=0.05, method="wilson")
+    return {"rate": rej / n_exps, "ci": (lo, hi)}
+```
+
+# What we do today {.unnumbered}
+
+Earlier practices compared groups by **means** ($z$-, $t$-tests) or by
+**categories** ($\chi^2$). But product metrics — delivery time, revenue, session
+length — are almost always **skewed** with **outliers**, so the mean misleads.
+Today: the family of **nonparametric** tests that look at **direction** and
+**order**, not magnitude:
+
+- **sign test** — only the direction of each change (binomial);
+- **Wilcoxon signed-rank** — ranks the sizes of paired changes;
+- **Mann–Whitney** — compares two independent groups by ranks.
+
+We build **A/B guardrails** for the **GreenBowl** delivery app (the same one as
+in Practices 4–7) and separately dissect Mann–Whitney's **main trap**: what
+happens when the **medians are equal but the distribution shapes are not**.
+
+::: {.callout-note icon="false"}
+## Rules of the game
+- For each design we **build our own tool** (`sign_test`, `signed_rank`,
+  `mw_report`); the tests themselves come ready-made from `scipy.stats`.
+- We **generate the data ourselves** — so we know the "truth" and can check
+  whether the test catches it.
+- Before each case — a **🔮 "Guess first"** box: write your answer before running
+  code.
+- After it — **"Your turn"** with mini-tasks and a collapsed solution.
+- Calibration (FPR/power) is checked with **Monte-Carlo** (the `rate` and
+  `prate` engines from setup) — the habit from Practice 5.
+:::
+
+---
+
+# Part I — Sign test: did it get faster? {#sec-sign}
+
+> **Case.** GreenBowl turned on **route optimisation**. Each of 24 couriers
+> worked a week **before** and a week **after**. This is a **paired** (crossover)
+> design: the same couriers twice, so the groups are **not independent** —
+> `ttest_ind` or Mann–Whitney do not apply. We look at the within-pair
+> difference $d_i$.
+
+```{python}
+#| label: sign-data
+
+rng = np.random.default_rng(1)
+n_c    = 24
+before = delivery(median=38, sigma=0.25, n=n_c, rng=rng)          # min, before
+after  = before * rng.lognormal(np.log(0.93), 0.10, n_c)          # ~7% faster
+```
+
+::: {.callout-tip icon="false"}
+## 🔮 Guess first
+Most couriers got faster. Will the sign test reject "no change" at the 5% level?
+And did we need to know **by how many minutes** faster?
+:::
+
+## The tool: `sign_test`
+
+The simplest idea — drop the magnitude, keep only the **sign** of the difference.
+The count of improvements under $H_0$ behaves like a fair coin:
+$T = \#\{d_i > 0\} \sim \text{Binom}(n, \tfrac12)$.
+
+```{python}
+#| label: sign-test
+
+def sign_test(before, after, alpha=0.05):
+    """Sign test: did the metric decrease (after < before)?"""
+    d = np.asarray(before, float) - np.asarray(after, float)   # >0 => got faster
+    d = d[d != 0]                                              # drop zeros
+    n, k = len(d), int((d > 0).sum())
+    p = binomtest(k, n, 0.5, alternative="greater").pvalue
+    return {"k": k, "n": n, "p": p,
+            "verdict": "reject H0" if p < alpha else "keep H0"}
+
+r = sign_test(before, after)
+print(f"improved {r['k']}/{r['n']} couriers,  p = {r['p']:.4f}  →  {r['verdict']}")
+```
+
+No assumption about the distribution — only courier independence. The price: we
+**ignore** how much faster, so it is the least powerful of the three.
+
+::: {.callout-tip icon="false"}
+## Your turn 1
+1. Generate a **null** week where optimisation changes nothing
+   (`after = before * rng.lognormal(0, 0.10, n_c)`) and run `sign_test`. Does it
+   keep its promise (large $p$)?
+2. **SLA.** The contract promises a **median ≤ 30 min**. For the sample
+   `delivery(33, 0.4, 40, rng)` test the one-sided "median > 30" via `binomtest`.
+   Is the SLA breached?
+3. **Outlier.** Add one courier who got stuck in traffic "after"
+   (`after[0] *= 6`). How does the sign-test $p$ change? Explain why barely at all.
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 1
+
+```{python}
+#| label: sol1
+
+rng = np.random.default_rng(11)
+
+# (1) null week — H0 true
+b0 = delivery(38, 0.25, n_c, rng)
+a0 = b0 * rng.lognormal(0, 0.10, n_c)
+print("(1) H0:", sign_test(b0, a0))
+
+# (2) SLA: median > 30 min?
+x = delivery(33, 0.4, 40, rng)
+above = int((x > 30).sum())
+p_sla = binomtest(above, len(x), 0.5, alternative="greater").pvalue
+print(f"(2) above 30 min: {above}/{len(x)}, median={np.median(x):.1f}, p={p_sla:.4f}")
+
+# (3) one outlier barely matters — a sign does not "bend"
+b3, a3 = before.copy(), after.copy()
+a3[0] *= 6
+print("(3) with outlier:", sign_test(b3, a3))
+```
+
+**Interpretation.** (1) On the null week $p$ is large — the test invents no
+effect. (2) If more than half the orders exceed 30 min, the SLA is at risk. (3)
+$p$ barely moves: an outlier flips only **one** sign, it does not drag a mean as
+in the $t$-test.
+:::
+
+```{python}
+#| label: sign-fpr
+#| code-fold: true
+
+# Monte-Carlo: sign-test FPR under H0 (differences symmetric around 0)
+fpr = prate(lambda n, r: r.normal(0, 1, n), n=n_c, test="sign")
+print(f"sign-test FPR (n={n_c}): {fpr['rate']:.3f}  "
+      f"CI={tuple(round(c, 3) for c in fpr['ci'])}")
+```
+
+::: {.callout-warning icon="false"}
+## What Monte-Carlo showed
+The FPR sits on 5% — the sign test **holds its level** with no assumption about
+shape. We pay for it in power: see Part II.
+:::
+
+---
+
+# Part II — Wilcoxon signed-rank: adding magnitude {#sec-sr}
+
+The sign test throws away the **size** of each change. Wilcoxon ranks the
+absolute differences and re-attaches the signs:
+$W = \sum_i \text{rank}(|d_i|)\cdot\text{sign}(d_i)$. A few large improvements now
+outweigh many tiny ones — the test is **more powerful**.
+
+```{python}
+#| label: signed-rank
+
+def signed_rank(before, after, alpha=0.05):
+    """Wilcoxon signed-rank test (paired)."""
+    d = np.asarray(before, float) - np.asarray(after, float)
+    nz = d[d != 0]
+    W = float(np.sum(rankdata(np.abs(nz)) * np.sign(nz)))
+    p = wilcoxon(before, after, alternative="greater").pvalue
+    return {"W": W, "p": p,
+            "verdict": "reject H0" if p < alpha else "keep H0"}
+
+print("sign        :", sign_test(before, after))
+print("signed-rank :", signed_rank(before, after))
+```
+
+::: {.callout-important icon="false"}
+Wilcoxon's extra assumption: the differences $d_i$ are **symmetric** about their
+center. Milder than full normality, but not free — look at a histogram of $d_i$
+first. If there is no symmetry, fall back to the sign test.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 2
+1. Compare `sign_test`, `signed_rank` and the **paired** `ttest_rel(before,
+   after, alternative='greater')` on our data. Who gives the smallest $p$?
+2. **Outlier.** Set `after[0] *= 6` and recompute all three. Which test "breaks"?
+   Why the paired $t$?
+3. Plot a histogram of the differences `before - after`. Does it look symmetric
+   enough to trust Wilcoxon?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 2
+
+```{python}
+#| label: sol2
+#| fig-align: center
+
+p_pt = ttest_rel(before, after, alternative="greater").pvalue
+print(f"(1) sign={sign_test(before, after)['p']:.4f}  "
+      f"sr={signed_rank(before, after)['p']:.4f}  paired-t={p_pt:.4f}")
+
+b3, a3 = before.copy(), after.copy(); a3[0] *= 6
+print(f"(2) with outlier: sign={sign_test(b3, a3)['p']:.4f}  "
+      f"sr={signed_rank(b3, a3)['p']:.4f}  "
+      f"paired-t={ttest_rel(b3, a3, alternative='greater').pvalue:.4f}")
+
+fig, ax = plt.subplots(figsize=(7, 3))
+ax.hist(before - after, bins=10, color=turquoise)
+ax.axvline(0, color=slate, ls="--"); ax.set_xlabel("before - after, min")
+ax.set_title("Distribution of paired differences"); plt.tight_layout(); plt.show()
+```
+
+**Interpretation.** (1) On clean data signed-rank tracks the paired $t$ and beats
+the sign test. (2) The outlier breaks the paired $t$ (its $p$ jumps) — the mean
+of differences becomes a hostage to one value; the rank tests barely react. (3)
+If the differences are roughly symmetric, Wilcoxon is appropriate.
+:::
+
+```{python}
+#| label: sr-power
+#| code-fold: true
+#| fig-align: center
+
+# Power on HEAVY-TAILED differences (Student-t, df=2) with a shift
+sizes = [10, 20, 40, 80]
+curves = {t: [prate(lambda n, r: 0.7 + r.standard_t(2, n), nn, test=t)["rate"]
+              for nn in sizes] for t in ("sr", "sign", "pt")}
+
+fig, ax = plt.subplots(figsize=(8, 3.6))
+ax.plot(sizes, curves["sr"],   "o-", color=red_pink, lw=2.3, label="signed-rank")
+ax.plot(sizes, curves["sign"], "^-", color=green,    lw=2.3, label="sign")
+ax.plot(sizes, curves["pt"],   "s--", color=blue,    lw=2.3, label="paired t")
+ax.axhline(0.8, color=slate, ls=":", lw=2, label="80%")
+ax.set_xlabel("number of couriers n"); ax.set_ylabel("power")
+ax.set_ylim(0, 1); ax.legend(); ax.set_title("Heavy tails: ranks beat the paired t")
+plt.tight_layout(); plt.show()
+```
+
+::: {.callout-warning icon="false"}
+## What Monte-Carlo showed
+On heavy-tailed differences signed-rank leads, the sign test trails a little, and
+the paired $t$ **lags** — its variance is wrecked by the tails. Magnitude buys
+power, ranks buy robustness.
+:::
+
+---
+
+# Part III — Mann–Whitney: two independent groups {#sec-mw}
+
+> **Case.** A classic A/B: half the orders go through the **old** dispatcher
+> (control), half through the **new** one (test). The metric — **delivery time,
+> min** — is heavily skewed. The groups are **independent** (different orders),
+> so Mann–Whitney applies.
+
+```{python}
+#| label: mw-data
+
+rng     = np.random.default_rng(3)
+control = delivery(median=40, sigma=0.5, n=120, rng=rng)
+testg   = delivery(median=35, sigma=0.5, n=120, rng=rng)   # new one is faster
+```
+
+::: {.callout-tip icon="false"}
+## 🔮 Guess first
+The new dispatcher shifts the median from 40 to 35 min. Will Mann–Whitney catch
+it? And will its $p$ be smaller or larger than a plain $t$-test on this skewed
+data?
+:::
+
+## The tool: `mw_report`
+
+```{python}
+#| label: mw-report
+
+def mw_report(a, b, alpha=0.05):
+    """Mann-Whitney for two independent groups + effect size P(a<b)."""
+    res = mannwhitneyu(a, b, alternative="two-sided")
+    na, nb = len(a), len(b)
+    p_a_lt_b = 1 - res.statistic / (na * nb)   # P(a<b): a is faster than b
+    return {"U": float(res.statistic), "p": res.pvalue, "P(a<b)": p_a_lt_b,
+            "verdict": "reject H0" if res.pvalue < alpha else "keep H0"}
+
+print(mw_report(control, testg))
+```
+
+`P(a<b)` is the "probability of superiority": the share of pairs where the
+control order is slower than the test order. $0.5$ means "no effect".
+
+::: {.callout-tip icon="false"}
+## Your turn 3
+1. Compare the $p$ from `mw_report` and from `ttest_ind(control, testg)`. On
+   skewed data do both see the effect?
+2. **Outlier.** Add one "all-night" order to control
+   (`control = np.append(control, 1500)`). Recompute Mann–Whitney and the
+   $t$-test. Which is more robust?
+3. **Effect size.** Print `P(a<b)` and explain to a manager in one sentence what
+   the number means for the customer.
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 3
+
+```{python}
+#| label: sol3
+
+print(f"(1) MW p={mw_report(control, testg)['p']:.4g}  "
+      f"t p={ttest_ind(control, testg).pvalue:.4g}")
+
+c_out = np.append(control, 1500)
+print(f"(2) with outlier: MW p={mannwhitneyu(c_out, testg).pvalue:.4g}  "
+      f"t p={ttest_ind(c_out, testg).pvalue:.4g}")
+
+ps = mw_report(control, testg)["P(a<b)"]
+print(f"(3) P(control slower than test) = {ps:.2f} → "
+      f"in ~{ps:.0%} of random pairs the new order arrives sooner")
+```
+
+**Interpretation.** (1) Both catch the shift. (2) One outlier inflates the mean
+and **rescues** the null for the $t$-test, while Mann–Whitney barely reacts. (3)
+`P(a<b)` is understandable to the business without statistical jargon.
+:::
+
+```{python}
+#| label: mw-fpr-power
+#| code-fold: true
+
+skew = lambda n, r: delivery(40, 0.6, n, r)              # one skewed law
+fpr  = rate(skew, skew, 80, 80, test="mw")               # H0: identical groups
+pw_mw = rate(lambda n, r: delivery(40, 0.6, n, r),
+             lambda n, r: delivery(34, 0.6, n, r), 80, 80, test="mw")["rate"]
+pw_t  = rate(lambda n, r: delivery(40, 0.6, n, r),
+             lambda n, r: delivery(34, 0.6, n, r), 80, 80, test="welch")["rate"]
+print(f"MW FPR on skewed equal groups: {fpr['rate']:.3f} "
+      f"CI={tuple(round(c, 3) for c in fpr['ci'])}")
+print(f"power (median 40 vs 34): MW={pw_mw:.2f}  Welch t={pw_t:.2f}")
+```
+
+::: {.callout-warning icon="false"}
+## What Monte-Carlo showed
+When the groups have the **same shape**, Mann–Whitney holds its FPR at 5% and on
+skewed data beats the $t$-test in power. But "same shape" is a critical
+condition. Let's see what happens without it.
+:::
+
+---
+
+# Part IV — The shape trap: equal medians, different shapes {#sec-trap}
+
+> **Case.** The new dispatcher keeps the **same median** delivery time but makes
+> it **far more variable**: some orders arrive very early, some very late. Model
+> the deviation from the planned time (min): $A \sim U(-10, 10)$ (control, tight),
+> $B \sim U(-100, 100)$ (new, "swingy").
+
+```{python}
+#| label: trap-data
+#| fig-align: center
+
+rng = np.random.default_rng(5)
+A = rng.uniform(-10, 10, 100_000)
+B = rng.uniform(-100, 100, 100_000)
+print(f"median A = {np.median(A):.2f},  median B = {np.median(B):.2f}")
+print(f"P(A < B) ≈ {np.mean(A < B):.3f}")
+
+fig, ax = plt.subplots(figsize=(8, 3))
+ax.hist(A, bins=40, density=True, color=turquoise, alpha=0.8, label="A: U(-10,10)")
+ax.hist(B, bins=40, density=True, color=red_pink, alpha=0.5, label="B: U(-100,100)")
+ax.axvline(0, color=slate, ls="--"); ax.set_xlabel("deviation from plan, min")
+ax.legend(); ax.set_title("Equal medians (0), different shapes"); plt.tight_layout(); plt.show()
+```
+
+::: {.callout-tip icon="false"}
+## 🔮 Guess first
+The medians are equal and $P(A<B)=0.5$. Write down **before running**: what will
+Mann–Whitney's FPR be at equal samples ($n=30+30$)? And with **unequal** samples?
+:::
+
+## Equal samples: does Mann–Whitney hold its level?
+
+```{python}
+#| label: trap-equal
+
+gA = lambda n, r: r.uniform(-10, 10, n)
+gB = lambda n, r: r.uniform(-100, 100, n)
+
+eq = rate(gA, gB, 30, 30, test="mw", n_exps=3000)
+print(f"Mann-Whitney FPR, n=30+30:  {eq['rate']:.3f}  "
+      f"CI={tuple(round(c, 3) for c in eq['ci'])}")
+```
+
+The medians are equal, yet the FPR is about **10%** — twice the promised 5%. The
+test **falsely** declares a difference even though there is none in location.
+
+## Unequal samples: it gets worse
+
+```{python}
+#| label: trap-unbalanced
+
+print("nx   ny    MW     Welch t   Brunner-Munzel")
+for nx, ny in [(30, 30), (10, 100), (100, 10), (20, 200), (200, 20)]:
+    mw = rate(gA, gB, nx, ny, test="mw",    n_exps=3000)["rate"]
+    tt = rate(gA, gB, nx, ny, test="welch", n_exps=3000)["rate"]
+    bm = rate(gA, gB, nx, ny, test="bm",    n_exps=3000)["rate"]
+    print(f"{nx:<4d} {ny:<4d}  {mw:5.3f}    {tt:5.3f}     {bm:5.3f}")
+```
+
+::: {.callout-warning icon="false"}
+## What Monte-Carlo showed
+Mann–Whitney's FPR ranges from **0.00** to **~0.28** depending on the balance:
+when the **smaller** group is drawn from the **wider** distribution the test is
+liberal (rejects too often); when from the **narrower** one it is conservative.
+By contrast, **Welch t** and **Brunner–Munzel** hold ~5% across all
+configurations.
+:::
+
+::: {.callout-important icon="false"}
+## Catch the mistake 🕵️
+Mann–Whitney's null is **$F = G$** (equal distributions), **not** "equal
+medians". When shapes differ, the test mixes **location** and **spread**, and its
+calibration breaks. So:
+
+- read Mann–Whitney as a test of **stochastic superiority** $P(A<B)=\tfrac12$
+  **under equal shapes**;
+- if shapes differ but the question is about **location/median**, use
+  **Brunner–Munzel** (`scipy.stats.brunnermunzel`, rank-based and robust to
+  unequal variances) or **Welch t** for the means.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 4
+1. Explain the **direction** of the bias: why does `(100, 10)` give a liberal FPR
+   while `(10, 100)` is conservative? (hint: which group is narrower/wider?)
+2. Put a **real shift** into B (`r.uniform(-100, 100, n) + 8`) and compare the
+   **power** of Mann–Whitney and Brunner–Munzel at `n=40+40`. Who is better when
+   the effect is real?
+3. **Takeaway for the team.** State in one sentence: when does "nonparametric"
+   still not mean "you can skip looking at the shape"?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 4
+
+```{python}
+#| label: sol4
+
+# (1) direction comes from the variance of the smaller group — see the table above
+print("(1) smaller group from the wider law → liberal; from the narrower → conservative")
+
+# (2) power with a real +8 min shift in B
+gB_shift = lambda n, r: r.uniform(-100, 100, n) + 8
+pw_mw = rate(gA, gB_shift, 40, 40, test="mw", n_exps=3000)["rate"]
+pw_bm = rate(gA, gB_shift, 40, 40, test="bm", n_exps=3000)["rate"]
+print(f"(2) power with shift: MW={pw_mw:.2f}  Brunner-Munzel={pw_bm:.2f}")
+
+print("(3) nonparametric != assumption-free: different shapes break MW")
+```
+
+**Interpretation.** (1) The $U$ variance formula assumes $F=G$; when the smaller
+group is wider, the true variance of $U$ exceeds the nominal one — the $Z$ is
+inflated and the FPR grows. (2) With a real shift both have decent power, but
+Brunner–Munzel is also honest about the FPR. (3) Before Mann–Whitney, look at
+the shape/spread.
+:::
+
+---
+
+# Nonparametric A/B checklist {.unnumbered}
+
+- [ ] Design identified: **paired** (same unit twice) → sign / signed-rank;
+  **independent** groups → Mann–Whitney; **one sample vs a KPI** → sign /
+  signed-rank.
+- [ ] For paired differences, **symmetry** checked before Wilcoxon (otherwise →
+  sign test).
+- [ ] Alongside $p$, an **effect size** is reported ($P(A<B)$, median difference),
+  because on large $n$ significant $\neq$ large.
+- [ ] Before reading Mann–Whitney as a "median test", the **shape/spread** of the
+  groups is checked; with different shapes use **Brunner–Munzel** or **Welch t**.
+- [ ] Calibration validated with **Monte-Carlo** (FPR under $H_0$) where in doubt.
+- [ ] The metric is genuinely **numeric/ordinal** (not categorical, where
+  $\chi^2$ fits better).
+
+If even one answer is "no", it is **too early** to trust the conclusion.
