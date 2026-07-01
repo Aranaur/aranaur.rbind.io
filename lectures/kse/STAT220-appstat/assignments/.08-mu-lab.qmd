@@ -1,0 +1,504 @@
+---
+title: "Lab 8"
+subtitle: "Nonparametric A/B Forensics: When the Mean Is the Suspect"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+execute:
+  echo: true
+  warning: false
+---
+
+# Objective
+
+In **Lab 7** you learned that a tidy "chi-square is significant" line can hide
+six different realities. **Lab 8 returns to a numeric metric — delivery time —
+and takes away the crutch you have leaned on since Lab 4: the mean.** Product
+metrics like delivery minutes are heavily right-skewed with the odd
+stuck-in-traffic outlier, and the platform's headline verdict — a **Welch
+$t$-test on the means** — is exactly the test that skew and outliers break.
+
+The GreenBowl experimentation platform A/B-tested a new **courier dispatcher**.
+For every order it logged the **delivery time in minutes** (lower = better) and
+the **courier** who carried it. The automated report prints a Welch-$t$
+"ship / don't ship" line. Your job is to decide whether you can **believe** it.
+
+The lecture gave you a family of tests that read only the **direction** or the
+**order** of the data, plus the guardrails around them:
+
+- **Sign test** — keep only the direction of each change (binomial); also the
+  one-sample test of a median against a target KPI.
+- **Wilcoxon signed-rank** — rank the sizes of *paired* changes; needs
+  **symmetric** differences.
+- **Mann–Whitney U** — two independent groups compared by ranks; its $H_0$ is
+  $F = G$, **not** "the medians are equal".
+- **Effect sizes** — the probability of superiority $\hat P(A<B) = U/NM$ and
+  the **Hodges–Lehmann** shift *in minutes*, with a distribution-free CI.
+- **Brunner–Munzel** — the honest rank test when the two groups have
+  **different shapes** (Practice 8's "shape trap").
+- **Monte Carlo** — the course-long habit: validate whatever criterion your
+  verdict rests on, at *your* $n$ and *your* kind of data.
+
+The twist, as in Labs 4–7: **you do not get to see what is wrong.** Your
+experiment is pulled live from `greenbowl_mu.py`, keyed to your student id.
+Some students received a genuine, business-meaningful speed-up; some an honest
+null; some a mean "win" manufactured by a handful of **outliers**; some a
+microscopic shift made "significant" by an enormous sample; some a dispatcher
+that keeps the **median** but wrecks the **tail**; and some a **crossover**
+design where the same couriers appear in both arms — so every
+independent-samples test is invalid before it starts. **The only honest way to
+find out which one you hold is to run the diagnostics.**
+
+You will:
+
+1. Pull your experiment and read the platform's **headline Welch-$t$ verdict**
+   — the one you are about to put on trial.
+2. Run **design & shape forensics**: is the design *really* two independent
+   groups? What does the metric's distribution look like, and can the mean be
+   trusted with it?
+3. Warm up on the **SLA sign test** — one sample against the contractual
+   45-minute median.
+4. Build the **rank toolkit** step by step — `mw_report` → `ab_report` →
+   `robust_ab` — or, if your design turns out to be paired, the
+   `sign_test` / `signed_rank` pair on within-courier differences.
+5. Check the **shape trap**: what Mann–Whitney's $H_0$ really claims, and when
+   Brunner–Münzel (or plain quantiles) is the honest answer.
+6. **Validate with Monte Carlo** — the FPR and power of the exact criterion
+   your verdict rests on, at your $n$.
+7. Deliver a one-page **forensic verdict** a non-statistician PM can act on.
+
+# General Requirements
+
+::: {.callout-important icon="false"}
+## The fixed business context (same for everyone)
+
+- **Unit:** one order.
+- **Metric:** **delivery time, minutes** — *lower is better*.
+- **Arms:** `control` = old dispatcher, `test` = new dispatcher.
+- **SLA:** the courier contract promises a **median ≤ 45 min** (`SLA_MIN`).
+- **Business threshold:** a median speed-up smaller than **3 minutes**
+  (`BUSINESS_MDE`) is not worth the rollout risk.
+- **Significance level:** $\alpha = 0.05$.
+:::
+
+::: {.callout-important icon="false"}
+## Everyone's experiment is different — on purpose
+
+Your experiment is unique to your id. It might be a clean win, an honest null,
+an outlier artifact dressed up as a win, a significant-but-trivial shift on a
+huge sample, a same-median-fatter-tail reliability regression, or a paired
+crossover that independent tests cannot even legally touch. **There is no
+single "right answer" shared across the class** — there is only the diagnosis
+your diagnostics support. Copying another student's conclusion will be
+obviously wrong for your experiment.
+:::
+
+::: {.callout-note icon="false"}
+## Report Format
+
+Submit the report in **one** of the following formats:
+
+- **Quarto → PDF** (`.qmd` → `.pdf`)
+- **Quarto → HTML** (`.qmd` → `.html`, hosted, e.g. on
+  [Quarto Pub](https://quartopub.com/),
+  [Posit Connect Cloud](https://connect.posit.cloud/))
+- **Jupyter Notebook** (`.ipynb`)
+- **Google Colab** (share the link with viewing permissions)
+
+The report must contain both code **and** narrative. Every section begins with
+a written explanation, not code.
+:::
+
+::: {.callout-warning icon="false"}
+## What you build vs. what you use ready-made
+
+The thing you **build** today is the **rank-based guardrail toolkit** —
+`design_check`, `sign_test`, `mw_report` → `ab_report` → `robust_ab`, and the
+Monte-Carlo validators — grown step by step from Practice 8, each version
+**reusing** the previous one. The **criteria** themselves you take ready-made:
+`scipy.stats.mannwhitneyu`, `scipy.stats.wilcoxon`, `scipy.stats.binomtest`,
+`scipy.stats.brunnermunzel`, `scipy.stats.ttest_ind` / `ttest_rel`, and
+`statsmodels.stats.proportion.proportion_confint` for the Wilson interval. You
+may **not** replace your validators with a library power/AA function — the
+simulation loop and the confidence-interval verdict must be **your own code**.
+:::
+
+::: {.callout-warning icon="false"}
+## Honour rule on the data platform
+
+`greenbowl_mu.py` contains the hidden truth in its source. **Do not read past
+the `# === instructor section ===` line, and do not call `_reveal`.** The point
+of the lab is to reach the diagnosis *by running the diagnostics*, not by
+reading the answer. Any report that names the hidden pathology from the source
+instead of demonstrating it with the toolkit scores **zero** for
+interpretation.
+:::
+
+::: {.callout-warning icon="false"}
+## Deadline
+
+📅 **July 8, 2026, 23:59**
+:::
+
+# Tasks
+
+## Get Your Experiment {#sec-data}
+
+Download `greenbowl_mu.py` (provided with the lab) into your working folder
+and load **your** experiment. Use **one** id consistently — your KSE email is
+recommended.
+
+```{python}
+#| label: load
+#| eval: false
+
+from greenbowl_mu import load_my_experiment, ALPHA, SLA_MIN, BUSINESS_MDE
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import (mannwhitneyu, wilcoxon, binomtest, brunnermunzel,
+                         ttest_ind, ttest_rel, ttest_1samp, rankdata)
+from statsmodels.stats.proportion import proportion_confint
+
+STUDENT_ID = "your.email@kse.org.ua"   # <-- put YOUR id here
+exp = load_my_experiment(STUDENT_ID)
+
+print(exp)                     # arm sizes
+print(exp.data.head())         # one row per order: courier_id, arm, minutes
+control, test = exp.control, exp.test
+```
+
+::: {.border}
+1. State your `STUDENT_ID`. Report $n_{\text{control}}$, $n_{\text{test}}$, and
+   a small numeric summary of each arm: mean, median, min, max, P90.
+2. Run the platform's **headline test** — `ttest_ind(control, test,
+   equal_var=False)` — and write down the "ship / don't ship / roll back" line
+   it would print (remember: *lower minutes = better*, so a significantly
+   **smaller test mean** reads as "ship"). **This is the verdict you are about
+   to put on trial** — do not believe it yet.
+3. Confirm in one sentence that you understand the experiment's true nature is
+   **hidden**, and your task is to *diagnose* it with the rank toolkit.
+:::
+
+## Design & Shape Forensics (`design_check`) {#sec-design}
+
+Before choosing *any* test, answer two questions the headline never asks.
+**First: what is the design?** Independent-samples tests (Welch $t$,
+Mann–Whitney) require the two arms to be **independent** — no shared users, no
+repeated measures. If the *same courier* appears in both arms, you have a
+**crossover** and must switch to the paired family. **Second: what is the
+shape?** If the metric is heavily skewed, the mean answers a question nobody
+asked.
+
+::: {.border}
+1. Implement **Version 1** of your toolkit, `design_check(exp)`, that returns:
+   whether any `courier_id` appears in **both arms** (→ paired!), the arm
+   sizes, and per-arm skew diagnostics (mean vs median gap, P90/P50 ratio).
+   *Hint: `exp.data["courier_id"].duplicated().any()`, or compare the sets of
+   ids per arm.*
+2. Run it. **State your design**: independent A/B or paired crossover. This
+   single boolean decides which half of the lecture applies to you — and
+   whether the platform's headline test was even *legal*.
+3. Plot the two arms' distributions (overlaid histograms **and** an ECDF
+   plot). Describe the shape in one sentence: skew, outliers, tails. Mark the
+   means and medians on the histogram — how far apart are they, and why?
+4. In one sentence: given this shape, what could make a **mean-based** verdict
+   lie, and which summaries would you trust instead?
+:::
+
+::: {.callout-tip icon="false"}
+## Research hook
+Most students will find an honest independent design here — and that finding
+is worth one sentence, not zero: "I checked, no courier appears twice, the
+independent-samples family applies." For a few of you this check will
+**overturn the entire analysis**. Skipping it and being wrong is the single
+most expensive mistake in this lab.
+:::
+
+## Warm-up: the SLA Sign Test (`sign_test`) {#sec-sla}
+
+The courier contract promises a **median delivery time ≤ 45 min** in the
+control (current) experience. Before any A/B question, the platform must
+verify the SLA — and the right tool for "is the median above the target?" on
+a skewed metric with zero distributional assumptions is the **one-sample sign
+test**: count how many orders exceed the target and compare with a fair coin,
+$T = \#\{x_i > m_0\} \sim \text{Binom}(n, \tfrac12)$ under $H_0$.
+
+::: {.border}
+1. Implement `sign_test_median(x, m0, alternative="greater", alpha=0.05)` using
+   `scipy.stats.binomtest` (drop exact ties with `m0` first). Return the count
+   above target, $n$, the $p$-value, and a verdict.
+2. Run it on your **control** arm against `SLA_MIN`: test $H_1$: "median > 45
+   min". Report the sample median next to the verdict.
+3. Interpret for the contract owner in one sentence — and be careful about the
+   direction of the logic: "not rejected" means *consistent with the SLA*, not
+   *proven to meet it* (recall the lecture's KPI example).
+:::
+
+## The Right Test for Your Design (`mw_report` → `ab_report`) {#sec-test}
+
+Now the headline question, answered with the machinery your design permits.
+**Follow the branch your @sec-design verdict dictates** — and in both branches,
+report an **effect size in minutes**, not just a $p$-value.
+
+### Branch A — independent A/B (most students)
+
+The rank answer to "did the new dispatcher speed deliveries up?" is
+**Mann–Whitney** plus two effect sizes: the **probability of superiority**
+$\hat P(\text{test} < \text{control})$ — the share of random order pairs where
+the test order arrives sooner — and the **Hodges–Lehmann shift** — the median
+of all pairwise differences, in minutes, with its distribution-free CI (the
+inversion of the U-test from the lecture).
+
+::: {.border}
+1. Implement **Version 2**, `mw_report(control, test, alpha=0.05)`: run
+   `mannwhitneyu`, return $U$, the $p$-value,
+   $\hat P(\text{test} < \text{control})$, and a verdict. (Mind the direction:
+   `scipy` reports $U$ for its **first** argument; check which orientation of
+   $U/NM$ gives "test is faster" and say so in a comment.)
+2. Implement **Version 3**, `ab_report(control, test, alpha=0.05,
+   mde=BUSINESS_MDE)`, that **reuses** `mw_report` and adds the
+   **Hodges–Lehmann** shift with its 95% CI (lecture code:
+   `np.subtract.outer` → sorted pairwise differences → the rank-quantile
+   indices). If an arm is longer than ~2 000 observations, compute HL on a
+   **random subsample** of 2 000 per arm (the $NM$ pairwise matrix does not
+   fit in memory at 150k×150k) — and say you did.
+3. Run `ab_report`. Report $p$, $\hat P(\text{test}<\text{control})$, the HL
+   shift in minutes with its CI, and — separately — the **decision layer**: is
+   the shift, *at its CI's optimistic and pessimistic ends*, past
+   `BUSINESS_MDE`? "Statistically real" and "worth shipping" are two different
+   sentences; write both.
+4. Put your rank verdict **next to the headline Welch $t$** from @sec-data. If
+   they agree, say what that adds. If they disagree, this is the heart of your
+   lab: find *why* (re-plot; try the comparison with the most extreme 1–2% of
+   values winsorised; look at where mean and median moved). Which verdict do
+   you trust, and what exactly is the other one reacting to?
+:::
+
+### Branch B — paired crossover (if `design_check` found shared couriers)
+
+The arms share couriers, so **independent tests are void** — including the
+platform's headline. Collapse each courier to their difference
+$d_i = \text{control}_i - \text{test}_i$ (positive = the new dispatcher made
+courier $i$ faster) and test *that*, exactly as in Practice 8 Part I–II.
+
+::: {.border}
+1. Build the per-courier paired frame (`exp.data.pivot(index="courier_id",
+   columns="arm", values="minutes")`) and compute the differences $d_i$.
+2. Implement `sign_test(before, after)` and `signed_rank(before, after)` (reuse
+   the Practice 8 versions), plus the paired $t$ (`ttest_rel`) for contrast.
+   Run all three, one-sided ("the new dispatcher is faster").
+3. **Check the symmetry** of the $d_i$ histogram before trusting signed-rank —
+   if it is visibly asymmetric, the sign test is your primary verdict, and say
+   so.
+4. Report the **median per-courier saving in minutes** and the share of
+   couriers who improved. Decision layer: is the saving past `BUSINESS_MDE`?
+   Be honest if it is *statistically clear but sitting on the business
+   threshold* — that is a "ship, but re-measure at scale" recommendation, not
+   a triumphant one.
+5. Explain in two sentences why the pooled Welch $t$ (and a pooled
+   Mann–Whitney) **missed** what the paired analysis sees — where did the
+   between-courier variance go?
+:::
+
+::: {.callout-important icon="false"}
+## Stop-the-line rule
+If your design is paired and you report a pooled independent-samples $p$-value
+anyway, everything downstream is void — the observations are not independent,
+so the test's null distribution is simply not the one it was calibrated on.
+The design check is not bureaucracy; it decides which mathematics exists for
+you.
+:::
+
+## The Shape Trap (`robust_ab`) {#sec-shape}
+
+Mann–Whitney's strict null is $F = G$ — the **whole distributions** match. It
+reads cleanly as a **median/shift** test only when the two shapes are the
+same. If the new dispatcher changes the *spread* (some orders much earlier,
+some much later), then: (a) the **means** move even when medians do not (a
+lognormal's mean grows with its variance) — fooling the headline $t$; (b)
+$P(A<B)$ can sit at exactly $0.5$ — so **Mann–Whitney sees nothing**; and (c)
+with **unequal group sizes**, MW's calibration itself breaks (Practice 8, Part
+IV). A "no change" from MW plus a "slower!" from Welch $t$ can both be wrong
+*about the thing the business cares about*.
+
+::: {.border}
+1. Compare the two arms' **shape**, not just location: the variance (or IQR)
+   ratio, and a quantile table — P10 / P50 / P90 per arm. Overlay the two
+   ECDFs. Do the curves *shift* or *rotate* (cross)?
+2. Run `brunnermunzel(control, test)` next to your `mw_report`. Recall from
+   Practice 8: BM tests stochastic superiority while staying calibrated when
+   shapes and variances differ (and MW's own FPR can drift far from 5% with
+   unequal $n$ and unequal spreads — your Monte-Carlo section can prove this
+   for *your* sizes).
+3. Implement **Version 4**, `robust_ab(exp, alpha=0.05, mde=BUSINESS_MDE)` —
+   your all-in-one entry point, which **reuses** everything so far:
+   `design_check` first (paired → route to the sign/signed-rank branch);
+   otherwise compare shapes (variance/IQR ratio and the quantile table); if
+   shapes clearly differ, report **Brunner–Münzel + quantiles** as the honest
+   reading; else `ab_report`. Use `robust_ab` as your final analytical word.
+4. **If your quantile table shows the tail moving while the median stands
+   still** — say it in business language: the median customer is unaffected,
+   but the P90 customer waits X minutes instead of Y, and SLA breaches went
+   from a% to b% (compute the share of orders above `SLA_MIN` per arm). Which
+   headline — "ship", "no change", "roll back" — does *that* support, and is
+   it any of the ones the tests printed?
+:::
+
+::: {.callout-tip icon="false"}
+## Research hook
+One of the hidden worlds has **equal medians and $P(A<B) = 0.5$ exactly** — a
+rank test *cannot* see it, by construction, and the mean test "sees" it for
+the wrong reason. If every test you ran feels weirdly contradictory, stop
+testing and look at the two ECDFs. The answer is a picture, not a $p$-value.
+:::
+
+## Validate Your Criterion with Monte Carlo {#sec-mc}
+
+Whatever your verdict rests on — MW, BM, the sign test on differences — it is
+itself a **criterion**, and the course-long habit applies: check that it keeps
+its promised 5% false positives on data *shaped like yours*, at *your* sample
+sizes, and measure what it *could* have detected. Reuse the `rate` / `prate`
+engines from Practice 8 (rebuild them briefly in your report; they are your
+own code now).
+
+::: {.border}
+1. **FPR (A/A).** Simulate the null with a right-skewed law that mimics your
+   control arm (`rng.lognormal(np.log(median), sigma, n)` with your arm's
+   median and a plausible sigma), at **your** $(n_{\text{control}},
+   n_{\text{test}})$, 2 000+ experiments, and report the FPR of your primary
+   criterion **with a Wilson CI**. Is $0.05$ inside?
+2. **Stress the calibration the way your data stresses it.** Pick the stress
+   relevant to *your* experiment: unequal spreads at **unequal $n$** for MW
+   vs. Brunner–Münzel (the Practice 8 Part-IV table, at your sizes); or an
+   A/A with a few injected extreme outliers for Welch $t$ vs. MW; or — if you
+   are in the paired branch — asymmetric null differences for signed-rank vs.
+   the sign test. Show the FPR table and say which criterion stays honest.
+3. **Power / MDE.** Inject a *real* effect of the kind your world suggests (a
+   multiplicative median shift for location; your observed per-courier lift if
+   paired) and estimate the power at your $n$; then find (roughly) the
+   **smallest shift in minutes** your setup detects with power ≥ 80%. If your
+   verdict was "no effect", this is the line that makes it *informative*:
+   "we would have seen anything ≥ X min".
+:::
+
+::: {.callout-important icon="false"}
+## Match the validation to *your* diagnosis
+A student in the outlier world should be validating *robustness to outliers*;
+a student with unequal arm sizes and different spreads should be validating
+*MW's FPR at those sizes*; a student in the paired world should be validating
+the *paired* criteria on asymmetric differences; a student with a null should
+be reporting *power*, not just a passing FPR. A generic copy-pasted A/A that
+ignores what your data looks like earns the methodology point only halfway.
+:::
+
+## Final Forensic Verdict {#sec-final}
+
+::: {.border}
+Write a **single-page memo** (≤ 400 words) to a **non-technical** GreenBowl PM
+who has only seen the platform's headline Welch-$t$ line. It must contain:
+
+1. The **headline verdict** (what the automated report claimed) and your
+   **one-line forensic verdict** — one of: a real, business-meaningful
+   speed-up (**ship**); an honest null with a stated detectable-effect floor
+   (**don't ship, and stop the experiment**); a mean artifact from stuck-order
+   outliers (**don't ship; fix the headline's metric**); a
+   **significant-but-trivial** shift (**don't ship**); a same-median,
+   fatter-tail **reliability regression** (**don't ship; the tail, not the
+   average, is the story**); or a paired crossover the platform analysed with
+   the wrong test (**re-analyse paired; then decide — state your paired
+   verdict**).
+2. The **evidence** that forces it, quoted as numbers, not adjectives: the
+   design check, the shape summary, the $p$-values you trust *and* the ones
+   you overrule, $\hat P(\text{test}<\text{control})$, the Hodges–Lehmann
+   shift (or median per-courier saving) in **minutes** with its CI against the
+   **3-minute** business threshold, the quantile/SLA table where relevant, and
+   the Monte-Carlo calibration/power at your $n$.
+3. A concrete **recommendation**: ship / don't ship / fix the metric in the
+   headline report / re-run the analysis paired / collect more — whichever
+   your diagnosis demands.
+4. One honest **caveat** of your own audit (e.g. MW answers "stochastically
+   faster", not "the medians differ", unless shapes match; HL on a subsample
+   is an approximation; a sign test throws away magnitude; simulation noise at
+   your `n_exps`).
+
+It must be readable by someone who has never heard the words "Mann–Whitney"
+or "$p$-value". You are graded on whether the PM could act on it without
+follow-up questions.
+:::
+
+# Grading {.unnumbered}
+
+| Criterion | Points |
+|---|:---:|
+| Correctness of methodology | 3 |
+| Interpretation of results | 3 |
+| Code quality and organization | 2 |
+| **Total** | **8** |
+
+::: {.callout-tip icon="false"}
+## Grading Details
+
+**Correctness of methodology (3 pts):**
+
+- `design_check` and the SLA `sign_test` are correct, and the analysis follows
+  the branch the design dictates (paired data never fed to independent tests)
+  (1 pt).
+- The rank toolkit is built step by step (`mw_report` → `ab_report` →
+  `robust_ab`, each version **reusing** the previous), with correct directions
+  ($U$ orientation, one- vs two-sided) and a correct Hodges–Lehmann shift + CI
+  (subsampled where necessary) (1 pt).
+- The Monte-Carlo validation is your own loop, returns FPR/power **with** a
+  Wilson CI, and stresses the criterion the way *your* data does (1 pt).
+
+**Interpretation of results (3 pts):**
+
+- @sec-design and @sec-shape actually gate the analysis (a paired design or a
+  shape difference changes which test you trust, not just adds a sentence).
+- @sec-test separates **statistically real** from **worth shipping**
+  ($\hat P$, HL in minutes vs. the 3-minute threshold), and disagreements
+  between the mean and rank verdicts are explained mechanically, not waved at.
+- The memo's forensic verdict **matches the evidence** and overturns or
+  confirms the headline for the right reason.
+
+**Code quality and organization (2 pts):**
+
+- The toolkit functions are single reusable pieces used across all sections
+  (built step by step, not re-implemented inline).
+- Plots (histogram + ECDF, symmetry histogram if paired, FPR/power curves)
+  have axis labels, titles, legends, and a dashed line at $\alpha$ or at the
+  business threshold where relevant.
+- Narrative precedes every code block; each section reads as an argument, not
+  a dump of outputs.
+:::
+
+# Defense {.unnumbered}
+
+During the defense (5–7 minutes) you will be asked *"What if?"* questions that
+probe whether you understand **why** each piece exists, for example:
+
+- *"Your Welch $t$ says the new dispatcher is faster and Mann–Whitney says
+  nothing. Show me — live — the two or three orders that explain the
+  disagreement, and tell me which verdict I should believe."*
+- *"Your MW $p$ is $10^{-8}$ on 300 000 orders and the Hodges–Lehmann shift is
+  $-0.3$ minutes. Ship or not? What single number settles it?"*
+- *"The same courier id appears in both arms. What exactly breaks in
+  `mannwhitneyu` — which assumption, and what happens to its null
+  distribution?"*
+- *"Medians are equal, $P(A<B) = 0.5$, yet you told the PM 'don't ship'. What
+  did you see that the rank test is blind to, by construction?"*
+- *"Why did you trust the sign test over the signed-rank here? What did the
+  histogram of differences show, and which extra assumption does signed-rank
+  quietly add?"*
+- *"Your A/A says MW's FPR is 11% at your group sizes. Which of your reported
+  $p$-values does that invalidate, and what do you switch to?"*
+
+You may also be asked to **change one thing live** (winsorise the outliers,
+swap MW for Brunner–Münzel, pool the paired data and watch the effect vanish,
+shrink $n$ in the Monte-Carlo) and explain the resulting shift.
