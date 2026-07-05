@@ -1,0 +1,834 @@
+---
+title: "Practice 9"
+subtitle: "Bootstrap"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: en
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import time
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import norm
+from statsmodels.stats.proportion import proportion_confint
+
+turquoise = "#20B2AA"
+red       = "#fb6107"
+blue      = "#181485"
+green     = "#8bb174"
+gray      = "#A0A0A0"
+red_pink  = "#e64173"
+orange    = "#FFA500"
+slate     = "#314f4f"
+
+
+def arpu_sample(n, rng, uplift=0.0):
+    """2-week revenue per user (ARPU), UAH: zeros + right skew.
+
+    ~25% of users ordered nothing; active users place 1 + Pois(1.2)
+    orders with a lognormal basket. uplift multiplies active revenue.
+    """
+    active = rng.random(n) < 0.75
+    orders = 1 + rng.poisson(1.2, n)
+    check  = rng.lognormal(np.log(240), 0.40, n)
+    return np.where(active, orders * check * (1 + uplift), 0.0)
+```
+
+# What we are doing today {.unnumbered}
+
+In the lecture the bootstrap gave us a CI **in minutes**: the difference in
+P75 taxi waiting time. But a real A/B report is read on a different line:
+**"by how many percent did revenue grow — and does the feature pay for
+itself?"** Today we build the rest of the road from the lecture recipe to a
+finished decision:
+
+- **relative effect (uplift, %)** — a CI for $\theta_T/\theta_C - 1$, a
+  statistic where **both the numerator and the denominator are random**;
+- **Poisson bootstrap** — how industry (Google, Spotify) resamples a
+  billion rows without holding them in memory;
+- **experiment design by simulation** — power and MDE for metrics that have
+  no power formula at all;
+- **`ab_report`** — the final tool: a three-zone decision against a
+  breakeven threshold, probability of profitability, and expected value.
+
+::: {.callout-note icon="false"}
+## Rules of the game
+- Running case: **GreenBowl** (same as in Practices 4–8) launches **"Free
+  delivery on orders over 300 UAH"**. The metric is **2-week ARPU**.
+- **We build one tool step by step**: `uplift_ci` → `uplift_ci_pois` →
+  `rate_uplift` → `power_sim` → the final `ab_report`.
+- We **generate the data ourselves** — we know the "truth" and can check
+  the honesty of every version of the tool with **Monte Carlo** (the habit
+  from Practice 5).
+- Before every result — a **🔮 "Guess first"** block: write your answer
+  down before running the code. After — **"Your turn"** with a collapsed
+  solution.
+- From the lecture we take only the **idea of the central CI**
+  $CI = \big(2\widehat\theta - \theta^*_{[1-\alpha/2]},\,
+  2\widehat\theta - \theta^*_{[\alpha/2]}\big)$ — the rest of the machinery
+  we assemble for the new problem.
+:::
+
+---
+
+# Part I — Uplift: how many percent did we win? {#sec-uplift}
+
+> **Case.** GreenBowl runs a two-week Kyiv test of "Free delivery over
+> 300 UAH": 6000 users in control and 6000 in test. Finance did the math:
+> the delivery subsidy will cost **≈3% of annual revenue**, so the feature
+> pays off only if it lifts ARPU **by more than +3%** — that is our
+> **breakeven**. The CFO expects the answer in percent, not in hryvnias.
+
+```{python}
+#| label: data-kyiv
+
+rng = np.random.default_rng(8)
+control = arpu_sample(6000, rng)                 # old delivery pricing
+test    = arpu_sample(6000, rng, uplift=0.05)    # free delivery over 300
+
+print(f"ARPU control: {control.mean():.0f} UAH   test: {test.mean():.0f} UAH")
+print(f"zero-revenue users: {np.mean(control == 0):.0%}")
+```
+
+```{python}
+#| label: kyiv-hist
+#| code-fold: true
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(9, 3.6))
+bins = np.linspace(0, 2500, 60)
+ax.hist(control, bins=bins, density=True, alpha=0.55, color=turquoise,
+        label=f"control (ARPU = {control.mean():.0f} UAH)")
+ax.hist(test, bins=bins, density=True, alpha=0.55, color=red_pink,
+        label=f"test (ARPU = {test.mean():.0f} UAH)")
+ax.set_xlabel("revenue per user over 2 weeks, UAH")
+ax.set_ylabel("density")
+ax.set_title("A quarter of zeros + a long right tail: classic revenue data")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+::: {.callout-tip icon="false"}
+## 🔮 Guess first
+In the lecture we built a CI for the **difference** $\theta_T - \theta_C$
+in minutes. Could we just divide the bounds of that CI (in UAH) by
+$\bar X_C$ — and call the result a "confidence interval in percent"? What
+could go wrong?
+:::
+
+The trap: $\bar X_C$ is **a random variable too**. Dividing the bounds by a
+"frozen" number pretends the denominator is known exactly and throws away
+part of the uncertainty. The ratio
+
+$$
+\text{uplift} = \frac{\theta_T}{\theta_C} - 1
+$$
+
+is a **statistic of its own**, with no textbook CI formula. But we own the
+universal recipe: compute the statistic **as a whole** on every pair of
+bootstrap samples — and assemble the central CI.
+
+## Tool v1: `uplift_ci`
+
+```{python}
+#| label: uplift-ci
+
+def uplift_ci(control, test, stat=np.mean, alpha=0.05, B=4000, seed=42):
+    """Central bootstrap CI for the relative effect stat(T)/stat(C) - 1.
+
+    stat must accept axis (np.mean, np.median, ...). Resample WITHIN
+    each group, independently (the lecture rule!).
+    """
+    rng = np.random.default_rng(seed)
+    c, t = np.asarray(control, float), np.asarray(test, float)
+
+    up_hat = stat(t) / stat(c) - 1
+    c_star = stat(rng.choice(c, size=(B, c.size), replace=True), axis=1)
+    t_star = stat(rng.choice(t, size=(B, t.size), replace=True), axis=1)
+    up_star = t_star / c_star - 1                       # the ratio AS A WHOLE
+
+    q_lo, q_hi = np.quantile(up_star, [alpha/2, 1 - alpha/2])
+    return {"uplift": up_hat, "ci": (2*up_hat - q_hi, 2*up_hat - q_lo),
+            "star": up_star}
+
+
+t0 = time.perf_counter()
+r = uplift_ci(control, test)
+elapsed = time.perf_counter() - t0
+
+lo, hi = r["ci"]
+print(f"ARPU uplift: {r['uplift']:+.2%}   95% CI: ({lo:+.2%}, {hi:+.2%})")
+print(f"⏱ execution time: {elapsed:.2f} s")
+```
+
+```{python}
+#| label: star-plot
+#| code-fold: true
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(9, 3.6))
+ax.hist(r["star"], bins=60, density=True, color=turquoise, alpha=0.9,
+        label=r"bootstrap distribution of uplift$^*$")
+ax.axvline(0, color=slate, lw=2, label="zero effect")
+ax.axvline(0.03, color=orange, lw=2, ls="--", label="breakeven +3%")
+ax.axvspan(lo, hi, color=red_pink, alpha=0.20,
+           label=f"95% CI ({lo:+.1%}, {hi:+.1%})")
+ax.set_xlabel("ARPU uplift")
+ax.set_ylabel("density")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+The effect is **significant against zero** (the whole CI is above zero) —
+but notice: the +3% breakeven sits **inside** the interval. We return to
+this cliffhanger in @sec-report.
+
+Now let's test the "naive" route from 🔮 — the CI of the difference in UAH
+divided by the control mean:
+
+```{python}
+#| label: naive-ci
+
+def diff_ci(control, test, alpha=0.05, B=4000, seed=42):
+    """Central bootstrap CI for the difference of means (lecture recipe)."""
+    rng = np.random.default_rng(seed)
+    c, t = np.asarray(control, float), np.asarray(test, float)
+    d_hat = t.mean() - c.mean()
+    c_star = rng.choice(c, size=(B, c.size), replace=True).mean(axis=1)
+    t_star = rng.choice(t, size=(B, t.size), replace=True).mean(axis=1)
+    q_lo, q_hi = np.quantile(t_star - c_star, [alpha/2, 1 - alpha/2])
+    return d_hat, (2*d_hat - q_hi, 2*d_hat - q_lo)
+
+
+d_hat, (d_lo, d_hi) = diff_ci(control, test)
+print(f"difference: {d_hat:+.1f} UAH, CI ({d_lo:+.1f}, {d_hi:+.1f})")
+print(f"naive %-CI:  ({d_lo/control.mean():+.2%}, {d_hi/control.mean():+.2%})")
+print(f"honest %-CI: ({lo:+.2%}, {hi:+.2%})")
+```
+
+Almost identical? Yes — but that is the **luck of a small effect**: at ~5%
+uplift the denominator wobbles little relative to the numerator. Stress
+test: a smaller sample, a bigger effect.
+
+```{python}
+#| label: stress
+
+rng_s = np.random.default_rng(5)
+c_small = arpu_sample(250, rng_s)
+t_small = arpu_sample(250, rng_s, uplift=0.35)   # a new premium segment
+
+r_ratio = uplift_ci(c_small, t_small)
+ds_hat, (ds_lo, ds_hi) = diff_ci(c_small, t_small)
+
+print(f"honest %-CI: ({r_ratio['ci'][0]:+.1%}, {r_ratio['ci'][1]:+.1%})")
+print(f"naive  %-CI: ({ds_lo/c_small.mean():+.1%}, {ds_hi/c_small.mean():+.1%})")
+```
+
+::: {.callout-warning icon="false"}
+## Why this matters
+The lower bound: honest **+1%**, naive **+5%**. Had the breakeven been +3%,
+the naive interval would have "proven" a profitability the data does not
+prove. The error hits exactly where the business looks — the **lower
+bound**. The rule: the statistic you report must be computed **entirely
+inside** every bootstrap iteration.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 1
+1. Compute the uplift of the **median** ARPU (`stat=np.median`). Why is
+   the CI wider than for the mean, even though the median is "more
+   robust"?
+2. **A/A test.** Generate two control groups with no effect (a fresh
+   `rng`) and run `uplift_ci`. What must an honest tool show?
+3. **Case.** Write two sentences for the CFO: point estimate, interval,
+   and what these two weeks have **not yet proven**.
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 1
+
+```{python}
+#| label: sol1
+
+# (1) median uplift
+r_med = uplift_ci(control, test, stat=np.median)
+print(f"(1) median: {r_med['uplift']:+.2%}  "
+      f"CI ({r_med['ci'][0]:+.2%}, {r_med['ci'][1]:+.2%})")
+
+# (2) A/A: no effect — the CI must cover zero
+rng_aa = np.random.default_rng(7)
+r_aa = uplift_ci(arpu_sample(6000, rng_aa), arpu_sample(6000, rng_aa))
+print(f"(2) A/A:    {r_aa['uplift']:+.2%}  "
+      f"CI ({r_aa['ci'][0]:+.2%}, {r_aa['ci'][1]:+.2%})")
+```
+
+**Interpretation.** (1) The median "jumps" discretely between neighboring
+observations, so its bootstrap distribution is coarser and the CI wider —
+robustness to outliers does not mean a smaller variance of the estimate.
+(2) The CI covers zero: on a null effect the tool does not invent wins.
+(3) For example: "ARPU grew by **+5.2%**, 95% CI **(+1.5%, +8.8%)** — the
+growth is real, but profitability (+3%) is not yet proven: the lower bound
+of the interval is below breakeven."
+:::
+
+---
+
+# Part II — Poisson bootstrap: A/B on a billion rows {#sec-pois}
+
+> **Case.** Kyiv is 12k users in one laptop's memory. But GreenBowl wants
+> the same report for the **whole country**: hundreds of millions of rows
+> in a distributed store. `rng.choice` over the full sample requires seeing
+> **all the data at once** — on a sharded cluster that is exactly what you
+> cannot do.
+
+Look at ordinary resampling from another angle. How many times does a given
+user land in one bootstrap sample? That is
+$W_i \sim \text{Binom}(N, \tfrac1N)$, and for large $N$
+
+$$
+\text{Binom}\!\left(N, \tfrac1N\right) \;\xrightarrow{N\to\infty}\;
+\text{Pois}(1).
+$$
+
+So instead of "drawing indices with replacement" we can hand **every row an
+independent** random weight $W_i \sim \text{Pois}(1)$ — and compute a
+weighted statistic. No shared state between rows: each shard weights its
+own rows, a reducer adds up the sums. This is how the bootstrap ships to
+production at Google and Spotify.
+
+::: {.callout-tip icon="false"}
+## 🔮 Guess first
+1. What share of users gets weight $W = 0$ in a Poisson iteration? (Hint:
+   one famous number from the lecture.)
+2. How different will the CIs of the classic and the Poisson engines be on
+   the Kyiv data?
+:::
+
+## Tool v2: `uplift_ci_pois`
+
+```{python}
+#| label: pois-fn
+
+def uplift_ci_pois(control, test, alpha=0.05, B=4000, seed=42):
+    """Poisson bootstrap CI for the uplift of MEANS: weights W ~ Pois(1).
+
+    Weighted mean = (w @ x) / w.sum() — sums only, so it computes in one
+    pass over the data and parallelizes across shards.
+    """
+    rng = np.random.default_rng(seed)
+    c, t = np.asarray(control, float), np.asarray(test, float)
+
+    up_hat = t.mean() / c.mean() - 1
+    wc = rng.poisson(1.0, size=(B, c.size))
+    wt = rng.poisson(1.0, size=(B, t.size))
+    c_star = wc @ c / wc.sum(axis=1)
+    t_star = wt @ t / wt.sum(axis=1)
+    up_star = t_star / c_star - 1
+
+    q_lo, q_hi = np.quantile(up_star, [alpha/2, 1 - alpha/2])
+    return {"uplift": up_hat, "ci": (2*up_hat - q_hi, 2*up_hat - q_lo),
+            "star": up_star, "w0": (wc == 0).mean()}
+
+
+t0 = time.perf_counter()
+r_pois = uplift_ci_pois(control, test)
+elapsed = time.perf_counter() - t0
+
+print(f"classic CI: ({r['ci'][0]:+.2%}, {r['ci'][1]:+.2%})")
+print(f"Poisson CI: ({r_pois['ci'][0]:+.2%}, {r_pois['ci'][1]:+.2%})")
+print(f"share of weights W=0: {r_pois['w0']:.1%}   (e^-1 = {np.exp(-1):.1%})")
+print(f"⏱ execution time: {elapsed:.2f} s")
+```
+
+The intervals practically coincide, and the share of "unused" rows is the
+lecture's own $e^{-1} \approx 36.8\%$: the Poisson bootstrap is the same
+resampling with replacement, just written **through weights**.
+
+::: {.callout-note icon="false"}
+## Limitation
+One pass and weights work for statistics made of **sums**: means, shares,
+totals, ratios of sums. A **median or percentile** would need a weighted
+quantile — possible, but the one-pass magic is gone. That is why on big
+data industry often replaces quantile metrics with shares: "% of orders
+longer than 45 min" instead of P75.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 2
+1. The total "size" of a Poisson iteration is
+   $\sum_i W_i \sim \text{Pois}(N) \approx N \pm \sqrt N$ — i.e. **not
+   exactly $N$**. The lecture FAQ said: resampling at a different size
+   imitates the wrong error. Why doesn't that break the method here?
+   (Compare $\sqrt N$ to $N$.)
+2. **Big spenders.** The PM asks: did the share of users who ordered
+   **over 600 UAH** grow? A share is a weighted sum — build a Poisson CI
+   for the uplift of this share.
+3. **Case.** Explain to an engineer colleague, in one paragraph, why the
+   Poisson variant can be computed by a SQL query with `GROUP BY` and the
+   classic one cannot.
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 2
+
+```{python}
+#| label: sol2
+
+# (1) the size wobble relative to N vanishes as 1/sqrt(N)
+N = control.size
+print(f"(1) sqrt(N)/N = {np.sqrt(N)/N:.3f} — a ~1.3% deviation from N; "
+      f"a second-order contribution to the error variance")
+print(f"    std(uplift*): classic {r['star'].std():.4f}, "
+      f"Poisson {r_pois['star'].std():.4f}")
+
+# (2) share of users with revenue > 600 UAH
+thr = 600
+pc, pt = (control > thr).mean(), (test > thr).mean()
+rng2 = np.random.default_rng(42)
+wc = rng2.poisson(1.0, size=(4000, control.size))
+wt = rng2.poisson(1.0, size=(4000, test.size))
+pc_star = wc @ (control > thr) / wc.sum(axis=1)
+pt_star = wt @ (test > thr) / wt.sum(axis=1)
+up_hat = pt / pc - 1
+q_lo, q_hi = np.quantile(pt_star / pc_star - 1, [0.025, 0.975])
+print(f"(2) share >600 UAH: {pc:.1%} -> {pt:.1%}, "
+      f"uplift {up_hat:+.1%}, CI ({2*up_hat - q_hi:+.1%}, {2*up_hat - q_lo:+.1%})")
+```
+
+**Interpretation.** (1) The size wobbles by $\pm\sqrt N$, but relative to
+$N$ that is $1/\sqrt N \to 0$: the error distributions of the two engines
+coincide (compare the stds). (2) There are ~8% more "big" clients — the
+feature works exactly where it should: on baskets near and above the
+300 UAH threshold. (3) The weight $W_i$ is generated from
+`hash(user_id, b)` independently per row, so `SUM(w*x) / SUM(w)` by groups
+is ordinary aggregation; classic resampling needs global random access to
+all rows at once.
+:::
+
+---
+
+# Part III — Is our engine honest? Monte Carlo {#sec-mc}
+
+We built two engines from scratch — and, per the course habit, **we take
+neither on faith**. Same test bench as in Practices 5–8: simulate worlds
+where we know the truth and count how often the tool errs.
+
+```{python}
+#| label: rate-uplift
+
+def rate_uplift(engine, n, uplift=0.0, n_exps=400, B=800, alpha=0.05, seed=1):
+    """Share of experiments where the CI did NOT cover zero (+ Wilson CI).
+
+    uplift=0 -> A/A worlds, rate = FPR (an honest engine ~ alpha).
+    uplift>0 -> rate = power on an effect of that size.
+    """
+    rng, rej = np.random.default_rng(seed), 0
+    for i in range(n_exps):
+        c = arpu_sample(n, rng)
+        t = arpu_sample(n, rng, uplift=uplift)
+        lo, hi = engine(c, t, B=B, seed=seed + i)["ci"]
+        rej += (lo > 0) or (hi < 0)
+    lo, hi = proportion_confint(rej, n_exps, method="wilson")
+    return {"rate": rej / n_exps, "ci": (lo, hi)}
+```
+
+::: {.callout-tip icon="false"}
+## 🔮 Guess first
+We deviated from the lecture's straight path **twice**: the statistic is a
+ratio, the weights are Poisson. Will both engines hold FPR ≈ 5% on A/A
+worlds?
+:::
+
+```{python}
+#| label: fpr-run
+
+for name, engine in [("classic", uplift_ci),
+                     ("Poisson", uplift_ci_pois)]:
+    t0 = time.perf_counter()
+    f = rate_uplift(engine, n=1500)
+    elapsed = time.perf_counter() - t0
+    print(f"{name}: FPR = {f['rate']:.3f}  "
+          f"Wilson ({f['ci'][0]:.3f}, {f['ci'][1]:.3f})   ⏱ {elapsed:.1f} s")
+```
+
+Both hold $\alpha$ — we have **earned the right to use them**. This is not
+a formality: in Part I we saw how a "minor" change (dividing by a frozen
+mean) silently corrupts the lower bound. The only way to know is to check.
+
+::: {.callout-tip icon="false"}
+## Your turn 3
+1. Same bench, but with an effect: `rate_uplift(uplift_ci_pois, 1500,
+   uplift=0.05)`. What is the **power** at the Kyiv-sized effect with
+   n=1500 per arm?
+2. What does this mean for a city manager who "just launched" a two-week
+   experiment in a small city and got a non-significant result?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 3
+
+```{python}
+#| label: sol3
+
+t0 = time.perf_counter()
+pw = rate_uplift(uplift_ci_pois, 1500, uplift=0.05, n_exps=300)
+print(f"(1) power(+5%, n=1500) = {pw['rate']:.2f}  "
+      f"Wilson ({pw['ci'][0]:.2f}, {pw['ci'][1]:.2f})")
+print(f"⏱ execution time: {time.perf_counter() - t0:.1f} s")
+```
+
+**Interpretation.** (1) Only about a quarter of such experiments would
+catch a real +5%. (2) "Non-significant" at n=1500 is the expected outcome
+**even if the feature works**: three out of four such launches end in
+nothing. So how many users do we need? That is a **design** question —
+Part IV.
+:::
+
+---
+
+# Part IV — Designing the next experiment: Lviv {#sec-design}
+
+> **Case.** The feature is headed to Lviv. From the logs we have a
+> **pilot**: 1500 Lviv users on the old delivery pricing (the feature has
+> never been on there). The team wants to reliably catch a Kyiv-sized
+> effect — **design-MDE = +5%**. The question: **how many users per arm**
+> do we need?
+
+For a mean there is a sample-size formula. For the **ratio of two means**
+of a skewed distribution with a quarter of zeros — there is none. But we
+have a pilot and the bootstrap: resampling the pilot is a "world that looks
+like Lviv", into which we can **inject** any effect and measure power
+directly.
+
+::: {.callout-important icon="false"}
+## Do not confuse the two thresholds
+**Breakeven (+3%)** is the **decision** threshold: we compare the CI to it
+*after* the experiment. **Design-MDE (+5%)** is the **planning** threshold:
+the smallest effect we want to catch reliably; it sets $n$ *before* the
+experiment. Demanding "the CI lower bound must clear the MDE" is a way to
+systematically bury profitable features: for the decision, breakeven is
+enough.
+:::
+
+## Tool v3: `power_sim`
+
+```{python}
+#| label: power-sim
+
+def power_sim(pilot, uplift, n, n_exps=200, B=800, seed=1):
+    """Power by simulation: resample the pilot as the 'world' + injected uplift."""
+    rng, hits = np.random.default_rng(seed), 0
+    pilot = np.asarray(pilot, float)
+    for i in range(n_exps):
+        c = rng.choice(pilot, n, replace=True)
+        t = rng.choice(pilot, n, replace=True) * (1 + uplift)
+        hits += uplift_ci_pois(c, t, B=B, seed=seed + i)["ci"][0] > 0
+    lo, hi = proportion_confint(hits, n_exps, method="wilson")
+    return {"power": hits / n_exps, "ci": (lo, hi)}
+
+
+rng_pilot = np.random.default_rng(21)
+pilot = arpu_sample(1500, rng_pilot)      # the Lviv log, no feature yet
+print(f"pilot: ARPU {pilot.mean():.0f} UAH, zeros {np.mean(pilot == 0):.0%}")
+```
+
+::: {.callout-tip icon="false"}
+## 🔮 Guess first
+Order of magnitude: how many users **per arm** does Lviv need to catch +5%
+with 80% power — hundreds, thousands, or tens of thousands?
+:::
+
+```{python}
+#| label: power-curve
+#| fig-align: center
+
+sizes = [1000, 2000, 4000, 8000]
+t0 = time.perf_counter()
+curve = [power_sim(pilot, uplift=0.05, n=n) for n in sizes]
+elapsed = time.perf_counter() - t0
+
+for n, pw in zip(sizes, curve):
+    print(f"n = {n:5d}: power {pw['power']:.2f}  "
+          f"({pw['ci'][0]:.2f}, {pw['ci'][1]:.2f})")
+print(f"⏱ execution time: {elapsed:.1f} s")
+```
+
+```{python}
+#| label: power-plot
+#| code-fold: true
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(9, 3.8))
+xt = np.arange(len(sizes))
+band = np.array([pw["ci"] for pw in curve])
+ax.axhline(0.8, color=red, lw=2, ls="--", label="80% target")
+ax.plot(xt, [pw["power"] for pw in curve], color=green, lw=2.5, marker="o",
+        label="power (MDE = +5%)")
+ax.fill_between(xt, band[:, 0], band[:, 1], color=green, alpha=0.18)
+ax.set_xticks(xt, sizes)
+ax.set_xlabel("users per arm")
+ax.set_ylabel("power")
+ax.set_title("Power curve simulated from the pilot")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+80% is reached near **n ≈ 8000 per arm**. And the other way around — fix
+$n$ and ask which effect we can still catch: that is the **MDE at a given
+n**.
+
+```{python}
+#| label: mde-run
+
+n_fix = 4000
+t0 = time.perf_counter()
+for u in (0.03, 0.04, 0.05, 0.06, 0.07, 0.08):
+    pw = power_sim(pilot, uplift=u, n=n_fix)
+    flag = "  <- ~80%" if 0.75 <= pw["power"] <= 0.85 else ""
+    print(f"uplift {u:+.0%}: power {pw['power']:.2f}{flag}")
+print(f"⏱ execution time: {time.perf_counter() - t0:.1f} s")
+```
+
+At n = 4000 only effects of **≈+7% and up** are caught reliably: a smaller
+traffic budget means a coarser ruler.
+
+::: {.callout-important icon="false"}
+## Catch the mistake 🕵️
+While we were planning, an impatient Lviv manager **already launched** a
+two-week experiment: 700 users per arm.
+
+```{python}
+#| label: catch-lviv
+
+rng_l = np.random.default_rng(17)
+c_lv = arpu_sample(700, rng_l)
+t_lv = arpu_sample(700, rng_l, uplift=0.05)   # the effect IS there
+
+r_lv = uplift_ci_pois(c_lv, t_lv)
+se = r_lv["star"].std()
+z = r_lv["uplift"] / se
+p = 2 * (1 - norm.cdf(abs(z)))
+print(f"uplift {r_lv['uplift']:+.2%}, "
+      f"CI ({r_lv['ci'][0]:+.2%}, {r_lv['ci'][1]:+.2%}), p ~ {p:.2f}")
+print(f"'power at the observed effect': "
+      f"{norm.cdf(abs(z) - norm.ppf(0.975)):.2f}")
+```
+
+**Analyst A:** "The CI covers zero, but look: the power at the observed
++4.3% is only 13%! The test is simply blind, the effect is surely real — I
+propose we declare a win."
+
+**Analyst B:** "'Power at the observed effect' is **the p-value wearing a
+percent costume**. It is computed from $z$, and $z$ is a monotone function
+of $p$. Look:
+
+```{python}
+#| label: catch-mapping
+
+print("p-value  -> 'post-hoc power'")
+for pp in (0.01, 0.05, 0.2, 0.4, 0.8):
+    zz = norm.ppf(1 - pp/2)
+    print(f"  {pp:.2f}   ->  {norm.cdf(zz - norm.ppf(0.975)):.2f}")
+```
+
+A large $p$ ⇒ a small 'post-hoc power' — **always**, on any data. Zero new
+information, yet it sounds like an excuse for any failure. The honest
+conclusion is different: with n=700 the a-priori power at the design-MDE
+was ~10–15% — the experiment never had a chance and should never have been
+launched. Power is computed **before** the experiment on a pilot, not after
+— on the result."
+
+**Who is right?** Analyst B. Post-hoc power adds nothing to $p$; and "the
+effect is surely real" with a CI of $(-6\%, +14\%)$ is wishful thinking.
+The only workable conclusion: relaunch with an $n$ computed via
+`power_sim`.
+:::
+
+::: {.callout-tip icon="false"}
+## Your turn 4
+1. Lviv yields ~2000 new users per arm per week. How many **weeks** does
+   an honest experiment take at design-MDE +5%?
+2. What if the team wants to catch the **breakeven +3% itself** (i.e.
+   MDE = 3%)? Estimate the power at n = 16000 and draw the conclusion:
+   wait, or change the plan?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 4
+
+```{python}
+#| label: sol4
+
+# (1) from the curve: 80% near n=8000 -> 8000/2000 = ~4 weeks
+print("(1) ~8000 per arm / 2000 per week = ~4 weeks")
+
+# (2) MDE = breakeven = +3%
+t0 = time.perf_counter()
+pw = power_sim(pilot, uplift=0.03, n=16000, n_exps=150)
+print(f"(2) power(+3%, n=16000) = {pw['power']:.2f}  "
+      f"({pw['ci'][0]:.2f}, {pw['ci'][1]:.2f})")
+print(f"⏱ execution time: {time.perf_counter() - t0:.1f} s")
+```
+
+**Interpretation.** (1) Four weeks — and that is the honest price: the
+two-week launch on 700 users was theater, not an experiment. (2) Even 16k
+per arm (8 weeks!) gives only ~70%: catching +3% in Lviv is an unrealistic
+plan. The sane options: plan for a larger MDE, pool cities, or lengthen
+the metric window. That is a design decision, and it is made **now**, not
+after a failure.
+:::
+
+---
+
+# Part V — The finale: `ab_report` {#sec-report}
+
+Back to the Kyiv cliffhanger from @sec-uplift: uplift **+5.2%**, CI
+**(+1.5%, +8.8%)**, breakeven **+3%** — inside the interval.
+
+::: {.callout-tip icon="false"}
+## 🔮 Guess first
+The effect is "statistically significant" (the CI excludes zero). Does that
+mean the feature should ship?
+:::
+
+Significance against **zero** is the wrong threshold: money is compared to
+**breakeven**. But a binary "lower bound above/below +3%" throws away half
+the information too. Let's assemble everything we can do into the final
+tool: **three zones** instead of two, the probability of profitability,
+and the expected value.
+
+```{python}
+#| label: ab-report
+
+def ab_report(control, test, breakeven, annual_revenue,
+              alpha=0.05, B=4000, seed=42):
+    """Final A/B report: uplift, CI, three-zone decision, P(profitable), EV.
+
+    Zones: SHIP if the whole CI is above breakeven; KILL if it is entirely
+    below; otherwise GREY ZONE. P(profitable) and EV come from the
+    bootstrap distribution of uplift*.
+    """
+    r = uplift_ci_pois(control, test, alpha=alpha, B=B, seed=seed)
+    lo, hi = r["ci"]
+    star = r["star"]
+
+    zone = ("SHIP — roll it out" if lo > breakeven else
+            "KILL — switch it off" if hi < breakeven else
+            "GREY ZONE — more data needed")
+    p_be = (star >= breakeven).mean()          # P(effect >= breakeven)
+    ev = annual_revenue * (star.mean() - breakeven)   # expected net value
+
+    print(f"uplift:         {r['uplift']:+.2%}")
+    print(f"95% CI:         ({lo:+.2%}, {hi:+.2%})   breakeven {breakeven:+.0%}")
+    print(f"decision:       {zone}")
+    print(f"P(profitable):  {p_be:.0%}")
+    print(f"EV per year:    {ev/1e6:+.1f} M UAH")
+    return {"uplift": r["uplift"], "ci": (lo, hi), "zone": zone,
+            "p_breakeven": p_be, "ev": ev}
+
+
+R_YEAR = 430 * 26 * 80_000    # ARPU/2wk * 26 * Kyiv user base = ~0.9 bn UAH
+rep = ab_report(control, test, breakeven=0.03, annual_revenue=R_YEAR)
+```
+
+Read the report as a whole: the data does not support "ship now" (the lower
+bound is below breakeven), but this is **not a failure** — profitability
+has ~88% probability and the expected value of launching is **+20 M UAH a
+year**. The rational move in the grey zone is not to discard the feature
+but to **buy more precision**: extend the experiment, with the extra sample
+size computed via `power_sim` (Part IV — now with the current data as the
+pilot).
+
+::: {.callout-tip icon="false"}
+## Your turn 5 — the final case
+The team extended the Kyiv experiment by two more weeks: now **12,000**
+users per arm (`default_rng(9)`, the same +5% in the generator).
+
+1. Run `ab_report` on the full data. Which zone now? What happened to
+   P(profitable) and EV?
+2. **Sensitivity to the economics.** Finance recalculated the subsidy: if
+   the breakeven is actually **+6%**, what does the report become? State
+   the decision for both scenarios, one sentence each.
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 5
+
+```{python}
+#| label: sol5
+
+rng_e = np.random.default_rng(9)
+c_ext = arpu_sample(12000, rng_e)
+t_ext = arpu_sample(12000, rng_e, uplift=0.05)
+
+t0 = time.perf_counter()
+print("(1) breakeven +3%:")
+rep3 = ab_report(c_ext, t_ext, breakeven=0.03, annual_revenue=R_YEAR)
+
+print("\n(2) breakeven +6%:")
+rep6 = ab_report(c_ext, t_ext, breakeven=0.06, annual_revenue=R_YEAR)
+print(f"\n⏱ execution time: {time.perf_counter() - t0:.1f} s")
+```
+
+**Interpretation.** (1) Doubling the sample narrowed the CI to
+**(+3.2%, +8.4%)** — the lower bound crossed breakeven: **SHIP**,
+profitability is practically certain (~99%), EV ~ +26 M UAH/year. (2) Same
+data, different economics: at breakeven +6% the CI straddles the threshold
+again, P(profitable) ~ 46%, EV is negative. The two one-liners: "At
+breakeven +3% — ship: profitability is proven, EV +26 M/year. At breakeven
++6% — neither ship nor kill: the odds of paying off are below a coin flip;
+the decision needs either a cheaper subsidy or more data." The statistics
+are identical — the **economics** makes the decision.
+:::
+
+---
+
+# Pitfalls + checklist {.unnumbered}
+
+| Pitfall | Why it hurts | What to do |
+|---|---|---|
+| Dividing the bounds of the difference CI by $\bar X_C$ | the denominator is random too; the lie lands on the lower bound — exactly where the business looks | compute the ratio **inside** every bootstrap iteration |
+| Comparing the CI to zero when the feature costs money | "significant" ≠ "profitable" | the decision threshold is **breakeven**, three zones instead of two |
+| Demanding "lower bound > design-MDE" | systematic false negatives on profitable features | MDE is for planning $n$, breakeven is for the decision |
+| "Power at the observed effect" | a deterministic function of the $p$-value, zero new information | compute power **before** the experiment, on a pilot (`power_sim`) |
+| Poisson weights for a median "as is" | a weighted quantile ≠ a weighted sum | on big data use shares/sums, or a proper weighted quantile |
+| Trusting an engine because "the code looks right" | a minor change to the statistic can break calibration | an A/A Monte Carlo bench: FPR ≈ $\alpha$ (`rate_uplift`) |
+
+**Checklist for a bootstrap A/B report:**
+
+- [ ] The reported statistic (uplift, ratio, share) is computed **as a
+  whole** inside every bootstrap iteration; resampling is done **within**
+  each group.
+- [ ] The engine is validated by **Monte Carlo**: FPR on A/A ≈ $\alpha$.
+- [ ] $n$ was planned **before** launch by simulation on a pilot at the
+  **design-MDE**; there is no post-hoc power in the report.
+- [ ] The decision is **three-zone** against **breakeven**: ship / kill /
+  grey zone, plus P(profitable) and EV.
+- [ ] In the grey zone the report says **how much more data** is needed
+  (simulation with the current data as the pilot).
+- [ ] For big data the engine is weighted (Poisson) and the statistics are
+  reduced to **sums**.
+
+If any answer is "no" — the report is not ready to meet the CFO.
