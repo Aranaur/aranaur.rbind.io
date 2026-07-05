@@ -1,0 +1,1897 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src=".08-bootstrap_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".08-bootstrap_files/libs/quarto-html/tabby.min.js"></script>
+<script src=".08-bootstrap_files/libs/quarto-html/popper.min.js"></script>
+<script src=".08-bootstrap_files/libs/quarto-html/tippy.umd.min.js"></script>
+<link href=".08-bootstrap_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".08-bootstrap_files/libs/quarto-html/light-border.css" rel="stylesheet">
+<link href=".08-bootstrap_files/libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".08-bootstrap_files/libs/quarto-contrib/iconify-1.0.7/iconify-icon.min.js"></script><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.9.37">
+
+  <meta name="author" content="Ihor Miroshnychenko">
+  <title>Bootstrap: a confidence interval for anything</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href=".08-bootstrap_files/libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href=".08-bootstrap_files/libs/revealjs/dist/reveal.css">
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+      vertical-align: middle;
+    }
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+      }
+    pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+    div.sourceCode
+      { color: #24292e;  }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #24292e; } /* Normal */
+    code span.al { color: #ff5555; font-weight: bold; } /* Alert */
+    code span.an { color: #6a737d; } /* Annotation */
+    code span.at { color: #d73a49; } /* Attribute */
+    code span.bn { color: #005cc5; } /* BaseN */
+    code span.bu { color: #d73a49; } /* BuiltIn */
+    code span.cf { color: #d73a49; } /* ControlFlow */
+    code span.ch { color: #032f62; } /* Char */
+    code span.cn { color: #005cc5; } /* Constant */
+    code span.co { color: #6a737d; } /* Comment */
+    code span.cv { color: #6a737d; } /* CommentVar */
+    code span.do { color: #6a737d; } /* Documentation */
+    code span.dt { color: #d73a49; } /* DataType */
+    code span.dv { color: #005cc5; } /* DecVal */
+    code span.er { color: #ff5555; text-decoration: underline; } /* Error */
+    code span.ex { color: #d73a49; font-weight: bold; } /* Extension */
+    code span.fl { color: #005cc5; } /* Float */
+    code span.fu { color: #6f42c1; } /* Function */
+    code span.im { color: #032f62; } /* Import */
+    code span.in { color: #6a737d; } /* Information */
+    code span.kw { color: #d73a49; } /* Keyword */
+    code span.op { color: #24292e; } /* Operator */
+    code span.ot { color: #6f42c1; } /* Other */
+    code span.pp { color: #d73a49; } /* Preprocessor */
+    code span.re { color: #6a737d; } /* RegionMarker */
+    code span.sc { color: #005cc5; } /* SpecialChar */
+    code span.ss { color: #032f62; } /* SpecialString */
+    code span.st { color: #032f62; } /* String */
+    code span.va { color: #e36209; } /* Variable */
+    code span.vs { color: #032f62; } /* VerbatimString */
+    code span.wa { color: #ff5555; } /* Warning */
+  </style>
+  <link rel="stylesheet" href=".08-bootstrap_files/libs/revealjs/dist/theme/quarto-8a52321a21477e1bb40c2cb18c896737.css">
+  <link href=".08-bootstrap_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href=".08-bootstrap_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href=".08-bootstrap_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href=".08-bootstrap_files/libs/revealjs/plugin/reveal-chalkboard/font-awesome/css/all.css" rel="stylesheet">
+  <link href=".08-bootstrap_files/libs/revealjs/plugin/reveal-chalkboard/style.css" rel="stylesheet">
+  <link href=".08-bootstrap_files/libs/revealjs/plugin/verticator/verticator.css" rel="stylesheet">
+  <link href=".08-bootstrap_files/libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+</head>
+<body class="quarto-light">
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide" data-background-iframe=".08-bootstrap_files/libs/colored-particles/index.html" class="quarto-title-block center">
+  <h1 class="title">Bootstrap: a confidence interval for anything</h1>
+  <p class="subtitle">Applied Statistics</p>
+
+<div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+Ihor Miroshnychenko 
+</div>
+        <p class="quarto-title-affiliation">
+            Kyiv School of Economics
+          </p>
+    </div>
+</div>
+
+</section><section id="TOC">
+<nav role="doc-toc"> 
+<h2 id="toc-title">Table of contents</h2>
+<ul>
+<li><a href="#/one-interval-for-anything" id="/toc-one-interval-for-anything">One interval for anything</a></li>
+<li><a href="#/idea-1-monte-carlo-in-god-mode" id="/toc-idea-1-monte-carlo-in-god-mode">Idea 1: Monte Carlo in god mode</a></li>
+<li><a href="#/idea-2-the-plug-in-principle" id="/toc-idea-2-the-plug-in-principle">Idea 2: the plug-in principle</a></li>
+<li><a href="#/the-bootstrap-algorithm" id="/toc-the-bootstrap-algorithm">The bootstrap algorithm</a></li>
+<li><a href="#/bootstrap-for-the-ab-test" id="/toc-bootstrap-for-the-ab-test">Bootstrap for the A/B test</a></li>
+<li><a href="#/three-flavors-of-bootstrap-ci" id="/toc-three-flavors-of-bootstrap-ci">Three flavors of bootstrap CI</a></li>
+<li><a href="#/when-does-the-bootstrap-break" id="/toc-when-does-the-bootstrap-break">When does the bootstrap break?</a></li>
+<li><a href="#/summary" id="/toc-summary">Summary</a></li>
+</ul>
+</nav>
+</section>
+<section>
+<section id="one-interval-for-anything" class="title-slide slide level1 center" data-background-iframe=".08-bootstrap_files/libs/colored-particles/index.html">
+<h1>One interval for anything</h1>
+
+</section>
+<section id="the-task" class="slide level2 smaller">
+<h2>🚕 The task</h2>
+<blockquote>
+<p>You are an analyst at a <strong>ride-hailing company</strong>. A product manager comes to you: the app too often matches a <strong>driver who is far away</strong>, users stare at a 10-minute ETA — and <strong>churn</strong>. The team wants to fix the matching algorithm.</p>
+<p>Before touching anything, you must <strong>fix the yardstick</strong>: the metric that any future improvement will be judged by, and its <strong>current value with a confidence interval</strong> — the baseline.</p>
+</blockquote>
+<div class="fragment">
+<p>The team picks the <span class="hi">75th percentile of waiting time</span>, <span class="math inline">\(X_{[0.75]}\)</span>, as the quality metric.</p>
+<p>Why not the mean?</p>
+<ul>
+<li>Waiting time is <strong>right-skewed</strong> — the mean is dragged by rare disasters, most rides feel fine.</li>
+<li>Churn is driven by <strong>bad experiences</strong>, not by the average one. P75 reads: <em>“3 rides out of 4 arrive faster than this.”</em></li>
+<li>Tail metrics (P75, P90, P99) are the industry standard for latency-like quantities.</li>
+</ul>
+<aside class="notes">
+<p>Наскрізний кейс лекції: райд-хейлінг. Менеджер скаржиться: застосунок надто часто підбирає водія, який далеко, — користувач бачить ETA 10 хвилин і йде до конкурента. Команда збирається покращувати алгоритм метчингу, але СПОЧАТКУ треба зафіксувати лінійку: метрику якості та її поточне значення З ДОВІРЧИМ ІНТЕРВАЛОМ — бейзлайн, з яким порівнюватимемо всі майбутні покращення. Метрика — 75-й перцентиль часу очікування. Чому не середнє? (1) Час очікування скошений вправо — середнє тягнуть рідкісні катастрофи. (2) Відтік створюють ПОГАНІ поїздки, а не середня; P75 читається як «3 з 4 поїздок швидші за це число». (3) Хвостові метрики (P75/P90/P99) — індустріальний стандарт для латентностей. Інтрига лекції: для середнього ми вміємо будувати ДІ з другої-третьої лекції, а для перцентиля — ще ні.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="the-data-1000-logged-rides" class="slide level2 smaller">
+<h2>⏱️ The data: 1000 logged rides</h2>
+<div id="cell-control-hist" class="cell" data-execution_count="2">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">4.4</span>))</span>
+<span id="cb1-2"><a href="" aria-hidden="true" tabindex="-1"></a>ax.hist(control, bins<span class="op">=</span><span class="dv">40</span>, color<span class="op">=</span>turquoise, alpha<span class="op">=</span><span class="fl">0.9</span>, density<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb1-3"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axvline(p75_control, color<span class="op">=</span>red_pink, lw<span class="op">=</span><span class="fl">2.5</span>, ls<span class="op">=</span><span class="st">"--"</span>,</span>
+<span id="cb1-4"><a href="" aria-hidden="true" tabindex="-1"></a>           label<span class="op">=</span><span class="ss">f"P75 = </span><span class="sc">{</span>p75_control<span class="sc">:.2f}</span><span class="ss"> min"</span>)</span>
+<span id="cb1-5"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axvline(np.mean(control), color<span class="op">=</span>slate, lw<span class="op">=</span><span class="dv">2</span>, ls<span class="op">=</span><span class="st">":"</span>,</span>
+<span id="cb1-6"><a href="" aria-hidden="true" tabindex="-1"></a>           label<span class="op">=</span><span class="ss">f"mean = </span><span class="sc">{</span>np<span class="sc">.</span>mean(control)<span class="sc">:.2f}</span><span class="ss"> min"</span>)</span>
+<span id="cb1-7"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Waiting time for a driver (N = 1000 rides)"</span>)</span>
+<span id="cb1-8"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"minutes"</span>)<span class="op">;</span> ax.set_ylabel(<span class="st">"density"</span>)<span class="op">;</span> ax.legend()</span>
+<span id="cb1-9"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb1-10"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".08-bootstrap_files/figure-revealjs/control-hist-output-1.svg" id="control-hist" class="quarto-figure quarto-figure-center r-stretch"><p>Point estimate: <span class="math inline">\(\widehat{X}_{[0.75]}\)</span> = 4.6 minutes. But a point estimate from one sample <strong>is a random variable</strong> — a different week of logs would give a different number.</p>
+<center>
+<strong>We need a confidence interval for the 75th percentile.</strong>
+</center>
+<aside class="notes">
+<p>Реальна вибірка: 1000 залогованих поїздок. Форма — класична для часів очікування: скошена вправо, довгий хвіст до 20+ хвилин. Середнє 3.4 хв, P75 = 4.6 хв — три чверті клієнтів чекають менше. Ключова думка слайда: точкова оцінка 4.6 — це ВИПАДКОВА ВЕЛИЧИНА. Інший тиждень логів дав би 4.4 чи 4.8. Якщо ми зафіксуємо бейзлайн як «рівно 4.6», то через місяць не зможемо відрізнити реальне покращення від шуму вибірки. Тому потрібен довірчий інтервал. І тут ми впираємось у стіну — наступний слайд.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="the-wall-our-ci-toolbox-is-tiny" class="slide level2 smaller">
+<h2>🧱 The wall: our CI toolbox is tiny</h2>
+<p>So far every confidence interval in this course came from a <strong>hand-derived formula</strong> for one specific statistic:</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>CI recipe</th>
+<th>Where from</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>proportion (conversion)</td>
+<td><span class="math inline">\(\hat p \pm z_{1-\alpha/2}\sqrt{\hat p(1-\hat p)/n}\)</span></td>
+<td>z-test lecture</td>
+</tr>
+<tr class="even">
+<td>mean (minutes, revenue)</td>
+<td><span class="math inline">\(\bar X \pm t_{1-\alpha/2}\, S/\sqrt{n}\)</span></td>
+<td>t-test lecture</td>
+</tr>
+<tr class="odd">
+<td><strong>75th percentile</strong></td>
+<td><strong>?</strong></td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>median, P99, IQR</td>
+<td><strong>?</strong></td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>ratio of means, Gini, top-10% share</td>
+<td><strong>?</strong></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<div class="fragment">
+<p>Each formula needed its own math: a pivot statistic, its distribution, a proof. For a percentile of an unknown skewed distribution there is <strong>no clean textbook formula</strong>.</p>
+<div class="callout callout-tip no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p>Today’s promise: <strong>one universal recipe</strong> that manufactures a confidence interval for <em>almost any</em> statistic — the <span class="hi">bootstrap</span>. The price: computation instead of theory.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Чому це проблема? Досі кожен ДІ в курсі — це окрема, виведена вручну формула під конкретну статистику: для частки — z-інтервал, для середнього — t-інтервал. Кожна формула вимагала своєї математики: півотна статистика, її розподіл, доведення. Для перцентиля невідомого скошеного розподілу чистої підручникової формули немає (є асимптотичні, але вони потребують оцінки щільності в точці — окремий біль). А бізнес щодня питає про медіани, P99, співвідношення середніх, частку топ-10% користувачів у виручці… Обіцянка лекції: ОДИН універсальний рецепт, що виготовляє ДІ майже для будь-якої статистики — бутстреп. Ціна: замість теорії — обчислення. План: спершу зрозуміємо ідею в «режимі бога» (коли знаємо істину), потім замінимо істину на її наближення — і отримаємо алгоритм.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section></section>
+<section>
+<section id="idea-1-monte-carlo-in-god-mode" class="title-slide slide level1 center" data-background-iframe=".08-bootstrap_files/libs/colored-particles/index.html">
+<h1>Idea 1: Monte Carlo in god mode</h1>
+
+</section>
+<section id="practice-on-a-known-world" class="slide level2 smaller">
+<h2>🎲 Practice on a known world</h2>
+<p>Before solving the real problem, rehearse on a world where we <strong>know everything</strong>. Let waiting times follow a Gamma law — we choose it, so we know the true <span class="math inline">\(\theta\)</span> = true P75.</p>
+<div id="toy-world" class="cell" data-execution_count="3">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="" aria-hidden="true" tabindex="-1"></a>true_dist <span class="op">=</span> stats.gamma(a<span class="op">=</span><span class="dv">2</span>, scale<span class="op">=</span><span class="dv">3</span>)        <span class="co"># the "true" world</span></span>
+<span id="cb2-2"><a href="" aria-hidden="true" tabindex="-1"></a>N         <span class="op">=</span> <span class="dv">1000</span>                             <span class="co"># same size as our real sample</span></span>
+<span id="cb2-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="" aria-hidden="true" tabindex="-1"></a>rng_toy    <span class="op">=</span> np.random.default_rng(<span class="dv">42</span>)</span>
+<span id="cb2-5"><a href="" aria-hidden="true" tabindex="-1"></a>toy_sample <span class="op">=</span> true_dist.rvs(N, random_state<span class="op">=</span>rng_toy)</span>
+<span id="cb2-6"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="" aria-hidden="true" tabindex="-1"></a>theta     <span class="op">=</span> true_dist.ppf(<span class="fl">0.75</span>)              <span class="co"># TRUE P75 — god mode only</span></span>
+<span id="cb2-8"><a href="" aria-hidden="true" tabindex="-1"></a>theta_hat <span class="op">=</span> np.percentile(toy_sample, <span class="dv">75</span>)    <span class="co"># its estimate from the sample</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="cell-toy-world-plot" class="cell" data-execution_count="4">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="" aria-hidden="true" tabindex="-1"></a>x <span class="op">=</span> np.linspace(<span class="dv">0</span>, <span class="dv">25</span>, <span class="dv">500</span>)</span>
+<span id="cb3-2"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">3.6</span>))</span>
+<span id="cb3-3"><a href="" aria-hidden="true" tabindex="-1"></a>ax.hist(toy_sample, bins<span class="op">=</span><span class="dv">40</span>, density<span class="op">=</span><span class="va">True</span>, color<span class="op">=</span>turquoise, alpha<span class="op">=</span><span class="fl">0.8</span>, label<span class="op">=</span><span class="st">"sample"</span>)</span>
+<span id="cb3-4"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(x, true_dist.pdf(x), color<span class="op">=</span>blue, lw<span class="op">=</span><span class="fl">2.5</span>, label<span class="op">=</span><span class="st">"true density"</span>)</span>
+<span id="cb3-5"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axvline(theta,     color<span class="op">=</span>slate,    lw<span class="op">=</span><span class="fl">2.5</span>, label<span class="op">=</span><span class="ss">f"true P75 = </span><span class="sc">{</span>theta<span class="sc">:.2f}</span><span class="ss">"</span>)</span>
+<span id="cb3-6"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axvline(theta_hat, color<span class="op">=</span>red_pink, lw<span class="op">=</span><span class="fl">2.5</span>, ls<span class="op">=</span><span class="st">"--"</span>, label<span class="op">=</span><span class="ss">f"estimate = </span><span class="sc">{</span>theta_hat<span class="sc">:.2f}</span><span class="ss">"</span>)</span>
+<span id="cb3-7"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"minutes"</span>)<span class="op">;</span> ax.set_ylabel(<span class="st">"density"</span>)<span class="op">;</span> ax.legend()</span>
+<span id="cb3-8"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb3-9"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".08-bootstrap_files/figure-revealjs/toy-world-plot-output-1.svg" id="toy-world-plot" class="quarto-figure quarto-figure-center r-stretch"><p><span class="math inline">\(\theta\)</span> = 8.078, <span class="math inline">\(\;\widehat\theta\)</span> = 7.876. The estimate misses the truth a little. <em>By how much does it typically miss?</em></p>
+<aside class="notes">
+<p>Той самий прийом, що в лекції про Монте-Карло: «вдягаємо капелюх всезнаючого бога». Беремо іграшковий світ — Gamma(2, 3), — у якому МИ призначили істину, тож знаємо справжній θ (істинний P75 ≈ 8.08). Генеруємо вибірку такого ж розміру, як наша реальна (N=1000), і рахуємо оцінку θ̂. Вона трохи промахується повз істину. Центральне запитання, довкола якого будується вся лекція: НАСКІЛЬКИ типово промахується оцінка? Якщо ми знаємо розподіл промаху — ми знаємо, наскільки широким має бути довірчий інтервал. θ тут — будь-яка характеристика: перцентиль, середнє, дисперсія, що завгодно.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="the-error-distribution-delta-widehattheta---theta" class="slide level2 smaller">
+<h2>📐 The error distribution <span class="math inline">\(\Delta = \widehat\theta - \theta\)</span></h2>
+<p>In god mode we can <em>replay the world</em>: draw fresh samples from the <strong>true</strong> distribution again and again, and watch how the estimate misses.</p>
+<div id="delta-sim" class="cell" data-execution_count="5">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="" aria-hidden="true" tabindex="-1"></a>B <span class="op">=</span> <span class="dv">10_000</span>                                     <span class="co"># number of replayed worlds</span></span>
+<span id="cb4-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="" aria-hidden="true" tabindex="-1"></a>samples    <span class="op">=</span> true_dist.rvs((B, N), random_state<span class="op">=</span>rng_toy)</span>
+<span id="cb4-4"><a href="" aria-hidden="true" tabindex="-1"></a>theta_hats <span class="op">=</span> np.percentile(samples, <span class="dv">75</span>, axis<span class="op">=</span><span class="dv">1</span>)   <span class="co"># B estimates of P75</span></span>
+<span id="cb4-5"><a href="" aria-hidden="true" tabindex="-1"></a>delta      <span class="op">=</span> theta_hats <span class="op">-</span> theta                   <span class="co"># B observed errors</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="cell-delta-plot" class="cell" data-execution_count="6">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">3.8</span>))</span>
+<span id="cb5-2"><a href="" aria-hidden="true" tabindex="-1"></a>ax.hist(delta, bins<span class="op">=</span><span class="dv">60</span>, density<span class="op">=</span><span class="va">True</span>, color<span class="op">=</span>turquoise, alpha<span class="op">=</span><span class="fl">0.9</span>)</span>
+<span id="cb5-3"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axvline(<span class="dv">0</span>, color<span class="op">=</span>slate, lw<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb5-4"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="vs">r"</span><span class="dv">$\D</span><span class="vs">elta = </span><span class="dv">\w</span><span class="vs">idehat{</span><span class="ch">\t</span><span class="vs">heta} - </span><span class="ch">\t</span><span class="vs">heta</span><span class="dv">$</span><span class="vs"> across 10 000 replayed worlds"</span>)</span>
+<span id="cb5-5"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="vs">r"</span><span class="dv">$\D</span><span class="vs">elta</span><span class="dv">$</span><span class="vs"> </span><span class="kw">(</span><span class="vs">minutes</span><span class="kw">)</span><span class="vs">"</span>)<span class="op">;</span> ax.set_ylabel(<span class="st">"density"</span>)</span>
+<span id="cb5-6"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb5-7"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".08-bootstrap_files/figure-revealjs/delta-plot-output-1.svg" id="delta-plot" class="quarto-figure quarto-figure-center r-stretch"><p>This histogram is the <strong>sampling error distribution</strong>: it tells us that with <span class="math inline">\(N = 1000\)</span> the P75 estimate typically misses by a few tenths of a minute — and in which direction.</p>
+<aside class="notes">
+<p>У режимі бога ми можемо «перегравати світ»: знову й знову тягнути СВІЖІ вибірки з ІСТИННОГО розподілу і дивитись, як промахується оцінка. B=10000 повторів, у кожному рахуємо θ̂_i і промах Δ_i = θ̂_i − θ. Гістограма Δ — це і є розподіл помилки вибіркової оцінки: видно, що з N=1000 оцінка P75 типово промахується на кілька десятих хвилини, приблизно симетрично. Зверніть увагу на техніку: ми векторизуємо — генеруємо одразу матрицю B×N і рахуємо перцентиль по axis=1, жодних циклів. Це та звичка, яка зробить бутстреп швидким наприкінці лекції.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="from-delta-to-a-confidence-interval" class="slide level2 smaller">
+<h2>🎯 From <span class="math inline">\(\Delta\)</span> to a confidence interval</h2>
+<p>Take the <span class="math inline">\(\alpha/2\)</span> and <span class="math inline">\(1-\alpha/2\)</span> quantiles of <span class="math inline">\(\Delta\)</span>. By the definition of quantiles:</p>
+<p><span class="math display">\[
+P\big(\Delta_{[\alpha/2]} &lt; \widehat\theta - \theta &lt; \Delta_{[1-\alpha/2]}\big) = 1 - \alpha .
+\]</span></p>
+<p>Solve the inequality for <span class="math inline">\(\theta\)</span> (flip the signs — the bounds swap):</p>
+<p><span class="math display">\[
+P\big(\widehat\theta - \Delta_{[1-\alpha/2]} &lt; \theta &lt; \widehat\theta - \Delta_{[\alpha/2]}\big) = 1 - \alpha
+\;\;\Rightarrow\;\;
+CI = \big(\widehat\theta - \Delta_{[1-\alpha/2]},\; \widehat\theta - \Delta_{[\alpha/2]}\big).
+\]</span></p>
+<div id="god-ci" class="cell columns column-output-location" data-execution_count="7">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="" aria-hidden="true" tabindex="-1"></a>alpha <span class="op">=</span> <span class="fl">0.05</span></span>
+<span id="cb6-2"><a href="" aria-hidden="true" tabindex="-1"></a>d_lo, d_hi <span class="op">=</span> np.quantile(delta, [alpha<span class="op">/</span><span class="dv">2</span>, <span class="dv">1</span> <span class="op">-</span> alpha<span class="op">/</span><span class="dv">2</span>])</span>
+<span id="cb6-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="" aria-hidden="true" tabindex="-1"></a>ci <span class="op">=</span> (theta_hat <span class="op">-</span> d_hi, theta_hat <span class="op">-</span> d_lo)</span>
+<span id="cb6-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"true theta : </span><span class="sc">{</span>theta<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb6-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"95% CI     : (</span><span class="sc">{</span>ci[<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>ci[<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span>
+<span id="cb6-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"covers the truth"</span> <span class="cf">if</span> ci[<span class="dv">0</span>] <span class="op">&lt;</span> theta <span class="op">&lt;</span> ci[<span class="dv">1</span>] <span class="cf">else</span> <span class="st">"misses"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>true theta : 8.078
+95% CI     : (7.435, 8.308)
+covers the truth</code></pre>
+</div>
+</div></div>
+<div class="fragment">
+<div class="callout callout-important no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Important</strong></p>
+</div>
+<div class="callout-content">
+<p>It works — but we <strong>cheated twice</strong>: we used the <em>true distribution</em> to replay the worlds, and the <em>true <span class="math inline">\(\theta\)</span></em> to compute <span class="math inline">\(\Delta\)</span>. In real life we have neither.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Тепер із розподілу промаху робимо довірчий інтервал. Беремо квантилі Δ на рівнях α/2 і 1−α/2 — за означенням квантилів промах потрапляє між ними з імовірністю 1−α. Розв’язуємо нерівність відносно θ — знаки перевертаються, межі міняються місцями — і отримуємо CI = (θ̂ − Δ_{1−α/2}, θ̂ − Δ_{α/2}). Перевіряємо: істина всередині. Здавалося б, перемога. Але чесно зізнаймося: ми змахлювали ДВІЧІ. Щоб перегравати світи, ми використали ІСТИННИЙ розподіл; щоб порахувати Δ, — ІСТИННЕ θ. У реальному житті немає ні того, ні іншого. Уся геніальність бутстрепа — в тому, чим ці дві речі замінити. Це наступна секція.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section></section>
+<section>
+<section id="idea-2-the-plug-in-principle" class="title-slide slide level1 center" data-background-iframe=".08-bootstrap_files/libs/colored-particles/index.html">
+<h1>Idea 2: the plug-in principle</h1>
+
+</section>
+<section id="the-best-model-of-the-population-is-the-sample" class="slide level2 smaller">
+<h2>🔌 The best model of the population is… the sample</h2>
+<p>We don’t know the true distribution <span class="math inline">\(F\)</span>. But we hold its portrait: the <span class="hi">empirical distribution</span> <span class="math inline">\(\widehat F\)</span> — the distribution that puts probability <span class="math inline">\(\tfrac1N\)</span> on every observed point.</p>
+<div id="cell-ecdf-plot" class="cell" data-execution_count="8">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="" aria-hidden="true" tabindex="-1"></a>rng_e <span class="op">=</span> np.random.default_rng(<span class="dv">7</span>)</span>
+<span id="cb8-2"><a href="" aria-hidden="true" tabindex="-1"></a>x <span class="op">=</span> np.linspace(<span class="dv">0</span>, <span class="dv">25</span>, <span class="dv">500</span>)</span>
+<span id="cb8-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-4"><a href="" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="fl">12.5</span>, <span class="fl">3.6</span>), sharey<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb8-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ax, n <span class="kw">in</span> <span class="bu">zip</span>(axes, [<span class="dv">30</span>, <span class="dv">200</span>, <span class="dv">1000</span>]):</span>
+<span id="cb8-6"><a href="" aria-hidden="true" tabindex="-1"></a>    s <span class="op">=</span> np.sort(true_dist.rvs(n, random_state<span class="op">=</span>rng_e))</span>
+<span id="cb8-7"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.step(s, np.arange(<span class="dv">1</span>, n <span class="op">+</span> <span class="dv">1</span>) <span class="op">/</span> n, where<span class="op">=</span><span class="st">"post"</span>,</span>
+<span id="cb8-8"><a href="" aria-hidden="true" tabindex="-1"></a>            color<span class="op">=</span>red_pink, lw<span class="op">=</span><span class="fl">1.8</span>, label<span class="op">=</span><span class="vs">r"ECDF </span><span class="dv">$\w</span><span class="vs">idehat F</span><span class="dv">$</span><span class="vs">"</span>)</span>
+<span id="cb8-9"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(x, true_dist.cdf(x), color<span class="op">=</span>blue, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"true $F$"</span>)</span>
+<span id="cb8-10"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_title(<span class="ss">f"N = </span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb8-11"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_xlabel(<span class="st">"minutes"</span>)</span>
+<span id="cb8-12"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_ylabel(<span class="st">"CDF"</span>)<span class="op">;</span> axes[<span class="dv">0</span>].legend()</span>
+<span id="cb8-13"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb8-14"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".08-bootstrap_files/figure-revealjs/ecdf-plot-output-1.svg" id="ecdf-plot" class="quarto-figure quarto-figure-center r-stretch"><p>As <span class="math inline">\(N\)</span> grows, <span class="math inline">\(\widehat F\)</span> hugs <span class="math inline">\(F\)</span> everywhere (Glivenko–Cantelli). At <span class="math inline">\(N = 1000\)</span> they are near-twins. <strong>Plug-in principle:</strong> wherever the recipe says “the true distribution”, substitute the empirical one.</p>
+<aside class="notes">
+<p>Чим замінити істинний розподіл F? Тим найкращим його портретом, який у нас уже є, — ЕМПІРИЧНИМ розподілом: кожній спостереженій точці даємо ймовірність 1/N. Графік: ECDF проти істинної CDF за N=30, 200, 1000. Що більша вибірка, то щільніше сходинки обіймають плавну криву — це теорема Глівенка–Кантеллі («фундаментальна теорема статистики»): ECDF збігається до F рівномірно. За N=1000 вони майже близнюки. Звідси plug-in принцип: скрізь, де в рецепті написано «істинний розподіл», підставляємо емпіричний. І приємний бонус: у емпіричного розподілу ВСІ характеристики відомі точно — його P75 це просто вибірковий P75.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="sampling-from-widehat-f-resampling-with-replacement" class="slide level2 smaller">
+<h2>♻️ Sampling from <span class="math inline">\(\widehat F\)</span> = resampling with replacement</h2>
+<p>Drawing <span class="math inline">\(N\)</span> i.i.d. points from <span class="math inline">\(\widehat F\)</span> ≡ drawing <span class="math inline">\(N\)</span> times <strong>from the sample itself, with replacement</strong>. One line of numpy:</p>
+<div id="one-boot" class="cell columns column-output-location" data-execution_count="9">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="" aria-hidden="true" tabindex="-1"></a>idx <span class="op">=</span> np.arange(N)                 <span class="co"># id of each original ride</span></span>
+<span id="cb9-2"><a href="" aria-hidden="true" tabindex="-1"></a>boot_idx <span class="op">=</span> rng_toy.choice(idx, size<span class="op">=</span>N, replace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb9-3"><a href="" aria-hidden="true" tabindex="-1"></a>counts   <span class="op">=</span> np.bincount(boot_idx, minlength<span class="op">=</span>N)</span>
+<span id="cb9-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">5</span>):</span>
+<span id="cb9-6"><a href="" aria-hidden="true" tabindex="-1"></a>    share <span class="op">=</span> (counts <span class="op">==</span> k).mean()</span>
+<span id="cb9-7"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"picked </span><span class="sc">{</span>k<span class="sc">}</span><span class="ss">x : </span><span class="sc">{</span>share<span class="sc">:5.1%}</span><span class="ss"> of rides"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>picked 0x : 36.4% of rides
+picked 1x : 36.6% of rides
+picked 2x : 19.4% of rides
+picked 3x :  6.0% of rides
+picked 4x :  1.4% of rides</code></pre>
+</div>
+</div></div>
+<div class="fragment">
+<p>A bootstrap sample is the same data, <strong>reweighted by chance</strong>: some rides picked twice or thrice, about <span class="math inline">\(\left(1-\tfrac1N\right)^N \approx e^{-1} \approx 36.8\%\)</span> never picked at all. That random reweighting is exactly the sampling noise we want to imitate.</p>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p>The name: <em>“to pull yourself up by your own bootstraps”</em> — the sample generates its own replicas, no new data needed.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Як технічно «генерувати з емпіричного розподілу»? Тягнути N разів ІЗ САМОЇ ВИБІРКИ З ПОВЕРНЕННЯМ — один рядок numpy: np.random.choice(sample, size=N, replace=True). Розглянемо одну бутстреп-вибірку під мікроскопом: якісь поїздки витягнуто двічі-тричі, а приблизно (1−1/N)^N ≈ e^{−1} ≈ 36.8% — жодного разу. Тобто бутстреп-вибірка — це ті самі дані, ВИПАДКОВО ПЕРЕЗВАЖЕНІ. Саме це випадкове перезважування й імітує вибірковий шум: «а якби нам того тижня трапились трохи інші поїздки». Назва методу — від ідіоми «витягнути себе за шнурівки черевиків»: вибірка сама породжує свої репліки, нові дані не потрібні. Це і жарт, і точний опис.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="the-bootstrap-assumption-delta-approx-delta" class="slide level2 smaller">
+<h2>🤝 The bootstrap assumption: <span class="math inline">\(\Delta^* \approx \Delta\)</span></h2>
+<p>Replace <strong>both</strong> cheats: the true <span class="math inline">\(F\)</span> → the sample; the true <span class="math inline">\(\theta\)</span> → the estimate <span class="math inline">\(\widehat\theta\)</span>. The god-mode error <span class="math inline">\(\Delta = \widehat\theta - \theta\)</span> becomes the bootstrap error <span class="math inline">\(\Delta^* = \widehat\theta^{\,*} - \widehat\theta\)</span>, where <span class="math inline">\(\widehat\theta^{\,*}\)</span> is the estimate on a bootstrap sample.</p>
+<div id="delta-star" class="cell" data-execution_count="10">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="" aria-hidden="true" tabindex="-1"></a>boot_samples <span class="op">=</span> rng_toy.choice(toy_sample, size<span class="op">=</span>(B, N), replace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb11-2"><a href="" aria-hidden="true" tabindex="-1"></a>theta_stars  <span class="op">=</span> np.percentile(boot_samples, <span class="dv">75</span>, axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb11-3"><a href="" aria-hidden="true" tabindex="-1"></a>delta_star   <span class="op">=</span> theta_stars <span class="op">-</span> theta_hat</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="cell-delta-star-plot" class="cell" data-execution_count="11">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">3.6</span>))</span>
+<span id="cb12-2"><a href="" aria-hidden="true" tabindex="-1"></a>ax.hist(delta,      bins<span class="op">=</span><span class="dv">60</span>, density<span class="op">=</span><span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.55</span>, color<span class="op">=</span>turquoise,</span>
+<span id="cb12-3"><a href="" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="vs">r"</span><span class="dv">$\D</span><span class="vs">elta</span><span class="dv">$</span><span class="vs"> </span><span class="kw">(</span><span class="vs">god mode: true </span><span class="dv">$</span><span class="vs">F</span><span class="dv">$</span><span class="vs">, true </span><span class="dv">$</span><span class="ch">\t</span><span class="vs">heta</span><span class="dv">$</span><span class="kw">)</span><span class="vs">"</span>)</span>
+<span id="cb12-4"><a href="" aria-hidden="true" tabindex="-1"></a>ax.hist(delta_star, bins<span class="op">=</span><span class="dv">60</span>, density<span class="op">=</span><span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.55</span>, color<span class="op">=</span>green,</span>
+<span id="cb12-5"><a href="" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="vs">r"</span><span class="dv">$\D</span><span class="vs">elta</span><span class="dv">^</span><span class="op">*</span><span class="dv">$</span><span class="vs"> </span><span class="kw">(</span><span class="vs">bootstrap: sample only</span><span class="kw">)</span><span class="vs">"</span>)</span>
+<span id="cb12-6"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axvline(<span class="dv">0</span>, color<span class="op">=</span>slate, lw<span class="op">=</span><span class="fl">1.5</span>)</span>
+<span id="cb12-7"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="vs">r"error </span><span class="kw">(</span><span class="vs">minutes</span><span class="kw">)</span><span class="vs">"</span>)<span class="op">;</span> ax.set_ylabel(<span class="st">"density"</span>)<span class="op">;</span> ax.legend()</span>
+<span id="cb12-8"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb12-9"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".08-bootstrap_files/figure-revealjs/delta-star-plot-output-1.svg" id="delta-star-plot" class="quarto-figure quarto-figure-center r-stretch"><p>The two error distributions nearly coincide — <strong>computed without ever touching the truth</strong>. This is the whole method: <span class="math inline">\(\Delta^* \approx \Delta\)</span>.</p>
+<aside class="notes">
+<p>Замінюємо ОБИДВА махлювання одночасно: істинний розподіл → вибірка (генеруємо з поверненням), істинний θ → оцінка θ̂. «Божий» промах Δ = θ̂ − θ перетворюється на бутстреп-промах Δ* = θ̂* − θ̂, де θ̂* — оцінка на бутстреп-вибірці. Головний графік лекції: дві гістограми промахів майже збігаються, але зелену ми порахували, НЕ ТОРКАЮЧИСЬ істини — лише з однієї вибірки. У цьому весь метод: Δ* ≈ Δ. Наближення тримається на двох ногах: N велике (ECDF близька до F) і B велике (квантилі Δ* оцінені точно). Другу ногу ми контролюємо завжди, першу — ні; про це поговоримо в секції «коли бутстреп ламається».</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section></section>
+<section>
+<section id="the-bootstrap-algorithm" class="title-slide slide level1 center" data-background-iframe=".08-bootstrap_files/libs/colored-particles/index.html">
+<h1>The bootstrap algorithm</h1>
+
+</section>
+<section id="algorithm" class="slide level2 smaller">
+<h2>🧭 Algorithm</h2>
+<p>To build a <span class="math inline">\((1-\alpha)\)</span> CI for any statistic <span class="math inline">\(\theta\)</span> from a sample of size <span class="math inline">\(N\)</span>:</p>
+<ol type="1">
+<li>Compute <span class="math inline">\(\widehat\theta\)</span> on the original sample.</li>
+<li>Repeat <span class="math inline">\(B\)</span> times (default <span class="math inline">\(B = 10\,000\)</span>):
+<ol type="1">
+<li>Draw a <strong>bootstrap sample</strong>: <span class="math inline">\(N\)</span> points from the original sample, <strong>with replacement</strong>.</li>
+<li>Compute <span class="math inline">\(\theta^*_i\)</span> on it — <em>the same way</em> you computed <span class="math inline">\(\widehat\theta\)</span>.</li>
+</ol></li>
+<li>Collect <span class="math inline">\(\theta^*_1, \dots, \theta^*_B\)</span> and their quantiles <span class="math inline">\(\theta^*_{[\alpha/2]},\, \theta^*_{[1-\alpha/2]}\)</span>.</li>
+<li>Since <span class="math inline">\(\Delta^*_{[q]} = \theta^*_{[q]} - \widehat\theta\)</span>, the god-mode formula <span class="math inline">\(CI = \big(\widehat\theta - \Delta^*_{[1-\alpha/2]},\, \widehat\theta - \Delta^*_{[\alpha/2]}\big)\)</span> becomes</li>
+</ol>
+<p><span class="math display">\[
+\boxed{\;CI = \big(2\widehat\theta - \theta^*_{[1-\alpha/2]},\;\; 2\widehat\theta - \theta^*_{[\alpha/2]}\big)\;}
+\]</span></p>
+<div class="fragment">
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p>Nothing here mentions <em>which</em> statistic <span class="math inline">\(\theta\)</span> is. Percentile, median, trimmed mean, ratio — the recipe is identical. That’s the universality we were promised.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Збираємо все в алгоритм. (1) Рахуємо θ̂ на оригінальній вибірці. (2) B разів (за замовчуванням 10000): тягнемо бутстреп-вибірку розміру N з поверненням і рахуємо на ній θ*_i ТИМ САМИМ способом, що й θ̂. (3) Збираємо масив θ* і його квантилі. (4) Підставляємо Δ*_{[q]} = θ*_{[q]} − θ̂ у «божу» формулу — виходить елегантне CI = (2θ̂ − θ*_{[1−α/2]}, 2θ̂ − θ*_{[α/2]}). Цей варіант називають ЦЕНТРАЛЬНИМ (central / basic / reverse percentile) ДІ. Зверніть увагу: ніде не сказано, ЯКА саме статистика θ. Перцентиль, медіана, урізане середнє, співвідношення — рецепт один. Це і є обіцяна універсальність. Далі — код.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="bootstrap_ci-in-a-dozen-lines" class="slide level2 smaller">
+<h2>🐍 <code>bootstrap_ci</code> in a dozen lines</h2>
+<div id="bootstrap-fn" class="cell" data-execution_count="12">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> bootstrap_ci(sample, theta_func, alpha<span class="op">=</span><span class="fl">0.05</span>, B<span class="op">=</span><span class="dv">10_000</span>, seed<span class="op">=</span><span class="dv">42</span>):</span>
+<span id="cb13-2"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Central bootstrap CI for any statistic.</span></span>
+<span id="cb13-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-4"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">    theta_func must reduce a 2-D array along axis=1,</span></span>
+<span id="cb13-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">    e.g. lambda s: np.percentile(s, 75, axis=1).</span></span>
+<span id="cb13-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb13-7"><a href="" aria-hidden="true" tabindex="-1"></a>    rng <span class="op">=</span> np.random.default_rng(seed)</span>
+<span id="cb13-8"><a href="" aria-hidden="true" tabindex="-1"></a>    sample <span class="op">=</span> np.asarray(sample)</span>
+<span id="cb13-9"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-10"><a href="" aria-hidden="true" tabindex="-1"></a>    theta_hat  <span class="op">=</span> theta_func(sample[<span class="va">None</span>, :])[<span class="dv">0</span>]          <span class="co"># estimate on the data</span></span>
+<span id="cb13-11"><a href="" aria-hidden="true" tabindex="-1"></a>    boots      <span class="op">=</span> rng.choice(sample, size<span class="op">=</span>(B, sample.size), replace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb13-12"><a href="" aria-hidden="true" tabindex="-1"></a>    theta_star <span class="op">=</span> theta_func(boots)                       <span class="co"># B bootstrap estimates</span></span>
+<span id="cb13-13"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-14"><a href="" aria-hidden="true" tabindex="-1"></a>    q_lo, q_hi <span class="op">=</span> np.quantile(theta_star, [alpha<span class="op">/</span><span class="dv">2</span>, <span class="dv">1</span> <span class="op">-</span> alpha<span class="op">/</span><span class="dv">2</span>])</span>
+<span id="cb13-15"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">2</span><span class="op">*</span>theta_hat <span class="op">-</span> q_hi, <span class="dv">2</span><span class="op">*</span>theta_hat <span class="op">-</span> q_lo</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="fragment">
+<p>Sanity check against god mode on the toy world:</p>
+<div id="bootstrap-fn-check" class="cell columns column-output-location" data-execution_count="13">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="" aria-hidden="true" tabindex="-1"></a>p75 <span class="op">=</span> <span class="kw">lambda</span> s: np.percentile(s, <span class="dv">75</span>, axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb14-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-3"><a href="" aria-hidden="true" tabindex="-1"></a>boot_ci <span class="op">=</span> bootstrap_ci(toy_sample, p75)</span>
+<span id="cb14-4"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"god-mode CI : (</span><span class="sc">{</span>ci[<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>ci[<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span>
+<span id="cb14-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"bootstrap CI: (</span><span class="sc">{</span>boot_ci[<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>boot_ci[<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)"</span>)</span>
+<span id="cb14-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"true theta  : </span><span class="sc">{</span>theta<span class="sc">:.3f}</span><span class="ss">  (inside both)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>god-mode CI : (7.435, 8.308)
+bootstrap CI: (7.390, 8.375)
+true theta  : 8.078  (inside both)</code></pre>
+</div>
+</div></div>
+<aside class="notes">
+<p>Увесь метод — дюжина рядків. Дві інженерні деталі. Перша: theta_func приймає 2D-масив і редукує по axis=1 — це дозволяє порахувати всі B оцінок ОДНИМ викликом numpy без циклу (порівняйте з торішнім циклом на 10000 ітерацій — векторизована версія в десятки разів швидша). Друга: rng.choice(sample, size=(B, N)) генерує одразу всю матрицю бутстреп-вибірок. Перевірка чесності: на іграшковому світі бутстреп-ДІ майже збігається з «божим» ДІ, і обидва накривають істину. Тобто метод, який бачить ЛИШЕ вибірку, відтворює інтервал, для якого нам був потрібен істинний розподіл. Тепер можна повертатися до реальних даних.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="back-to-the-taxi-data-the-baseline" class="slide level2 smaller">
+<h2>🚕 Back to the taxi data: the baseline</h2>
+<div id="taxi-baseline" class="cell columns column-output-location" data-execution_count="14">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="" aria-hidden="true" tabindex="-1"></a>lo, hi <span class="op">=</span> bootstrap_ci(control, p75)</span>
+<span id="cb16-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"P75 estimate : </span><span class="sc">{</span>p75_control<span class="sc">:.2f}</span><span class="ss"> min"</span>)</span>
+<span id="cb16-4"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"95% CI       : (</span><span class="sc">{</span>lo<span class="sc">:.2f}</span><span class="ss">, </span><span class="sc">{</span>hi<span class="sc">:.2f}</span><span class="ss">) min"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>P75 estimate : 4.60 min
+95% CI       : (4.38, 4.85) min</code></pre>
+</div>
+</div></div>
+<div id="cell-taxi-baseline-plot" class="cell" data-execution_count="15">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">3.8</span>))</span>
+<span id="cb18-2"><a href="" aria-hidden="true" tabindex="-1"></a>ax.hist(control, bins<span class="op">=</span><span class="dv">40</span>, color<span class="op">=</span>turquoise, alpha<span class="op">=</span><span class="fl">0.85</span>, density<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb18-3"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axvspan(lo, hi, color<span class="op">=</span>red_pink, alpha<span class="op">=</span><span class="fl">0.25</span>, label<span class="op">=</span><span class="ss">f"95% CI (</span><span class="sc">{</span>lo<span class="sc">:.2f}</span><span class="ss">, </span><span class="sc">{</span>hi<span class="sc">:.2f}</span><span class="ss">)"</span>)</span>
+<span id="cb18-4"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axvline(p75_control, color<span class="op">=</span>red_pink, lw<span class="op">=</span><span class="fl">2.5</span>, label<span class="op">=</span><span class="ss">f"P75 = </span><span class="sc">{</span>p75_control<span class="sc">:.2f}</span><span class="ss"> min"</span>)</span>
+<span id="cb18-5"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Baseline: P75 of waiting time, with uncertainty"</span>)</span>
+<span id="cb18-6"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"minutes"</span>)<span class="op">;</span> ax.set_ylabel(<span class="st">"density"</span>)<span class="op">;</span> ax.legend()</span>
+<span id="cb18-7"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb18-8"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".08-bootstrap_files/figure-revealjs/taxi-baseline-plot-output-1.svg" id="taxi-baseline-plot" class="quarto-figure quarto-figure-center r-stretch"><div class="fragment">
+<p>The deliverable for the manager: <em>“P75 waiting time is 4.6 min, 95% CI (4.38, 4.85).”</em> Any future algorithm change will be measured against this — and we know how much of a move is just noise.</p>
+<aside class="notes">
+<p>Повертаємось до задачі з першого слайда — і закриваємо її одним викликом функції. Бейзлайн для менеджера: P75 = 4.6 хв, 95% ДІ приблизно (4.4, 4.8). Тепер у команди є не просто число, а число З ЦІНОЮ ПОДІЛКИ: зрушення в межах ±0.2 хв — це шум вибірки, і лише більші зміни варто обговорювати. Це пряма відповідь на запит «зафіксувати лінійку». Зверніть увагу, наскільки це коротко в коді: та сама функція, інша вибірка. Жодної нової математики під перцентиль виводити не довелося. Наступний крок сюжету: команда таки ЗРОБИЛА новий алгоритм метчингу — і запустила A/B-експеримент.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section></section>
+<section>
+<section id="bootstrap-for-the-ab-test" class="title-slide slide level1 center" data-background-iframe=".08-bootstrap_files/libs/colored-particles/index.html">
+<h1>Bootstrap for the A/B test</h1>
+
+</section>
+<section id="the-experiment-new-matching-algorithm" class="slide level2 smaller">
+<h2>🧪 The experiment: new matching algorithm</h2>
+<p>Three months later the team ships a new driver-matching algorithm and runs an A/B: <strong>control</strong> keeps the old matching, <strong>test</strong> gets the new one.</p>
+<div id="cell-ab-hist" class="cell" data-execution_count="16">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">4.2</span>))</span>
+<span id="cb19-2"><a href="" aria-hidden="true" tabindex="-1"></a>ax.hist(control, bins<span class="op">=</span><span class="dv">40</span>, density<span class="op">=</span><span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.55</span>, color<span class="op">=</span>turquoise,</span>
+<span id="cb19-3"><a href="" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="ss">f"control, N=</span><span class="sc">{</span>control<span class="sc">.</span>size<span class="sc">}</span><span class="ss">, P75=</span><span class="sc">{</span>p75_control<span class="sc">:.2f}</span><span class="ss">"</span>)</span>
+<span id="cb19-4"><a href="" aria-hidden="true" tabindex="-1"></a>ax.hist(test, bins<span class="op">=</span><span class="dv">40</span>, density<span class="op">=</span><span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.55</span>, color<span class="op">=</span>red_pink,</span>
+<span id="cb19-5"><a href="" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="ss">f"test,    M=</span><span class="sc">{</span>test<span class="sc">.</span>size<span class="sc">}</span><span class="ss">, P75=</span><span class="sc">{</span>p75_test<span class="sc">:.2f}</span><span class="ss">"</span>)</span>
+<span id="cb19-6"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axvline(p75_control, color<span class="op">=</span>turquoise, lw<span class="op">=</span><span class="fl">2.5</span>, ls<span class="op">=</span><span class="st">"--"</span>)</span>
+<span id="cb19-7"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axvline(p75_test,    color<span class="op">=</span>red_pink,  lw<span class="op">=</span><span class="fl">2.5</span>, ls<span class="op">=</span><span class="st">"--"</span>)</span>
+<span id="cb19-8"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Waiting time: old vs new matching algorithm"</span>)</span>
+<span id="cb19-9"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"minutes"</span>)<span class="op">;</span> ax.set_ylabel(<span class="st">"density"</span>)<span class="op">;</span> ax.legend()</span>
+<span id="cb19-10"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb19-11"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".08-bootstrap_files/figure-revealjs/ab-hist-output-1.svg" id="ab-hist" class="quarto-figure quarto-figure-center r-stretch"><p>The test group’s P75 is 0.7 min lower. Real improvement or sampling luck? We need a <strong>CI for the difference of two P75s</strong> — yet another statistic with no textbook formula.</p>
+<aside class="notes">
+<p>Продовження сюжету: команда написала новий алгоритм метчингу і запустила класичний A/B — контроль (N=1000) їздить на старому алгоритмі, тест (M=900) — на новому. Гістограми показують: тестова група зсунута вліво, її P75 менший приблизно на 0.7 хвилини, причому найбільше «схудла» саме права частина розподілу. Питання, з якого починається будь-який аналіз експерименту: це реальне покращення чи вибіркове везіння? Нам потрібен ДІ для РІЗНИЦІ двох 75-х перцентилів — ще однієї статистики, для якої немає підручникової формули (t-тест порівнює середні, Манн–Уітні — порядки, а нам треба саме різницю P75 у хвилинах). Бутстреп узагальнюється на два вибірки природно — наступний слайд. (Чесне зізнання в нотатках: тестову групу для демо згенеровано синтетично — новий метчинг ріже лише ДОВГІ очікування, до ~25% на хвості; короткі не чіпає. Це стане важливим наприкінці секції.)</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="two-sample-bootstrap" class="slide level2 tiny">
+<h2>⚔️ Two-sample bootstrap</h2>
+<p>Samples <span class="math inline">\(X\)</span> (control, size <span class="math inline">\(N\)</span>) and <span class="math inline">\(Y\)</span> (test, size <span class="math inline">\(M\)</span>); statistic <span class="math inline">\(\widehat\theta = \widehat\theta_Y - \widehat\theta_X\)</span>.</p>
+<ol type="1">
+<li>Compute <span class="math inline">\(\widehat\theta = \widehat\theta_Y - \widehat\theta_X\)</span> on the original groups.</li>
+<li>Repeat <span class="math inline">\(B\)</span> times: resample <span class="math inline">\(X^*\)</span> <strong>from <span class="math inline">\(X\)</span></strong> (size <span class="math inline">\(N\)</span>) and <span class="math inline">\(Y^*\)</span> <strong>from <span class="math inline">\(Y\)</span></strong> (size <span class="math inline">\(M\)</span>) — <em>independently, with replacement</em>; compute <span class="math inline">\(\theta^*_i = \theta^*_{Y,i} - \theta^*_{X,i}\)</span>.</li>
+<li>CI from the same central formula: <span class="math inline">\(CI = \big(2\widehat\theta - \theta^*_{[1-\alpha/2]},\, 2\widehat\theta - \theta^*_{[\alpha/2]}\big)\)</span>.</li>
+</ol>
+<div id="bootstrap-2s-fn" class="cell" data-execution_count="17">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> bootstrap_ci_2sample(x, y, theta_func, alpha<span class="op">=</span><span class="fl">0.05</span>, B<span class="op">=</span><span class="dv">10_000</span>, seed<span class="op">=</span><span class="dv">42</span>):</span>
+<span id="cb20-2"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Central bootstrap CI for theta(y) - theta(x), independent groups."""</span></span>
+<span id="cb20-3"><a href="" aria-hidden="true" tabindex="-1"></a>    rng <span class="op">=</span> np.random.default_rng(seed)</span>
+<span id="cb20-4"><a href="" aria-hidden="true" tabindex="-1"></a>    x, y <span class="op">=</span> np.asarray(x), np.asarray(y)</span>
+<span id="cb20-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-6"><a href="" aria-hidden="true" tabindex="-1"></a>    diff_hat  <span class="op">=</span> theta_func(y[<span class="va">None</span>, :])[<span class="dv">0</span>] <span class="op">-</span> theta_func(x[<span class="va">None</span>, :])[<span class="dv">0</span>]</span>
+<span id="cb20-7"><a href="" aria-hidden="true" tabindex="-1"></a>    x_star    <span class="op">=</span> rng.choice(x, size<span class="op">=</span>(B, x.size), replace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb20-8"><a href="" aria-hidden="true" tabindex="-1"></a>    y_star    <span class="op">=</span> rng.choice(y, size<span class="op">=</span>(B, y.size), replace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb20-9"><a href="" aria-hidden="true" tabindex="-1"></a>    diff_star <span class="op">=</span> theta_func(y_star) <span class="op">-</span> theta_func(x_star)</span>
+<span id="cb20-10"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-11"><a href="" aria-hidden="true" tabindex="-1"></a>    q_lo, q_hi <span class="op">=</span> np.quantile(diff_star, [alpha<span class="op">/</span><span class="dv">2</span>, <span class="dv">1</span> <span class="op">-</span> alpha<span class="op">/</span><span class="dv">2</span>])</span>
+<span id="cb20-12"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">2</span><span class="op">*</span>diff_hat <span class="op">-</span> q_hi, <span class="dv">2</span><span class="op">*</span>diff_hat <span class="op">-</span> q_lo</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-important no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Important</strong></p>
+</div>
+<div class="callout-content">
+<p>Resample <strong>within</strong> each group, never from the pooled data. Each group has its own distribution; pooling would simulate a world where <span class="math inline">\(H_0\)</span> is forced to be true (that’s the <em>permutation test</em> — a different tool).</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Двовибірковий бутстреп — те саме, лише промах рахуємо для різниці. Оригінальна оцінка: θ̂ = θ̂_Y − θ̂_X. У циклі B разів: ресемплимо X* З X (розмір N) і Y* З Y (розмір M) — НЕЗАЛЕЖНО, кожну зі своєї групи, з поверненням; рахуємо θ*_i = θ*_{Y,i} − θ*_{X,i}. ДІ — за тією ж центральною формулою. Критично важливий callout: ресемплимо ВСЕРЕДИНІ кожної групи, ніколи з об’єднаної вибірки. У кожної групи свій розподіл; змішування симулювало б світ, де H0 примусово вірна — це ідея ПЕРЕСТАНОВОЧНОГО тесту, іншого інструмента (він відповідає на інше питання: «а якби ефекту не було»). Бутстреп натомість відтворює світ ЯК Є — з ефектом, якщо він є, — і питає, наскільки хитається наша оцінка цього ефекту.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="did-the-new-algorithm-speed-up-the-tail" class="slide level2 smaller">
+<h2>📉 Did the new algorithm speed up the tail?</h2>
+<div id="ab-result" class="cell columns column-output-location" data-execution_count="18">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="" aria-hidden="true" tabindex="-1"></a>diff_hat <span class="op">=</span> p75_test <span class="op">-</span> p75_control</span>
+<span id="cb21-2"><a href="" aria-hidden="true" tabindex="-1"></a>lo_d, hi_d <span class="op">=</span> bootstrap_ci_2sample(control, test, p75)</span>
+<span id="cb21-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-4"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"diff in P75 : </span><span class="sc">{</span>diff_hat<span class="sc">:+.2f}</span><span class="ss"> min"</span>)</span>
+<span id="cb21-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"95% CI      : (</span><span class="sc">{</span>lo_d<span class="sc">:+.2f}</span><span class="ss">, </span><span class="sc">{</span>hi_d<span class="sc">:+.2f}</span><span class="ss">) min"</span>)</span>
+<span id="cb21-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"CI excludes 0 -&gt; significant"</span></span>
+<span id="cb21-7"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="cf">if</span> hi_d <span class="op">&lt;</span> <span class="dv">0</span> <span class="kw">or</span> lo_d <span class="op">&gt;</span> <span class="dv">0</span> <span class="cf">else</span> <span class="st">"CI covers 0"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>diff in P75 : -0.70 min
+95% CI      : (-0.99, -0.41) min
+CI excludes 0 -&gt; significant</code></pre>
+</div>
+</div></div>
+<div id="cell-ab-result-plot" class="cell" data-execution_count="19">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="" aria-hidden="true" tabindex="-1"></a>rng_ab <span class="op">=</span> np.random.default_rng(<span class="dv">42</span>)</span>
+<span id="cb23-2"><a href="" aria-hidden="true" tabindex="-1"></a>x_star <span class="op">=</span> rng_ab.choice(control, size<span class="op">=</span>(<span class="dv">10_000</span>, control.size), replace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb23-3"><a href="" aria-hidden="true" tabindex="-1"></a>y_star <span class="op">=</span> rng_ab.choice(test,    size<span class="op">=</span>(<span class="dv">10_000</span>, test.size),    replace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb23-4"><a href="" aria-hidden="true" tabindex="-1"></a>diff_star <span class="op">=</span> p75(y_star) <span class="op">-</span> p75(x_star)</span>
+<span id="cb23-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-6"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">3.6</span>))</span>
+<span id="cb23-7"><a href="" aria-hidden="true" tabindex="-1"></a>ax.hist(diff_star, bins<span class="op">=</span><span class="dv">60</span>, density<span class="op">=</span><span class="va">True</span>, color<span class="op">=</span>turquoise, alpha<span class="op">=</span><span class="fl">0.9</span>,</span>
+<span id="cb23-8"><a href="" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="vs">r"bootstrap </span><span class="dv">$</span><span class="ch">\t</span><span class="vs">heta</span><span class="dv">^</span><span class="op">*</span><span class="vs"> = P75</span><span class="dv">^</span><span class="op">*</span><span class="vs">_{test} - P75</span><span class="dv">^</span><span class="op">*</span><span class="vs">_{control}</span><span class="dv">$</span><span class="vs">"</span>)</span>
+<span id="cb23-9"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axvline(<span class="dv">0</span>, color<span class="op">=</span>slate, lw<span class="op">=</span><span class="fl">2.5</span>, label<span class="op">=</span><span class="st">"zero effect"</span>)</span>
+<span id="cb23-10"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axvspan(lo_d, hi_d, color<span class="op">=</span>red_pink, alpha<span class="op">=</span><span class="fl">0.22</span>, label<span class="op">=</span><span class="ss">f"95% CI (</span><span class="sc">{</span>lo_d<span class="sc">:.2f}</span><span class="ss">, </span><span class="sc">{</span>hi_d<span class="sc">:.2f}</span><span class="ss">)"</span>)</span>
+<span id="cb23-11"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"difference in P75 (minutes)"</span>)<span class="op">;</span> ax.set_ylabel(<span class="st">"density"</span>)<span class="op">;</span> ax.legend()</span>
+<span id="cb23-12"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb23-13"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".08-bootstrap_files/figure-revealjs/ab-result-plot-output-1.svg" id="ab-result-plot" class="quarto-figure quarto-figure-center r-stretch"><p>The CI sits entirely <strong>below zero</strong>: the new matching cuts P75 waiting time by roughly 0.4–1.0 min. Statistically significant — and <span class="math inline">\(\approx\)</span> 15.2% at the tail, which the product team can judge against rollout costs.</p>
+<aside class="notes">
+<p>Результат експерименту. Точкова оцінка: нова система зменшує P75 на 0.7 хв. Бутстреп-ДІ: (−0.99, −0.41) — ЦІЛКОМ нижче нуля, отже ефект статистично значущий на рівні 5%. Гістограма показує весь розподіл θ*: практично вся маса лівіше нуля. Але не зупиняємось на значущості — читаємо інтервал ЗМІСТОВНО: покращення десь від 0.4 до 1 хвилини на 75-му перцентилі, у відсотках — близько 15% на хвості. Рішення про викочування — це порівняння цього діапазону з вартістю розкатки та ризиками, а не лише p&lt;0.05: якщо навіть нижня межа ефекту виправдовує вартість — котимо впевнено; якщо ні — можливо, варто продовжити експеримент, щоб звузити інтервал. ДІ дає для цього більше інформації, ніж бінарний вердикт тесту.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="bonus-the-same-machinery-gives-a-p-value" class="slide level2 smaller">
+<h2>🎛️ Bonus: the same machinery gives a p-value</h2>
+<p>A CI and a test are two views of the same object. Reject <span class="math inline">\(H_0\!: \theta = 0\)</span> at level <span class="math inline">\(\alpha\)</span> <span class="math inline">\(\iff\)</span> the <span class="math inline">\((1-\alpha)\)</span> CI excludes <span class="math inline">\(0\)</span>. You can also read an (approximate) <strong>bootstrap p-value</strong> straight off <span class="math inline">\(\Delta^*\)</span>:</p>
+<div id="boot-pvalue" class="cell columns column-output-location" data-execution_count="20">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="" aria-hidden="true" tabindex="-1"></a>B_ab <span class="op">=</span> diff_star.size</span>
+<span id="cb24-2"><a href="" aria-hidden="true" tabindex="-1"></a>p_simple <span class="op">=</span> <span class="dv">2</span> <span class="op">*</span> <span class="bu">min</span>((diff_star <span class="op">&gt;=</span> <span class="dv">0</span>).mean(),</span>
+<span id="cb24-3"><a href="" aria-hidden="true" tabindex="-1"></a>                   (diff_star <span class="op">&lt;=</span> <span class="dv">0</span>).mean())</span>
+<span id="cb24-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"share of theta* above 0 : </span><span class="sc">{</span>(diff_star <span class="op">&gt;=</span> <span class="dv">0</span>)<span class="sc">.</span>mean()<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb24-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> p_simple <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb24-7"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"percentile-style p      : &lt; </span><span class="sc">{</span><span class="dv">2</span><span class="op">/</span>B_ab<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb24-8"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb24-9"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"percentile-style p      : </span><span class="sc">{</span>p_simple<span class="sc">:.4f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>share of theta* above 0 : 0.0000
+percentile-style p      : &lt; 0.0002</code></pre>
+</div>
+</div></div>
+<div class="fragment">
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p>The quick version: <span class="math inline">\(p \approx 2\min\big(P(\theta^* \ge 0),\, P(\theta^* \le 0)\big)\)</span> — twice the share of bootstrap differences on the “wrong” side of zero. Two caveats: the resolution is limited by <span class="math inline">\(B\)</span> (with <span class="math inline">\(B = 10\,000\)</span> the smallest readable value is <span class="math inline">\(2/B = 0.0002\)</span> — report <em>“p &lt; 0.001”</em>, never <em>“p = 0”</em>), and the CI carries strictly more information anyway: <em>magnitude and direction</em>, not just a verdict.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Місток до тестування гіпотез, який студенти часто просять. ДІ і тест — два погляди на один об’єкт: відхиляємо H0: θ=0 на рівні α тоді й лише тоді, коли (1−α)-ДІ не накриває нуль. З бутстреп-розподілу можна зчитати й наближений p-value: швидка версія — подвоєна частка бутстреп-різниць по «неправильний» бік нуля, p ≈ 2·min(P(θ<em>≥0), P(θ</em>≤0)). У нас УСІ 10000 різниць нижче нуля — і це привід для важливого застереження: роздільна здатність бутстреп-p обмежена кількістю ресемплів, найменше зчитуване значення — 2/B = 0.0002. Тому в звіті пишемо «p &lt; 0.001», а НІКОЛИ не «p = 0». І наголосіть: ДІ несе строго БІЛЬШЕ інформації, ніж p-value, — величину і напрямок ефекту, а не лише вердикт. У продуктовій аналітиці звітуйте інтервал у хвилинах/відсотках, p-value — за бажанням. (Формально коректніших бутстреп-тестів існує кілька; для курсу достатньо цієї інтуїції.)</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="beyond-one-number-which-riders-got-faster" class="slide level2 smaller">
+<h2>🔎 Beyond one number: <em>which</em> riders got faster?</h2>
+<p>P75 compresses the whole experiment into a single number. But a treatment can act on a <strong>segment</strong>: our fix targets <em>far drivers</em>, so short waits shouldn’t move at all. Let’s test every <strong>decile</strong> of waiting time — the same two-sample bootstrap, nine statistics at once:</p>
+<div id="decile-analysis" class="cell columns column-output-location" data-execution_count="21">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="" aria-hidden="true" tabindex="-1"></a>qs <span class="op">=</span> np.arange(<span class="dv">10</span>, <span class="dv">91</span>, <span class="dv">10</span>)          <span class="co"># deciles D1..D9</span></span>
+<span id="cb26-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># same bootstrap resamples as before -&gt; 9 statistics in one pass</span></span>
+<span id="cb26-4"><a href="" aria-hidden="true" tabindex="-1"></a>diff_hat_q  <span class="op">=</span> np.percentile(test, qs) <span class="op">-</span> np.percentile(control, qs)</span>
+<span id="cb26-5"><a href="" aria-hidden="true" tabindex="-1"></a>diff_star_q <span class="op">=</span> (np.percentile(y_star, qs, axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb26-6"><a href="" aria-hidden="true" tabindex="-1"></a>             <span class="op">-</span> np.percentile(x_star, qs, axis<span class="op">=</span><span class="dv">1</span>))     <span class="co"># shape (9, B)</span></span>
+<span id="cb26-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-8"><a href="" aria-hidden="true" tabindex="-1"></a>q_lo, q_hi <span class="op">=</span> np.quantile(diff_star_q, [<span class="fl">0.025</span>, <span class="fl">0.975</span>], axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb26-9"><a href="" aria-hidden="true" tabindex="-1"></a>ci_lo, ci_hi <span class="op">=</span> <span class="dv">2</span><span class="op">*</span>diff_hat_q <span class="op">-</span> q_hi, <span class="dv">2</span><span class="op">*</span>diff_hat_q <span class="op">-</span> q_lo</span>
+<span id="cb26-10"><a href="" aria-hidden="true" tabindex="-1"></a>sig <span class="op">=</span> (ci_hi <span class="op">&lt;</span> <span class="dv">0</span>) <span class="op">|</span> (ci_lo <span class="op">&gt;</span> <span class="dv">0</span>)</span>
+<span id="cb26-11"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-12"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> q, d, l, h, s <span class="kw">in</span> <span class="bu">zip</span>(qs, diff_hat_q, ci_lo, ci_hi, sig):</span>
+<span id="cb26-13"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"D</span><span class="sc">{</span>q<span class="op">//</span><span class="dv">10</span><span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>d<span class="sc">:+.2f}</span><span class="ss">  (</span><span class="sc">{</span>l<span class="sc">:+.2f}</span><span class="ss">, </span><span class="sc">{</span>h<span class="sc">:+.2f}</span><span class="ss">)"</span></span>
+<span id="cb26-14"><a href="" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"  </span><span class="sc">{</span><span class="st">'significant'</span> <span class="cf">if</span> s <span class="cf">else</span> <span class="st">'-'</span><span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>D1: -0.02  (-0.10, +0.12)  -
+D2: -0.00  (-0.20, +0.22)  -
+D3: -0.10  (-0.29, +0.05)  -
+D4: -0.09  (-0.32, +0.13)  -
+D5: -0.14  (-0.36, +0.08)  -
+D6: -0.27  (-0.55, -0.00)  significant
+D7: -0.53  (-0.81, -0.22)  significant
+D8: -0.94  (-1.26, -0.59)  significant
+D9: -1.72  (-2.20, -1.24)  significant</code></pre>
+</div>
+</div></div>
+<div class="fragment">
+<p>This is the <span class="hi">quantile treatment effects</span> view of an A/B test: instead of one averaged verdict, a <strong>profile</strong> of the effect across the whole distribution. Note the code: no new machinery — the <em>same</em> bootstrap matrices, <code>np.percentile</code> just takes a vector of quantiles.</p>
+<aside class="notes">
+<p>Ідемо далі за один підсумковий показник. P75 стискає весь експеримент в одне число, але трітмент може діяти лише на СЕГМЕНТ клієнтів: наш фікс цілить у далеких водіїв, тож короткі очікування взагалі не мають зрушитись. Перевіряємо КОЖЕН дециль часу очікування — той самий двовибірковий бутстреп, лише статистик тепер дев’ять. Це називають quantile treatment effects: замість одного усередненого вердикту — ПРОФІЛЬ ефекту вздовж усього розподілу. Такий підхід популяризували аналітики стримінгів і маркетплейсів: «на кого саме подіяв трітмент?». Технічна краса: жодної нової машинерії — ТІ САМІ бутстреп-матриці x_star і y_star, np.percentile просто приймає вектор квантилів і повертає матрицю 9×B; центральний ДІ по кожному рядку. У таблиці видно: D1–D5 незначущі (ДІ накривають нуль), D6–D9 — значущі, і ефект наростає до −1.7 хв на 9-му децилі. Зверніть увагу на D6: верхня межа ДІ −0.005 — впритул до нуля. Це чудовий місток до розмови про множинні порівняння на наступному слайді: саме такі «ледь значущі» знахідки найчастіше виявляються хибними спрацюваннями. Графічно — наступний слайд.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="the-decile-plot-the-effect-lives-in-the-tail" class="slide level2 smaller">
+<h2>📊 The decile plot: the effect lives in the tail</h2>
+<div id="cell-decile-plot" class="cell" data-execution_count="22">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="" aria-hidden="true" tabindex="-1"></a>x_pos <span class="op">=</span> np.percentile(test, qs)          <span class="co"># where each decile sits, in minutes</span></span>
+<span id="cb28-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-3"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">4.6</span>))</span>
+<span id="cb28-4"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axhline(<span class="dv">0</span>, color<span class="op">=</span>slate, ls<span class="op">=</span><span class="st">"--"</span>, lw<span class="op">=</span><span class="fl">1.5</span>)</span>
+<span id="cb28-5"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(x_pos, diff_hat_q, color<span class="op">=</span><span class="st">"#bbbbbb"</span>, lw<span class="op">=</span><span class="dv">2</span>, zorder<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb28-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> xp, d, l, h, s, q <span class="kw">in</span> <span class="bu">zip</span>(x_pos, diff_hat_q, ci_lo, ci_hi, sig, qs):</span>
+<span id="cb28-7"><a href="" aria-hidden="true" tabindex="-1"></a>    color <span class="op">=</span> red_pink <span class="cf">if</span> s <span class="cf">else</span> orange</span>
+<span id="cb28-8"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.vlines(xp, l, h, color<span class="op">=</span>color, lw<span class="op">=</span><span class="fl">2.5</span>, alpha<span class="op">=</span><span class="fl">0.85</span>)</span>
+<span id="cb28-9"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.scatter(xp, d, s<span class="op">=</span><span class="dv">90</span>, color<span class="op">=</span>color, zorder<span class="op">=</span><span class="dv">3</span>,</span>
+<span id="cb28-10"><a href="" aria-hidden="true" tabindex="-1"></a>               edgecolor<span class="op">=</span><span class="st">"white"</span>, linewidth<span class="op">=</span><span class="fl">1.5</span>)</span>
+<span id="cb28-11"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.annotate(<span class="ss">f"D</span><span class="sc">{</span>q<span class="op">//</span><span class="dv">10</span><span class="sc">}</span><span class="ss">"</span>, (xp, h), textcoords<span class="op">=</span><span class="st">"offset points"</span>,</span>
+<span id="cb28-12"><a href="" aria-hidden="true" tabindex="-1"></a>                xytext<span class="op">=</span>(<span class="dv">0</span>, <span class="dv">6</span>), ha<span class="op">=</span><span class="st">"center"</span>, fontsize<span class="op">=</span><span class="dv">9</span>, color<span class="op">=</span>slate)</span>
+<span id="cb28-13"><a href="" aria-hidden="true" tabindex="-1"></a>first_sig <span class="op">=</span> qs[sig][<span class="dv">0</span>] <span class="op">//</span> <span class="dv">10</span></span>
+<span id="cb28-14"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="ss">f"Decile differences with 95% bootstrap CIs — significant from D</span><span class="sc">{</span>first_sig<span class="sc">}</span><span class="ss"> up"</span>)</span>
+<span id="cb28-15"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"waiting-time deciles of the test group (minutes)"</span>)</span>
+<span id="cb28-16"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"decile difference:</span><span class="ch">\n</span><span class="st">test − control (min)"</span>)</span>
+<span id="cb28-17"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb28-18"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".08-bootstrap_files/figure-revealjs/decile-plot-output-1.svg" id="decile-plot" class="quarto-figure quarto-figure-center r-stretch"><p>Short and typical waits (D1–D5): CIs straddle zero — the median rider feels <strong>nothing</strong>. From D6 up the effect switches on and grows to <span class="math inline">\(\approx\)</span> 1.7 min at D9: the algorithm fixes <strong>exactly</strong> the far-driver problem the PM complained about.</p>
+<div class="callout callout-important no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Important</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Multiple comparisons:</strong> nine 95% CIs means <span class="math inline">\(\approx 9 \times 0.05 \approx 0.5\)</span> false flags <em>expected</em> even with no effect anywhere. Use the decile profile as a <strong>diagnostic</strong>; for a confirmatory claim about a specific decile, pre-register it or adjust (e.g.&nbsp;Bonferroni: 99.4% CIs).</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Графік у стилі індустріальних A/B-звітів: по осі X — децилі тестової групи в хвилинах, по Y — різниця тест−контроль із бутстреп-вусами; значущі децилі — рожеві, незначущі — помаранчеві. Читання: короткі й типові очікування (D1–D5) — вуса обіймають нуль, медіанний клієнт НЕ відчує змін. Із D6 ефект «вмикається» і наростає до ≈1.7 хв на D9. Це і є головна знахідка: алгоритм лагодить САМЕ проблему далеких водіїв, з якої почалась лекція, — і тепер ми можемо сказати менеджеру не лише «стало краще на P75», а ХТО САМЕ виграв. Обов’язковий callout про множинні порівняння: дев’ять 95%-их ДІ — це ≈0.5 хибних спрацювань У СЕРЕДНЬОМУ навіть за повної відсутності ефекту. Тому децильний профіль — ДІАГНОСТИЧНИЙ інструмент («де шукати»); для конфірматорної заяви про конкретний дециль — попередня реєстрація гіпотези або поправка (Бонферроні: 99.4% ДІ на кожен дециль). Зв’яжіть із χ²-лекцією, де ми вже говорили про пастку множинних порівнянь.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section></section>
+<section>
+<section id="three-flavors-of-bootstrap-ci" class="title-slide slide level1 center" data-background-iframe=".08-bootstrap_files/libs/colored-particles/index.html">
+<h1>Three flavors of bootstrap CI</h1>
+
+</section>
+<section id="central-percentile-normal" class="slide level2 smaller">
+<h2>🍦 Central, percentile, normal</h2>
+<p>The array <span class="math inline">\(\theta^*_1, \dots, \theta^*_B\)</span> can be turned into an interval in (at least) three ways:</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Flavor</th>
+<th>Formula</th>
+<th>Logic</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Central</strong> (a.k.a. basic / reverse)</td>
+<td><span class="math inline">\(\big(2\widehat\theta - \theta^*_{[1-\alpha/2]},\; 2\widehat\theta - \theta^*_{[\alpha/2]}\big)\)</span></td>
+<td>reflect the error quantiles around <span class="math inline">\(\widehat\theta\)</span> — our derivation</td>
+</tr>
+<tr class="even">
+<td><strong>Percentile</strong></td>
+<td><span class="math inline">\(\big(\theta^*_{[\alpha/2]},\; \theta^*_{[1-\alpha/2]}\big)\)</span></td>
+<td>just take the quantiles of <span class="math inline">\(\theta^*\)</span> as they are</td>
+</tr>
+<tr class="odd">
+<td><strong>Normal</strong></td>
+<td><span class="math inline">\(\widehat\theta \pm z_{1-\alpha/2}\,\sqrt{S^2_{\theta^*}}\)</span></td>
+<td>trust normality; use <span class="math inline">\(\theta^*\)</span> only for its standard deviation</td>
+</tr>
+</tbody>
+</table>
+<div class="fragment">
+<ul>
+<li><strong>Percentile</strong> looks the most natural but quietly assumes the bootstrap distribution is <em>unbiased and symmetric-izable</em> (formally: some monotone transform of <span class="math inline">\(\widehat\theta\)</span> is normal). With skewed <span class="math inline">\(\theta^*\)</span>, central and percentile intervals <strong>disagree</strong> — they reflect the skew in opposite directions.</li>
+<li><strong>Normal</strong> is fine when <span class="math inline">\(\widehat\theta\)</span> is approximately Gaussian (means, large <span class="math inline">\(N\)</span>) and pointless to trust otherwise.</li>
+</ul>
+<aside class="notes">
+<p>З одного й того ж масиву θ* інтервал можна зібрати щонайменше трьома способами. ЦЕНТРАЛЬНИЙ (він же basic/reverse) — наш виведений: відбиваємо квантилі помилки навколо θ̂. ПЕРЦЕНТИЛЬНИЙ — просто беремо квантилі θ* як є; виглядає найприродніше, але неявно припускає, що розподіл оцінки можна монотонним перетворенням звести до нормального і що зсуву немає. Якщо θ* скошений — центральний і перцентильний ДАЮТЬ РІЗНІ інтервали: вони відображають скіс у протилежні боки. НОРМАЛЬНИЙ — використовує θ* лише заради стандартного відхилення і чіпляє його до z-квантилів; чесний, коли θ̂ приблизно гаусівська (середні, великі N). Яка різниця на практиці? Не сперечаймося — перевіримо Монте-Карло, як ми робимо з КОЖНИМ критерієм у цьому курсі. Наступний слайд.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="which-flavor-keeps-its-promise-monte-carlo" class="slide level2 tiny">
+<h2>🔬 Which flavor keeps its promise? Monte Carlo!</h2>
+<p>Same habit as for the <span class="math inline">\(t\)</span>-, KS-, <span class="math inline">\(\chi^2\)</span>- and MW-tests: simulate worlds where the truth is known, count how often each CI <strong>misses</strong> it, add a Wilson interval.</p>
+<div id="mc-checker" class="cell" data-execution_count="23">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> three_cis(sample, q, alpha, B, rng):</span>
+<span id="cb29-2"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Central, percentile and normal CIs from one bootstrap pass."""</span></span>
+<span id="cb29-3"><a href="" aria-hidden="true" tabindex="-1"></a>    est <span class="op">=</span> np.percentile(sample, q)</span>
+<span id="cb29-4"><a href="" aria-hidden="true" tabindex="-1"></a>    th  <span class="op">=</span> np.percentile(rng.choice(sample, size<span class="op">=</span>(B, sample.size), replace<span class="op">=</span><span class="va">True</span>),</span>
+<span id="cb29-5"><a href="" aria-hidden="true" tabindex="-1"></a>                        q, axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb29-6"><a href="" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> np.quantile(th, [alpha<span class="op">/</span><span class="dv">2</span>, <span class="dv">1</span> <span class="op">-</span> alpha<span class="op">/</span><span class="dv">2</span>])</span>
+<span id="cb29-7"><a href="" aria-hidden="true" tabindex="-1"></a>    z <span class="op">=</span> norm.ppf(<span class="dv">1</span> <span class="op">-</span> alpha<span class="op">/</span><span class="dv">2</span>)</span>
+<span id="cb29-8"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"central"</span>:    (<span class="dv">2</span><span class="op">*</span>est <span class="op">-</span> hi, <span class="dv">2</span><span class="op">*</span>est <span class="op">-</span> lo),</span>
+<span id="cb29-9"><a href="" aria-hidden="true" tabindex="-1"></a>            <span class="st">"percentile"</span>: (lo, hi),</span>
+<span id="cb29-10"><a href="" aria-hidden="true" tabindex="-1"></a>            <span class="st">"normal"</span>:     (est <span class="op">-</span> z<span class="op">*</span>th.std(), est <span class="op">+</span> z<span class="op">*</span>th.std())}</span>
+<span id="cb29-11"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-12"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> miss_rates(dist, theta, q, sizes, MC<span class="op">=</span><span class="dv">300</span>, B<span class="op">=</span><span class="dv">1000</span>, alpha<span class="op">=</span><span class="fl">0.05</span>, seed<span class="op">=</span><span class="dv">1</span>):</span>
+<span id="cb29-13"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Share of Monte Carlo worlds where each CI flavor misses the truth."""</span></span>
+<span id="cb29-14"><a href="" aria-hidden="true" tabindex="-1"></a>    rng, out <span class="op">=</span> np.random.default_rng(seed), {}</span>
+<span id="cb29-15"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> n <span class="kw">in</span> sizes:</span>
+<span id="cb29-16"><a href="" aria-hidden="true" tabindex="-1"></a>        miss <span class="op">=</span> {<span class="st">"central"</span>: <span class="dv">0</span>, <span class="st">"percentile"</span>: <span class="dv">0</span>, <span class="st">"normal"</span>: <span class="dv">0</span>}</span>
+<span id="cb29-17"><a href="" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(MC):</span>
+<span id="cb29-18"><a href="" aria-hidden="true" tabindex="-1"></a>            s <span class="op">=</span> dist.rvs(n, random_state<span class="op">=</span>rng)</span>
+<span id="cb29-19"><a href="" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> m, (l, r) <span class="kw">in</span> three_cis(s, q, alpha, B, rng).items():</span>
+<span id="cb29-20"><a href="" aria-hidden="true" tabindex="-1"></a>                miss[m] <span class="op">+=</span> <span class="kw">not</span> (l <span class="op">&lt;</span> theta <span class="op">&lt;</span> r)</span>
+<span id="cb29-21"><a href="" aria-hidden="true" tabindex="-1"></a>        out[n] <span class="op">=</span> {m: (k <span class="op">/</span> MC, proportion_confint(k, MC, method<span class="op">=</span><span class="st">"wilson"</span>))</span>
+<span id="cb29-22"><a href="" aria-hidden="true" tabindex="-1"></a>                  <span class="cf">for</span> m, k <span class="kw">in</span> miss.items()}</span>
+<span id="cb29-23"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> out</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-tip no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p>If a 95% CI is honest, it should miss the truth <strong>about 5% of the time</strong> — the FPR sits on <span class="math inline">\(\alpha\)</span>.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Не віримо на слово жодному з трьох варіантів — валідуємо Монте-Карло, та сама звичка, що з t-, KS-, χ²- і MW-критеріями. Логіка: чесний 95%-ДІ має ПРОМАХУВАТИСЯ повз істину приблизно у 5% симульованих світів — FPR на рівні α. Код: three_cis будує всі три інтервали з ОДНОГО прогону бутстрепа (економимо втричі), miss_rates ганяє MC=300 світів для кожного розміру вибірки і додає інтервал Уілсона до частки промахів — бо частка промахів сама є оцінкою з шумом (мета-рівень, який ми обговорювали в лекції про Монте-Карло). Тест-кейс: медіана експоненційного розподілу — скошений розподіл, «незручна» статистика. Результати на наступному слайді.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="fpr-vs-sample-size" class="slide level2 smaller">
+<h2>📊 FPR vs sample size</h2>
+<p>Test bench: the <strong>median</strong> of a skewed <span class="math inline">\(\text{Exp}(\text{scale}=5)\)</span> world.</p>
+<div id="cell-mc-flavors-run" class="cell" data-execution_count="24">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="" aria-hidden="true" tabindex="-1"></a>target   <span class="op">=</span> expon(scale<span class="op">=</span><span class="dv">5</span>)</span>
+<span id="cb30-2"><a href="" aria-hidden="true" tabindex="-1"></a>truth    <span class="op">=</span> target.ppf(<span class="fl">0.5</span>)</span>
+<span id="cb30-3"><a href="" aria-hidden="true" tabindex="-1"></a>sizes    <span class="op">=</span> [<span class="dv">50</span>, <span class="dv">100</span>, <span class="dv">500</span>, <span class="dv">2000</span>]</span>
+<span id="cb30-4"><a href="" aria-hidden="true" tabindex="-1"></a>results  <span class="op">=</span> miss_rates(target, truth, q<span class="op">=</span><span class="dv">50</span>, sizes<span class="op">=</span>sizes)</span>
+<span id="cb30-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-6"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">4.4</span>))</span>
+<span id="cb30-7"><a href="" aria-hidden="true" tabindex="-1"></a>xt <span class="op">=</span> np.arange(<span class="bu">len</span>(sizes))</span>
+<span id="cb30-8"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axhline(<span class="fl">0.05</span>, color<span class="op">=</span>red, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="vs">r"</span><span class="dv">$</span><span class="ch">\a</span><span class="vs">lpha = 0</span><span class="dv">.</span><span class="vs">05</span><span class="dv">$</span><span class="vs">"</span>)</span>
+<span id="cb30-9"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> m, color <span class="kw">in</span> <span class="bu">zip</span>((<span class="st">"central"</span>, <span class="st">"percentile"</span>, <span class="st">"normal"</span>),</span>
+<span id="cb30-10"><a href="" aria-hidden="true" tabindex="-1"></a>                    (green, turquoise, blue)):</span>
+<span id="cb30-11"><a href="" aria-hidden="true" tabindex="-1"></a>    fpr <span class="op">=</span> [results[n][m][<span class="dv">0</span>] <span class="cf">for</span> n <span class="kw">in</span> sizes]</span>
+<span id="cb30-12"><a href="" aria-hidden="true" tabindex="-1"></a>    band <span class="op">=</span> np.array([results[n][m][<span class="dv">1</span>] <span class="cf">for</span> n <span class="kw">in</span> sizes])</span>
+<span id="cb30-13"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(xt, fpr, color<span class="op">=</span>color, lw<span class="op">=</span><span class="fl">2.5</span>, marker<span class="op">=</span><span class="st">"o"</span>, label<span class="op">=</span>m)</span>
+<span id="cb30-14"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.fill_between(xt, band[:, <span class="dv">0</span>], band[:, <span class="dv">1</span>], color<span class="op">=</span>color, alpha<span class="op">=</span><span class="fl">0.18</span>)</span>
+<span id="cb30-15"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xticks(xt, sizes)</span>
+<span id="cb30-16"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"sample size N"</span>)<span class="op">;</span> ax.set_ylabel(<span class="st">"FPR (CI missed the truth)"</span>)</span>
+<span id="cb30-17"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"All three flavors are roughly calibrated for the median"</span>)</span>
+<span id="cb30-18"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb30-19"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb30-20"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".08-bootstrap_files/figure-revealjs/mc-flavors-run-output-1.svg" id="mc-flavors-run" class="quarto-figure quarto-figure-center r-stretch"><p>For a “nice” statistic all three flavors hover around <span class="math inline">\(\alpha\)</span> already at moderate <span class="math inline">\(N\)</span>. Differences show up for <strong>skewed, biased</strong> statistics — then the central CI (which corrects for bias) is the safer default.</p>
+<aside class="notes">
+<p>Стенд: медіана Exp(scale=5), розміри вибірки від 50 до 2000, MC=300 світів, для кожного — всі три ДІ. Графік: усі три криві коливаються навколо 5%, смуги Уілсона здебільшого накривають α. Висновок перший: для «пристойної» статистики на середніх N усі три варіанти працюють — обирайте будь-який, різниця в межах шуму. Висновок другий, тонший: відмінності проявляються для СКОШЕНИХ і ЗМІЩЕНИХ статистик (екстремальні квантилі, співвідношення, малі N) — там центральний ДІ, який виправляє зсув через відбиття, зазвичай безпечніший за перцентильний. Тому як дефолт у курсі беремо центральний. І мета-порада: якщо ваша статистика екзотична — не гадайте, проженіть ось цей самий Монте-Карло-стенд на розподілі, схожому на ваші дані. Це двадцять рядків коду.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section></section>
+<section>
+<section id="when-does-the-bootstrap-break" class="title-slide slide level1 center" data-background-iframe=".08-bootstrap_files/libs/colored-particles/index.html">
+<h1>When does the bootstrap break?</h1>
+
+</section>
+<section id="bootstrap-vs-t-test-for-the-mean" class="slide level2 smaller">
+<h2>🥊 Bootstrap vs <span class="math inline">\(t\)</span>-test for the mean</h2>
+<p>Tempting thought: <em>“the bootstrap is assumption-free, so it must beat the <span class="math inline">\(t\)</span>-test on small skewed samples.”</em> Let’s check — mean of <span class="math inline">\(\text{Exp}(\text{scale}=5)\)</span>, tiny <span class="math inline">\(N\)</span>:</p>
+<div id="cell-mc-ttest-run" class="cell" data-execution_count="25">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> miss_rates_mean(dist, theta, sizes, MC<span class="op">=</span><span class="dv">400</span>, B<span class="op">=</span><span class="dv">1000</span>, alpha<span class="op">=</span><span class="fl">0.05</span>, seed<span class="op">=</span><span class="dv">2</span>):</span>
+<span id="cb31-2"><a href="" aria-hidden="true" tabindex="-1"></a>    rng, out <span class="op">=</span> np.random.default_rng(seed), {}</span>
+<span id="cb31-3"><a href="" aria-hidden="true" tabindex="-1"></a>    mean_f <span class="op">=</span> <span class="kw">lambda</span> s: np.mean(s, axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb31-4"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> n <span class="kw">in</span> sizes:</span>
+<span id="cb31-5"><a href="" aria-hidden="true" tabindex="-1"></a>        miss <span class="op">=</span> {<span class="st">"central bootstrap"</span>: <span class="dv">0</span>, <span class="st">"t-test"</span>: <span class="dv">0</span>}</span>
+<span id="cb31-6"><a href="" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(MC):</span>
+<span id="cb31-7"><a href="" aria-hidden="true" tabindex="-1"></a>            s <span class="op">=</span> dist.rvs(n, random_state<span class="op">=</span>rng)</span>
+<span id="cb31-8"><a href="" aria-hidden="true" tabindex="-1"></a>            th <span class="op">=</span> mean_f(rng.choice(s, size<span class="op">=</span>(B, n), replace<span class="op">=</span><span class="va">True</span>))</span>
+<span id="cb31-9"><a href="" aria-hidden="true" tabindex="-1"></a>            lo, hi <span class="op">=</span> np.quantile(th, [alpha<span class="op">/</span><span class="dv">2</span>, <span class="dv">1</span> <span class="op">-</span> alpha<span class="op">/</span><span class="dv">2</span>])</span>
+<span id="cb31-10"><a href="" aria-hidden="true" tabindex="-1"></a>            l, r <span class="op">=</span> <span class="dv">2</span><span class="op">*</span>s.mean() <span class="op">-</span> hi, <span class="dv">2</span><span class="op">*</span>s.mean() <span class="op">-</span> lo</span>
+<span id="cb31-11"><a href="" aria-hidden="true" tabindex="-1"></a>            miss[<span class="st">"central bootstrap"</span>] <span class="op">+=</span> <span class="kw">not</span> (l <span class="op">&lt;</span> theta <span class="op">&lt;</span> r)</span>
+<span id="cb31-12"><a href="" aria-hidden="true" tabindex="-1"></a>            miss[<span class="st">"t-test"</span>] <span class="op">+=</span> ttest_1samp(s, popmean<span class="op">=</span>theta).pvalue <span class="op">&lt;</span> alpha</span>
+<span id="cb31-13"><a href="" aria-hidden="true" tabindex="-1"></a>        out[n] <span class="op">=</span> {m: (k <span class="op">/</span> MC, proportion_confint(k, MC, method<span class="op">=</span><span class="st">"wilson"</span>))</span>
+<span id="cb31-14"><a href="" aria-hidden="true" tabindex="-1"></a>                  <span class="cf">for</span> m, k <span class="kw">in</span> miss.items()}</span>
+<span id="cb31-15"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> out</span>
+<span id="cb31-16"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-17"><a href="" aria-hidden="true" tabindex="-1"></a>sizes_t <span class="op">=</span> [<span class="dv">5</span>, <span class="dv">10</span>, <span class="dv">20</span>, <span class="dv">50</span>, <span class="dv">100</span>, <span class="dv">200</span>]</span>
+<span id="cb31-18"><a href="" aria-hidden="true" tabindex="-1"></a>res_t <span class="op">=</span> miss_rates_mean(expon(scale<span class="op">=</span><span class="dv">5</span>), expon(scale<span class="op">=</span><span class="dv">5</span>).mean(), sizes_t)</span>
+<span id="cb31-19"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-20"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">4.2</span>))</span>
+<span id="cb31-21"><a href="" aria-hidden="true" tabindex="-1"></a>xt <span class="op">=</span> np.arange(<span class="bu">len</span>(sizes_t))</span>
+<span id="cb31-22"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axhline(<span class="fl">0.05</span>, color<span class="op">=</span>red, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="vs">r"</span><span class="dv">$</span><span class="ch">\a</span><span class="vs">lpha = 0</span><span class="dv">.</span><span class="vs">05</span><span class="dv">$</span><span class="vs">"</span>)</span>
+<span id="cb31-23"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> m, color <span class="kw">in</span> <span class="bu">zip</span>((<span class="st">"central bootstrap"</span>, <span class="st">"t-test"</span>), (green, yellow)):</span>
+<span id="cb31-24"><a href="" aria-hidden="true" tabindex="-1"></a>    fpr  <span class="op">=</span> [res_t[n][m][<span class="dv">0</span>] <span class="cf">for</span> n <span class="kw">in</span> sizes_t]</span>
+<span id="cb31-25"><a href="" aria-hidden="true" tabindex="-1"></a>    band <span class="op">=</span> np.array([res_t[n][m][<span class="dv">1</span>] <span class="cf">for</span> n <span class="kw">in</span> sizes_t])</span>
+<span id="cb31-26"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(xt, fpr, color<span class="op">=</span>color, lw<span class="op">=</span><span class="fl">2.5</span>, marker<span class="op">=</span><span class="st">"o"</span>, label<span class="op">=</span>m)</span>
+<span id="cb31-27"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.fill_between(xt, band[:, <span class="dv">0</span>], band[:, <span class="dv">1</span>], color<span class="op">=</span>color, alpha<span class="op">=</span><span class="fl">0.18</span>)</span>
+<span id="cb31-28"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xticks(xt, sizes_t)</span>
+<span id="cb31-29"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"sample size N"</span>)<span class="op">;</span> ax.set_ylabel(<span class="st">"FPR"</span>)</span>
+<span id="cb31-30"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Skewed data, small N: the bootstrap misbehaves too"</span>)</span>
+<span id="cb31-31"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb31-32"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb31-33"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".08-bootstrap_files/figure-revealjs/mc-ttest-run-output-1.svg" id="mc-ttest-run" class="quarto-figure quarto-figure-center r-stretch"><p><strong>No free lunch:</strong> on <span class="math inline">\(N \le 20\)</span> <em>both</em> overshoot <span class="math inline">\(\alpha\)</span>. The bootstrap can’t conjure information the sample doesn’t hold — a tiny sample is a bad portrait of the population, so <span class="math inline">\(\widehat F \not\approx F\)</span>.</p>
+<aside class="notes">
+<p>Спокуслива думка: «бутстреп без припущень, отже на малих скошених вибірках він поб’є t-тест». Перевіряємо: середнє Exp(scale=5), N від 5 до 200. Результат протверезний: на N≤20 ОБИДВА методи перевищують α — і t-тест (це ми знали з лекції про Монте-Карло), і бутстреп. Безкоштовних обідів немає: бутстреп не може вичаклувати інформацію, якої у вибірці немає. Його перша «нога» — ECDF ≈ F — на N=10 просто не стоїть: десять точок — поганий портрет генеральної сукупності. На великих N обидва методи калібруються. Мораль: бутстреп — це універсальність (працює для будь-якої статистики), а НЕ суперсила для малих вибірок. Малий N — проблема, яку не лікує жоден метод.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="where-it-honestly-fails-extreme-quantiles" class="slide level2 tiny">
+<h2>🕳️ Where it honestly fails: extreme quantiles</h2>
+<p>The bootstrap “replays” the world using only observed points. A statistic that lives <strong>at the edge of the data</strong> — P99, the maximum — has almost nothing to stand on: a resample can never exceed the sample maximum.</p>
+<div id="extreme-quantile" class="cell columns column-output-location" data-execution_count="26">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> coverage(dist, theta, q, n, MC<span class="op">=</span><span class="dv">600</span>,</span>
+<span id="cb32-2"><a href="" aria-hidden="true" tabindex="-1"></a>             B<span class="op">=</span><span class="dv">1000</span>, seed<span class="op">=</span><span class="dv">3</span>):</span>
+<span id="cb32-3"><a href="" aria-hidden="true" tabindex="-1"></a>    rng, hit <span class="op">=</span> np.random.default_rng(seed), <span class="dv">0</span></span>
+<span id="cb32-4"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(MC):</span>
+<span id="cb32-5"><a href="" aria-hidden="true" tabindex="-1"></a>        s <span class="op">=</span> dist.rvs(n, random_state<span class="op">=</span>rng)</span>
+<span id="cb32-6"><a href="" aria-hidden="true" tabindex="-1"></a>        th <span class="op">=</span> np.percentile(</span>
+<span id="cb32-7"><a href="" aria-hidden="true" tabindex="-1"></a>            rng.choice(s, size<span class="op">=</span>(B, n), replace<span class="op">=</span><span class="va">True</span>),</span>
+<span id="cb32-8"><a href="" aria-hidden="true" tabindex="-1"></a>            q, axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb32-9"><a href="" aria-hidden="true" tabindex="-1"></a>        lo, hi <span class="op">=</span> np.quantile(th, [<span class="fl">0.025</span>, <span class="fl">0.975</span>])</span>
+<span id="cb32-10"><a href="" aria-hidden="true" tabindex="-1"></a>        l, r <span class="op">=</span> <span class="dv">2</span><span class="op">*</span>np.percentile(s, q) <span class="op">-</span> hi, <span class="op">\</span></span>
+<span id="cb32-11"><a href="" aria-hidden="true" tabindex="-1"></a>               <span class="dv">2</span><span class="op">*</span>np.percentile(s, q) <span class="op">-</span> lo</span>
+<span id="cb32-12"><a href="" aria-hidden="true" tabindex="-1"></a>        hit <span class="op">+=</span> l <span class="op">&lt;</span> theta <span class="op">&lt;</span> r</span>
+<span id="cb32-13"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> hit <span class="op">/</span> MC</span>
+<span id="cb32-14"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-15"><a href="" aria-hidden="true" tabindex="-1"></a>d <span class="op">=</span> expon(scale<span class="op">=</span><span class="dv">5</span>)</span>
+<span id="cb32-16"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> (<span class="dv">50</span>, <span class="dv">200</span>, <span class="dv">2000</span>):</span>
+<span id="cb32-17"><a href="" aria-hidden="true" tabindex="-1"></a>    cov99 <span class="op">=</span> coverage(d, d.ppf(<span class="fl">0.99</span>), <span class="dv">99</span>, n)</span>
+<span id="cb32-18"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"P99, N=</span><span class="sc">{</span>n<span class="sc">:4d}</span><span class="ss">: coverage </span><span class="sc">{</span>cov99<span class="sc">:.0%}</span><span class="ss">"</span></span>
+<span id="cb32-19"><a href="" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"  (want 95%)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-stdout">
+<pre><code>P99, N=  50: coverage 56%  (want 95%)
+P99, N= 200: coverage 73%  (want 95%)
+P99, N=2000: coverage 88%  (want 95%)</code></pre>
+</div>
+</div></div>
+<div class="fragment">
+<div class="callout callout-important no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Important</strong></p>
+</div>
+<div class="callout-content">
+<p>For <strong>P99 on <span class="math inline">\(N = 50\)</span></strong> the “95%” interval covers the truth far less often than promised — there are only ~0.5 points beyond P99 in such a sample. Rule of thumb: you need a decent number of observations <strong>beyond</strong> the quantile you’re estimating. Medians and P75 are easy; P99 needs thousands; the <strong>maximum</strong> is hopeless (bootstrap provably fails for it).</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Чесна межа методу. Бутстреп «перегравує світ», використовуючи ЛИШЕ спостережені точки: бутстреп-вибірка ніколи не вийде за максимум оригінальної. Тому статистики, що живуть НА КРАЮ даних, — P99, максимум — не мають на що спертися. Експеримент: покриття «95%»-го ДІ для P99 при N=50 — суттєво нижче обіцяного (у вибірці з 50 точок за P99 лежить у середньому пів-спостереження!); при N=200 краще; при N=2000 — уже пристойно. Правило великого пальця: потрібна відчутна кількість спостережень ПО ТОЙ БІК квантиля, який оцінюєте. Медіана і P75 — легко; P99 — тисячі спостережень; максимум — безнадійно (для нього бутстреп ламається ДОВЕДЕНО, це класичний контрприклад). Для нашого кейсу з P75 на N=1000 — зона комфорту.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section>
+<section id="two-knobs-n-and-b" class="slide level2 smaller">
+<h2>🎚️ Two knobs: <span class="math inline">\(N\)</span> and <span class="math inline">\(B\)</span></h2>
+<p>The bootstrap stands on <strong>two approximations</strong> — know which knob controls which:</p>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong><span class="math inline">\(N\)</span> — sample size</strong> (given, not yours to turn)</p>
+<ul>
+<li>Controls <span class="math inline">\(\widehat F \approx F\)</span>: how well the sample portrays the population.</li>
+<li>Too small → CIs lie, no matter how big <span class="math inline">\(B\)</span> is.</li>
+<li><em>Cannot</em> be fixed in post-production; fix it at design time (power analysis).</li>
+</ul>
+</div><div class="column" style="width:50%;">
+<p><strong><span class="math inline">\(B\)</span> — number of resamples</strong> (fully yours)</p>
+<ul>
+<li>Controls how precisely you read the quantiles of <span class="math inline">\(\Delta^*\)</span>.</li>
+<li>Default <span class="math inline">\(B = 10\,000\)</span>; on modern numpy it’s a fraction of a second.</li>
+<li>Smaller <span class="math inline">\(B\)</span> for speed? Fine — but validate with Monte Carlo first.</li>
+</ul>
+</div></div>
+<div class="fragment">
+<p><strong>FAQ.</strong> <em>Can a bootstrap sample have a size other than <span class="math inline">\(N\)</span>?</em> — <strong>No.</strong> <span class="math inline">\(\Delta^*\)</span> must imitate the error of <span class="math inline">\(\widehat\theta\)</span>, and that error depends on the sample size: an estimate from <span class="math inline">\(N/2\)</span> points wobbles <span class="math inline">\(\sqrt2\)</span> times more. Resampling at a different size imitates the wrong error.</p>
+<aside class="notes">
+<p>Систематизуємо дві «ноги» методу — і хто якою ручкою керує. N — розмір вибірки: контролює наближення ECDF ≈ F, тобто наскільки добре вибірка портретує сукупність. Це ручка, яку НЕ МОЖНА крутити постфактум: замалий N — і ДІ бреше, хоч яким великим зробиш B. Лікується на етапі ДИЗАЙНУ дослідження (розрахунок розміру вибірки — тема, яку ми знаємо). B — кількість ресемплів: контролює, наскільки точно ми зчитуємо квантилі Δ<em>. Повністю у ваших руках: дефолт 10000, на векторизованому numpy це частки секунди; хочете менше заради швидкості — гаразд, але спершу провалідуйте Монте-Карло. І класичне екзаменаційне питання: чи можна тягнути бутстреп-вибірки іншого розміру, ніж N? НІ: Δ</em> має імітувати помилку оцінки θ̂, а ця помилка залежить від розміру вибірки — оцінка з N/2 точок хитається в √2 разів сильніше. Ресемпл іншого розміру імітує ЧУЖУ помилку.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section></section>
+<section>
+<section id="summary" class="title-slide slide level1 center" data-background-iframe=".08-bootstrap_files/libs/colored-particles/index.html">
+<h1>Summary</h1>
+
+</section>
+<section id="the-one-idea" class="slide level2 smaller">
+<h2>🧾 The one idea</h2>
+<p><span class="hi">The sample is our best model of the population. Resample it to watch your own estimator wobble.</span></p>
+<p><span class="math display">\[
+\Delta = \widehat\theta - \theta \;\;\approx\;\; \Delta^* = \widehat\theta^{\,*} - \widehat\theta,
+\qquad
+CI = \big(2\widehat\theta - \theta^*_{[1-\alpha/2]},\; 2\widehat\theta - \theta^*_{[\alpha/2]}\big).
+\]</span></p>
+<ul>
+<li><strong>Universal</strong> — one recipe for percentiles, medians, ratios, differences between A/B groups… anything you can compute on a sample.</li>
+<li><strong>Plug-in + Monte Carlo</strong> — replace the true <span class="math inline">\(F\)</span> with the sample (<span class="math inline">\(N\)</span> must be decent), read quantiles of <span class="math inline">\(\Delta^*\)</span> by brute force (<span class="math inline">\(B\)</span> is yours, default <span class="math inline">\(10\,000\)</span>).</li>
+<li><strong>Two-sample version</strong> — resample each group <em>within itself</em>; the CI for the difference doubles as a significance test (does it cover <span class="math inline">\(0\)</span>?) and, better, reports the <em>size</em> of the effect. Slice by deciles to see <em>who</em> the treatment touched.</li>
+<li><strong>Not magic</strong> — small <span class="math inline">\(N\)</span> hurts it like everyone else; edge statistics (P99, max) need lots of data; when in doubt, <strong>validate with Monte Carlo</strong>.</li>
+</ul>
+<aside class="notes">
+<p>Підсумок однією думкою: вибірка — наш найкращий портрет генеральної сукупності; ресемплюючи її з поверненням, ми дивимось, як хитається наша власна оцінка. Формули: бутстреп-припущення Δ ≈ Δ* і центральний ДІ. Чотири тези: (1) універсальність — один рецепт для перцентилів, медіан, співвідношень, різниць в A/B, будь-чого обчислюваного; (2) plug-in + Монте-Карло — істинний розподіл замінюємо вибіркою (N має бути пристойним), квантилі промаху читаємо грубою силою (B — наш, дефолт 10000); (3) двовибіркова версія — ресемпл всередині кожної групи; ДІ різниці працює і як тест (чи накриває нуль), і — краще — звітує РОЗМІР ефекту, а зріз по децилях показує, НА КОГО подіяв трітмент; (4) не магія — малий N шкодить як усім, крайові статистики вимагають багато даних, у сумнівах — валідуйте Монте-Карло. У кейсі: зафіксували бейзлайн P75, виміряли ефект нового метчингу з інтервалом у хвилинах і децильним профілем знайшли, що виграли саме клієнти з довгими очікуваннями.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="which-tool-when" class="slide level2 tiny">
+<h2>🧭 Which tool, when?</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Your statistic / situation</th>
+<th>Reach for</th>
+<th>Watch out for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>proportion (conversion)</td>
+<td><strong>z-interval</strong> / <code>proportion_confint</code></td>
+<td>tiny <span class="math inline">\(n\)</span>, <span class="math inline">\(\hat p\)</span> near 0 or 1</td>
+</tr>
+<tr class="even">
+<td>mean, roughly normal or large <span class="math inline">\(N\)</span></td>
+<td><strong>t-interval</strong> (<code>ttest_ind</code> CI)</td>
+<td>heavy skew on small <span class="math inline">\(N\)</span></td>
+</tr>
+<tr class="odd">
+<td>median, P75, IQR, trimmed mean, ratio</td>
+<td><strong>bootstrap</strong> (central CI)</td>
+<td><span class="math inline">\(N\)</span> large enough for <span class="math inline">\(\widehat F \approx F\)</span></td>
+</tr>
+<tr class="even">
+<td>difference of <em>any</em> metric in an A/B</td>
+<td><strong>two-sample bootstrap</strong></td>
+<td>resample within groups only</td>
+</tr>
+<tr class="odd">
+<td><em>which segment</em> did the treatment hit</td>
+<td><strong>per-decile bootstrap CIs</strong> (quantile treatment effects)</td>
+<td>9 CIs ⇒ multiple comparisons</td>
+</tr>
+<tr class="even">
+<td>extreme quantiles (P99), max</td>
+<td>bootstrap only with <strong>big</strong> <span class="math inline">\(N\)</span></td>
+<td>provably fails for the max</td>
+</tr>
+<tr class="odd">
+<td>tiny skewed samples (<span class="math inline">\(N \lesssim 20\)</span>)</td>
+<td>more data / design change</td>
+<td><em>nothing</em> is calibrated there — incl.&nbsp;bootstrap</td>
+</tr>
+<tr class="even">
+<td>exotic statistic, unsure about coverage</td>
+<td>bootstrap + <strong>Monte Carlo check</strong></td>
+<td>20 lines of code, no excuses</td>
+</tr>
+</tbody>
+</table>
+<div class="fragment">
+<div class="callout callout-tip no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p>The course meta-lesson, once more: a formula-free method is <em>not</em> an assumption-free method. When in doubt, <span class="hi">validate with Monte Carlo</span> on data that looks like yours.</p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Шпаргалка «який інструмент коли». Для частки і середнього — класичні z/t-інтервали, вони швидші й точніші там, де застосовні. Для медіан, перцентилів, урізаних середніх, співвідношень — бутстреп з центральним ДІ. Для різниці будь-якої метрики в A/B — двовибірковий бутстреп (ресемпл лише всередині груп!); щоб побачити, на який сегмент подіяв трітмент, — децильний профіль, але пам’ятайте про множинні порівняння. Крайні квантилі — тільки з великим N; максимум — не намагайтеся. Крихітні скошені вибірки — не покриє ніщо, включно з бутстрепом: це проблема дизайну, а не аналізу. Екзотична статистика — бутстреп плюс Монте-Карло-перевірка покриття: двадцять рядків коду, жодних виправдань. І мета-урок курсу востаннє: метод без формул — НЕ метод без припущень. Сумніваєтесь — валідуйте Монте-Карло на даних, схожих на ваші. Наступна лекція — фінал курсу.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</div>
+</section></section>
+<section id="questions" class="title-slide slide level1 unnumbered unlisted center" data-background-iframe=".08-bootstrap_files/libs/colored-particles/index.html">
+<h1>Questions?</h1>
+<p><iconify-icon inline="" icon="solar:book-bold"></iconify-icon> <a href="https://teaching.kse.org.ua/course/view.php?id=4049">Course materials</a></p>
+<p><iconify-icon inline="" icon="mdi:envelope"></iconify-icon> imiroshnychenko@kse.org.ua</p>
+<p><iconify-icon inline="" icon="ic:baseline-telegram"></iconify-icon> <a href="https://t.me/araprof"><span class="citation" data-cites="araprof">@araprof</span></a></p>
+<p><iconify-icon inline="" icon="mdi:youtube"></iconify-icon> <a href="https://www.youtube.com/@datamirosh"><span class="citation" data-cites="datamirosh">@datamirosh</span></a></p>
+<p><iconify-icon inline="" icon="mdi:linkedin"></iconify-icon> <a href="https://www.linkedin.com/in/ihormiroshnychenko/">@ihormiroshnychenko</a></p>
+<p><iconify-icon inline="" icon="mdi:github"></iconify-icon> <a href="https://github.com/Aranaur">@aranaur</a></p>
+<p><iconify-icon inline="" icon="ion:home"></iconify-icon> <a href="https://aranaur.rbind.io">aranaur.rbind.io</a></p>
+
+</section>
+    </div>
+  <div class="quarto-auto-generated-content" style="display: none;">
+<p><img src="img/kse.png" class="slide-logo"></p>
+<div class="footer footer-default">
+<p><a href="https://teaching.kse.org.ua/course/view.php?id=4049">🔗Applied Statistics</a></p>
+</div>
+</div></div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src=".08-bootstrap_files/libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src=".08-bootstrap_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src=".08-bootstrap_files/libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src=".08-bootstrap_files/libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src=".08-bootstrap_files/libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src=".08-bootstrap_files/libs/revealjs/plugin/reveal-chalkboard/plugin.js"></script>
+  <script src=".08-bootstrap_files/libs/revealjs/plugin/verticator/verticator.js"></script>
+  <script src=".08-bootstrap_files/libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src=".08-bootstrap_files/libs/revealjs/plugin/notes/notes.js"></script>
+  <script src=".08-bootstrap_files/libs/revealjs/plugin/search/search.js"></script>
+  <script src=".08-bootstrap_files/libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script src=".08-bootstrap_files/libs/revealjs/plugin/math/math.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': true,
+'previewLinksAuto': false,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'jumpToSlide': true,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.togglePdfExport(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleScrollView(event)\"><kbd>r</kbd> Scroll View Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleChalkboard(event)\"><kbd>b</kbd> Toggle Chalkboard</a></li>\n<li class=\"slide-tool-item\" data-item=\"6\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleNotesCanvas(event)\"><kbd>c</kbd> Toggle Notes Canvas</a></li>\n<li class=\"slide-tool-item\" data-item=\"7\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.downloadDrawings(event)\"><kbd>d</kbd> Download Drawings</a></li>\n<li class=\"slide-tool-item\" data-item=\"8\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'chalkboard': {"buttons":true},
+'verticator': {"themetag":"h1","color":"","inversecolor":"","skipuncounted":false,"clickable":true,"position":"auto","offset":"3vmin","autogenerate":true,"tooltip":false,"scale":1},
+'smaller': false,
+ 
+        // Display controls in the bottom right corner
+        controls: false,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: 'h.v',
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'default',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: true,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: true,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'fade',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'fade',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1350,
+
+        height: 759.375,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 0.1,
+
+        math: {
+          mathjax: 'https://cdn.jsdelivr.net/npm/mathjax@2.7.9/MathJax.js',
+          config: 'TeX-AMS_HTML-full',
+          tex2jax: {
+            inlineMath: [['\\(','\\)']],
+            displayMath: [['\\[','\\]']],
+            balanceBraces: true,
+            processEscapes: false,
+            processRefs: true,
+            processEnvironments: true,
+            preview: 'TeX',
+            skipTags: ['script','noscript','style','textarea','pre','code'],
+            ignoreClass: 'tex2jax_ignore',
+            processClass: 'tex2jax_process'
+          },
+        },
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, RevealChalkboard, Verticator, QuartoSupport,
+
+          RevealMath,
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    <script id="quarto-html-after-body" type="application/javascript">
+      window.document.addEventListener("DOMContentLoaded", function (event) {
+        const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+        tabsets.forEach(function(tabset) {
+          const tabby = new Tabby('#' + tabset.id);
+        });
+        const isCodeAnnotation = (el) => {
+          for (const clz of el.classList) {
+            if (clz.startsWith('code-annotation-')) {                     
+              return true;
+            }
+          }
+          return false;
+        }
+        const onCopySuccess = function(e) {
+          // button target
+          const button = e.trigger;
+          // don't keep focus
+          button.blur();
+          // flash "checked"
+          button.classList.add('code-copy-button-checked');
+          var currentTitle = button.getAttribute("title");
+          button.setAttribute("title", "Copied!");
+          let tooltip;
+          if (window.bootstrap) {
+            button.setAttribute("data-bs-toggle", "tooltip");
+            button.setAttribute("data-bs-placement", "left");
+            button.setAttribute("data-bs-title", "Copied!");
+            tooltip = new bootstrap.Tooltip(button, 
+              { trigger: "manual", 
+                customClass: "code-copy-button-tooltip",
+                offset: [0, -8]});
+            tooltip.show();    
+          }
+          setTimeout(function() {
+            if (tooltip) {
+              tooltip.hide();
+              button.removeAttribute("data-bs-title");
+              button.removeAttribute("data-bs-toggle");
+              button.removeAttribute("data-bs-placement");
+            }
+            button.setAttribute("title", currentTitle);
+            button.classList.remove('code-copy-button-checked');
+          }, 1000);
+          // clear code selection
+          e.clearSelection();
+        }
+        const getTextToCopy = function(trigger) {
+          const outerScaffold = trigger.parentElement.cloneNode(true);
+          const codeEl = outerScaffold.querySelector('code');
+          for (const childEl of codeEl.children) {
+            if (isCodeAnnotation(childEl)) {
+              childEl.remove();
+            }
+          }
+          return codeEl.innerText;
+        }
+        const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+          text: getTextToCopy
+        });
+        clipboard.on('success', onCopySuccess);
+        if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+          const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+            text: getTextToCopy,
+            container: window.document.getElementById('quarto-embedded-source-code-modal')
+          });
+          clipboardModal.on('success', onCopySuccess);
+        }
+          var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+          var mailtoRegex = new RegExp(/^mailto:/);
+            var filterRegex = new RegExp('/' + window.location.host + '/');
+          var isInternal = (href) => {
+              return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+          }
+          // Inspect non-navigation links and adorn them if external
+         var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+          for (var i=0; i<links.length; i++) {
+            const link = links[i];
+            if (!isInternal(link.href)) {
+              // undo the damage that might have been done by quarto-nav.js in the case of
+              // links that we want to consider external
+              if (link.dataset.originalHref !== undefined) {
+                link.href = link.dataset.originalHref;
+              }
+            }
+          }
+        function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+          const config = {
+            allowHTML: true,
+            maxWidth: 500,
+            delay: 100,
+            arrow: false,
+            appendTo: function(el) {
+                return el.closest('section.slide') || el.parentElement;
+            },
+            interactive: true,
+            interactiveBorder: 10,
+            theme: 'light-border',
+            placement: 'bottom-start',
+          };
+          if (contentFn) {
+            config.content = contentFn;
+          }
+          if (onTriggerFn) {
+            config.onTrigger = onTriggerFn;
+          }
+          if (onUntriggerFn) {
+            config.onUntrigger = onUntriggerFn;
+          }
+            config['offset'] = [0,0];
+            config['maxWidth'] = 700;
+          window.tippy(el, config); 
+        }
+        const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+        for (var i=0; i<noterefs.length; i++) {
+          const ref = noterefs[i];
+          tippyHover(ref, function() {
+            // use id or data attribute instead here
+            let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+            try { href = new URL(href).hash; } catch {}
+            const id = href.replace(/^#\/?/, "");
+            const note = window.document.getElementById(id);
+            if (note) {
+              return note.innerHTML;
+            } else {
+              return "";
+            }
+          });
+        }
+        const findCites = (el) => {
+          const parentEl = el.parentElement;
+          if (parentEl) {
+            const cites = parentEl.dataset.cites;
+            if (cites) {
+              return {
+                el,
+                cites: cites.split(' ')
+              };
+            } else {
+              return findCites(el.parentElement)
+            }
+          } else {
+            return undefined;
+          }
+        };
+        var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+        for (var i=0; i<bibliorefs.length; i++) {
+          const ref = bibliorefs[i];
+          const citeInfo = findCites(ref);
+          if (citeInfo) {
+            tippyHover(citeInfo.el, function() {
+              var popup = window.document.createElement('div');
+              citeInfo.cites.forEach(function(cite) {
+                var citeDiv = window.document.createElement('div');
+                citeDiv.classList.add('hanging-indent');
+                citeDiv.classList.add('csl-entry');
+                var biblioDiv = window.document.getElementById('ref-' + cite);
+                if (biblioDiv) {
+                  citeDiv.innerHTML = biblioDiv.innerHTML;
+                }
+                popup.appendChild(citeDiv);
+              });
+              return popup.innerHTML;
+            });
+          }
+        }
+      });
+      </script>
+    
+
+</body></html>

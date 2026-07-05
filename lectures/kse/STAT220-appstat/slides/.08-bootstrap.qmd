@@ -1,0 +1,965 @@
+---
+title: "Bootstrap: a confidence interval for anything"
+subtitle: "Applied Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .08-bootstrap_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=4049">🔗Applied Statistics</a>
+format:
+  revealjs:
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+jupyter: python3
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+from scipy.stats import norm, expon, ttest_1samp
+from statsmodels.stats.proportion import proportion_confint
+
+# Define colors (shared palette across the slides)
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+# Minimal theme defaults — close to ggplot2 theme_minimal()
+plt.rcParams.update({
+    "figure.facecolor": "white",
+    "axes.facecolor":   "white",
+    "axes.edgecolor":   slate,
+    "axes.labelcolor":  slate,
+    "axes.titlesize":   13,
+    "axes.spines.top":   False,
+    "axes.spines.right": False,
+    "axes.grid":        True,
+    "grid.color":       "#dddddd",
+    "grid.alpha":       0.6,
+    "xtick.color":      slate,
+    "ytick.color":      slate,
+    "font.size":        11,
+    "legend.frameon":   False,
+})
+
+# ---- Running case: ride-hailing A/B test on driver waiting time --------
+# Control = current driver-matching algorithm (real logged sample).
+# Test    = new matching algorithm (synthetic for the demo). The effect is
+#           heterogeneous: short waits are untouched, long waits (far
+#           drivers) get cut by up to ~25% — a logistic ramp around 4 min.
+control = np.load("data/Bootstrap.npy")          # waiting time, minutes
+
+rng_case = np.random.default_rng(73)
+cut  = 0.25 / (1 + np.exp(-(control - 4.0)))      # 0% short -> ~25% long
+test = control * (1 - cut) * rng_case.lognormal(0, 0.05, control.size)
+rng_case.shuffle(test)
+test = test[:900]                                 # a slightly smaller arm
+
+p75_control = np.percentile(control, 75)
+p75_test    = np.percentile(test, 75)
+```
+
+# One interval for anything {background-iframe=".08-bootstrap_files/libs/colored-particles/index.html"}
+
+## 🚕 The task {.smaller}
+
+> You are an analyst at a **ride-hailing company**. A product manager comes to you: the app too often matches a **driver who is far away**, users stare at a 10-minute ETA — and **churn**. The team wants to fix the matching algorithm.
+>
+> Before touching anything, you must **fix the yardstick**: the metric that any future improvement will be judged by, and its **current value with a confidence interval** — the baseline.
+
+. . .
+
+The team picks the [75th percentile of waiting time]{.hi}, $X_{[0.75]}$, as the quality metric.
+
+Why not the mean?
+
+- Waiting time is **right-skewed** — the mean is dragged by rare disasters, most rides feel fine.
+- Churn is driven by **bad experiences**, not by the average one. P75 reads: *"3 rides out of 4 arrive faster than this."*
+- Tail metrics (P75, P90, P99) are the industry standard for latency-like quantities.
+
+::: {.notes}
+Наскрізний кейс лекції: райд-хейлінг. Менеджер скаржиться: застосунок надто часто підбирає водія, який далеко, — користувач бачить ETA 10 хвилин і йде до конкурента. Команда збирається покращувати алгоритм метчингу, але СПОЧАТКУ треба зафіксувати лінійку: метрику якості та її поточне значення З ДОВІРЧИМ ІНТЕРВАЛОМ — бейзлайн, з яким порівнюватимемо всі майбутні покращення. Метрика — 75-й перцентиль часу очікування. Чому не середнє? (1) Час очікування скошений вправо — середнє тягнуть рідкісні катастрофи. (2) Відтік створюють ПОГАНІ поїздки, а не середня; P75 читається як «3 з 4 поїздок швидші за це число». (3) Хвостові метрики (P75/P90/P99) — індустріальний стандарт для латентностей. Інтрига лекції: для середнього ми вміємо будувати ДІ з другої-третьої лекції, а для перцентиля — ще ні.
+:::
+
+## ⏱️ The data: 1000 logged rides {.smaller}
+
+```{python}
+#| label: control-hist
+#| code-fold: true
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(11, 4.4))
+ax.hist(control, bins=40, color=turquoise, alpha=0.9, density=True)
+ax.axvline(p75_control, color=red_pink, lw=2.5, ls="--",
+           label=f"P75 = {p75_control:.2f} min")
+ax.axvline(np.mean(control), color=slate, lw=2, ls=":",
+           label=f"mean = {np.mean(control):.2f} min")
+ax.set_title("Waiting time for a driver (N = 1000 rides)")
+ax.set_xlabel("minutes"); ax.set_ylabel("density"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+Point estimate: $\widehat{X}_{[0.75]}$ = `{python} round(float(p75_control), 2)` minutes. But a point estimate from one sample **is a random variable** — a different week of logs would give a different number.
+
+<center>**We need a confidence interval for the 75th percentile.**</center>
+
+::: {.notes}
+Реальна вибірка: 1000 залогованих поїздок. Форма — класична для часів очікування: скошена вправо, довгий хвіст до 20+ хвилин. Середнє 3.4 хв, P75 = 4.6 хв — три чверті клієнтів чекають менше. Ключова думка слайда: точкова оцінка 4.6 — це ВИПАДКОВА ВЕЛИЧИНА. Інший тиждень логів дав би 4.4 чи 4.8. Якщо ми зафіксуємо бейзлайн як «рівно 4.6», то через місяць не зможемо відрізнити реальне покращення від шуму вибірки. Тому потрібен довірчий інтервал. І тут ми впираємось у стіну — наступний слайд.
+:::
+
+## 🧱 The wall: our CI toolbox is tiny {.smaller}
+
+So far every confidence interval in this course came from a **hand-derived formula** for one specific statistic:
+
+| Metric | CI recipe | Where from |
+|---|---|---|
+| proportion (conversion) | $\hat p \pm z_{1-\alpha/2}\sqrt{\hat p(1-\hat p)/n}$ | z-test lecture |
+| mean (minutes, revenue) | $\bar X \pm t_{1-\alpha/2}\, S/\sqrt{n}$ | t-test lecture |
+| **75th percentile** | **?** | — |
+| median, P99, IQR | **?** | — |
+| ratio of means, Gini, top-10% share | **?** | — |
+
+. . .
+
+Each formula needed its own math: a pivot statistic, its distribution, a proof. For a percentile of an unknown skewed distribution there is **no clean textbook formula**.
+
+::: {.callout-tip icon=false}
+Today's promise: **one universal recipe** that manufactures a confidence interval for *almost any* statistic — the [bootstrap]{.hi}. The price: computation instead of theory.
+:::
+
+::: {.notes}
+Чому це проблема? Досі кожен ДІ в курсі — це окрема, виведена вручну формула під конкретну статистику: для частки — z-інтервал, для середнього — t-інтервал. Кожна формула вимагала своєї математики: півотна статистика, її розподіл, доведення. Для перцентиля невідомого скошеного розподілу чистої підручникової формули немає (є асимптотичні, але вони потребують оцінки щільності в точці — окремий біль). А бізнес щодня питає про медіани, P99, співвідношення середніх, частку топ-10% користувачів у виручці… Обіцянка лекції: ОДИН універсальний рецепт, що виготовляє ДІ майже для будь-якої статистики — бутстреп. Ціна: замість теорії — обчислення. План: спершу зрозуміємо ідею в «режимі бога» (коли знаємо істину), потім замінимо істину на її наближення — і отримаємо алгоритм.
+:::
+
+# Idea 1: Monte Carlo in god mode {background-iframe=".08-bootstrap_files/libs/colored-particles/index.html"}
+
+## 🎲 Practice on a known world {.smaller}
+
+Before solving the real problem, rehearse on a world where we **know everything**. Let waiting times follow a Gamma law — we choose it, so we know the true $\theta$ = true P75.
+
+```{python}
+#| label: toy-world
+
+true_dist = stats.gamma(a=2, scale=3)        # the "true" world
+N         = 1000                             # same size as our real sample
+
+rng_toy    = np.random.default_rng(42)
+toy_sample = true_dist.rvs(N, random_state=rng_toy)
+
+theta     = true_dist.ppf(0.75)              # TRUE P75 — god mode only
+theta_hat = np.percentile(toy_sample, 75)    # its estimate from the sample
+```
+
+```{python}
+#| label: toy-world-plot
+#| code-fold: true
+#| fig-align: center
+
+x = np.linspace(0, 25, 500)
+fig, ax = plt.subplots(figsize=(11, 3.6))
+ax.hist(toy_sample, bins=40, density=True, color=turquoise, alpha=0.8, label="sample")
+ax.plot(x, true_dist.pdf(x), color=blue, lw=2.5, label="true density")
+ax.axvline(theta,     color=slate,    lw=2.5, label=f"true P75 = {theta:.2f}")
+ax.axvline(theta_hat, color=red_pink, lw=2.5, ls="--", label=f"estimate = {theta_hat:.2f}")
+ax.set_xlabel("minutes"); ax.set_ylabel("density"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+$\theta$ = `{python} round(float(theta), 3)`, $\;\widehat\theta$ = `{python} round(float(theta_hat), 3)`. The estimate misses the truth a little. *By how much does it typically miss?*
+
+::: {.notes}
+Той самий прийом, що в лекції про Монте-Карло: «вдягаємо капелюх всезнаючого бога». Беремо іграшковий світ — Gamma(2, 3), — у якому МИ призначили істину, тож знаємо справжній θ (істинний P75 ≈ 8.08). Генеруємо вибірку такого ж розміру, як наша реальна (N=1000), і рахуємо оцінку θ̂. Вона трохи промахується повз істину. Центральне запитання, довкола якого будується вся лекція: НАСКІЛЬКИ типово промахується оцінка? Якщо ми знаємо розподіл промаху — ми знаємо, наскільки широким має бути довірчий інтервал. θ тут — будь-яка характеристика: перцентиль, середнє, дисперсія, що завгодно.
+:::
+
+## 📐 The error distribution $\Delta = \widehat\theta - \theta$ {.smaller}
+
+In god mode we can *replay the world*: draw fresh samples from the **true** distribution again and again, and watch how the estimate misses.
+
+```{python}
+#| label: delta-sim
+
+B = 10_000                                     # number of replayed worlds
+
+samples    = true_dist.rvs((B, N), random_state=rng_toy)
+theta_hats = np.percentile(samples, 75, axis=1)   # B estimates of P75
+delta      = theta_hats - theta                   # B observed errors
+```
+
+```{python}
+#| label: delta-plot
+#| code-fold: true
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(11, 3.8))
+ax.hist(delta, bins=60, density=True, color=turquoise, alpha=0.9)
+ax.axvline(0, color=slate, lw=2)
+ax.set_title(r"$\Delta = \widehat{\theta} - \theta$ across 10 000 replayed worlds")
+ax.set_xlabel(r"$\Delta$ (minutes)"); ax.set_ylabel("density")
+plt.tight_layout()
+plt.show()
+```
+
+This histogram is the **sampling error distribution**: it tells us that with $N = 1000$ the P75 estimate typically misses by a few tenths of a minute — and in which direction.
+
+::: {.notes}
+У режимі бога ми можемо «перегравати світ»: знову й знову тягнути СВІЖІ вибірки з ІСТИННОГО розподілу і дивитись, як промахується оцінка. B=10000 повторів, у кожному рахуємо θ̂_i і промах Δ_i = θ̂_i − θ. Гістограма Δ — це і є розподіл помилки вибіркової оцінки: видно, що з N=1000 оцінка P75 типово промахується на кілька десятих хвилини, приблизно симетрично. Зверніть увагу на техніку: ми векторизуємо — генеруємо одразу матрицю B×N і рахуємо перцентиль по axis=1, жодних циклів. Це та звичка, яка зробить бутстреп швидким наприкінці лекції.
+:::
+
+## 🎯 From $\Delta$ to a confidence interval {.smaller}
+
+Take the $\alpha/2$ and $1-\alpha/2$ quantiles of $\Delta$. By the definition of quantiles:
+
+$$
+P\big(\Delta_{[\alpha/2]} < \widehat\theta - \theta < \Delta_{[1-\alpha/2]}\big) = 1 - \alpha .
+$$
+
+Solve the inequality for $\theta$ (flip the signs — the bounds swap):
+
+$$
+P\big(\widehat\theta - \Delta_{[1-\alpha/2]} < \theta < \widehat\theta - \Delta_{[\alpha/2]}\big) = 1 - \alpha
+\;\;\Rightarrow\;\;
+CI = \big(\widehat\theta - \Delta_{[1-\alpha/2]},\; \widehat\theta - \Delta_{[\alpha/2]}\big).
+$$
+
+```{python}
+#| label: god-ci
+#| output-location: column
+
+alpha = 0.05
+d_lo, d_hi = np.quantile(delta, [alpha/2, 1 - alpha/2])
+
+ci = (theta_hat - d_hi, theta_hat - d_lo)
+print(f"true theta : {theta:.3f}")
+print(f"95% CI     : ({ci[0]:.3f}, {ci[1]:.3f})")
+print("covers the truth" if ci[0] < theta < ci[1] else "misses")
+```
+
+. . .
+
+::: {.callout-important icon=false}
+It works — but we **cheated twice**: we used the *true distribution* to replay the worlds, and the *true $\theta$* to compute $\Delta$. In real life we have neither.
+:::
+
+::: {.notes}
+Тепер із розподілу промаху робимо довірчий інтервал. Беремо квантилі Δ на рівнях α/2 і 1−α/2 — за означенням квантилів промах потрапляє між ними з імовірністю 1−α. Розв'язуємо нерівність відносно θ — знаки перевертаються, межі міняються місцями — і отримуємо CI = (θ̂ − Δ_{1−α/2}, θ̂ − Δ_{α/2}). Перевіряємо: істина всередині. Здавалося б, перемога. Але чесно зізнаймося: ми змахлювали ДВІЧІ. Щоб перегравати світи, ми використали ІСТИННИЙ розподіл; щоб порахувати Δ, — ІСТИННЕ θ. У реальному житті немає ні того, ні іншого. Уся геніальність бутстрепа — в тому, чим ці дві речі замінити. Це наступна секція.
+:::
+
+# Idea 2: the plug-in principle {background-iframe=".08-bootstrap_files/libs/colored-particles/index.html"}
+
+## 🔌 The best model of the population is… the sample {.smaller}
+
+We don't know the true distribution $F$. But we hold its portrait: the [empirical distribution]{.hi} $\widehat F$ — the distribution that puts probability $\tfrac1N$ on every observed point.
+
+```{python}
+#| label: ecdf-plot
+#| code-fold: true
+#| fig-align: center
+
+rng_e = np.random.default_rng(7)
+x = np.linspace(0, 25, 500)
+
+fig, axes = plt.subplots(1, 3, figsize=(12.5, 3.6), sharey=True)
+for ax, n in zip(axes, [30, 200, 1000]):
+    s = np.sort(true_dist.rvs(n, random_state=rng_e))
+    ax.step(s, np.arange(1, n + 1) / n, where="post",
+            color=red_pink, lw=1.8, label=r"ECDF $\widehat F$")
+    ax.plot(x, true_dist.cdf(x), color=blue, lw=2, label="true $F$")
+    ax.set_title(f"N = {n}")
+    ax.set_xlabel("minutes")
+axes[0].set_ylabel("CDF"); axes[0].legend()
+plt.tight_layout()
+plt.show()
+```
+
+As $N$ grows, $\widehat F$ hugs $F$ everywhere (Glivenko–Cantelli). At $N = 1000$ they are near-twins. **Plug-in principle:** wherever the recipe says "the true distribution", substitute the empirical one.
+
+::: {.notes}
+Чим замінити істинний розподіл F? Тим найкращим його портретом, який у нас уже є, — ЕМПІРИЧНИМ розподілом: кожній спостереженій точці даємо ймовірність 1/N. Графік: ECDF проти істинної CDF за N=30, 200, 1000. Що більша вибірка, то щільніше сходинки обіймають плавну криву — це теорема Глівенка–Кантеллі («фундаментальна теорема статистики»): ECDF збігається до F рівномірно. За N=1000 вони майже близнюки. Звідси plug-in принцип: скрізь, де в рецепті написано «істинний розподіл», підставляємо емпіричний. І приємний бонус: у емпіричного розподілу ВСІ характеристики відомі точно — його P75 це просто вибірковий P75.
+:::
+
+## ♻️ Sampling from $\widehat F$ = resampling with replacement {.smaller}
+
+Drawing $N$ i.i.d. points from $\widehat F$ ≡ drawing $N$ times **from the sample itself, with replacement**. One line of numpy:
+
+```{python}
+#| label: one-boot
+#| output-location: column
+
+idx = np.arange(N)                 # id of each original ride
+boot_idx = rng_toy.choice(idx, size=N, replace=True)
+counts   = np.bincount(boot_idx, minlength=N)
+
+for k in range(5):
+    share = (counts == k).mean()
+    print(f"picked {k}x : {share:5.1%} of rides")
+```
+
+. . .
+
+A bootstrap sample is the same data, **reweighted by chance**: some rides picked twice or thrice, about $\left(1-\tfrac1N\right)^N \approx e^{-1} \approx 36.8\%$ never picked at all. That random reweighting is exactly the sampling noise we want to imitate.
+
+::: {.callout-note icon=false}
+The name: *"to pull yourself up by your own bootstraps"* — the sample generates its own replicas, no new data needed.
+:::
+
+::: {.notes}
+Як технічно «генерувати з емпіричного розподілу»? Тягнути N разів ІЗ САМОЇ ВИБІРКИ З ПОВЕРНЕННЯМ — один рядок numpy: np.random.choice(sample, size=N, replace=True). Розглянемо одну бутстреп-вибірку під мікроскопом: якісь поїздки витягнуто двічі-тричі, а приблизно (1−1/N)^N ≈ e^{−1} ≈ 36.8% — жодного разу. Тобто бутстреп-вибірка — це ті самі дані, ВИПАДКОВО ПЕРЕЗВАЖЕНІ. Саме це випадкове перезважування й імітує вибірковий шум: «а якби нам того тижня трапились трохи інші поїздки». Назва методу — від ідіоми «витягнути себе за шнурівки черевиків»: вибірка сама породжує свої репліки, нові дані не потрібні. Це і жарт, і точний опис.
+:::
+
+## 🤝 The bootstrap assumption: $\Delta^* \approx \Delta$ {.smaller}
+
+Replace **both** cheats: the true $F$ → the sample; the true $\theta$ → the estimate $\widehat\theta$. The god-mode error $\Delta = \widehat\theta - \theta$ becomes the bootstrap error $\Delta^* = \widehat\theta^{\,*} - \widehat\theta$, where $\widehat\theta^{\,*}$ is the estimate on a bootstrap sample.
+
+```{python}
+#| label: delta-star
+
+boot_samples = rng_toy.choice(toy_sample, size=(B, N), replace=True)
+theta_stars  = np.percentile(boot_samples, 75, axis=1)
+delta_star   = theta_stars - theta_hat
+```
+
+```{python}
+#| label: delta-star-plot
+#| code-fold: true
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(11, 3.6))
+ax.hist(delta,      bins=60, density=True, alpha=0.55, color=turquoise,
+        label=r"$\Delta$ (god mode: true $F$, true $\theta$)")
+ax.hist(delta_star, bins=60, density=True, alpha=0.55, color=green,
+        label=r"$\Delta^*$ (bootstrap: sample only)")
+ax.axvline(0, color=slate, lw=1.5)
+ax.set_xlabel(r"error (minutes)"); ax.set_ylabel("density"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+The two error distributions nearly coincide — **computed without ever touching the truth**. This is the whole method: $\Delta^* \approx \Delta$.
+
+::: {.notes}
+Замінюємо ОБИДВА махлювання одночасно: істинний розподіл → вибірка (генеруємо з поверненням), істинний θ → оцінка θ̂. «Божий» промах Δ = θ̂ − θ перетворюється на бутстреп-промах Δ* = θ̂* − θ̂, де θ̂* — оцінка на бутстреп-вибірці. Головний графік лекції: дві гістограми промахів майже збігаються, але зелену ми порахували, НЕ ТОРКАЮЧИСЬ істини — лише з однієї вибірки. У цьому весь метод: Δ* ≈ Δ. Наближення тримається на двох ногах: N велике (ECDF близька до F) і B велике (квантилі Δ* оцінені точно). Другу ногу ми контролюємо завжди, першу — ні; про це поговоримо в секції «коли бутстреп ламається».
+:::
+
+# The bootstrap algorithm {background-iframe=".08-bootstrap_files/libs/colored-particles/index.html"}
+
+## 🧭 Algorithm {.smaller}
+
+To build a $(1-\alpha)$ CI for any statistic $\theta$ from a sample of size $N$:
+
+1. Compute $\widehat\theta$ on the original sample.
+2. Repeat $B$ times (default $B = 10\,000$):
+   1. Draw a **bootstrap sample**: $N$ points from the original sample, **with replacement**.
+   2. Compute $\theta^*_i$ on it — *the same way* you computed $\widehat\theta$.
+3. Collect $\theta^*_1, \dots, \theta^*_B$ and their quantiles $\theta^*_{[\alpha/2]},\, \theta^*_{[1-\alpha/2]}$.
+4. Since $\Delta^*_{[q]} = \theta^*_{[q]} - \widehat\theta$, the god-mode formula $CI = \big(\widehat\theta - \Delta^*_{[1-\alpha/2]},\, \widehat\theta - \Delta^*_{[\alpha/2]}\big)$ becomes
+
+$$
+\boxed{\;CI = \big(2\widehat\theta - \theta^*_{[1-\alpha/2]},\;\; 2\widehat\theta - \theta^*_{[\alpha/2]}\big)\;}
+$$
+
+. . .
+
+::: {.callout-note icon=false}
+Nothing here mentions *which* statistic $\theta$ is. Percentile, median, trimmed mean, ratio — the recipe is identical. That's the universality we were promised.
+:::
+
+::: {.notes}
+Збираємо все в алгоритм. (1) Рахуємо θ̂ на оригінальній вибірці. (2) B разів (за замовчуванням 10000): тягнемо бутстреп-вибірку розміру N з поверненням і рахуємо на ній θ*_i ТИМ САМИМ способом, що й θ̂. (3) Збираємо масив θ* і його квантилі. (4) Підставляємо Δ*_{[q]} = θ*_{[q]} − θ̂ у «божу» формулу — виходить елегантне CI = (2θ̂ − θ*_{[1−α/2]}, 2θ̂ − θ*_{[α/2]}). Цей варіант називають ЦЕНТРАЛЬНИМ (central / basic / reverse percentile) ДІ. Зверніть увагу: ніде не сказано, ЯКА саме статистика θ. Перцентиль, медіана, урізане середнє, співвідношення — рецепт один. Це і є обіцяна універсальність. Далі — код.
+:::
+
+## 🐍 `bootstrap_ci` in a dozen lines {.smaller}
+
+```{python}
+#| label: bootstrap-fn
+
+def bootstrap_ci(sample, theta_func, alpha=0.05, B=10_000, seed=42):
+    """Central bootstrap CI for any statistic.
+
+    theta_func must reduce a 2-D array along axis=1,
+    e.g. lambda s: np.percentile(s, 75, axis=1).
+    """
+    rng = np.random.default_rng(seed)
+    sample = np.asarray(sample)
+
+    theta_hat  = theta_func(sample[None, :])[0]          # estimate on the data
+    boots      = rng.choice(sample, size=(B, sample.size), replace=True)
+    theta_star = theta_func(boots)                       # B bootstrap estimates
+
+    q_lo, q_hi = np.quantile(theta_star, [alpha/2, 1 - alpha/2])
+    return 2*theta_hat - q_hi, 2*theta_hat - q_lo
+```
+
+. . .
+
+Sanity check against god mode on the toy world:
+
+```{python}
+#| label: bootstrap-fn-check
+#| output-location: column
+
+p75 = lambda s: np.percentile(s, 75, axis=1)
+
+boot_ci = bootstrap_ci(toy_sample, p75)
+print(f"god-mode CI : ({ci[0]:.3f}, {ci[1]:.3f})")
+print(f"bootstrap CI: ({boot_ci[0]:.3f}, {boot_ci[1]:.3f})")
+print(f"true theta  : {theta:.3f}  (inside both)")
+```
+
+::: {.notes}
+Увесь метод — дюжина рядків. Дві інженерні деталі. Перша: theta_func приймає 2D-масив і редукує по axis=1 — це дозволяє порахувати всі B оцінок ОДНИМ викликом numpy без циклу (порівняйте з торішнім циклом на 10000 ітерацій — векторизована версія в десятки разів швидша). Друга: rng.choice(sample, size=(B, N)) генерує одразу всю матрицю бутстреп-вибірок. Перевірка чесності: на іграшковому світі бутстреп-ДІ майже збігається з «божим» ДІ, і обидва накривають істину. Тобто метод, який бачить ЛИШЕ вибірку, відтворює інтервал, для якого нам був потрібен істинний розподіл. Тепер можна повертатися до реальних даних.
+:::
+
+## 🚕 Back to the taxi data: the baseline {.smaller}
+
+```{python}
+#| label: taxi-baseline
+#| output-location: column
+
+lo, hi = bootstrap_ci(control, p75)
+
+print(f"P75 estimate : {p75_control:.2f} min")
+print(f"95% CI       : ({lo:.2f}, {hi:.2f}) min")
+```
+
+```{python}
+#| label: taxi-baseline-plot
+#| code-fold: true
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(11, 3.8))
+ax.hist(control, bins=40, color=turquoise, alpha=0.85, density=True)
+ax.axvspan(lo, hi, color=red_pink, alpha=0.25, label=f"95% CI ({lo:.2f}, {hi:.2f})")
+ax.axvline(p75_control, color=red_pink, lw=2.5, label=f"P75 = {p75_control:.2f} min")
+ax.set_title("Baseline: P75 of waiting time, with uncertainty")
+ax.set_xlabel("minutes"); ax.set_ylabel("density"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+. . .
+
+The deliverable for the manager: *"P75 waiting time is `{python} round(float(p75_control), 2)` min, 95% CI (`{python} round(float(lo), 2)`, `{python} round(float(hi), 2)`)."* Any future algorithm change will be measured against this — and we know how much of a move is just noise.
+
+::: {.notes}
+Повертаємось до задачі з першого слайда — і закриваємо її одним викликом функції. Бейзлайн для менеджера: P75 = 4.6 хв, 95% ДІ приблизно (4.4, 4.8). Тепер у команди є не просто число, а число З ЦІНОЮ ПОДІЛКИ: зрушення в межах ±0.2 хв — це шум вибірки, і лише більші зміни варто обговорювати. Це пряма відповідь на запит «зафіксувати лінійку». Зверніть увагу, наскільки це коротко в коді: та сама функція, інша вибірка. Жодної нової математики під перцентиль виводити не довелося. Наступний крок сюжету: команда таки ЗРОБИЛА новий алгоритм метчингу — і запустила A/B-експеримент.
+:::
+
+# Bootstrap for the A/B test {background-iframe=".08-bootstrap_files/libs/colored-particles/index.html"}
+
+## 🧪 The experiment: new matching algorithm {.smaller}
+
+Three months later the team ships a new driver-matching algorithm and runs an A/B: **control** keeps the old matching, **test** gets the new one.
+
+```{python}
+#| label: ab-hist
+#| code-fold: true
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(11, 4.2))
+ax.hist(control, bins=40, density=True, alpha=0.55, color=turquoise,
+        label=f"control, N={control.size}, P75={p75_control:.2f}")
+ax.hist(test, bins=40, density=True, alpha=0.55, color=red_pink,
+        label=f"test,    M={test.size}, P75={p75_test:.2f}")
+ax.axvline(p75_control, color=turquoise, lw=2.5, ls="--")
+ax.axvline(p75_test,    color=red_pink,  lw=2.5, ls="--")
+ax.set_title("Waiting time: old vs new matching algorithm")
+ax.set_xlabel("minutes"); ax.set_ylabel("density"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+The test group's P75 is `{python} round(float(p75_control - p75_test), 2)` min lower. Real improvement or sampling luck? We need a **CI for the difference of two P75s** — yet another statistic with no textbook formula.
+
+::: {.notes}
+Продовження сюжету: команда написала новий алгоритм метчингу і запустила класичний A/B — контроль (N=1000) їздить на старому алгоритмі, тест (M=900) — на новому. Гістограми показують: тестова група зсунута вліво, її P75 менший приблизно на 0.7 хвилини, причому найбільше «схудла» саме права частина розподілу. Питання, з якого починається будь-який аналіз експерименту: це реальне покращення чи вибіркове везіння? Нам потрібен ДІ для РІЗНИЦІ двох 75-х перцентилів — ще однієї статистики, для якої немає підручникової формули (t-тест порівнює середні, Манн–Уітні — порядки, а нам треба саме різницю P75 у хвилинах). Бутстреп узагальнюється на два вибірки природно — наступний слайд. (Чесне зізнання в нотатках: тестову групу для демо згенеровано синтетично — новий метчинг ріже лише ДОВГІ очікування, до ~25% на хвості; короткі не чіпає. Це стане важливим наприкінці секції.)
+:::
+
+## ⚔️ Two-sample bootstrap {.tiny}
+
+Samples $X$ (control, size $N$) and $Y$ (test, size $M$); statistic $\widehat\theta = \widehat\theta_Y - \widehat\theta_X$.
+
+1. Compute $\widehat\theta = \widehat\theta_Y - \widehat\theta_X$ on the original groups.
+2. Repeat $B$ times: resample $X^*$ **from $X$** (size $N$) and $Y^*$ **from $Y$** (size $M$) — *independently, with replacement*; compute $\theta^*_i = \theta^*_{Y,i} - \theta^*_{X,i}$.
+3. CI from the same central formula: $CI = \big(2\widehat\theta - \theta^*_{[1-\alpha/2]},\, 2\widehat\theta - \theta^*_{[\alpha/2]}\big)$.
+
+```{python}
+#| label: bootstrap-2s-fn
+
+def bootstrap_ci_2sample(x, y, theta_func, alpha=0.05, B=10_000, seed=42):
+    """Central bootstrap CI for theta(y) - theta(x), independent groups."""
+    rng = np.random.default_rng(seed)
+    x, y = np.asarray(x), np.asarray(y)
+
+    diff_hat  = theta_func(y[None, :])[0] - theta_func(x[None, :])[0]
+    x_star    = rng.choice(x, size=(B, x.size), replace=True)
+    y_star    = rng.choice(y, size=(B, y.size), replace=True)
+    diff_star = theta_func(y_star) - theta_func(x_star)
+
+    q_lo, q_hi = np.quantile(diff_star, [alpha/2, 1 - alpha/2])
+    return 2*diff_hat - q_hi, 2*diff_hat - q_lo
+```
+
+::: {.callout-important icon=false}
+Resample **within** each group, never from the pooled data. Each group has its own distribution; pooling would simulate a world where $H_0$ is forced to be true (that's the *permutation test* — a different tool).
+:::
+
+::: {.notes}
+Двовибірковий бутстреп — те саме, лише промах рахуємо для різниці. Оригінальна оцінка: θ̂ = θ̂_Y − θ̂_X. У циклі B разів: ресемплимо X* З X (розмір N) і Y* З Y (розмір M) — НЕЗАЛЕЖНО, кожну зі своєї групи, з поверненням; рахуємо θ*_i = θ*_{Y,i} − θ*_{X,i}. ДІ — за тією ж центральною формулою. Критично важливий callout: ресемплимо ВСЕРЕДИНІ кожної групи, ніколи з об'єднаної вибірки. У кожної групи свій розподіл; змішування симулювало б світ, де H0 примусово вірна — це ідея ПЕРЕСТАНОВОЧНОГО тесту, іншого інструмента (він відповідає на інше питання: «а якби ефекту не було»). Бутстреп натомість відтворює світ ЯК Є — з ефектом, якщо він є, — і питає, наскільки хитається наша оцінка цього ефекту.
+:::
+
+## 📉 Did the new algorithm speed up the tail? {.smaller}
+
+```{python}
+#| label: ab-result
+#| output-location: column
+
+diff_hat = p75_test - p75_control
+lo_d, hi_d = bootstrap_ci_2sample(control, test, p75)
+
+print(f"diff in P75 : {diff_hat:+.2f} min")
+print(f"95% CI      : ({lo_d:+.2f}, {hi_d:+.2f}) min")
+print("CI excludes 0 -> significant"
+      if hi_d < 0 or lo_d > 0 else "CI covers 0")
+```
+
+```{python}
+#| label: ab-result-plot
+#| code-fold: true
+#| fig-align: center
+
+rng_ab = np.random.default_rng(42)
+x_star = rng_ab.choice(control, size=(10_000, control.size), replace=True)
+y_star = rng_ab.choice(test,    size=(10_000, test.size),    replace=True)
+diff_star = p75(y_star) - p75(x_star)
+
+fig, ax = plt.subplots(figsize=(11, 3.6))
+ax.hist(diff_star, bins=60, density=True, color=turquoise, alpha=0.9,
+        label=r"bootstrap $\theta^* = P75^*_{test} - P75^*_{control}$")
+ax.axvline(0, color=slate, lw=2.5, label="zero effect")
+ax.axvspan(lo_d, hi_d, color=red_pink, alpha=0.22, label=f"95% CI ({lo_d:.2f}, {hi_d:.2f})")
+ax.set_xlabel("difference in P75 (minutes)"); ax.set_ylabel("density"); ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+The CI sits entirely **below zero**: the new matching cuts P75 waiting time by roughly `{python} round(float(-hi_d), 1)`–`{python} round(float(-lo_d), 1)` min. Statistically significant — and $\approx$ `{python} round(float(-diff_hat / p75_control * 100), 1)`% at the tail, which the product team can judge against rollout costs.
+
+::: {.notes}
+Результат експерименту. Точкова оцінка: нова система зменшує P75 на 0.7 хв. Бутстреп-ДІ: (−0.99, −0.41) — ЦІЛКОМ нижче нуля, отже ефект статистично значущий на рівні 5%. Гістограма показує весь розподіл θ*: практично вся маса лівіше нуля. Але не зупиняємось на значущості — читаємо інтервал ЗМІСТОВНО: покращення десь від 0.4 до 1 хвилини на 75-му перцентилі, у відсотках — близько 15% на хвості. Рішення про викочування — це порівняння цього діапазону з вартістю розкатки та ризиками, а не лише p<0.05: якщо навіть нижня межа ефекту виправдовує вартість — котимо впевнено; якщо ні — можливо, варто продовжити експеримент, щоб звузити інтервал. ДІ дає для цього більше інформації, ніж бінарний вердикт тесту.
+:::
+
+## 🎛️ Bonus: the same machinery gives a p-value {.smaller}
+
+A CI and a test are two views of the same object. Reject $H_0\!: \theta = 0$ at level $\alpha$ $\iff$ the $(1-\alpha)$ CI excludes $0$. You can also read an (approximate) **bootstrap p-value** straight off $\Delta^*$:
+
+```{python}
+#| label: boot-pvalue
+#| output-location: column
+
+B_ab = diff_star.size
+p_simple = 2 * min((diff_star >= 0).mean(),
+                   (diff_star <= 0).mean())
+
+print(f"share of theta* above 0 : {(diff_star >= 0).mean():.4f}")
+if p_simple == 0:
+    print(f"percentile-style p      : < {2/B_ab:.4f}")
+else:
+    print(f"percentile-style p      : {p_simple:.4f}")
+```
+
+. . .
+
+::: {.callout-note icon=false}
+The quick version: $p \approx 2\min\big(P(\theta^* \ge 0),\, P(\theta^* \le 0)\big)$ — twice the share of bootstrap differences on the "wrong" side of zero. Two caveats: the resolution is limited by $B$ (with $B = 10\,000$ the smallest readable value is $2/B = 0.0002$ — report *"p < 0.001"*, never *"p = 0"*), and the CI carries strictly more information anyway: *magnitude and direction*, not just a verdict.
+:::
+
+::: {.notes}
+Місток до тестування гіпотез, який студенти часто просять. ДІ і тест — два погляди на один об'єкт: відхиляємо H0: θ=0 на рівні α тоді й лише тоді, коли (1−α)-ДІ не накриває нуль. З бутстреп-розподілу можна зчитати й наближений p-value: швидка версія — подвоєна частка бутстреп-різниць по «неправильний» бік нуля, p ≈ 2·min(P(θ*≥0), P(θ*≤0)). У нас УСІ 10000 різниць нижче нуля — і це привід для важливого застереження: роздільна здатність бутстреп-p обмежена кількістю ресемплів, найменше зчитуване значення — 2/B = 0.0002. Тому в звіті пишемо «p < 0.001», а НІКОЛИ не «p = 0». І наголосіть: ДІ несе строго БІЛЬШЕ інформації, ніж p-value, — величину і напрямок ефекту, а не лише вердикт. У продуктовій аналітиці звітуйте інтервал у хвилинах/відсотках, p-value — за бажанням. (Формально коректніших бутстреп-тестів існує кілька; для курсу достатньо цієї інтуїції.)
+:::
+
+## 🔎 Beyond one number: *which* riders got faster? {.smaller}
+
+P75 compresses the whole experiment into a single number. But a treatment can act on a **segment**: our fix targets *far drivers*, so short waits shouldn't move at all. Let's test every **decile** of waiting time — the same two-sample bootstrap, nine statistics at once:
+
+```{python}
+#| label: decile-analysis
+#| output-location: column
+
+qs = np.arange(10, 91, 10)          # deciles D1..D9
+
+# same bootstrap resamples as before -> 9 statistics in one pass
+diff_hat_q  = np.percentile(test, qs) - np.percentile(control, qs)
+diff_star_q = (np.percentile(y_star, qs, axis=1)
+             - np.percentile(x_star, qs, axis=1))     # shape (9, B)
+
+q_lo, q_hi = np.quantile(diff_star_q, [0.025, 0.975], axis=1)
+ci_lo, ci_hi = 2*diff_hat_q - q_hi, 2*diff_hat_q - q_lo
+sig = (ci_hi < 0) | (ci_lo > 0)
+
+for q, d, l, h, s in zip(qs, diff_hat_q, ci_lo, ci_hi, sig):
+    print(f"D{q//10}: {d:+.2f}  ({l:+.2f}, {h:+.2f})"
+          f"  {'significant' if s else '-'}")
+```
+
+. . .
+
+This is the [quantile treatment effects]{.hi} view of an A/B test: instead of one averaged verdict, a **profile** of the effect across the whole distribution. Note the code: no new machinery — the *same* bootstrap matrices, `np.percentile` just takes a vector of quantiles.
+
+::: {.notes}
+Ідемо далі за один підсумковий показник. P75 стискає весь експеримент в одне число, але трітмент може діяти лише на СЕГМЕНТ клієнтів: наш фікс цілить у далеких водіїв, тож короткі очікування взагалі не мають зрушитись. Перевіряємо КОЖЕН дециль часу очікування — той самий двовибірковий бутстреп, лише статистик тепер дев'ять. Це називають quantile treatment effects: замість одного усередненого вердикту — ПРОФІЛЬ ефекту вздовж усього розподілу. Такий підхід популяризували аналітики стримінгів і маркетплейсів: «на кого саме подіяв трітмент?». Технічна краса: жодної нової машинерії — ТІ САМІ бутстреп-матриці x_star і y_star, np.percentile просто приймає вектор квантилів і повертає матрицю 9×B; центральний ДІ по кожному рядку. У таблиці видно: D1–D5 незначущі (ДІ накривають нуль), D6–D9 — значущі, і ефект наростає до −1.7 хв на 9-му децилі. Зверніть увагу на D6: верхня межа ДІ −0.005 — впритул до нуля. Це чудовий місток до розмови про множинні порівняння на наступному слайді: саме такі «ледь значущі» знахідки найчастіше виявляються хибними спрацюваннями. Графічно — наступний слайд.
+:::
+
+## 📊 The decile plot: the effect lives in the tail {.smaller}
+
+```{python}
+#| label: decile-plot
+#| code-fold: true
+#| fig-align: center
+
+x_pos = np.percentile(test, qs)          # where each decile sits, in minutes
+
+fig, ax = plt.subplots(figsize=(11, 4.6))
+ax.axhline(0, color=slate, ls="--", lw=1.5)
+ax.plot(x_pos, diff_hat_q, color="#bbbbbb", lw=2, zorder=1)
+for xp, d, l, h, s, q in zip(x_pos, diff_hat_q, ci_lo, ci_hi, sig, qs):
+    color = red_pink if s else orange
+    ax.vlines(xp, l, h, color=color, lw=2.5, alpha=0.85)
+    ax.scatter(xp, d, s=90, color=color, zorder=3,
+               edgecolor="white", linewidth=1.5)
+    ax.annotate(f"D{q//10}", (xp, h), textcoords="offset points",
+                xytext=(0, 6), ha="center", fontsize=9, color=slate)
+first_sig = qs[sig][0] // 10
+ax.set_title(f"Decile differences with 95% bootstrap CIs — significant from D{first_sig} up")
+ax.set_xlabel("waiting-time deciles of the test group (minutes)")
+ax.set_ylabel("decile difference:\ntest − control (min)")
+plt.tight_layout()
+plt.show()
+```
+
+Short and typical waits (D1–D5): CIs straddle zero — the median rider feels **nothing**. From D`{python} int(first_sig)` up the effect switches on and grows to $\approx$ `{python} round(float(-diff_hat_q[-1]), 1)` min at D9: the algorithm fixes **exactly** the far-driver problem the PM complained about.
+
+::: {.callout-important icon=false}
+**Multiple comparisons:** nine 95% CIs means $\approx 9 \times 0.05 \approx 0.5$ false flags *expected* even with no effect anywhere. Use the decile profile as a **diagnostic**; for a confirmatory claim about a specific decile, pre-register it or adjust (e.g. Bonferroni: 99.4% CIs).
+:::
+
+::: {.notes}
+Графік у стилі індустріальних A/B-звітів: по осі X — децилі тестової групи в хвилинах, по Y — різниця тест−контроль із бутстреп-вусами; значущі децилі — рожеві, незначущі — помаранчеві. Читання: короткі й типові очікування (D1–D5) — вуса обіймають нуль, медіанний клієнт НЕ відчує змін. Із D6 ефект «вмикається» і наростає до ≈1.7 хв на D9. Це і є головна знахідка: алгоритм лагодить САМЕ проблему далеких водіїв, з якої почалась лекція, — і тепер ми можемо сказати менеджеру не лише «стало краще на P75», а ХТО САМЕ виграв. Обов'язковий callout про множинні порівняння: дев'ять 95%-их ДІ — це ≈0.5 хибних спрацювань У СЕРЕДНЬОМУ навіть за повної відсутності ефекту. Тому децильний профіль — ДІАГНОСТИЧНИЙ інструмент («де шукати»); для конфірматорної заяви про конкретний дециль — попередня реєстрація гіпотези або поправка (Бонферроні: 99.4% ДІ на кожен дециль). Зв'яжіть із χ²-лекцією, де ми вже говорили про пастку множинних порівнянь.
+:::
+
+# Three flavors of bootstrap CI {background-iframe=".08-bootstrap_files/libs/colored-particles/index.html"}
+
+## 🍦 Central, percentile, normal {.smaller}
+
+The array $\theta^*_1, \dots, \theta^*_B$ can be turned into an interval in (at least) three ways:
+
+| Flavor | Formula | Logic |
+|---|---|---|
+| **Central** (a.k.a. basic / reverse) | $\big(2\widehat\theta - \theta^*_{[1-\alpha/2]},\; 2\widehat\theta - \theta^*_{[\alpha/2]}\big)$ | reflect the error quantiles around $\widehat\theta$ — our derivation |
+| **Percentile** | $\big(\theta^*_{[\alpha/2]},\; \theta^*_{[1-\alpha/2]}\big)$ | just take the quantiles of $\theta^*$ as they are |
+| **Normal** | $\widehat\theta \pm z_{1-\alpha/2}\,\sqrt{S^2_{\theta^*}}$ | trust normality; use $\theta^*$ only for its standard deviation |
+
+. . .
+
+- **Percentile** looks the most natural but quietly assumes the bootstrap distribution is *unbiased and symmetric-izable* (formally: some monotone transform of $\widehat\theta$ is normal). With skewed $\theta^*$, central and percentile intervals **disagree** — they reflect the skew in opposite directions.
+- **Normal** is fine when $\widehat\theta$ is approximately Gaussian (means, large $N$) and pointless to trust otherwise.
+
+::: {.notes}
+З одного й того ж масиву θ* інтервал можна зібрати щонайменше трьома способами. ЦЕНТРАЛЬНИЙ (він же basic/reverse) — наш виведений: відбиваємо квантилі помилки навколо θ̂. ПЕРЦЕНТИЛЬНИЙ — просто беремо квантилі θ* як є; виглядає найприродніше, але неявно припускає, що розподіл оцінки можна монотонним перетворенням звести до нормального і що зсуву немає. Якщо θ* скошений — центральний і перцентильний ДАЮТЬ РІЗНІ інтервали: вони відображають скіс у протилежні боки. НОРМАЛЬНИЙ — використовує θ* лише заради стандартного відхилення і чіпляє його до z-квантилів; чесний, коли θ̂ приблизно гаусівська (середні, великі N). Яка різниця на практиці? Не сперечаймося — перевіримо Монте-Карло, як ми робимо з КОЖНИМ критерієм у цьому курсі. Наступний слайд.
+:::
+
+## 🔬 Which flavor keeps its promise? Monte Carlo! {.tiny}
+
+Same habit as for the $t$-, KS-, $\chi^2$- and MW-tests: simulate worlds where the truth is known, count how often each CI **misses** it, add a Wilson interval.
+
+```{python}
+#| label: mc-checker
+
+def three_cis(sample, q, alpha, B, rng):
+    """Central, percentile and normal CIs from one bootstrap pass."""
+    est = np.percentile(sample, q)
+    th  = np.percentile(rng.choice(sample, size=(B, sample.size), replace=True),
+                        q, axis=1)
+    lo, hi = np.quantile(th, [alpha/2, 1 - alpha/2])
+    z = norm.ppf(1 - alpha/2)
+    return {"central":    (2*est - hi, 2*est - lo),
+            "percentile": (lo, hi),
+            "normal":     (est - z*th.std(), est + z*th.std())}
+
+def miss_rates(dist, theta, q, sizes, MC=300, B=1000, alpha=0.05, seed=1):
+    """Share of Monte Carlo worlds where each CI flavor misses the truth."""
+    rng, out = np.random.default_rng(seed), {}
+    for n in sizes:
+        miss = {"central": 0, "percentile": 0, "normal": 0}
+        for _ in range(MC):
+            s = dist.rvs(n, random_state=rng)
+            for m, (l, r) in three_cis(s, q, alpha, B, rng).items():
+                miss[m] += not (l < theta < r)
+        out[n] = {m: (k / MC, proportion_confint(k, MC, method="wilson"))
+                  for m, k in miss.items()}
+    return out
+```
+
+::: {.callout-tip icon=false}
+If a 95% CI is honest, it should miss the truth **about 5% of the time** — the FPR sits on $\alpha$.
+:::
+
+::: {.notes}
+Не віримо на слово жодному з трьох варіантів — валідуємо Монте-Карло, та сама звичка, що з t-, KS-, χ²- і MW-критеріями. Логіка: чесний 95%-ДІ має ПРОМАХУВАТИСЯ повз істину приблизно у 5% симульованих світів — FPR на рівні α. Код: three_cis будує всі три інтервали з ОДНОГО прогону бутстрепа (економимо втричі), miss_rates ганяє MC=300 світів для кожного розміру вибірки і додає інтервал Уілсона до частки промахів — бо частка промахів сама є оцінкою з шумом (мета-рівень, який ми обговорювали в лекції про Монте-Карло). Тест-кейс: медіана експоненційного розподілу — скошений розподіл, «незручна» статистика. Результати на наступному слайді.
+:::
+
+## 📊 FPR vs sample size {.smaller}
+
+Test bench: the **median** of a skewed $\text{Exp}(\text{scale}=5)$ world.
+
+```{python}
+#| label: mc-flavors-run
+#| code-fold: true
+#| fig-align: center
+
+target   = expon(scale=5)
+truth    = target.ppf(0.5)
+sizes    = [50, 100, 500, 2000]
+results  = miss_rates(target, truth, q=50, sizes=sizes)
+
+fig, ax = plt.subplots(figsize=(11, 4.4))
+xt = np.arange(len(sizes))
+ax.axhline(0.05, color=red, lw=2, label=r"$\alpha = 0.05$")
+for m, color in zip(("central", "percentile", "normal"),
+                    (green, turquoise, blue)):
+    fpr = [results[n][m][0] for n in sizes]
+    band = np.array([results[n][m][1] for n in sizes])
+    ax.plot(xt, fpr, color=color, lw=2.5, marker="o", label=m)
+    ax.fill_between(xt, band[:, 0], band[:, 1], color=color, alpha=0.18)
+ax.set_xticks(xt, sizes)
+ax.set_xlabel("sample size N"); ax.set_ylabel("FPR (CI missed the truth)")
+ax.set_title("All three flavors are roughly calibrated for the median")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+For a "nice" statistic all three flavors hover around $\alpha$ already at moderate $N$. Differences show up for **skewed, biased** statistics — then the central CI (which corrects for bias) is the safer default.
+
+::: {.notes}
+Стенд: медіана Exp(scale=5), розміри вибірки від 50 до 2000, MC=300 світів, для кожного — всі три ДІ. Графік: усі три криві коливаються навколо 5%, смуги Уілсона здебільшого накривають α. Висновок перший: для «пристойної» статистики на середніх N усі три варіанти працюють — обирайте будь-який, різниця в межах шуму. Висновок другий, тонший: відмінності проявляються для СКОШЕНИХ і ЗМІЩЕНИХ статистик (екстремальні квантилі, співвідношення, малі N) — там центральний ДІ, який виправляє зсув через відбиття, зазвичай безпечніший за перцентильний. Тому як дефолт у курсі беремо центральний. І мета-порада: якщо ваша статистика екзотична — не гадайте, проженіть ось цей самий Монте-Карло-стенд на розподілі, схожому на ваші дані. Це двадцять рядків коду.
+:::
+
+# When does the bootstrap break? {background-iframe=".08-bootstrap_files/libs/colored-particles/index.html"}
+
+## 🥊 Bootstrap vs $t$-test for the mean {.smaller}
+
+Tempting thought: *"the bootstrap is assumption-free, so it must beat the $t$-test on small skewed samples."* Let's check — mean of $\text{Exp}(\text{scale}=5)$, tiny $N$:
+
+```{python}
+#| label: mc-ttest-run
+#| code-fold: true
+#| fig-align: center
+
+def miss_rates_mean(dist, theta, sizes, MC=400, B=1000, alpha=0.05, seed=2):
+    rng, out = np.random.default_rng(seed), {}
+    mean_f = lambda s: np.mean(s, axis=1)
+    for n in sizes:
+        miss = {"central bootstrap": 0, "t-test": 0}
+        for _ in range(MC):
+            s = dist.rvs(n, random_state=rng)
+            th = mean_f(rng.choice(s, size=(B, n), replace=True))
+            lo, hi = np.quantile(th, [alpha/2, 1 - alpha/2])
+            l, r = 2*s.mean() - hi, 2*s.mean() - lo
+            miss["central bootstrap"] += not (l < theta < r)
+            miss["t-test"] += ttest_1samp(s, popmean=theta).pvalue < alpha
+        out[n] = {m: (k / MC, proportion_confint(k, MC, method="wilson"))
+                  for m, k in miss.items()}
+    return out
+
+sizes_t = [5, 10, 20, 50, 100, 200]
+res_t = miss_rates_mean(expon(scale=5), expon(scale=5).mean(), sizes_t)
+
+fig, ax = plt.subplots(figsize=(11, 4.2))
+xt = np.arange(len(sizes_t))
+ax.axhline(0.05, color=red, lw=2, label=r"$\alpha = 0.05$")
+for m, color in zip(("central bootstrap", "t-test"), (green, yellow)):
+    fpr  = [res_t[n][m][0] for n in sizes_t]
+    band = np.array([res_t[n][m][1] for n in sizes_t])
+    ax.plot(xt, fpr, color=color, lw=2.5, marker="o", label=m)
+    ax.fill_between(xt, band[:, 0], band[:, 1], color=color, alpha=0.18)
+ax.set_xticks(xt, sizes_t)
+ax.set_xlabel("sample size N"); ax.set_ylabel("FPR")
+ax.set_title("Skewed data, small N: the bootstrap misbehaves too")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+**No free lunch:** on $N \le 20$ *both* overshoot $\alpha$. The bootstrap can't conjure information the sample doesn't hold — a tiny sample is a bad portrait of the population, so $\widehat F \not\approx F$.
+
+::: {.notes}
+Спокуслива думка: «бутстреп без припущень, отже на малих скошених вибірках він поб'є t-тест». Перевіряємо: середнє Exp(scale=5), N від 5 до 200. Результат протверезний: на N≤20 ОБИДВА методи перевищують α — і t-тест (це ми знали з лекції про Монте-Карло), і бутстреп. Безкоштовних обідів немає: бутстреп не може вичаклувати інформацію, якої у вибірці немає. Його перша «нога» — ECDF ≈ F — на N=10 просто не стоїть: десять точок — поганий портрет генеральної сукупності. На великих N обидва методи калібруються. Мораль: бутстреп — це універсальність (працює для будь-якої статистики), а НЕ суперсила для малих вибірок. Малий N — проблема, яку не лікує жоден метод.
+:::
+
+## 🕳️ Where it honestly fails: extreme quantiles {.tiny}
+
+The bootstrap "replays" the world using only observed points. A statistic that lives **at the edge of the data** — P99, the maximum — has almost nothing to stand on: a resample can never exceed the sample maximum.
+
+```{python}
+#| label: extreme-quantile
+#| output-location: column
+
+def coverage(dist, theta, q, n, MC=600,
+             B=1000, seed=3):
+    rng, hit = np.random.default_rng(seed), 0
+    for _ in range(MC):
+        s = dist.rvs(n, random_state=rng)
+        th = np.percentile(
+            rng.choice(s, size=(B, n), replace=True),
+            q, axis=1)
+        lo, hi = np.quantile(th, [0.025, 0.975])
+        l, r = 2*np.percentile(s, q) - hi, \
+               2*np.percentile(s, q) - lo
+        hit += l < theta < r
+    return hit / MC
+
+d = expon(scale=5)
+for n in (50, 200, 2000):
+    cov99 = coverage(d, d.ppf(0.99), 99, n)
+    print(f"P99, N={n:4d}: coverage {cov99:.0%}"
+          f"  (want 95%)")
+```
+
+. . .
+
+::: {.callout-important icon=false}
+For **P99 on $N = 50$** the "95%" interval covers the truth far less often than promised — there are only ~0.5 points beyond P99 in such a sample. Rule of thumb: you need a decent number of observations **beyond** the quantile you're estimating. Medians and P75 are easy; P99 needs thousands; the **maximum** is hopeless (bootstrap provably fails for it).
+:::
+
+::: {.notes}
+Чесна межа методу. Бутстреп «перегравує світ», використовуючи ЛИШЕ спостережені точки: бутстреп-вибірка ніколи не вийде за максимум оригінальної. Тому статистики, що живуть НА КРАЮ даних, — P99, максимум — не мають на що спертися. Експеримент: покриття «95%»-го ДІ для P99 при N=50 — суттєво нижче обіцяного (у вибірці з 50 точок за P99 лежить у середньому пів-спостереження!); при N=200 краще; при N=2000 — уже пристойно. Правило великого пальця: потрібна відчутна кількість спостережень ПО ТОЙ БІК квантиля, який оцінюєте. Медіана і P75 — легко; P99 — тисячі спостережень; максимум — безнадійно (для нього бутстреп ламається ДОВЕДЕНО, це класичний контрприклад). Для нашого кейсу з P75 на N=1000 — зона комфорту.
+:::
+
+## 🎚️ Two knobs: $N$ and $B$ {.smaller}
+
+The bootstrap stands on **two approximations** — know which knob controls which:
+
+:::: {.columns}
+
+::: {.column width="50%"}
+**$N$ — sample size** (given, not yours to turn)
+
+- Controls $\widehat F \approx F$: how well the sample portrays the population.
+- Too small → CIs lie, no matter how big $B$ is.
+- *Cannot* be fixed in post-production; fix it at design time (power analysis).
+:::
+
+::: {.column width="50%"}
+**$B$ — number of resamples** (fully yours)
+
+- Controls how precisely you read the quantiles of $\Delta^*$.
+- Default $B = 10\,000$; on modern numpy it's a fraction of a second.
+- Smaller $B$ for speed? Fine — but validate with Monte Carlo first.
+:::
+
+::::
+
+. . .
+
+**FAQ.** *Can a bootstrap sample have a size other than $N$?* — **No.** $\Delta^*$ must imitate the error of $\widehat\theta$, and that error depends on the sample size: an estimate from $N/2$ points wobbles $\sqrt2$ times more. Resampling at a different size imitates the wrong error.
+
+::: {.notes}
+Систематизуємо дві «ноги» методу — і хто якою ручкою керує. N — розмір вибірки: контролює наближення ECDF ≈ F, тобто наскільки добре вибірка портретує сукупність. Це ручка, яку НЕ МОЖНА крутити постфактум: замалий N — і ДІ бреше, хоч яким великим зробиш B. Лікується на етапі ДИЗАЙНУ дослідження (розрахунок розміру вибірки — тема, яку ми знаємо). B — кількість ресемплів: контролює, наскільки точно ми зчитуємо квантилі Δ*. Повністю у ваших руках: дефолт 10000, на векторизованому numpy це частки секунди; хочете менше заради швидкості — гаразд, але спершу провалідуйте Монте-Карло. І класичне екзаменаційне питання: чи можна тягнути бутстреп-вибірки іншого розміру, ніж N? НІ: Δ* має імітувати помилку оцінки θ̂, а ця помилка залежить від розміру вибірки — оцінка з N/2 точок хитається в √2 разів сильніше. Ресемпл іншого розміру імітує ЧУЖУ помилку.
+:::
+
+# Summary {background-iframe=".08-bootstrap_files/libs/colored-particles/index.html"}
+
+## 🧾 The one idea {.smaller}
+
+[The sample is our best model of the population. Resample it to watch your own estimator wobble.]{.hi}
+
+$$
+\Delta = \widehat\theta - \theta \;\;\approx\;\; \Delta^* = \widehat\theta^{\,*} - \widehat\theta,
+\qquad
+CI = \big(2\widehat\theta - \theta^*_{[1-\alpha/2]},\; 2\widehat\theta - \theta^*_{[\alpha/2]}\big).
+$$
+
+- **Universal** — one recipe for percentiles, medians, ratios, differences between A/B groups… anything you can compute on a sample.
+- **Plug-in + Monte Carlo** — replace the true $F$ with the sample ($N$ must be decent), read quantiles of $\Delta^*$ by brute force ($B$ is yours, default $10\,000$).
+- **Two-sample version** — resample each group *within itself*; the CI for the difference doubles as a significance test (does it cover $0$?) and, better, reports the *size* of the effect. Slice by deciles to see *who* the treatment touched.
+- **Not magic** — small $N$ hurts it like everyone else; edge statistics (P99, max) need lots of data; when in doubt, **validate with Monte Carlo**.
+
+::: {.notes}
+Підсумок однією думкою: вибірка — наш найкращий портрет генеральної сукупності; ресемплюючи її з поверненням, ми дивимось, як хитається наша власна оцінка. Формули: бутстреп-припущення Δ ≈ Δ* і центральний ДІ. Чотири тези: (1) універсальність — один рецепт для перцентилів, медіан, співвідношень, різниць в A/B, будь-чого обчислюваного; (2) plug-in + Монте-Карло — істинний розподіл замінюємо вибіркою (N має бути пристойним), квантилі промаху читаємо грубою силою (B — наш, дефолт 10000); (3) двовибіркова версія — ресемпл всередині кожної групи; ДІ різниці працює і як тест (чи накриває нуль), і — краще — звітує РОЗМІР ефекту, а зріз по децилях показує, НА КОГО подіяв трітмент; (4) не магія — малий N шкодить як усім, крайові статистики вимагають багато даних, у сумнівах — валідуйте Монте-Карло. У кейсі: зафіксували бейзлайн P75, виміряли ефект нового метчингу з інтервалом у хвилинах і децильним профілем знайшли, що виграли саме клієнти з довгими очікуваннями.
+:::
+
+## 🧭 Which tool, when? {.tiny}
+
+| Your statistic / situation | Reach for | Watch out for |
+|---|---|---|
+| proportion (conversion) | **z-interval** / `proportion_confint` | tiny $n$, $\hat p$ near 0 or 1 |
+| mean, roughly normal or large $N$ | **t-interval** (`ttest_ind` CI) | heavy skew on small $N$ |
+| median, P75, IQR, trimmed mean, ratio | **bootstrap** (central CI) | $N$ large enough for $\widehat F \approx F$ |
+| difference of *any* metric in an A/B | **two-sample bootstrap** | resample within groups only |
+| *which segment* did the treatment hit | **per-decile bootstrap CIs** (quantile treatment effects) | 9 CIs ⇒ multiple comparisons |
+| extreme quantiles (P99), max | bootstrap only with **big** $N$ | provably fails for the max |
+| tiny skewed samples ($N \lesssim 20$) | more data / design change | *nothing* is calibrated there — incl. bootstrap |
+| exotic statistic, unsure about coverage | bootstrap + **Monte Carlo check** | 20 lines of code, no excuses |
+
+. . .
+
+::: {.callout-tip icon=false}
+The course meta-lesson, once more: a formula-free method is *not* an assumption-free method. When in doubt, [validate with Monte Carlo]{.hi} on data that looks like yours.
+:::
+
+::: {.notes}
+Шпаргалка «який інструмент коли». Для частки і середнього — класичні z/t-інтервали, вони швидші й точніші там, де застосовні. Для медіан, перцентилів, урізаних середніх, співвідношень — бутстреп з центральним ДІ. Для різниці будь-якої метрики в A/B — двовибірковий бутстреп (ресемпл лише всередині груп!); щоб побачити, на який сегмент подіяв трітмент, — децильний профіль, але пам'ятайте про множинні порівняння. Крайні квантилі — тільки з великим N; максимум — не намагайтеся. Крихітні скошені вибірки — не покриє ніщо, включно з бутстрепом: це проблема дизайну, а не аналізу. Екзотична статистика — бутстреп плюс Монте-Карло-перевірка покриття: двадцять рядків коду, жодних виправдань. І мета-урок курсу востаннє: метод без формул — НЕ метод без припущень. Сумніваєтесь — валідуйте Монте-Карло на даних, схожих на ваші. Наступна лекція — фінал курсу.
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe=".08-bootstrap_files/libs/colored-particles/index.html"}
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=4049)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
