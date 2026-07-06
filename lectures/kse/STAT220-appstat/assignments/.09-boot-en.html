@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Ihor Miroshnychenko">
-<meta name="dcterms.date" content="2026-07-05">
+<meta name="dcterms.date" content="2026-07-06">
 
 <title>Practice 9</title>
 <style>
@@ -163,7 +163,7 @@ window.Quarto = {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">July 5, 2026</p>
+      <p class="date">July 6, 2026</p>
     </div>
   </div>
   
@@ -175,6 +175,37 @@ window.Quarto = {
 </header>
 
 
+<div id="setup" class="cell" data-execution_count="1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> warnings</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>warnings.filterwarnings(<span class="st">"ignore"</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.stats <span class="im">import</span> norm</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> statsmodels.stats.proportion <span class="im">import</span> proportion_confint</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>turquoise <span class="op">=</span> <span class="st">"#20B2AA"</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>red       <span class="op">=</span> <span class="st">"#fb6107"</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>blue      <span class="op">=</span> <span class="st">"#181485"</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>green     <span class="op">=</span> <span class="st">"#8bb174"</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>gray      <span class="op">=</span> <span class="st">"#A0A0A0"</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>red_pink  <span class="op">=</span> <span class="st">"#e64173"</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>orange    <span class="op">=</span> <span class="st">"#FFA500"</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>slate     <span class="op">=</span> <span class="st">"#314f4f"</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> arpu_sample(n, rng, uplift<span class="op">=</span><span class="fl">0.0</span>):</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""2-week revenue per user (ARPU), UAH: zeros + right skew.</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="co">    ~25% of users ordered nothing; active users place 1 + Pois(1.2)</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="co">    orders with a lognormal basket. uplift multiplies active revenue.</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>    active <span class="op">=</span> rng.random(n) <span class="op">&lt;</span> <span class="fl">0.75</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>    orders <span class="op">=</span> <span class="dv">1</span> <span class="op">+</span> rng.poisson(<span class="fl">1.2</span>, n)</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    check  <span class="op">=</span> rng.lognormal(np.log(<span class="dv">240</span>), <span class="fl">0.40</span>, n)</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.where(active, orders <span class="op">*</span> check <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> uplift), <span class="fl">0.0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 <section id="what-we-are-doing-today" class="level1 unnumbered">
 <h1 class="unnumbered">What we are doing today</h1>
 <p>In the lecture the bootstrap gave us a CI <strong>in minutes</strong>: the difference in P75 taxi waiting time. But a real A/B report is read on a different line: <strong>“by how many percent did revenue grow — and does the feature pay for itself?”</strong> Today we build the rest of the road from the lecture recipe to a finished decision:</p>
@@ -212,12 +243,12 @@ window.Quarto = {
 <p><strong>Case.</strong> GreenBowl runs a two-week Kyiv test of “Free delivery over 300 UAH”: 6000 users in control and 6000 in test. Finance did the math: the delivery subsidy will cost <strong>≈3% of annual revenue</strong>, so the feature pays off only if it lifts ARPU <strong>by more than +3%</strong> — that is our <strong>breakeven</strong>. The CFO expects the answer in percent, not in hryvnias.</p>
 </blockquote>
 <div id="data-kyiv" class="cell" data-execution_count="2">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">8</span>)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>control <span class="op">=</span> arpu_sample(<span class="dv">6000</span>, rng)                 <span class="co"># old delivery pricing</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>test    <span class="op">=</span> arpu_sample(<span class="dv">6000</span>, rng, uplift<span class="op">=</span><span class="fl">0.05</span>)    <span class="co"># free delivery over 300</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARPU control: </span><span class="sc">{</span>control<span class="sc">.</span>mean()<span class="sc">:.0f}</span><span class="ss"> UAH   test: </span><span class="sc">{</span>test<span class="sc">.</span>mean()<span class="sc">:.0f}</span><span class="ss"> UAH"</span>)</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"zero-revenue users: </span><span class="sc">{</span>np<span class="sc">.</span>mean(control <span class="op">==</span> <span class="dv">0</span>)<span class="sc">:.0%}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">8</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>control <span class="op">=</span> arpu_sample(<span class="dv">6000</span>, rng)                 <span class="co"># old delivery pricing</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>test    <span class="op">=</span> arpu_sample(<span class="dv">6000</span>, rng, uplift<span class="op">=</span><span class="fl">0.05</span>)    <span class="co"># free delivery over 300</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARPU control: </span><span class="sc">{</span>control<span class="sc">.</span>mean()<span class="sc">:.0f}</span><span class="ss"> UAH   test: </span><span class="sc">{</span>test<span class="sc">.</span>mean()<span class="sc">:.0f}</span><span class="ss"> UAH"</span>)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"zero-revenue users: </span><span class="sc">{</span>np<span class="sc">.</span>mean(control <span class="op">==</span> <span class="dv">0</span>)<span class="sc">:.0%}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>ARPU control: 430 UAH   test: 453 UAH
 zero-revenue users: 25%</code></pre>
@@ -226,18 +257,18 @@ zero-revenue users: 25%</code></pre>
 <div id="cell-kyiv-hist" class="cell" data-execution_count="3">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">9</span>, <span class="fl">3.6</span>))</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>bins <span class="op">=</span> np.linspace(<span class="dv">0</span>, <span class="dv">2500</span>, <span class="dv">60</span>)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>ax.hist(control, bins<span class="op">=</span>bins, density<span class="op">=</span><span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.55</span>, color<span class="op">=</span>turquoise,</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="ss">f"control (ARPU = </span><span class="sc">{</span>control<span class="sc">.</span>mean()<span class="sc">:.0f}</span><span class="ss"> UAH)"</span>)</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>ax.hist(test, bins<span class="op">=</span>bins, density<span class="op">=</span><span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.55</span>, color<span class="op">=</span>red_pink,</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="ss">f"test (ARPU = </span><span class="sc">{</span>test<span class="sc">.</span>mean()<span class="sc">:.0f}</span><span class="ss"> UAH)"</span>)</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"revenue per user over 2 weeks, UAH"</span>)</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"density"</span>)</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"A quarter of zeros + a long right tail: classic revenue data"</span>)</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">9</span>, <span class="fl">3.6</span>))</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>bins <span class="op">=</span> np.linspace(<span class="dv">0</span>, <span class="dv">2500</span>, <span class="dv">60</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>ax.hist(control, bins<span class="op">=</span>bins, density<span class="op">=</span><span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.55</span>, color<span class="op">=</span>turquoise,</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="ss">f"control (ARPU = </span><span class="sc">{</span>control<span class="sc">.</span>mean()<span class="sc">:.0f}</span><span class="ss"> UAH)"</span>)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>ax.hist(test, bins<span class="op">=</span>bins, density<span class="op">=</span><span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.55</span>, color<span class="op">=</span>red_pink,</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="ss">f"test (ARPU = </span><span class="sc">{</span>test<span class="sc">.</span>mean()<span class="sc">:.0f}</span><span class="ss"> UAH)"</span>)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"revenue per user over 2 weeks, UAH"</span>)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"density"</span>)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"A quarter of zeros + a long right tail: classic revenue data"</span>)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-display">
 <div class="quarto-figure quarto-figure-center">
@@ -268,32 +299,32 @@ zero-revenue users: 25%</code></pre>
 <section id="tool-v1-uplift_ci" class="level2" data-number="1.1">
 <h2 data-number="1.1" class="anchored" data-anchor-id="tool-v1-uplift_ci"><span class="header-section-number">1.1</span> Tool v1: <code>uplift_ci</code></h2>
 <div id="uplift-ci" class="cell" data-execution_count="4">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> uplift_ci(control, test, stat<span class="op">=</span>np.mean, alpha<span class="op">=</span><span class="fl">0.05</span>, B<span class="op">=</span><span class="dv">4000</span>, seed<span class="op">=</span><span class="dv">42</span>):</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Central bootstrap CI for the relative effect stat(T)/stat(C) - 1.</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">    stat must accept axis (np.mean, np.median, ...). Resample WITHIN</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="co">    each group, independently (the lecture rule!).</span></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    rng <span class="op">=</span> np.random.default_rng(seed)</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    c, t <span class="op">=</span> np.asarray(control, <span class="bu">float</span>), np.asarray(test, <span class="bu">float</span>)</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    up_hat <span class="op">=</span> stat(t) <span class="op">/</span> stat(c) <span class="op">-</span> <span class="dv">1</span></span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    c_star <span class="op">=</span> stat(rng.choice(c, size<span class="op">=</span>(B, c.size), replace<span class="op">=</span><span class="va">True</span>), axis<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    t_star <span class="op">=</span> stat(rng.choice(t, size<span class="op">=</span>(B, t.size), replace<span class="op">=</span><span class="va">True</span>), axis<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    up_star <span class="op">=</span> t_star <span class="op">/</span> c_star <span class="op">-</span> <span class="dv">1</span>                       <span class="co"># the ratio AS A WHOLE</span></span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    q_lo, q_hi <span class="op">=</span> np.quantile(up_star, [alpha<span class="op">/</span><span class="dv">2</span>, <span class="dv">1</span> <span class="op">-</span> alpha<span class="op">/</span><span class="dv">2</span>])</span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"uplift"</span>: up_hat, <span class="st">"ci"</span>: (<span class="dv">2</span><span class="op">*</span>up_hat <span class="op">-</span> q_hi, <span class="dv">2</span><span class="op">*</span>up_hat <span class="op">-</span> q_lo),</span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>            <span class="st">"star"</span>: up_star}</span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
-<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> uplift_ci(control, test)</span>
-<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>elapsed <span class="op">=</span> time.perf_counter() <span class="op">-</span> t0</span>
-<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>lo, hi <span class="op">=</span> r[<span class="st">"ci"</span>]</span>
-<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARPU uplift: </span><span class="sc">{</span>r[<span class="st">'uplift'</span>]<span class="sc">:+.2%}</span><span class="ss">   95% CI: (</span><span class="sc">{</span>lo<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>hi<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span>
-<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"⏱ execution time: </span><span class="sc">{</span>elapsed<span class="sc">:.2f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> uplift_ci(control, test, stat<span class="op">=</span>np.mean, alpha<span class="op">=</span><span class="fl">0.05</span>, B<span class="op">=</span><span class="dv">4000</span>, seed<span class="op">=</span><span class="dv">42</span>):</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Central bootstrap CI for the relative effect stat(T)/stat(C) - 1.</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co">    stat must accept axis (np.mean, np.median, ...). Resample WITHIN</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co">    each group, independently (the lecture rule!).</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    rng <span class="op">=</span> np.random.default_rng(seed)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    c, t <span class="op">=</span> np.asarray(control, <span class="bu">float</span>), np.asarray(test, <span class="bu">float</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    up_hat <span class="op">=</span> stat(t) <span class="op">/</span> stat(c) <span class="op">-</span> <span class="dv">1</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    c_star <span class="op">=</span> stat(rng.choice(c, size<span class="op">=</span>(B, c.size), replace<span class="op">=</span><span class="va">True</span>), axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    t_star <span class="op">=</span> stat(rng.choice(t, size<span class="op">=</span>(B, t.size), replace<span class="op">=</span><span class="va">True</span>), axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    up_star <span class="op">=</span> t_star <span class="op">/</span> c_star <span class="op">-</span> <span class="dv">1</span>                       <span class="co"># the ratio AS A WHOLE</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    q_lo, q_hi <span class="op">=</span> np.quantile(up_star, [alpha<span class="op">/</span><span class="dv">2</span>, <span class="dv">1</span> <span class="op">-</span> alpha<span class="op">/</span><span class="dv">2</span>])</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"uplift"</span>: up_hat, <span class="st">"ci"</span>: (<span class="dv">2</span><span class="op">*</span>up_hat <span class="op">-</span> q_hi, <span class="dv">2</span><span class="op">*</span>up_hat <span class="op">-</span> q_lo),</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>            <span class="st">"star"</span>: up_star}</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>r <span class="op">=</span> uplift_ci(control, test)</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>elapsed <span class="op">=</span> time.perf_counter() <span class="op">-</span> t0</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>lo, hi <span class="op">=</span> r[<span class="st">"ci"</span>]</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"ARPU uplift: </span><span class="sc">{</span>r[<span class="st">'uplift'</span>]<span class="sc">:+.2%}</span><span class="ss">   95% CI: (</span><span class="sc">{</span>lo<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>hi<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"⏱ execution time: </span><span class="sc">{</span>elapsed<span class="sc">:.2f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>ARPU uplift: +5.21%   95% CI: (+1.48%, +8.79%)
 ⏱ execution time: 0.23 s</code></pre>
@@ -302,18 +333,18 @@ zero-revenue users: 25%</code></pre>
 <div id="cell-star-plot" class="cell" data-execution_count="5">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">9</span>, <span class="fl">3.6</span>))</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>ax.hist(r[<span class="st">"star"</span>], bins<span class="op">=</span><span class="dv">60</span>, density<span class="op">=</span><span class="va">True</span>, color<span class="op">=</span>turquoise, alpha<span class="op">=</span><span class="fl">0.9</span>,</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="vs">r"bootstrap distribution of uplift</span><span class="dv">$^</span><span class="op">*</span><span class="dv">$</span><span class="vs">"</span>)</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>ax.axvline(<span class="dv">0</span>, color<span class="op">=</span>slate, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"zero effect"</span>)</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>ax.axvline(<span class="fl">0.03</span>, color<span class="op">=</span>orange, lw<span class="op">=</span><span class="dv">2</span>, ls<span class="op">=</span><span class="st">"--"</span>, label<span class="op">=</span><span class="st">"breakeven +3%"</span>)</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>ax.axvspan(lo, hi, color<span class="op">=</span>red_pink, alpha<span class="op">=</span><span class="fl">0.20</span>,</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>           label<span class="op">=</span><span class="ss">f"95% CI (</span><span class="sc">{</span>lo<span class="sc">:+.1%}</span><span class="ss">, </span><span class="sc">{</span>hi<span class="sc">:+.1%}</span><span class="ss">)"</span>)</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"ARPU uplift"</span>)</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"density"</span>)</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">9</span>, <span class="fl">3.6</span>))</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>ax.hist(r[<span class="st">"star"</span>], bins<span class="op">=</span><span class="dv">60</span>, density<span class="op">=</span><span class="va">True</span>, color<span class="op">=</span>turquoise, alpha<span class="op">=</span><span class="fl">0.9</span>,</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="vs">r"bootstrap distribution of uplift</span><span class="dv">$^</span><span class="op">*</span><span class="dv">$</span><span class="vs">"</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>ax.axvline(<span class="dv">0</span>, color<span class="op">=</span>slate, lw<span class="op">=</span><span class="dv">2</span>, label<span class="op">=</span><span class="st">"zero effect"</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>ax.axvline(<span class="fl">0.03</span>, color<span class="op">=</span>orange, lw<span class="op">=</span><span class="dv">2</span>, ls<span class="op">=</span><span class="st">"--"</span>, label<span class="op">=</span><span class="st">"breakeven +3%"</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>ax.axvspan(lo, hi, color<span class="op">=</span>red_pink, alpha<span class="op">=</span><span class="fl">0.20</span>,</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>           label<span class="op">=</span><span class="ss">f"95% CI (</span><span class="sc">{</span>lo<span class="sc">:+.1%}</span><span class="ss">, </span><span class="sc">{</span>hi<span class="sc">:+.1%}</span><span class="ss">)"</span>)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"ARPU uplift"</span>)</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"density"</span>)</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-display">
 <div class="quarto-figure quarto-figure-center">
@@ -326,21 +357,21 @@ zero-revenue users: 25%</code></pre>
 <p>The effect is <strong>significant against zero</strong> (the whole CI is above zero) — but notice: the +3% breakeven sits <strong>inside</strong> the interval. We return to this cliffhanger in <a href="#sec-report" class="quarto-xref">Section&nbsp;5</a>.</p>
 <p>Now let’s test the “naive” route from 🔮 — the CI of the difference in UAH divided by the control mean:</p>
 <div id="naive-ci" class="cell" data-execution_count="6">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> diff_ci(control, test, alpha<span class="op">=</span><span class="fl">0.05</span>, B<span class="op">=</span><span class="dv">4000</span>, seed<span class="op">=</span><span class="dv">42</span>):</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Central bootstrap CI for the difference of means (lecture recipe)."""</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    rng <span class="op">=</span> np.random.default_rng(seed)</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    c, t <span class="op">=</span> np.asarray(control, <span class="bu">float</span>), np.asarray(test, <span class="bu">float</span>)</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    d_hat <span class="op">=</span> t.mean() <span class="op">-</span> c.mean()</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    c_star <span class="op">=</span> rng.choice(c, size<span class="op">=</span>(B, c.size), replace<span class="op">=</span><span class="va">True</span>).mean(axis<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    t_star <span class="op">=</span> rng.choice(t, size<span class="op">=</span>(B, t.size), replace<span class="op">=</span><span class="va">True</span>).mean(axis<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    q_lo, q_hi <span class="op">=</span> np.quantile(t_star <span class="op">-</span> c_star, [alpha<span class="op">/</span><span class="dv">2</span>, <span class="dv">1</span> <span class="op">-</span> alpha<span class="op">/</span><span class="dv">2</span>])</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> d_hat, (<span class="dv">2</span><span class="op">*</span>d_hat <span class="op">-</span> q_hi, <span class="dv">2</span><span class="op">*</span>d_hat <span class="op">-</span> q_lo)</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>d_hat, (d_lo, d_hi) <span class="op">=</span> diff_ci(control, test)</span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"difference: </span><span class="sc">{</span>d_hat<span class="sc">:+.1f}</span><span class="ss"> UAH, CI (</span><span class="sc">{</span>d_lo<span class="sc">:+.1f}</span><span class="ss">, </span><span class="sc">{</span>d_hi<span class="sc">:+.1f}</span><span class="ss">)"</span>)</span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"naive %-CI:  (</span><span class="sc">{</span>d_lo<span class="op">/</span>control<span class="sc">.</span>mean()<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>d_hi<span class="op">/</span>control<span class="sc">.</span>mean()<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"honest %-CI: (</span><span class="sc">{</span>lo<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>hi<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> diff_ci(control, test, alpha<span class="op">=</span><span class="fl">0.05</span>, B<span class="op">=</span><span class="dv">4000</span>, seed<span class="op">=</span><span class="dv">42</span>):</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Central bootstrap CI for the difference of means (lecture recipe)."""</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    rng <span class="op">=</span> np.random.default_rng(seed)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    c, t <span class="op">=</span> np.asarray(control, <span class="bu">float</span>), np.asarray(test, <span class="bu">float</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    d_hat <span class="op">=</span> t.mean() <span class="op">-</span> c.mean()</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    c_star <span class="op">=</span> rng.choice(c, size<span class="op">=</span>(B, c.size), replace<span class="op">=</span><span class="va">True</span>).mean(axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    t_star <span class="op">=</span> rng.choice(t, size<span class="op">=</span>(B, t.size), replace<span class="op">=</span><span class="va">True</span>).mean(axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    q_lo, q_hi <span class="op">=</span> np.quantile(t_star <span class="op">-</span> c_star, [alpha<span class="op">/</span><span class="dv">2</span>, <span class="dv">1</span> <span class="op">-</span> alpha<span class="op">/</span><span class="dv">2</span>])</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> d_hat, (<span class="dv">2</span><span class="op">*</span>d_hat <span class="op">-</span> q_hi, <span class="dv">2</span><span class="op">*</span>d_hat <span class="op">-</span> q_lo)</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>d_hat, (d_lo, d_hi) <span class="op">=</span> diff_ci(control, test)</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"difference: </span><span class="sc">{</span>d_hat<span class="sc">:+.1f}</span><span class="ss"> UAH, CI (</span><span class="sc">{</span>d_lo<span class="sc">:+.1f}</span><span class="ss">, </span><span class="sc">{</span>d_hi<span class="sc">:+.1f}</span><span class="ss">)"</span>)</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"naive %-CI:  (</span><span class="sc">{</span>d_lo<span class="op">/</span>control<span class="sc">.</span>mean()<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>d_hi<span class="op">/</span>control<span class="sc">.</span>mean()<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"honest %-CI: (</span><span class="sc">{</span>lo<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>hi<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>difference: +22.4 UAH, CI (+7.2, +37.7)
 naive %-CI:  (+1.68%, +8.77%)
@@ -349,15 +380,15 @@ honest %-CI: (+1.48%, +8.79%)</code></pre>
 </div>
 <p>Almost identical? Yes — but that is the <strong>luck of a small effect</strong>: at ~5% uplift the denominator wobbles little relative to the numerator. Stress test: a smaller sample, a bigger effect.</p>
 <div id="stress" class="cell" data-execution_count="7">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>rng_s <span class="op">=</span> np.random.default_rng(<span class="dv">5</span>)</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>c_small <span class="op">=</span> arpu_sample(<span class="dv">250</span>, rng_s)</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>t_small <span class="op">=</span> arpu_sample(<span class="dv">250</span>, rng_s, uplift<span class="op">=</span><span class="fl">0.35</span>)   <span class="co"># a new premium segment</span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>r_ratio <span class="op">=</span> uplift_ci(c_small, t_small)</span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>ds_hat, (ds_lo, ds_hi) <span class="op">=</span> diff_ci(c_small, t_small)</span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"honest %-CI: (</span><span class="sc">{</span>r_ratio[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:+.1%}</span><span class="ss">, </span><span class="sc">{</span>r_ratio[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:+.1%}</span><span class="ss">)"</span>)</span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"naive  %-CI: (</span><span class="sc">{</span>ds_lo<span class="op">/</span>c_small<span class="sc">.</span>mean()<span class="sc">:+.1%}</span><span class="ss">, </span><span class="sc">{</span>ds_hi<span class="op">/</span>c_small<span class="sc">.</span>mean()<span class="sc">:+.1%}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>rng_s <span class="op">=</span> np.random.default_rng(<span class="dv">5</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>c_small <span class="op">=</span> arpu_sample(<span class="dv">250</span>, rng_s)</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>t_small <span class="op">=</span> arpu_sample(<span class="dv">250</span>, rng_s, uplift<span class="op">=</span><span class="fl">0.35</span>)   <span class="co"># a new premium segment</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>r_ratio <span class="op">=</span> uplift_ci(c_small, t_small)</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>ds_hat, (ds_lo, ds_hi) <span class="op">=</span> diff_ci(c_small, t_small)</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"honest %-CI: (</span><span class="sc">{</span>r_ratio[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:+.1%}</span><span class="ss">, </span><span class="sc">{</span>r_ratio[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:+.1%}</span><span class="ss">)"</span>)</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"naive  %-CI: (</span><span class="sc">{</span>ds_lo<span class="op">/</span>c_small<span class="sc">.</span>mean()<span class="sc">:+.1%}</span><span class="ss">, </span><span class="sc">{</span>ds_hi<span class="op">/</span>c_small<span class="sc">.</span>mean()<span class="sc">:+.1%}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>honest %-CI: (+1.0%, +44.4%)
 naive  %-CI: (+5.3%, +44.1%)</code></pre>
@@ -406,16 +437,16 @@ naive  %-CI: (+5.3%, +44.1%)</code></pre>
 <div id="callout-5" class="callout-5-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <div id="sol1" class="cell" data-execution_count="8">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) median uplift</span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>r_med <span class="op">=</span> uplift_ci(control, test, stat<span class="op">=</span>np.median)</span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"(1) median: </span><span class="sc">{</span>r_med[<span class="st">'uplift'</span>]<span class="sc">:+.2%}</span><span class="ss">  "</span></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"CI (</span><span class="sc">{</span>r_med[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>r_med[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) A/A: no effect — the CI must cover zero</span></span>
-<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>rng_aa <span class="op">=</span> np.random.default_rng(<span class="dv">7</span>)</span>
-<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>r_aa <span class="op">=</span> uplift_ci(arpu_sample(<span class="dv">6000</span>, rng_aa), arpu_sample(<span class="dv">6000</span>, rng_aa))</span>
-<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"(2) A/A:    </span><span class="sc">{</span>r_aa[<span class="st">'uplift'</span>]<span class="sc">:+.2%}</span><span class="ss">  "</span></span>
-<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"CI (</span><span class="sc">{</span>r_aa[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>r_aa[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) median uplift</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>r_med <span class="op">=</span> uplift_ci(control, test, stat<span class="op">=</span>np.median)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"(1) median: </span><span class="sc">{</span>r_med[<span class="st">'uplift'</span>]<span class="sc">:+.2%}</span><span class="ss">  "</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"CI (</span><span class="sc">{</span>r_med[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>r_med[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) A/A: no effect — the CI must cover zero</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>rng_aa <span class="op">=</span> np.random.default_rng(<span class="dv">7</span>)</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>r_aa <span class="op">=</span> uplift_ci(arpu_sample(<span class="dv">6000</span>, rng_aa), arpu_sample(<span class="dv">6000</span>, rng_aa))</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"(2) A/A:    </span><span class="sc">{</span>r_aa[<span class="st">'uplift'</span>]<span class="sc">:+.2%}</span><span class="ss">  "</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"CI (</span><span class="sc">{</span>r_aa[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>r_aa[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>(1) median: +5.43%  CI (+0.23%, +10.25%)
 (2) A/A:    -1.69%  CI (-5.09%, +1.55%)</code></pre>
@@ -458,40 +489,40 @@ naive  %-CI: (+5.3%, +44.1%)</code></pre>
 <section id="tool-v2-uplift_ci_pois" class="level2" data-number="2.1">
 <h2 data-number="2.1" class="anchored" data-anchor-id="tool-v2-uplift_ci_pois"><span class="header-section-number">2.1</span> Tool v2: <code>uplift_ci_pois</code></h2>
 <div id="pois-fn" class="cell" data-execution_count="9">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> uplift_ci_pois(control, test, alpha<span class="op">=</span><span class="fl">0.05</span>, B<span class="op">=</span><span class="dv">4000</span>, seed<span class="op">=</span><span class="dv">42</span>):</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Poisson bootstrap CI for the uplift of MEANS: weights W ~ Pois(1).</span></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="co">    Weighted mean = (w @ x) / w.sum() — sums only, so it computes in one</span></span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="co">    pass over the data and parallelizes across shards.</span></span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    rng <span class="op">=</span> np.random.default_rng(seed)</span>
-<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    c, t <span class="op">=</span> np.asarray(control, <span class="bu">float</span>), np.asarray(test, <span class="bu">float</span>)</span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    up_hat <span class="op">=</span> t.mean() <span class="op">/</span> c.mean() <span class="op">-</span> <span class="dv">1</span></span>
-<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>    wc <span class="op">=</span> rng.poisson(<span class="fl">1.0</span>, size<span class="op">=</span>(B, c.size))</span>
-<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>    wt <span class="op">=</span> rng.poisson(<span class="fl">1.0</span>, size<span class="op">=</span>(B, t.size))</span>
-<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>    c_star <span class="op">=</span> wc <span class="op">@</span> c <span class="op">/</span> wc.<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    t_star <span class="op">=</span> wt <span class="op">@</span> t <span class="op">/</span> wt.<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>    up_star <span class="op">=</span> t_star <span class="op">/</span> c_star <span class="op">-</span> <span class="dv">1</span></span>
-<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>    q_lo, q_hi <span class="op">=</span> np.quantile(up_star, [alpha<span class="op">/</span><span class="dv">2</span>, <span class="dv">1</span> <span class="op">-</span> alpha<span class="op">/</span><span class="dv">2</span>])</span>
-<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"uplift"</span>: up_hat, <span class="st">"ci"</span>: (<span class="dv">2</span><span class="op">*</span>up_hat <span class="op">-</span> q_hi, <span class="dv">2</span><span class="op">*</span>up_hat <span class="op">-</span> q_lo),</span>
-<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>            <span class="st">"star"</span>: up_star, <span class="st">"w0"</span>: (wc <span class="op">==</span> <span class="dv">0</span>).mean()}</span>
-<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
-<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>r_pois <span class="op">=</span> uplift_ci_pois(control, test)</span>
-<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>elapsed <span class="op">=</span> time.perf_counter() <span class="op">-</span> t0</span>
-<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"classic CI: (</span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span>
-<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Poisson CI: (</span><span class="sc">{</span>r_pois[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>r_pois[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span>
-<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"share of weights W=0: </span><span class="sc">{</span>r_pois[<span class="st">'w0'</span>]<span class="sc">:.1%}</span><span class="ss">   (e^-1 = </span><span class="sc">{</span>np<span class="sc">.</span>exp(<span class="op">-</span><span class="dv">1</span>)<span class="sc">:.1%}</span><span class="ss">)"</span>)</span>
-<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"⏱ execution time: </span><span class="sc">{</span>elapsed<span class="sc">:.2f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> uplift_ci_pois(control, test, alpha<span class="op">=</span><span class="fl">0.05</span>, B<span class="op">=</span><span class="dv">4000</span>, seed<span class="op">=</span><span class="dv">42</span>):</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Poisson bootstrap CI for the uplift of MEANS: weights W ~ Pois(1).</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="co">    Weighted mean = (w @ x) / w.sum() — sums only, so it computes in one</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="co">    pass over the data and parallelizes across shards.</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    rng <span class="op">=</span> np.random.default_rng(seed)</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>    c, t <span class="op">=</span> np.asarray(control, <span class="bu">float</span>), np.asarray(test, <span class="bu">float</span>)</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>    up_hat <span class="op">=</span> t.mean() <span class="op">/</span> c.mean() <span class="op">-</span> <span class="dv">1</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    wc <span class="op">=</span> rng.poisson(<span class="fl">1.0</span>, size<span class="op">=</span>(B, c.size))</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>    wt <span class="op">=</span> rng.poisson(<span class="fl">1.0</span>, size<span class="op">=</span>(B, t.size))</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>    c_star <span class="op">=</span> wc <span class="op">@</span> c <span class="op">/</span> wc.<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>    t_star <span class="op">=</span> wt <span class="op">@</span> t <span class="op">/</span> wt.<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>    up_star <span class="op">=</span> t_star <span class="op">/</span> c_star <span class="op">-</span> <span class="dv">1</span></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>    q_lo, q_hi <span class="op">=</span> np.quantile(up_star, [alpha<span class="op">/</span><span class="dv">2</span>, <span class="dv">1</span> <span class="op">-</span> alpha<span class="op">/</span><span class="dv">2</span>])</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"uplift"</span>: up_hat, <span class="st">"ci"</span>: (<span class="dv">2</span><span class="op">*</span>up_hat <span class="op">-</span> q_hi, <span class="dv">2</span><span class="op">*</span>up_hat <span class="op">-</span> q_lo),</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>            <span class="st">"star"</span>: up_star, <span class="st">"w0"</span>: (wc <span class="op">==</span> <span class="dv">0</span>).mean()}</span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>r_pois <span class="op">=</span> uplift_ci_pois(control, test)</span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>elapsed <span class="op">=</span> time.perf_counter() <span class="op">-</span> t0</span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"classic CI: (</span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>r[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Poisson CI: (</span><span class="sc">{</span>r_pois[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>r_pois[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:+.2%}</span><span class="ss">)"</span>)</span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"share of weights W=0: </span><span class="sc">{</span>r_pois[<span class="st">'w0'</span>]<span class="sc">:.1%}</span><span class="ss">   (e^-1 = </span><span class="sc">{</span>np<span class="sc">.</span>exp(<span class="op">-</span><span class="dv">1</span>)<span class="sc">:.1%}</span><span class="ss">)"</span>)</span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"⏱ execution time: </span><span class="sc">{</span>elapsed<span class="sc">:.2f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>classic CI: (+1.48%, +8.79%)
 Poisson CI: (+1.40%, +8.73%)
 share of weights W=0: 36.8%   (e^-1 = 36.8%)
-⏱ execution time: 1.03 s</code></pre>
+⏱ execution time: 1.00 s</code></pre>
 </div>
 </div>
 <p>The intervals practically coincide, and the share of “unused” rows is the lecture’s own <span class="math inline">\(e^{-1} \approx 36.8\%\)</span>: the Poisson bootstrap is the same resampling with replacement, just written <strong>through weights</strong>.</p>
@@ -538,25 +569,25 @@ share of weights W=0: 36.8%   (e^-1 = 36.8%)
 <div id="callout-9" class="callout-9-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <div id="sol2" class="cell" data-execution_count="10">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) the size wobble relative to N vanishes as 1/sqrt(N)</span></span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>N <span class="op">=</span> control.size</span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"(1) sqrt(N)/N = </span><span class="sc">{</span>np<span class="sc">.</span>sqrt(N)<span class="op">/</span>N<span class="sc">:.3f}</span><span class="ss"> — a ~1.3% deviation from N; "</span></span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"a second-order contribution to the error variance"</span>)</span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"    std(uplift*): classic </span><span class="sc">{</span>r[<span class="st">'star'</span>]<span class="sc">.</span>std()<span class="sc">:.4f}</span><span class="ss">, "</span></span>
-<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"Poisson </span><span class="sc">{</span>r_pois[<span class="st">'star'</span>]<span class="sc">.</span>std()<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
-<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) share of users with revenue &gt; 600 UAH</span></span>
-<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>thr <span class="op">=</span> <span class="dv">600</span></span>
-<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>pc, pt <span class="op">=</span> (control <span class="op">&gt;</span> thr).mean(), (test <span class="op">&gt;</span> thr).mean()</span>
-<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>rng2 <span class="op">=</span> np.random.default_rng(<span class="dv">42</span>)</span>
-<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>wc <span class="op">=</span> rng2.poisson(<span class="fl">1.0</span>, size<span class="op">=</span>(<span class="dv">4000</span>, control.size))</span>
-<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>wt <span class="op">=</span> rng2.poisson(<span class="fl">1.0</span>, size<span class="op">=</span>(<span class="dv">4000</span>, test.size))</span>
-<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>pc_star <span class="op">=</span> wc <span class="op">@</span> (control <span class="op">&gt;</span> thr) <span class="op">/</span> wc.<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>pt_star <span class="op">=</span> wt <span class="op">@</span> (test <span class="op">&gt;</span> thr) <span class="op">/</span> wt.<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>up_hat <span class="op">=</span> pt <span class="op">/</span> pc <span class="op">-</span> <span class="dv">1</span></span>
-<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>q_lo, q_hi <span class="op">=</span> np.quantile(pt_star <span class="op">/</span> pc_star <span class="op">-</span> <span class="dv">1</span>, [<span class="fl">0.025</span>, <span class="fl">0.975</span>])</span>
-<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"(2) share &gt;600 UAH: </span><span class="sc">{</span>pc<span class="sc">:.1%}</span><span class="ss"> -&gt; </span><span class="sc">{</span>pt<span class="sc">:.1%}</span><span class="ss">, "</span></span>
-<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"uplift </span><span class="sc">{</span>up_hat<span class="sc">:+.1%}</span><span class="ss">, CI (</span><span class="sc">{</span><span class="dv">2</span><span class="op">*</span>up_hat <span class="op">-</span> q_hi<span class="sc">:+.1%}</span><span class="ss">, </span><span class="sc">{</span><span class="dv">2</span><span class="op">*</span>up_hat <span class="op">-</span> q_lo<span class="sc">:+.1%}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) the size wobble relative to N vanishes as 1/sqrt(N)</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>N <span class="op">=</span> control.size</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"(1) sqrt(N)/N = </span><span class="sc">{</span>np<span class="sc">.</span>sqrt(N)<span class="op">/</span>N<span class="sc">:.3f}</span><span class="ss"> — a ~1.3% deviation from N; "</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"a second-order contribution to the error variance"</span>)</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"    std(uplift*): classic </span><span class="sc">{</span>r[<span class="st">'star'</span>]<span class="sc">.</span>std()<span class="sc">:.4f}</span><span class="ss">, "</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"Poisson </span><span class="sc">{</span>r_pois[<span class="st">'star'</span>]<span class="sc">.</span>std()<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) share of users with revenue &gt; 600 UAH</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>thr <span class="op">=</span> <span class="dv">600</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>pc, pt <span class="op">=</span> (control <span class="op">&gt;</span> thr).mean(), (test <span class="op">&gt;</span> thr).mean()</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>rng2 <span class="op">=</span> np.random.default_rng(<span class="dv">42</span>)</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>wc <span class="op">=</span> rng2.poisson(<span class="fl">1.0</span>, size<span class="op">=</span>(<span class="dv">4000</span>, control.size))</span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>wt <span class="op">=</span> rng2.poisson(<span class="fl">1.0</span>, size<span class="op">=</span>(<span class="dv">4000</span>, test.size))</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>pc_star <span class="op">=</span> wc <span class="op">@</span> (control <span class="op">&gt;</span> thr) <span class="op">/</span> wc.<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>pt_star <span class="op">=</span> wt <span class="op">@</span> (test <span class="op">&gt;</span> thr) <span class="op">/</span> wt.<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>up_hat <span class="op">=</span> pt <span class="op">/</span> pc <span class="op">-</span> <span class="dv">1</span></span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>q_lo, q_hi <span class="op">=</span> np.quantile(pt_star <span class="op">/</span> pc_star <span class="op">-</span> <span class="dv">1</span>, [<span class="fl">0.025</span>, <span class="fl">0.975</span>])</span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"(2) share &gt;600 UAH: </span><span class="sc">{</span>pc<span class="sc">:.1%}</span><span class="ss"> -&gt; </span><span class="sc">{</span>pt<span class="sc">:.1%}</span><span class="ss">, "</span></span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"uplift </span><span class="sc">{</span>up_hat<span class="sc">:+.1%}</span><span class="ss">, CI (</span><span class="sc">{</span><span class="dv">2</span><span class="op">*</span>up_hat <span class="op">-</span> q_hi<span class="sc">:+.1%}</span><span class="ss">, </span><span class="sc">{</span><span class="dv">2</span><span class="op">*</span>up_hat <span class="op">-</span> q_lo<span class="sc">:+.1%}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>(1) sqrt(N)/N = 0.013 — a ~1.3% deviation from N; a second-order contribution to the error variance
     std(uplift*): classic 0.0188, Poisson 0.0188
@@ -574,20 +605,20 @@ share of weights W=0: 36.8%   (e^-1 = 36.8%)
 <h1 data-number="3"><span class="header-section-number">3</span> Part III — Is our engine honest? Monte Carlo</h1>
 <p>We built two engines from scratch — and, per the course habit, <strong>we take neither on faith</strong>. Same test bench as in Practices 5–8: simulate worlds where we know the truth and count how often the tool errs.</p>
 <div id="rate-uplift" class="cell" data-execution_count="11">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> rate_uplift(engine, n, uplift<span class="op">=</span><span class="fl">0.0</span>, n_exps<span class="op">=</span><span class="dv">400</span>, B<span class="op">=</span><span class="dv">800</span>, alpha<span class="op">=</span><span class="fl">0.05</span>, seed<span class="op">=</span><span class="dv">1</span>):</span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Share of experiments where the CI did NOT cover zero (+ Wilson CI).</span></span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a><span class="co">    uplift=0 -&gt; A/A worlds, rate = FPR (an honest engine ~ alpha).</span></span>
-<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="co">    uplift&gt;0 -&gt; rate = power on an effect of that size.</span></span>
-<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
-<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    rng, rej <span class="op">=</span> np.random.default_rng(seed), <span class="dv">0</span></span>
-<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n_exps):</span>
-<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>        c <span class="op">=</span> arpu_sample(n, rng)</span>
-<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>        t <span class="op">=</span> arpu_sample(n, rng, uplift<span class="op">=</span>uplift)</span>
-<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>        lo, hi <span class="op">=</span> engine(c, t, B<span class="op">=</span>B, seed<span class="op">=</span>seed <span class="op">+</span> i)[<span class="st">"ci"</span>]</span>
-<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>        rej <span class="op">+=</span> (lo <span class="op">&gt;</span> <span class="dv">0</span>) <span class="kw">or</span> (hi <span class="op">&lt;</span> <span class="dv">0</span>)</span>
-<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> proportion_confint(rej, n_exps, method<span class="op">=</span><span class="st">"wilson"</span>)</span>
-<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"rate"</span>: rej <span class="op">/</span> n_exps, <span class="st">"ci"</span>: (lo, hi)}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> rate_uplift(engine, n, uplift<span class="op">=</span><span class="fl">0.0</span>, n_exps<span class="op">=</span><span class="dv">400</span>, B<span class="op">=</span><span class="dv">800</span>, alpha<span class="op">=</span><span class="fl">0.05</span>, seed<span class="op">=</span><span class="dv">1</span>):</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Share of experiments where the CI did NOT cover zero (+ Wilson CI).</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="co">    uplift=0 -&gt; A/A worlds, rate = FPR (an honest engine ~ alpha).</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="co">    uplift&gt;0 -&gt; rate = power on an effect of that size.</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>    rng, rej <span class="op">=</span> np.random.default_rng(seed), <span class="dv">0</span></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n_exps):</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>        c <span class="op">=</span> arpu_sample(n, rng)</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>        t <span class="op">=</span> arpu_sample(n, rng, uplift<span class="op">=</span>uplift)</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>        lo, hi <span class="op">=</span> engine(c, t, B<span class="op">=</span>B, seed<span class="op">=</span>seed <span class="op">+</span> i)[<span class="st">"ci"</span>]</span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>        rej <span class="op">+=</span> (lo <span class="op">&gt;</span> <span class="dv">0</span>) <span class="kw">or</span> (hi <span class="op">&lt;</span> <span class="dv">0</span>)</span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> proportion_confint(rej, n_exps, method<span class="op">=</span><span class="st">"wilson"</span>)</span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"rate"</span>: rej <span class="op">/</span> n_exps, <span class="st">"ci"</span>: (lo, hi)}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-tip no-icon callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -603,16 +634,16 @@ share of weights W=0: 36.8%   (e^-1 = 36.8%)
 </div>
 </div>
 <div id="fpr-run" class="cell" data-execution_count="12">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, engine <span class="kw">in</span> [(<span class="st">"classic"</span>, uplift_ci),</span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>                     (<span class="st">"Poisson"</span>, uplift_ci_pois)]:</span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    t0 <span class="op">=</span> time.perf_counter()</span>
-<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>    f <span class="op">=</span> rate_uplift(engine, n<span class="op">=</span><span class="dv">1500</span>)</span>
-<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>    elapsed <span class="op">=</span> time.perf_counter() <span class="op">-</span> t0</span>
-<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">}</span><span class="ss">: FPR = </span><span class="sc">{</span>f[<span class="st">'rate'</span>]<span class="sc">:.3f}</span><span class="ss">  "</span></span>
-<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"Wilson (</span><span class="sc">{</span>f[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>f[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)   ⏱ </span><span class="sc">{</span>elapsed<span class="sc">:.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, engine <span class="kw">in</span> [(<span class="st">"classic"</span>, uplift_ci),</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>                     (<span class="st">"Poisson"</span>, uplift_ci_pois)]:</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    t0 <span class="op">=</span> time.perf_counter()</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>    f <span class="op">=</span> rate_uplift(engine, n<span class="op">=</span><span class="dv">1500</span>)</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>    elapsed <span class="op">=</span> time.perf_counter() <span class="op">-</span> t0</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">}</span><span class="ss">: FPR = </span><span class="sc">{</span>f[<span class="st">'rate'</span>]<span class="sc">:.3f}</span><span class="ss">  "</span></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"Wilson (</span><span class="sc">{</span>f[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, </span><span class="sc">{</span>f[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">)   ⏱ </span><span class="sc">{</span>elapsed<span class="sc">:.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>classic: FPR = 0.050  Wilson (0.033, 0.076)   ⏱ 4.9 s
-Poisson: FPR = 0.052  Wilson (0.035, 0.079)   ⏱ 20.5 s</code></pre>
+<pre><code>classic: FPR = 0.050  Wilson (0.033, 0.076)   ⏱ 5.1 s
+Poisson: FPR = 0.052  Wilson (0.035, 0.079)   ⏱ 20.2 s</code></pre>
 </div>
 </div>
 <p>Both hold <span class="math inline">\(\alpha\)</span> — we have <strong>earned the right to use them</strong>. This is not a formality: in Part I we saw how a “minor” change (dividing by a frozen mean) silently corrupts the lower bound. The only way to know is to check.</p>
@@ -645,14 +676,14 @@ Poisson: FPR = 0.052  Wilson (0.035, 0.079)   ⏱ 20.5 s</code></pre>
 <div id="callout-12" class="callout-12-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <div id="sol3" class="cell" data-execution_count="13">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>pw <span class="op">=</span> rate_uplift(uplift_ci_pois, <span class="dv">1500</span>, uplift<span class="op">=</span><span class="fl">0.05</span>, n_exps<span class="op">=</span><span class="dv">300</span>)</span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"(1) power(+5%, n=1500) = </span><span class="sc">{</span>pw[<span class="st">'rate'</span>]<span class="sc">:.2f}</span><span class="ss">  "</span></span>
-<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"Wilson (</span><span class="sc">{</span>pw[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.2f}</span><span class="ss">, </span><span class="sc">{</span>pw[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.2f}</span><span class="ss">)"</span>)</span>
-<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"⏱ execution time: </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> t0<span class="sc">:.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>pw <span class="op">=</span> rate_uplift(uplift_ci_pois, <span class="dv">1500</span>, uplift<span class="op">=</span><span class="fl">0.05</span>, n_exps<span class="op">=</span><span class="dv">300</span>)</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"(1) power(+5%, n=1500) = </span><span class="sc">{</span>pw[<span class="st">'rate'</span>]<span class="sc">:.2f}</span><span class="ss">  "</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"Wilson (</span><span class="sc">{</span>pw[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.2f}</span><span class="ss">, </span><span class="sc">{</span>pw[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.2f}</span><span class="ss">)"</span>)</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"⏱ execution time: </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> t0<span class="sc">:.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>(1) power(+5%, n=1500) = 0.27  Wilson (0.22, 0.32)
-⏱ execution time: 15.4 s</code></pre>
+⏱ execution time: 15.2 s</code></pre>
 </div>
 </div>
 <p><strong>Interpretation.</strong> (1) Only about a quarter of such experiments would catch a real +5%. (2) “Non-significant” at n=1500 is the expected outcome <strong>even if the feature works</strong>: three out of four such launches end in nothing. So how many users do we need? That is a <strong>design</strong> question — Part IV.</p>
@@ -683,21 +714,21 @@ Poisson: FPR = 0.052  Wilson (0.035, 0.079)   ⏱ 20.5 s</code></pre>
 <section id="tool-v3-power_sim" class="level2" data-number="4.1">
 <h2 data-number="4.1" class="anchored" data-anchor-id="tool-v3-power_sim"><span class="header-section-number">4.1</span> Tool v3: <code>power_sim</code></h2>
 <div id="power-sim" class="cell" data-execution_count="14">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> power_sim(pilot, uplift, n, n_exps<span class="op">=</span><span class="dv">200</span>, B<span class="op">=</span><span class="dv">800</span>, seed<span class="op">=</span><span class="dv">1</span>):</span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Power by simulation: resample the pilot as the 'world' + injected uplift."""</span></span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    rng, hits <span class="op">=</span> np.random.default_rng(seed), <span class="dv">0</span></span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    pilot <span class="op">=</span> np.asarray(pilot, <span class="bu">float</span>)</span>
-<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n_exps):</span>
-<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>        c <span class="op">=</span> rng.choice(pilot, n, replace<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>        t <span class="op">=</span> rng.choice(pilot, n, replace<span class="op">=</span><span class="va">True</span>) <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> uplift)</span>
-<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>        hits <span class="op">+=</span> uplift_ci_pois(c, t, B<span class="op">=</span>B, seed<span class="op">=</span>seed <span class="op">+</span> i)[<span class="st">"ci"</span>][<span class="dv">0</span>] <span class="op">&gt;</span> <span class="dv">0</span></span>
-<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> proportion_confint(hits, n_exps, method<span class="op">=</span><span class="st">"wilson"</span>)</span>
-<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"power"</span>: hits <span class="op">/</span> n_exps, <span class="st">"ci"</span>: (lo, hi)}</span>
-<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a>rng_pilot <span class="op">=</span> np.random.default_rng(<span class="dv">21</span>)</span>
-<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a>pilot <span class="op">=</span> arpu_sample(<span class="dv">1500</span>, rng_pilot)      <span class="co"># the Lviv log, no feature yet</span></span>
-<span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"pilot: ARPU </span><span class="sc">{</span>pilot<span class="sc">.</span>mean()<span class="sc">:.0f}</span><span class="ss"> UAH, zeros </span><span class="sc">{</span>np<span class="sc">.</span>mean(pilot <span class="op">==</span> <span class="dv">0</span>)<span class="sc">:.0%}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> power_sim(pilot, uplift, n, n_exps<span class="op">=</span><span class="dv">200</span>, B<span class="op">=</span><span class="dv">800</span>, seed<span class="op">=</span><span class="dv">1</span>):</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Power by simulation: resample the pilot as the 'world' + injected uplift."""</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    rng, hits <span class="op">=</span> np.random.default_rng(seed), <span class="dv">0</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>    pilot <span class="op">=</span> np.asarray(pilot, <span class="bu">float</span>)</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n_exps):</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>        c <span class="op">=</span> rng.choice(pilot, n, replace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>        t <span class="op">=</span> rng.choice(pilot, n, replace<span class="op">=</span><span class="va">True</span>) <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> uplift)</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>        hits <span class="op">+=</span> uplift_ci_pois(c, t, B<span class="op">=</span>B, seed<span class="op">=</span>seed <span class="op">+</span> i)[<span class="st">"ci"</span>][<span class="dv">0</span>] <span class="op">&gt;</span> <span class="dv">0</span></span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> proportion_confint(hits, n_exps, method<span class="op">=</span><span class="st">"wilson"</span>)</span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"power"</span>: hits <span class="op">/</span> n_exps, <span class="st">"ci"</span>: (lo, hi)}</span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>rng_pilot <span class="op">=</span> np.random.default_rng(<span class="dv">21</span>)</span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>pilot <span class="op">=</span> arpu_sample(<span class="dv">1500</span>, rng_pilot)      <span class="co"># the Lviv log, no feature yet</span></span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"pilot: ARPU </span><span class="sc">{</span>pilot<span class="sc">.</span>mean()<span class="sc">:.0f}</span><span class="ss"> UAH, zeros </span><span class="sc">{</span>np<span class="sc">.</span>mean(pilot <span class="op">==</span> <span class="dv">0</span>)<span class="sc">:.0%}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>pilot: ARPU 437 UAH, zeros 25%</code></pre>
 </div>
@@ -716,40 +747,40 @@ Poisson: FPR = 0.052  Wilson (0.035, 0.079)   ⏱ 20.5 s</code></pre>
 </div>
 </div>
 <div id="power-curve" class="cell" data-execution_count="15">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>sizes <span class="op">=</span> [<span class="dv">1000</span>, <span class="dv">2000</span>, <span class="dv">4000</span>, <span class="dv">8000</span>]</span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>curve <span class="op">=</span> [power_sim(pilot, uplift<span class="op">=</span><span class="fl">0.05</span>, n<span class="op">=</span>n) <span class="cf">for</span> n <span class="kw">in</span> sizes]</span>
-<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>elapsed <span class="op">=</span> time.perf_counter() <span class="op">-</span> t0</span>
-<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n, pw <span class="kw">in</span> <span class="bu">zip</span>(sizes, curve):</span>
-<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"n = </span><span class="sc">{</span>n<span class="sc">:5d}</span><span class="ss">: power </span><span class="sc">{</span>pw[<span class="st">'power'</span>]<span class="sc">:.2f}</span><span class="ss">  "</span></span>
-<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"(</span><span class="sc">{</span>pw[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.2f}</span><span class="ss">, </span><span class="sc">{</span>pw[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.2f}</span><span class="ss">)"</span>)</span>
-<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"⏱ execution time: </span><span class="sc">{</span>elapsed<span class="sc">:.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>sizes <span class="op">=</span> [<span class="dv">1000</span>, <span class="dv">2000</span>, <span class="dv">4000</span>, <span class="dv">8000</span>]</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>curve <span class="op">=</span> [power_sim(pilot, uplift<span class="op">=</span><span class="fl">0.05</span>, n<span class="op">=</span>n) <span class="cf">for</span> n <span class="kw">in</span> sizes]</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>elapsed <span class="op">=</span> time.perf_counter() <span class="op">-</span> t0</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n, pw <span class="kw">in</span> <span class="bu">zip</span>(sizes, curve):</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"n = </span><span class="sc">{</span>n<span class="sc">:5d}</span><span class="ss">: power </span><span class="sc">{</span>pw[<span class="st">'power'</span>]<span class="sc">:.2f}</span><span class="ss">  "</span></span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"(</span><span class="sc">{</span>pw[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.2f}</span><span class="ss">, </span><span class="sc">{</span>pw[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.2f}</span><span class="ss">)"</span>)</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"⏱ execution time: </span><span class="sc">{</span>elapsed<span class="sc">:.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>n =  1000: power 0.17  (0.12, 0.22)
 n =  2000: power 0.28  (0.23, 0.35)
 n =  4000: power 0.55  (0.48, 0.62)
 n =  8000: power 0.84  (0.79, 0.89)
-⏱ execution time: 101.3 s</code></pre>
+⏱ execution time: 100.3 s</code></pre>
 </div>
 </div>
 <div id="cell-power-plot" class="cell" data-execution_count="16">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">9</span>, <span class="fl">3.8</span>))</span>
-<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>xt <span class="op">=</span> np.arange(<span class="bu">len</span>(sizes))</span>
-<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>band <span class="op">=</span> np.array([pw[<span class="st">"ci"</span>] <span class="cf">for</span> pw <span class="kw">in</span> curve])</span>
-<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>ax.axhline(<span class="fl">0.8</span>, color<span class="op">=</span>red, lw<span class="op">=</span><span class="dv">2</span>, ls<span class="op">=</span><span class="st">"--"</span>, label<span class="op">=</span><span class="st">"80% target"</span>)</span>
-<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>ax.plot(xt, [pw[<span class="st">"power"</span>] <span class="cf">for</span> pw <span class="kw">in</span> curve], color<span class="op">=</span>green, lw<span class="op">=</span><span class="fl">2.5</span>, marker<span class="op">=</span><span class="st">"o"</span>,</span>
-<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="st">"power (MDE = +5%)"</span>)</span>
-<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>ax.fill_between(xt, band[:, <span class="dv">0</span>], band[:, <span class="dv">1</span>], color<span class="op">=</span>green, alpha<span class="op">=</span><span class="fl">0.18</span>)</span>
-<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>ax.set_xticks(xt, sizes)</span>
-<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"users per arm"</span>)</span>
-<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"power"</span>)</span>
-<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Power curve simulated from the pilot"</span>)</span>
-<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
-<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">9</span>, <span class="fl">3.8</span>))</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>xt <span class="op">=</span> np.arange(<span class="bu">len</span>(sizes))</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>band <span class="op">=</span> np.array([pw[<span class="st">"ci"</span>] <span class="cf">for</span> pw <span class="kw">in</span> curve])</span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>ax.axhline(<span class="fl">0.8</span>, color<span class="op">=</span>red, lw<span class="op">=</span><span class="dv">2</span>, ls<span class="op">=</span><span class="st">"--"</span>, label<span class="op">=</span><span class="st">"80% target"</span>)</span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>ax.plot(xt, [pw[<span class="st">"power"</span>] <span class="cf">for</span> pw <span class="kw">in</span> curve], color<span class="op">=</span>green, lw<span class="op">=</span><span class="fl">2.5</span>, marker<span class="op">=</span><span class="st">"o"</span>,</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="st">"power (MDE = +5%)"</span>)</span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>ax.fill_between(xt, band[:, <span class="dv">0</span>], band[:, <span class="dv">1</span>], color<span class="op">=</span>green, alpha<span class="op">=</span><span class="fl">0.18</span>)</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>ax.set_xticks(xt, sizes)</span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"users per arm"</span>)</span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"power"</span>)</span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Power curve simulated from the pilot"</span>)</span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-display">
 <div class="quarto-figure quarto-figure-center">
@@ -761,13 +792,13 @@ n =  8000: power 0.84  (0.79, 0.89)
 </div>
 <p>80% is reached near <strong>n ≈ 8000 per arm</strong>. And the other way around — fix <span class="math inline">\(n\)</span> and ask which effect we can still catch: that is the <strong>MDE at a given n</strong>.</p>
 <div id="mde-run" class="cell" data-execution_count="17">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>n_fix <span class="op">=</span> <span class="dv">4000</span></span>
-<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
-<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> u <span class="kw">in</span> (<span class="fl">0.03</span>, <span class="fl">0.04</span>, <span class="fl">0.05</span>, <span class="fl">0.06</span>, <span class="fl">0.07</span>, <span class="fl">0.08</span>):</span>
-<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>    pw <span class="op">=</span> power_sim(pilot, uplift<span class="op">=</span>u, n<span class="op">=</span>n_fix)</span>
-<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>    flag <span class="op">=</span> <span class="st">"  &lt;- ~80%"</span> <span class="cf">if</span> <span class="fl">0.75</span> <span class="op">&lt;=</span> pw[<span class="st">"power"</span>] <span class="op">&lt;=</span> <span class="fl">0.85</span> <span class="cf">else</span> <span class="st">""</span></span>
-<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"uplift </span><span class="sc">{</span>u<span class="sc">:+.0%}</span><span class="ss">: power </span><span class="sc">{</span>pw[<span class="st">'power'</span>]<span class="sc">:.2f}{</span>flag<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"⏱ execution time: </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> t0<span class="sc">:.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>n_fix <span class="op">=</span> <span class="dv">4000</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> u <span class="kw">in</span> (<span class="fl">0.03</span>, <span class="fl">0.04</span>, <span class="fl">0.05</span>, <span class="fl">0.06</span>, <span class="fl">0.07</span>, <span class="fl">0.08</span>):</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>    pw <span class="op">=</span> power_sim(pilot, uplift<span class="op">=</span>u, n<span class="op">=</span>n_fix)</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>    flag <span class="op">=</span> <span class="st">"  &lt;- ~80%"</span> <span class="cf">if</span> <span class="fl">0.75</span> <span class="op">&lt;=</span> pw[<span class="st">"power"</span>] <span class="op">&lt;=</span> <span class="fl">0.85</span> <span class="cf">else</span> <span class="st">""</span></span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"uplift </span><span class="sc">{</span>u<span class="sc">:+.0%}</span><span class="ss">: power </span><span class="sc">{</span>pw[<span class="st">'power'</span>]<span class="sc">:.2f}{</span>flag<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"⏱ execution time: </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> t0<span class="sc">:.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>uplift +3%: power 0.24
 uplift +4%: power 0.41
@@ -775,7 +806,7 @@ uplift +5%: power 0.55
 uplift +6%: power 0.71
 uplift +7%: power 0.81  &lt;- ~80%
 uplift +8%: power 0.90
-⏱ execution time: 162.1 s</code></pre>
+⏱ execution time: 160.3 s</code></pre>
 </div>
 </div>
 <p>At n = 4000 only effects of <strong>≈+7% and up</strong> are caught reliably: a smaller traffic budget means a coarser ruler.</p>
@@ -791,18 +822,18 @@ uplift +8%: power 0.90
 <div class="callout-body-container callout-body">
 <p>While we were planning, an impatient Lviv manager <strong>already launched</strong> a two-week experiment: 700 users per arm.</p>
 <div id="catch-lviv" class="cell" data-execution_count="18">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>rng_l <span class="op">=</span> np.random.default_rng(<span class="dv">17</span>)</span>
-<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>c_lv <span class="op">=</span> arpu_sample(<span class="dv">700</span>, rng_l)</span>
-<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>t_lv <span class="op">=</span> arpu_sample(<span class="dv">700</span>, rng_l, uplift<span class="op">=</span><span class="fl">0.05</span>)   <span class="co"># the effect IS there</span></span>
-<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>r_lv <span class="op">=</span> uplift_ci_pois(c_lv, t_lv)</span>
-<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>se <span class="op">=</span> r_lv[<span class="st">"star"</span>].std()</span>
-<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>z <span class="op">=</span> r_lv[<span class="st">"uplift"</span>] <span class="op">/</span> se</span>
-<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> <span class="dv">2</span> <span class="op">*</span> (<span class="dv">1</span> <span class="op">-</span> norm.cdf(<span class="bu">abs</span>(z)))</span>
-<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"uplift </span><span class="sc">{</span>r_lv[<span class="st">'uplift'</span>]<span class="sc">:+.2%}</span><span class="ss">, "</span></span>
-<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"CI (</span><span class="sc">{</span>r_lv[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>r_lv[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:+.2%}</span><span class="ss">), p ~ </span><span class="sc">{</span>p<span class="sc">:.2f}</span><span class="ss">"</span>)</span>
-<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"'power at the observed effect': "</span></span>
-<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"</span><span class="sc">{</span>norm<span class="sc">.</span>cdf(<span class="bu">abs</span>(z) <span class="op">-</span> norm.ppf(<span class="fl">0.975</span>))<span class="sc">:.2f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>rng_l <span class="op">=</span> np.random.default_rng(<span class="dv">17</span>)</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>c_lv <span class="op">=</span> arpu_sample(<span class="dv">700</span>, rng_l)</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>t_lv <span class="op">=</span> arpu_sample(<span class="dv">700</span>, rng_l, uplift<span class="op">=</span><span class="fl">0.05</span>)   <span class="co"># the effect IS there</span></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>r_lv <span class="op">=</span> uplift_ci_pois(c_lv, t_lv)</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>se <span class="op">=</span> r_lv[<span class="st">"star"</span>].std()</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>z <span class="op">=</span> r_lv[<span class="st">"uplift"</span>] <span class="op">/</span> se</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> <span class="dv">2</span> <span class="op">*</span> (<span class="dv">1</span> <span class="op">-</span> norm.cdf(<span class="bu">abs</span>(z)))</span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"uplift </span><span class="sc">{</span>r_lv[<span class="st">'uplift'</span>]<span class="sc">:+.2%}</span><span class="ss">, "</span></span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"CI (</span><span class="sc">{</span>r_lv[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>r_lv[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:+.2%}</span><span class="ss">), p ~ </span><span class="sc">{</span>p<span class="sc">:.2f}</span><span class="ss">"</span>)</span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"'power at the observed effect': "</span></span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"</span><span class="sc">{</span>norm<span class="sc">.</span>cdf(<span class="bu">abs</span>(z) <span class="op">-</span> norm.ppf(<span class="fl">0.975</span>))<span class="sc">:.2f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>uplift +4.30%, CI (-6.23%, +14.11%), p ~ 0.41
 'power at the observed effect': 0.13</code></pre>
@@ -811,10 +842,10 @@ uplift +8%: power 0.90
 <p><strong>Analyst A:</strong> “The CI covers zero, but look: the power at the observed +4.3% is only 13%! The test is simply blind, the effect is surely real — I propose we declare a win.”</p>
 <p><strong>Analyst B:</strong> “‘Power at the observed effect’ is <strong>the p-value wearing a percent costume</strong>. It is computed from <span class="math inline">\(z\)</span>, and <span class="math inline">\(z\)</span> is a monotone function of <span class="math inline">\(p\)</span>. Look:</p>
 <div id="catch-mapping" class="cell" data-execution_count="19">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"p-value  -&gt; 'post-hoc power'"</span>)</span>
-<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> pp <span class="kw">in</span> (<span class="fl">0.01</span>, <span class="fl">0.05</span>, <span class="fl">0.2</span>, <span class="fl">0.4</span>, <span class="fl">0.8</span>):</span>
-<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>    zz <span class="op">=</span> norm.ppf(<span class="dv">1</span> <span class="op">-</span> pp<span class="op">/</span><span class="dv">2</span>)</span>
-<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  </span><span class="sc">{</span>pp<span class="sc">:.2f}</span><span class="ss">   -&gt;  </span><span class="sc">{</span>norm<span class="sc">.</span>cdf(zz <span class="op">-</span> norm.ppf(<span class="fl">0.975</span>))<span class="sc">:.2f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"p-value  -&gt; 'post-hoc power'"</span>)</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> pp <span class="kw">in</span> (<span class="fl">0.01</span>, <span class="fl">0.05</span>, <span class="fl">0.2</span>, <span class="fl">0.4</span>, <span class="fl">0.8</span>):</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>    zz <span class="op">=</span> norm.ppf(<span class="dv">1</span> <span class="op">-</span> pp<span class="op">/</span><span class="dv">2</span>)</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  </span><span class="sc">{</span>pp<span class="sc">:.2f}</span><span class="ss">   -&gt;  </span><span class="sc">{</span>norm<span class="sc">.</span>cdf(zz <span class="op">-</span> norm.ppf(<span class="fl">0.975</span>))<span class="sc">:.2f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>p-value  -&gt; 'post-hoc power'
   0.01   -&gt;  0.73
@@ -857,19 +888,19 @@ uplift +8%: power 0.90
 <div id="callout-17" class="callout-17-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <div id="sol4" class="cell" data-execution_count="20">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) from the curve: 80% near n=8000 -&gt; 8000/2000 = ~4 weeks</span></span>
-<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"(1) ~8000 per arm / 2000 per week = ~4 weeks"</span>)</span>
-<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) MDE = breakeven = +3%</span></span>
-<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
-<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>pw <span class="op">=</span> power_sim(pilot, uplift<span class="op">=</span><span class="fl">0.03</span>, n<span class="op">=</span><span class="dv">16000</span>, n_exps<span class="op">=</span><span class="dv">150</span>)</span>
-<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"(2) power(+3%, n=16000) = </span><span class="sc">{</span>pw[<span class="st">'power'</span>]<span class="sc">:.2f}</span><span class="ss">  "</span></span>
-<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"(</span><span class="sc">{</span>pw[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.2f}</span><span class="ss">, </span><span class="sc">{</span>pw[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.2f}</span><span class="ss">)"</span>)</span>
-<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"⏱ execution time: </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> t0<span class="sc">:.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (1) from the curve: 80% near n=8000 -&gt; 8000/2000 = ~4 weeks</span></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"(1) ~8000 per arm / 2000 per week = ~4 weeks"</span>)</span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a><span class="co"># (2) MDE = breakeven = +3%</span></span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>pw <span class="op">=</span> power_sim(pilot, uplift<span class="op">=</span><span class="fl">0.03</span>, n<span class="op">=</span><span class="dv">16000</span>, n_exps<span class="op">=</span><span class="dv">150</span>)</span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"(2) power(+3%, n=16000) = </span><span class="sc">{</span>pw[<span class="st">'power'</span>]<span class="sc">:.2f}</span><span class="ss">  "</span></span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"(</span><span class="sc">{</span>pw[<span class="st">'ci'</span>][<span class="dv">0</span>]<span class="sc">:.2f}</span><span class="ss">, </span><span class="sc">{</span>pw[<span class="st">'ci'</span>][<span class="dv">1</span>]<span class="sc">:.2f}</span><span class="ss">)"</span>)</span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"⏱ execution time: </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> t0<span class="sc">:.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>(1) ~8000 per arm / 2000 per week = ~4 weeks
 (2) power(+3%, n=16000) = 0.71  (0.64, 0.78)
-⏱ execution time: 80.4 s</code></pre>
+⏱ execution time: 79.7 s</code></pre>
 </div>
 </div>
 <p><strong>Interpretation.</strong> (1) Four weeks — and that is the honest price: the two-week launch on 700 users was theater, not an experiment. (2) Even 16k per arm (8 weeks!) gives only ~70%: catching +3% in Lviv is an unrealistic plan. The sane options: plan for a larger MDE, pool cities, or lengthen the metric window. That is a design decision, and it is made <strong>now</strong>, not after a failure.</p>
@@ -897,35 +928,35 @@ uplift +8%: power 0.90
 </div>
 <p>Significance against <strong>zero</strong> is the wrong threshold: money is compared to <strong>breakeven</strong>. But a binary “lower bound above/below +3%” throws away half the information too. Let’s assemble everything we can do into the final tool: <strong>three zones</strong> instead of two, the probability of profitability, and the expected value.</p>
 <div id="ab-report" class="cell" data-execution_count="21">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> ab_report(control, test, breakeven, annual_revenue,</span>
-<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>              alpha<span class="op">=</span><span class="fl">0.05</span>, B<span class="op">=</span><span class="dv">4000</span>, seed<span class="op">=</span><span class="dv">42</span>):</span>
-<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Final A/B report: uplift, CI, three-zone decision, P(profitable), EV.</span></span>
-<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a><span class="co">    Zones: SHIP if the whole CI is above breakeven; KILL if it is entirely</span></span>
-<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a><span class="co">    below; otherwise GREY ZONE. P(profitable) and EV come from the</span></span>
-<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a><span class="co">    bootstrap distribution of uplift*.</span></span>
-<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
-<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> uplift_ci_pois(control, test, alpha<span class="op">=</span>alpha, B<span class="op">=</span>B, seed<span class="op">=</span>seed)</span>
-<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> r[<span class="st">"ci"</span>]</span>
-<span id="cb35-11"><a href="#cb35-11" aria-hidden="true" tabindex="-1"></a>    star <span class="op">=</span> r[<span class="st">"star"</span>]</span>
-<span id="cb35-12"><a href="#cb35-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-13"><a href="#cb35-13" aria-hidden="true" tabindex="-1"></a>    zone <span class="op">=</span> (<span class="st">"SHIP — roll it out"</span> <span class="cf">if</span> lo <span class="op">&gt;</span> breakeven <span class="cf">else</span></span>
-<span id="cb35-14"><a href="#cb35-14" aria-hidden="true" tabindex="-1"></a>            <span class="st">"KILL — switch it off"</span> <span class="cf">if</span> hi <span class="op">&lt;</span> breakeven <span class="cf">else</span></span>
-<span id="cb35-15"><a href="#cb35-15" aria-hidden="true" tabindex="-1"></a>            <span class="st">"GREY ZONE — more data needed"</span>)</span>
-<span id="cb35-16"><a href="#cb35-16" aria-hidden="true" tabindex="-1"></a>    p_be <span class="op">=</span> (star <span class="op">&gt;=</span> breakeven).mean()          <span class="co"># P(effect &gt;= breakeven)</span></span>
-<span id="cb35-17"><a href="#cb35-17" aria-hidden="true" tabindex="-1"></a>    ev <span class="op">=</span> annual_revenue <span class="op">*</span> (star.mean() <span class="op">-</span> breakeven)   <span class="co"># expected net value</span></span>
-<span id="cb35-18"><a href="#cb35-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-19"><a href="#cb35-19" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"uplift:         </span><span class="sc">{</span>r[<span class="st">'uplift'</span>]<span class="sc">:+.2%}</span><span class="ss">"</span>)</span>
-<span id="cb35-20"><a href="#cb35-20" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"95% CI:         (</span><span class="sc">{</span>lo<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>hi<span class="sc">:+.2%}</span><span class="ss">)   breakeven </span><span class="sc">{</span>breakeven<span class="sc">:+.0%}</span><span class="ss">"</span>)</span>
-<span id="cb35-21"><a href="#cb35-21" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"decision:       </span><span class="sc">{</span>zone<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb35-22"><a href="#cb35-22" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"P(profitable):  </span><span class="sc">{</span>p_be<span class="sc">:.0%}</span><span class="ss">"</span>)</span>
-<span id="cb35-23"><a href="#cb35-23" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"EV per year:    </span><span class="sc">{</span>ev<span class="op">/</span><span class="fl">1e6</span><span class="sc">:+.1f}</span><span class="ss"> M UAH"</span>)</span>
-<span id="cb35-24"><a href="#cb35-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"uplift"</span>: r[<span class="st">"uplift"</span>], <span class="st">"ci"</span>: (lo, hi), <span class="st">"zone"</span>: zone,</span>
-<span id="cb35-25"><a href="#cb35-25" aria-hidden="true" tabindex="-1"></a>            <span class="st">"p_breakeven"</span>: p_be, <span class="st">"ev"</span>: ev}</span>
-<span id="cb35-26"><a href="#cb35-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-27"><a href="#cb35-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-28"><a href="#cb35-28" aria-hidden="true" tabindex="-1"></a>R_YEAR <span class="op">=</span> <span class="dv">430</span> <span class="op">*</span> <span class="dv">26</span> <span class="op">*</span> <span class="dv">80_000</span>    <span class="co"># ARPU/2wk * 26 * Kyiv user base = ~0.9 bn UAH</span></span>
-<span id="cb35-29"><a href="#cb35-29" aria-hidden="true" tabindex="-1"></a>rep <span class="op">=</span> ab_report(control, test, breakeven<span class="op">=</span><span class="fl">0.03</span>, annual_revenue<span class="op">=</span>R_YEAR)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> ab_report(control, test, breakeven, annual_revenue,</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>              alpha<span class="op">=</span><span class="fl">0.05</span>, B<span class="op">=</span><span class="dv">4000</span>, seed<span class="op">=</span><span class="dv">42</span>):</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Final A/B report: uplift, CI, three-zone decision, P(profitable), EV.</span></span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a><span class="co">    Zones: SHIP if the whole CI is above breakeven; KILL if it is entirely</span></span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a><span class="co">    below; otherwise GREY ZONE. P(profitable) and EV come from the</span></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a><span class="co">    bootstrap distribution of uplift*.</span></span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> uplift_ci_pois(control, test, alpha<span class="op">=</span>alpha, B<span class="op">=</span>B, seed<span class="op">=</span>seed)</span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>    lo, hi <span class="op">=</span> r[<span class="st">"ci"</span>]</span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a>    star <span class="op">=</span> r[<span class="st">"star"</span>]</span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a>    zone <span class="op">=</span> (<span class="st">"SHIP — roll it out"</span> <span class="cf">if</span> lo <span class="op">&gt;</span> breakeven <span class="cf">else</span></span>
+<span id="cb36-14"><a href="#cb36-14" aria-hidden="true" tabindex="-1"></a>            <span class="st">"KILL — switch it off"</span> <span class="cf">if</span> hi <span class="op">&lt;</span> breakeven <span class="cf">else</span></span>
+<span id="cb36-15"><a href="#cb36-15" aria-hidden="true" tabindex="-1"></a>            <span class="st">"GREY ZONE — more data needed"</span>)</span>
+<span id="cb36-16"><a href="#cb36-16" aria-hidden="true" tabindex="-1"></a>    p_be <span class="op">=</span> (star <span class="op">&gt;=</span> breakeven).mean()          <span class="co"># P(effect &gt;= breakeven)</span></span>
+<span id="cb36-17"><a href="#cb36-17" aria-hidden="true" tabindex="-1"></a>    ev <span class="op">=</span> annual_revenue <span class="op">*</span> (star.mean() <span class="op">-</span> breakeven)   <span class="co"># expected net value</span></span>
+<span id="cb36-18"><a href="#cb36-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-19"><a href="#cb36-19" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"uplift:         </span><span class="sc">{</span>r[<span class="st">'uplift'</span>]<span class="sc">:+.2%}</span><span class="ss">"</span>)</span>
+<span id="cb36-20"><a href="#cb36-20" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"95% CI:         (</span><span class="sc">{</span>lo<span class="sc">:+.2%}</span><span class="ss">, </span><span class="sc">{</span>hi<span class="sc">:+.2%}</span><span class="ss">)   breakeven </span><span class="sc">{</span>breakeven<span class="sc">:+.0%}</span><span class="ss">"</span>)</span>
+<span id="cb36-21"><a href="#cb36-21" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"decision:       </span><span class="sc">{</span>zone<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb36-22"><a href="#cb36-22" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"P(profitable):  </span><span class="sc">{</span>p_be<span class="sc">:.0%}</span><span class="ss">"</span>)</span>
+<span id="cb36-23"><a href="#cb36-23" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"EV per year:    </span><span class="sc">{</span>ev<span class="op">/</span><span class="fl">1e6</span><span class="sc">:+.1f}</span><span class="ss"> M UAH"</span>)</span>
+<span id="cb36-24"><a href="#cb36-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"uplift"</span>: r[<span class="st">"uplift"</span>], <span class="st">"ci"</span>: (lo, hi), <span class="st">"zone"</span>: zone,</span>
+<span id="cb36-25"><a href="#cb36-25" aria-hidden="true" tabindex="-1"></a>            <span class="st">"p_breakeven"</span>: p_be, <span class="st">"ev"</span>: ev}</span>
+<span id="cb36-26"><a href="#cb36-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-27"><a href="#cb36-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-28"><a href="#cb36-28" aria-hidden="true" tabindex="-1"></a>R_YEAR <span class="op">=</span> <span class="dv">430</span> <span class="op">*</span> <span class="dv">26</span> <span class="op">*</span> <span class="dv">80_000</span>    <span class="co"># ARPU/2wk * 26 * Kyiv user base = ~0.9 bn UAH</span></span>
+<span id="cb36-29"><a href="#cb36-29" aria-hidden="true" tabindex="-1"></a>rep <span class="op">=</span> ab_report(control, test, breakeven<span class="op">=</span><span class="fl">0.03</span>, annual_revenue<span class="op">=</span>R_YEAR)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>uplift:         +5.21%
 95% CI:         (+1.40%, +8.73%)   breakeven +3%
@@ -965,17 +996,17 @@ EV per year:    +19.9 M UAH</code></pre>
 <div id="callout-20" class="callout-20-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <div id="sol5" class="cell" data-execution_count="22">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>rng_e <span class="op">=</span> np.random.default_rng(<span class="dv">9</span>)</span>
-<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>c_ext <span class="op">=</span> arpu_sample(<span class="dv">12000</span>, rng_e)</span>
-<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>t_ext <span class="op">=</span> arpu_sample(<span class="dv">12000</span>, rng_e, uplift<span class="op">=</span><span class="fl">0.05</span>)</span>
-<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb37-5"><a href="#cb37-5" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
-<span id="cb37-6"><a href="#cb37-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"(1) breakeven +3%:"</span>)</span>
-<span id="cb37-7"><a href="#cb37-7" aria-hidden="true" tabindex="-1"></a>rep3 <span class="op">=</span> ab_report(c_ext, t_ext, breakeven<span class="op">=</span><span class="fl">0.03</span>, annual_revenue<span class="op">=</span>R_YEAR)</span>
-<span id="cb37-8"><a href="#cb37-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb37-9"><a href="#cb37-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">(2) breakeven +6%:"</span>)</span>
-<span id="cb37-10"><a href="#cb37-10" aria-hidden="true" tabindex="-1"></a>rep6 <span class="op">=</span> ab_report(c_ext, t_ext, breakeven<span class="op">=</span><span class="fl">0.06</span>, annual_revenue<span class="op">=</span>R_YEAR)</span>
-<span id="cb37-11"><a href="#cb37-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">⏱ execution time: </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> t0<span class="sc">:.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>rng_e <span class="op">=</span> np.random.default_rng(<span class="dv">9</span>)</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>c_ext <span class="op">=</span> arpu_sample(<span class="dv">12000</span>, rng_e)</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>t_ext <span class="op">=</span> arpu_sample(<span class="dv">12000</span>, rng_e, uplift<span class="op">=</span><span class="fl">0.05</span>)</span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>t0 <span class="op">=</span> time.perf_counter()</span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"(1) breakeven +3%:"</span>)</span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>rep3 <span class="op">=</span> ab_report(c_ext, t_ext, breakeven<span class="op">=</span><span class="fl">0.03</span>, annual_revenue<span class="op">=</span>R_YEAR)</span>
+<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">(2) breakeven +6%:"</span>)</span>
+<span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>rep6 <span class="op">=</span> ab_report(c_ext, t_ext, breakeven<span class="op">=</span><span class="fl">0.06</span>, annual_revenue<span class="op">=</span>R_YEAR)</span>
+<span id="cb38-11"><a href="#cb38-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">⏱ execution time: </span><span class="sc">{</span>time<span class="sc">.</span>perf_counter() <span class="op">-</span> t0<span class="sc">:.1f}</span><span class="ss"> s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>(1) breakeven +3%:
 uplift:         +5.90%
@@ -991,7 +1022,7 @@ decision:       GREY ZONE — more data needed
 P(profitable):  46%
 EV per year:    -0.9 M UAH
 
-⏱ execution time: 4.0 s</code></pre>
+⏱ execution time: 3.9 s</code></pre>
 </div>
 </div>
 <p><strong>Interpretation.</strong> (1) Doubling the sample narrowed the CI to <strong>(+3.2%, +8.4%)</strong> — the lower bound crossed breakeven: <strong>SHIP</strong>, profitability is practically certain (~99%), EV ~ +26 M UAH/year. (2) Same data, different economics: at breakeven +6% the CI straddles the threshold again, P(profitable) ~ 46%, EV is negative. The two one-liners: “At breakeven +3% — ship: profitability is proven, EV +26 M/year. At breakeven +6% — neither ship nor kill: the odds of paying off are below a coin flip; the decision needs either a cheaper subsidy or more data.” The statistics are identical — the <strong>economics</strong> makes the decision.</p>
