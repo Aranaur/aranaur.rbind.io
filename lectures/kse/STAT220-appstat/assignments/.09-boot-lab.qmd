@@ -1,0 +1,637 @@
+---
+title: "Lab 9 — The Final Sign-Off"
+subtitle: "From a Bootstrap CI to a Go/No-Go Decision"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+execute:
+  echo: true
+  warning: false
+---
+
+# Objective
+
+Every lab in this course took one crutch away. **Lab 4** gave you an A/B
+dataset and asked for a decision. **Lab 5** took away blind faith in the
+criterion — you learned to validate it with Monte Carlo. **Lab 6** took away
+"the data is probably normal". **Lab 7** took away the tidy chi-square line.
+**Lab 8** took away the mean. **Lab 9 takes away the last one: someone else's
+decision layer.** This time nobody hands you the threshold, the test, or the
+verdict template. You are the lead analyst, and the memo that ships or kills
+the feature carries **your** signature.
+
+::: {.callout-important icon="false"}
+## This is the course finale — it is worth **16 points** (double weight)
+
+Lab 9 is the capstone: it uses every habit the course built — shape
+forensics, building your own tool step by step, Monte-Carlo validation,
+design-before-launch, and the decision layer. Budget your time accordingly:
+this is two labs' worth of work and two labs' worth of points.
+:::
+
+**The story.** The "Free delivery on orders over 300 UAH" feature you met in
+Practice 9 performed well in Kyiv, and GreenBowl is now rolling it out city
+by city. You have been handed the two-week A/B experiment for **your own
+city** (pulled live from `greenbowl_boot.py`, keyed to your student id).
+For every user the platform logged their **total revenue over the two weeks
+(2-week ARPU, UAH)** — a zero for everyone who ordered nothing, a long right
+tail for the users who ordered a lot.
+
+Finance did the math once for the whole rollout: the delivery subsidy costs
+**≈3% of revenue**, so in every city the feature pays off only if it lifts
+ARPU by **more than +3%** — the **breakeven**. Experiments across the rollout
+are *planned* to reliably catch a **+5%** effect — the **design-MDE**. The
+CFO reads one line per city: *"by how many percent did revenue grow, and
+does the feature pay for itself?"*
+
+The platform's automated report answers a different question. Its headline
+is a **Welch t-test against zero** plus a **"percent CI"** made by dividing
+the UAH-difference CI by the frozen control mean — the exact two traps
+Practice 9 exposed: *significant ≠ profitable*, and *the denominator is a
+random variable too*. Your job is to put that headline on trial, rebuild the
+honest pipeline from the practice — `uplift_ci` → `uplift_ci_pois` →
+`rate_uplift` → `power_sim` → `ab_report` — and deliver the memo the CFO can
+actually act on.
+
+You will:
+
+1. Pull your experiment and print the platform's **naive headline** — the
+   verdict you are about to put on trial.
+2. Run **revenue forensics**: zeros, skew, and whether a handful of users
+   holds a suspicious share of an arm's revenue.
+3. Build the **honest uplift engine** — the ratio computed *whole* inside
+   every bootstrap iteration — and compare it with the naive %-CI on your
+   own data.
+4. Rebuild it as a **Poisson (weighted) engine** — the way industry ships
+   the bootstrap to production — prove the two engines agree, time them
+   honestly, and then compute a **country-scale readout** that the classic
+   engine cannot touch at any speed.
+5. **Earn the right to trust your engine**: a Monte-Carlo A/A bench on data
+   shaped like yours, plus the power your sample size actually had.
+6. Assemble the **decision layer**: three zones against breakeven,
+   P(profitable), and expected value in UAH per year.
+7. **Design the next step** your verdict demands — extra weeks, a relaunch
+   size, or a robustness statement — by simulation, never by formulaless
+   hope.
+8. Sign a one-page **go/no-go memo** to a non-technical CFO.
+
+# General Requirements
+
+::: {.callout-important icon="false"}
+## The fixed business context (same for everyone)
+
+- **Unit:** one user.
+- **Metric:** **2-week ARPU, UAH** — total revenue per user over the two
+  weeks, *zeros included*; higher = better.
+- **Arms:** `control` = old delivery pricing, `test` = free delivery over
+  300 UAH.
+- **Breakeven:** the subsidy costs ~3% of revenue → the feature pays off
+  only if ARPU uplift **> +3%** (`BREAKEVEN`). This is the **decision**
+  threshold — the CI is compared to it *after* the experiment.
+- **Design-MDE:** rollout experiments are sized to reliably catch **+5%**
+  (`DESIGN_MDE`). This is the **planning** threshold — it sets $n$ *before*
+  the experiment. **Do not confuse the two** (Practice 9, Part IV).
+- **Scale:** `exp.user_base` is your city's user base;
+  `exp.annual_revenue` = user base × control ARPU × 26 — the number that
+  turns a percent into money.
+- **Significance level:** $\alpha = 0.05$.
+:::
+
+::: {.callout-important icon="false"}
+## Everyone's experiment is different — on purpose
+
+Your experiment is unique to your id. It might be a clean profitable win, a
+feature that actively burns money, a result stuck between "significant" and
+"profitable", a country-scale sample where significance is guaranteed and
+worthless, an "uplift" manufactured by a handful of enormous accounts, or an
+experiment too small to answer the question it was asked. **There is no
+single "right answer" shared across the class** — there is only the memo
+your pipeline supports. Copying another student's conclusion will be
+obviously wrong for your city.
+:::
+
+::: {.callout-note icon="false"}
+## Report Format
+
+Submit the report in **one** of the following formats:
+
+- **Quarto → PDF** (`.qmd` → `.pdf`)
+- **Quarto → HTML** (`.qmd` → `.html`, hosted, e.g. on
+  [Quarto Pub](https://quartopub.com/),
+  [Posit Connect Cloud](https://connect.posit.cloud/))
+- **Jupyter Notebook** (`.ipynb`)
+- **Google Colab** (share the link with viewing permissions)
+
+The report must contain both code **and** narrative. Every section begins
+with a written explanation, not code.
+:::
+
+::: {.callout-warning icon="false"}
+## What you build vs. what you use ready-made
+
+The thing you **build** today is the full A/B pipeline from Practice 9 —
+`uplift_ci` → `uplift_ci_pois` → `rate_uplift` → `power_sim` → `ab_report` —
+each version **reusing** the previous one. You may start from your Practice
+9 code, but every function must be adapted to *your* data and *your*
+verdict; a verbatim copy-paste that ignores what your forensics found earns
+the methodology points only halfway. Ready-made pieces you may use:
+`statsmodels.stats.proportion.proportion_confint` (Wilson intervals),
+`numpy`'s random generators, and `scipy.stats.ttest_ind` — but only to
+reproduce the platform's headline. You may **not** use `scipy.stats.bootstrap`
+or any library bootstrap/power/A-A function for the pipeline itself — the
+resampling loops, the CI assembly, and the simulation benches must be **your
+own code** (a library cross-check at the end is welcome).
+:::
+
+::: {.callout-warning icon="false"}
+## Honour rule on the data platform
+
+`greenbowl_boot.py` contains the hidden truth in its source. **Do not read
+past the `# === instructor section ===` line, and do not call `_reveal`.**
+The point of the lab is to reach the verdict *by running the pipeline*, not
+by reading the answer. Any report that names the hidden scenario from the
+source instead of demonstrating it with the pipeline scores **zero** for
+interpretation.
+:::
+
+::: {.callout-warning icon="false"}
+## Deadline
+
+📅 **July 15, 2026, 23:59**
+:::
+
+# Tasks
+
+## Get Your Experiment {#sec-data}
+
+Download `greenbowl_boot.py` (provided with the lab) into your working
+folder and load **your** experiment. Use **one** id consistently — your KSE
+email is recommended.
+
+```{python}
+#| label: load
+#| eval: false
+
+from greenbowl_boot import load_my_experiment, ALPHA, BREAKEVEN, DESIGN_MDE
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import ttest_ind
+from statsmodels.stats.proportion import proportion_confint
+
+STUDENT_ID = "your.email@kse.org.ua"   # <-- put YOUR id here
+exp = load_my_experiment(STUDENT_ID)
+
+print(exp)                     # city, arm sizes, user base
+print(exp.data.head())         # one row per user: user_id, arm, revenue
+control, test = exp.control, exp.test
+print(f"annual revenue at stake: {exp.annual_revenue/1e6:.0f} M UAH")
+```
+
+Then run the **platform headline** — the automated report every city manager
+sees. This is the verdict you are about to put on trial; do not believe it
+yet.
+
+```{python}
+#| label: headline
+#| eval: false
+
+# --- the platform's automated headline (as-is, warts and all) -------------
+t_stat, p = ttest_ind(test, control, equal_var=False)
+d_hat = test.mean() - control.mean()
+se = np.sqrt(test.var(ddof=1)/test.size + control.var(ddof=1)/control.size)
+naive = (d_hat - 1.96*se) / control.mean(), (d_hat + 1.96*se) / control.mean()
+
+print(f"ARPU uplift: {d_hat/control.mean():+.2%}   "
+      f"'95% CI': ({naive[0]:+.2%}, {naive[1]:+.2%})   p = {p:.3g}")
+print("HEADLINE:",
+      "SHIP — significant uplift" if p < ALPHA and d_hat > 0 else
+      "ROLL BACK — significant drop" if p < ALPHA else
+      "DON'T SHIP — no significant uplift")
+```
+
+::: {.border}
+1. State your `STUDENT_ID`. Report your **city**, $n_{\text{control}}$,
+   $n_{\text{test}}$, ARPU per arm, the share of zero-revenue users per arm,
+   and `annual_revenue`.
+2. Run the headline and write down its verdict **verbatim**.
+3. In two sentences, name the two statistical sins the headline commits
+   *even before you look at the data* (hint: what is it compared against,
+   and what does it pretend to know exactly?).
+:::
+
+## Revenue Forensics {#sec-shape}
+
+Before trusting any engine, look at what the metric is made of. Revenue
+data has two standard pathologies: a **mass of zeros + a long right tail**
+(which you expect and the bootstrap handles), and **concentration** — a few
+users so large that the arm's mean belongs to them, not to the city (which
+no resampling trick can fix: the CI's promise rests on $\widehat F \approx
+F$, and a tail your sample barely touches breaks it — the lecture's
+edge-statistic warning in A/B costume).
+
+::: {.border}
+1. Plot both arms' revenue distributions (overlaid histograms; a log-x or a
+   "positives only" view is fine as a companion). Report per arm: zero
+   share, mean, median, P90, max.
+2. **Concentration check:** for each arm compute the share of the arm's
+   total revenue held by its **top-1** and **top-5** users. In a healthy
+   arm of thousands of users these are on the order of a fraction of a
+   percent to ~1–2%. Report all four numbers.
+3. In one sentence: given this shape, what could make a **mean-based
+   percent verdict** lie for your data — and which robust summaries
+   (median uplift, winsorised mean, share of payers) would you check
+   against it?
+:::
+
+::: {.callout-tip icon="false"}
+## Research hook
+Most students will find an unremarkable concentration profile — and that
+finding is worth one sentence, not zero: "top-5 users hold X% of each arm,
+the mean is not hostage to anyone." For a few of you this check will become
+**the heart of the entire lab**. Skipping it and shipping a verdict you
+cannot defend is the single most expensive mistake here.
+:::
+
+## The Honest Engine: `uplift_ci` {#sec-engine}
+
+The CFO's question is **relative**: $\text{uplift} = \theta_T/\theta_C - 1$,
+a statistic where both the numerator and the denominator are random. There
+is no textbook CI for it — but you own the universal recipe: compute the
+statistic **as a whole** on every pair of bootstrap resamples (drawn
+**within** each arm, independently), and assemble the central CI
+$\big(2\widehat\theta - \theta^*_{[1-\alpha/2]},\,
+2\widehat\theta - \theta^*_{[\alpha/2]}\big)$.
+
+::: {.border}
+1. Implement **Version 1**, `uplift_ci(control, test, stat=np.mean,
+   alpha=0.05, B=4000, seed=...)`, returning the point uplift, the central
+   CI, and the array of bootstrap uplifts (`star`) — you will need the
+   whole distribution later. Resample **within** each arm; compute the
+   ratio **inside** every iteration.
+2. Run it on your data and plot the bootstrap distribution of uplift$^*$
+   with three vertical marks: zero, `BREAKEVEN`, and your CI. Describe the
+   distribution's *shape* in one sentence — smooth and symmetric, skewed,
+   or lumpy/multimodal — and say what a lumpy shape would tell you about
+   your data (connect to @sec-shape).
+3. Put the honest CI **next to the headline's naive %-CI** from @sec-data.
+   If they roughly agree, say why the small-effect regime makes the naive
+   version lucky (Practice 9, Part I). If they disagree — especially at the
+   **lower bound**, the line the business reads — explain mechanically
+   which of the headline's two sins did the damage.
+4. **A/A sanity check:** split your *control* arm in half at random (fresh
+   seed), run `uplift_ci` on the two halves, and confirm the CI covers
+   zero. One line: why is this a necessary-but-not-sufficient check?
+:::
+
+## The Industrial Engine: `uplift_ci_pois` {#sec-pois}
+
+GreenBowl's data platform computes metrics in a sharded warehouse — and
+while your city ran its two-week test, the same feature ran as a parallel
+**country-wide** experiment whose log no laptop can analyse the classic
+way. Rewrite the engine with **Poisson weights**: every user gets an
+independent weight $W_i \sim \text{Pois}(1)$, and the weighted mean
+$(w \cdot x)/\sum w$ is computed from **sums only** — one pass over the
+data, no shared state between rows.
+
+::: {.border}
+1. Implement **Version 2**, `uplift_ci_pois(control, test, alpha=0.05,
+   B=4000, seed=...)`, reusing the same central-CI assembly. Report the
+   share of weights $W = 0$ next to the number the lecture predicts for it.
+2. Show that the Poisson CI and the classic CI from @sec-engine practically
+   coincide on your data (or on a fixed-seed subsample if your city is too
+   large for the classic matrix — do the arithmetic from item 4 of the
+   country readout first).
+3. **Time both engines honestly** on the same data, same $B$, same machine
+   (`time.perf_counter`, a couple of repeats). Report both wall-clocks and
+   answer plainly: is the Poisson engine faster *here*? (Expect: **no** —
+   drawing $B \times N$ Poisson weights is no cheaper than drawing
+   $B \times N$ indices.) One sentence: if it buys no speed on a laptop,
+   what exactly are we buying it for? Your answer is the next sub-section.
+:::
+
+::: {.callout-important icon="false"}
+## Poisson is not a speed trick
+On one machine, over data that fits in memory, the Poisson bootstrap is
+**not faster** than the classic one — your own timer just proved it. Its
+value is structural: the statistic decomposes into **per-row sums**, so it
+needs (a) **O(B) memory** — accumulators instead of a $B \times N$ matrix,
+(b) **one pass** — no going back to the data, and (c) **no coordination
+between rows** — every shard of a distributed store can weight its own rows
+independently. The classic engine needs *global random access to all rows
+at once*, which is exactly what a sharded warehouse does not offer. You are
+about to feel all three.
+:::
+
+### The country readout: `uplift_ci_stream`
+
+The national experiment is served by the warehouse API — **one shard at a
+time**, per its contract (see the `CountryStream` docstring):
+
+```{python}
+#| label: country
+#| eval: false
+
+from greenbowl_boot import load_country_stream
+
+stream = load_country_stream(STUDENT_ID)
+print(stream)                    # ~24 shards, ~1.2M users per arm in total
+c0, t0 = stream.shard(0)         # one shard: ~50k per arm
+```
+
+::: {.callout-warning icon="false"}
+## The warehouse contract
+Your code may hold **one shard plus O(B) accumulators** at any moment —
+never the concatenated dataset. Pretend each shard sits on its own machine:
+at true warehouse scale even the raw concatenation would not fit, and the
+export API simply does not offer it. Concatenating the shards into one
+array voids this section.
+:::
+
+::: {.border}
+1. **Arithmetic first, allocation never.** At the country's $N$ and your
+   city's $B = 4000$: how many **GB** is the classic $(B, N)$ resample
+   matrix per arm? And even without that matrix — why does classic
+   resampling (`rng.choice` over all users) *structurally* require what the
+   warehouse refuses to export? Conclude in one sentence why the classic
+   engine has no path here at any speed.
+2. Implement **Version 2b**, `uplift_ci_stream(stream, alpha=0.05, B=800,
+   seed=...)` — one pass over the shards. For each shard $s$, draw its
+   Poisson weights from a generator seeded by **`(seed, s)`** (industry
+   does `hash(user_id, b)`; per-shard seeding is the same idea in
+   miniature) and update four length-$B$ accumulators: $S_T[b] \mathrel{+}=
+   w \cdot t$, $W_T[b] \mathrel{+}= \sum w$, and likewise for control.
+   After the pass: $\text{uplift}^*_b = (S_T[b]/W_T[b])\,/\,(S_C[b]/W_C[b])
+   - 1$, then the same central-CI assembly you already own. State your
+   peak memory in words: one shard + four arrays of length $B$.
+3. Run it on the country. Report the national uplift, its 95% CI, the
+   wall-clock, and the throughput in rows/second — next to your city
+   timings from item 3 above: **how many times more data did you just
+   process, and in what memory footprint?** One sentence reading the national CI
+   against `BREAKEVEN` (the decision drama stays with your city — this is
+   the engineering readout HQ asked for).
+4. **The shard-independence demo.** Process the shards in **reverse
+   order** (`for i in reversed(range(stream.n_shards))`) and show the CI is
+   **identical in every printed digit**. Explain why: each shard's weights
+   depend only on `(seed, shard)`, so any shard can be processed on any
+   machine, in any order, and the reducer just adds sums. (If you diff the
+   raw floats you will find a residue around the 13th significant digit —
+   that is the *order of float additions*, not statistics; saying so is
+   worth a sentence.) And one more sentence: why can the classic bootstrap
+   not even *state* this order-independence property?
+5. To an engineer colleague, one paragraph: why does your
+   `uplift_ci_stream` translate line-for-line into a SQL `GROUP BY` over
+   shards? And which statistics does the one-pass trick **not** cover
+   (Practice 9's limitation), and what does industry use instead?
+:::
+
+## Earn the Right to Trust It: `rate_uplift` {#sec-mc}
+
+You deviated from the lecture's straight path twice — a ratio statistic and
+Poisson weights — and the course-long habit applies: **no criterion is
+trusted until Monte Carlo says it keeps its promise on data shaped like
+yours, at your $n$.** In Practice 9 the bench generated worlds from the
+known ARPU law. You do not know your city's law — so **fit a generator to
+your control arm**: a zero with probability equal to your observed zero
+share, and a lognormal fitted to the positive revenues (match the median
+and the log-scale spread). That is the plug-in principle doing double duty.
+
+::: {.border}
+1. Build the generator `city_world(n, rng, uplift=0.0)` fitted to *your*
+   control arm as described. Show one overlaid histogram (your control vs
+   one simulated sample) as a visual goodness check — after Lab 6 you know
+   better than to skip it.
+2. Implement **Version 3**, `rate_uplift(engine, n, uplift=0.0, ...)` — your
+   own loop: simulate A/A worlds at **your** arm sizes, count how often the
+   engine's CI excludes zero, report the FPR **with a Wilson CI**. Run it
+   for `uplift_ci_pois`. Is $\alpha$ inside?
+3. Same bench with `uplift = DESIGN_MDE`: what **power** did your
+   experiment have, at *its actual size*, against the effect the rollout
+   was designed to catch? Report it with a Wilson CI.
+4. One sentence interpreting item 3 for your verdict: if your CI turns out
+   wide or your result "not significant", is that surprising — or exactly
+   what this power figure predicts?
+:::
+
+::: {.callout-important icon="false"}
+## Match the bench to *your* data
+A generic copy of the practice's bench (its ARPU constants, its n = 1500)
+validates *someone else's* experiment. The FPR must be measured at **your**
+arm sizes on a generator that mimics **your** control — zeros and tail
+included. If your forensics found extreme concentration, say honestly
+whether your fitted lognormal reproduces it, and what that means for the
+bench's verdict.
+:::
+
+## The Decision Layer: `ab_report` {#sec-decision}
+
+Significance against **zero** is the wrong threshold: money is compared to
+**breakeven**. And a binary "above/below" throws away half the information.
+Assemble the final tool exactly as the practice built it: **three zones**
+against `BREAKEVEN` (SHIP if the whole CI is above it, KILL if the whole CI
+is below it, GREY ZONE otherwise), the **probability of profitability**
+$P(\text{uplift}^* \ge \text{breakeven})$ read off the bootstrap
+distribution, and the **expected value**
+$EV = \text{annual\_revenue} \times (\overline{\text{uplift}^*} -
+\text{breakeven})$.
+
+::: {.border}
+1. Implement **Version 4**, `ab_report(control, test, breakeven,
+   annual_revenue, ...)`, **reusing** `uplift_ci_pois`. It must print:
+   uplift, CI, the three-zone decision, P(profitable), and EV per year in
+   UAH — and return them.
+2. Run it on your experiment with `BREAKEVEN` and `exp.annual_revenue`.
+   Read the report **as a whole** in 2–3 sentences: not just the zone, but
+   what P(profitable) and EV add to it.
+3. **Sensitivity to the economics.** Finance's 3% subsidy estimate carries
+   uncertainty. Re-run at breakeven **+2%** and **+4%** (one percentage
+   point either side) and state whether your zone survives. A decision that
+   flips inside finance's error bars is a different memo than one that
+   doesn't — say which you hold.
+4. **Robustness gate.** If — and only if — your @sec-shape concentration
+   check found that a handful of users holds an outsized share of an arm's
+   revenue, the mean-based report above is **not allowed to stand alone**.
+   Add: (a) the uplift of the **median** (via `uplift_ci` with
+   `stat=np.median`); (b) the mean uplift with both arms **winsorised at
+   their own P99**; (c) the mean uplift with the top handful of users
+   removed, stating how many you removed. If the three robust reads and the
+   mean disagree, the story of your lab is *why* — and your memo's verdict
+   must follow the read you can defend, not the largest number.
+:::
+
+::: {.callout-important icon="false"}
+## Stop-the-line rule
+If your report compares the CI to **zero** and prints "ship" — everything
+downstream is void. Zero is the threshold for "does an effect exist";
+**breakeven** is the threshold for "should we pay for it". The course has
+shown you enough experiments that are real-but-worthless and
+grey-but-valuable; the final memo must not confuse the two.
+:::
+
+## Design the Next Step: `power_sim` {#sec-design}
+
+A verdict is not a memo until it says **what happens next** — and "run it a
+bit longer" is a gut feeling, not a plan. The tool: **power by simulation**
+on a pilot. Resample your own data as the "world", inject a known uplift,
+and measure how often your engine catches it.
+
+::: {.border}
+1. Implement **Version 5**, `power_sim(pilot, uplift, n, ...)`, reusing
+   `uplift_ci_pois`, with your **control arm as the pilot**.
+2. Follow the branch your @sec-decision zone dictates — and answer that
+   branch's question **with numbers from `power_sim`**:
+   - **GREY ZONE** → how many users per arm does a decisive experiment
+     need (the CI must clear or exclude breakeven), and how many extra
+     weeks is that at your city's enrollment rate? Assume the experiment
+     enrolls new users at the two-week rate implied by your current arm
+     sizes.
+   - **CI too wide to say anything** (covers zero *and* breakeven with
+     room to spare) → what a-priori power did this launch have at
+     `DESIGN_MDE` (you already have it from @sec-mc — quote it), what $n$
+     per arm would a **relaunch** need for 80% power, and should the
+     original launch have happened at all?
+   - **Clear SHIP or clear KILL** → your decision looks safe; prove it is
+     not fragile. What is the smallest uplift your actual $n$ catches with
+     ~80% power (the MDE *at your n*)? Is your observed effect comfortably
+     inside that detection range, and does the zone survive the
+     @sec-decision sensitivity check?
+3. Whatever the branch: state the cost of your recommendation in plain
+   units — weeks of experimentation, users exposed, or UAH of expected
+   value forgone by waiting.
+:::
+
+::: {.callout-warning icon="false"}
+## Post-hoc power is banned by name
+Any line of the form *"the power at our observed effect was only X%, so the
+effect is probably real"* voids this section. As Practice 9 proved, "power
+at the observed effect" is a deterministic function of the p-value — zero
+new information, dressed as an excuse. Power is computed **before** a
+launch (or for the *next* one) on a pilot, at a **design** effect size —
+never on the observed result.
+:::
+
+## The Final Memo {#sec-final}
+
+::: {.border}
+Write a **single-page memo** (≤ 400 words) to the **non-technical** CFO who
+has only seen the platform's headline. It must contain:
+
+1. The **headline verdict** (quoted) and your **one-line sign-off** — one
+   of: *ship — profitability is proven*; *kill — the feature loses money*;
+   *kill — the effect is real but cannot pay for its subsidy*; *extend — the
+   effect is real, profitability is unproven; here is exactly how much more
+   data decides it*; *don't trust the ARPU verdict — the "uplift" belongs to
+   a handful of accounts; here is the metric to use instead*; or *no
+   conclusion — this experiment could never answer the question; here is
+   the relaunch that can*.
+2. The **evidence** that forces it, quoted as numbers, not adjectives: the
+   honest uplift and CI against **breakeven** (not zero), P(profitable),
+   EV in UAH per year, the FPR/power of your engine at your $n$, the
+   robust reads where relevant, and the `power_sim` sizing of whatever you
+   recommend next.
+3. A concrete **recommendation with a price tag**: what to do, how long it
+   takes or what it costs, and what number will settle it.
+4. One honest **caveat** of your own audit (e.g. the bench's generator is a
+   fit, not the truth; a winsorised metric answers a slightly different
+   question; simulation noise at your `n_exps`; the EV line assumes the
+   two-week effect persists for a year).
+
+It must be readable by someone who has never heard the words "bootstrap"
+or "p-value". You are graded on whether the CFO could sign it without
+follow-up questions.
+:::
+
+# Grading {.unnumbered}
+
+| Criterion | Points |
+|---|:---:|
+| Correctness of methodology | 6 |
+| Interpretation of results | 6 |
+| Code quality and organization | 4 |
+| **Total (double weight — course finale)** | **16** |
+
+::: {.callout-tip icon="false"}
+## Grading Details
+
+**Correctness of methodology (6 pts):**
+
+- `uplift_ci` is honest: resampling **within** arms, the ratio computed
+  **whole** inside every iteration, the central-CI assembly correct; the
+  naive-vs-honest comparison is run and explained (1.5 pt).
+- `uplift_ci_pois` is correct (weights, sums-only mean, $W=0$ share
+  checked, both engines timed honestly) **and** the country readout works:
+  a one-pass `uplift_ci_stream` under the warehouse contract, with
+  per-`(seed, shard)` weight seeding and the reverse-order identity check
+  shown (1.5 pt).
+- The Monte-Carlo bench is your own loop, fitted to **your** control (zeros
+  + tail), run at **your** arm sizes, and reports FPR *and* power at
+  `DESIGN_MDE` with Wilson CIs (1.5 pt).
+- All design questions are answered by `power_sim` on a pilot; no post-hoc
+  power anywhere; breakeven and design-MDE are never conflated (1.5 pt).
+
+**Interpretation of results (6 pts):**
+
+- @sec-shape actually **gates** the analysis: a concentration finding
+  triggers the robustness reads and changes which number the memo trusts —
+  not just adds a sentence (1.5 pt).
+- The decision is read against **breakeven** in three zones, with
+  P(profitable) and EV interpreted correctly, and the sensitivity check is
+  drawn into the conclusion (1.5 pt).
+- The next-step branch matches the zone and is **quantified** (users,
+  weeks, UAH) — the memo never says "collect more data" without a number
+  (1.5 pt).
+- The memo's verdict **matches the evidence**, overturns or confirms the
+  headline for the right reason, and the caveat is real, not decorative
+  (1.5 pt).
+
+**Code quality and organization (4 pts):**
+
+- One toolkit built step by step (`uplift_ci` → `uplift_ci_pois` →
+  `rate_uplift` → `power_sim` → `ab_report`), each version **reusing** the
+  previous — no re-implementations inline (1.5 pt).
+- Plots carry axis labels, titles, legends, and the reference lines that
+  matter (zero, breakeven, $\alpha$, the 80% power target) (1.5 pt).
+- Narrative precedes every code block; each section reads as an argument,
+  not a dump of outputs; seeds make the report reproducible (1 pt).
+:::
+
+# Defense {.unnumbered}
+
+During the defense (5–7 minutes) you will be asked *"What if?"* questions
+that probe whether you understand **why** each piece exists, for example:
+
+- *"Your naive and honest lower bounds differ by two percentage points.
+  Show me — in your own bootstrap code — where the denominator's randomness
+  enters, and what freezing it would delete."*
+- *"Your CI straddles breakeven and P(profitable) is 84%. The CFO says
+  'so it's probably fine — ship it.' What do you answer, and what single
+  number would change your mind?"*
+- *"Delete the largest user in your test arm, live, and re-run `ab_report`.
+  What moved, what didn't, and what does that say about your memo?"*
+- *"A city manager says: 'the test was underpowered at the observed +4%,
+  so the effect is surely real, we just couldn't see it.' Respond in two
+  sentences."*
+- *"Your laptop has 8 GB of RAM and the national log is 40 GB across 24
+  shards. Walk me through — accumulator by accumulator — how your
+  `uplift_ci_stream` produces the CI, and what exactly you would ship to
+  each shard's worker in a real warehouse."*
+- *"Your own timer showed the Poisson engine is no faster than the classic
+  one on your city. Why did you still use it for `ab_report`, and what
+  breaks if the metric is the median basket instead of ARPU?"*
+- *"Finance revises the subsidy: breakeven is +5%, not +3%. Re-run the
+  report live and give me the new memo in one sentence."*
+- *"Your A/A bench shows FPR = 9% with a Wilson CI of (6%, 13%). Which of
+  your report's numbers does that poison, and what do you do next?"*
+- *"You recommend four more weeks. What exactly did you simulate to get
+  that number, and why is resampling your own experiment a legitimate
+  stand-in for the city?"*
+
+You may also be asked to **change one thing live** (swap the statistic to
+the median, winsorise an arm, move breakeven, shrink `B`, re-seed the
+bench) and explain the resulting shift.
