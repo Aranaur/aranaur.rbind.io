@@ -1,0 +1,752 @@
+---
+title: "Practice 10"
+subtitle: "Variance reduction"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: en
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+from scipy.stats import norm, ttest_ind, t as tdist
+from statsmodels.stats.proportion import proportion_confint
+
+# ---- GreenBowl world parameters ----------------------------------------
+MU_U, MU_R, SD_W = 200.0, 300.0, 62.0   # unregistered/registered ARPU, within-stratum sd
+R_XY = 0.7                              # corr(pre, arpu) WITHIN a stratum
+
+
+def greenbowl_users(n, rng, uplift=0.0):
+    """One GreenBowl user cohort over 2 weeks.
+
+    Returns per-user columns:
+      stratum  — loyalty registration (True/False),
+      pre      — ARPU over the previous period (covariate),
+      arpu     — revenue over the experiment window (target metric),
+      sessions — number of sessions, orders — number of orders.
+    uplift adds an effect (UAH) to the test arm's arpu.
+    """
+    reg   = rng.random(n) < 0.5
+    mu_s  = np.where(reg, MU_R, MU_U)
+    pre   = mu_s + SD_W * rng.standard_normal(n)
+    arpu  = (mu_s + R_XY * (pre - mu_s)
+             + SD_W * np.sqrt(1 - R_XY**2) * rng.standard_normal(n) + uplift)
+    lam      = rng.gamma(1.0, 20.0, n)          # user activity
+    sessions = rng.poisson(lam) + 1
+    p        = rng.beta(0.8, 3.2, n)            # personal conversion
+    orders   = rng.binomial(sessions, p)
+    return {"stratum": reg, "pre": pre, "arpu": arpu,
+            "sessions": sessions, "orders": orders}
+
+
+def wilson(k, n):
+    lo, hi = proportion_confint(k, n, method="wilson")
+    return f"{k/n:.3f}  Wilson ({lo:.3f}, {hi:.3f})"
+```
+
+# What we do today {.unnumbered}
+
+In the lecture we met the master A/B design formula: sample size
+$n \propto \sigma^2 / \Delta^2$. The effect $\Delta$ is dictated by economics,
+traffic $n$ is capped by time — leaving **one free lever: $\sigma$**. Today we
+build, by hand, the tools that **reduce the variance** of a metric without
+touching the data or the honesty of the test: *the same sample, made more
+sensitive*.
+
+- **`strat_ttest`** — stratification by known audience structure;
+- **`calculate_theta` + `cuped`** — adjust the metric with the user's
+  pre-experiment history;
+- **`linearize`** — the right unit of analysis for ratio metrics;
+- **`vr_ci`** — compose everything into one criterion and validate it with
+  **Monte Carlo**;
+- **`vr_report`** — the finale: how many fewer users we need, and what
+  business decision follows.
+
+::: {.callout-note icon="false"}
+## Rules of the game
+- Running case: **GreenBowl** (the same as in Practices 4–9) launches an
+  **email campaign** with a personalised promo bundle. Primary metric —
+  **2-week ARPU**; at the end we touch **session conversion** too.
+- **Build one tool progressively**: each part adds one new capability — from
+  `strat_ttest` to the final `vr_report`.
+- We **generate the data ourselves** (`greenbowl_users`) — we know the
+  "truth" and can check each version's honesty by **Monte Carlo** (the habit
+  from Practice 5).
+- Before each result — **🔮 "Guess first"**: write your answer before running
+  the code. After it — **"Your turn"** with a collapsible solution.
+- **Design ≠ decision**: `design-MDE` sizes $n$ *before* launch; `breakeven`
+  is the decision threshold *after*. No post-hoc power in the report.
+:::
+
+```{python}
+#| label: design-baseline
+
+alpha = 0.05
+z_a, z_b = norm.ppf(1 - alpha/2), norm.ppf(1 - 0.20)
+
+def n_per_arm(sd, delta):
+    """Sample size per arm for a two-sample t-test (80% power, alpha 5%)."""
+    return int(np.ceil((z_a + z_b)**2 * 2 * sd**2 / delta**2))
+
+sigma, mde = 80.0, 10.0                 # historical ARPU sd; breakeven effect
+print(f"baseline design: sd = {sigma:.0f}, MDE = {mde:.0f} UAH "
+      f"-> {n_per_arm(sigma, mde)} users per arm")
+```
+
+---
+
+# Part I — Stratification {#sec-strat}
+
+> **Case.** GreenBowl runs a **loyalty program**. From history: registered
+> users spend on average **300 UAH** over 2 weeks, unregistered **200 UAH**,
+> each subgroup with $sd \approx 62$, shares $50/50$. A plain t-test sees one
+> smeared distribution with $\sigma \approx 80$ — and pays for it in sample
+> size.
+
+```{python}
+#| label: strata-decomp
+
+mu_bar   = 0.5*MU_R + 0.5*MU_U
+var_in   = SD_W**2
+var_betw = 0.5*(MU_R - mu_bar)**2 + 0.5*(MU_U - mu_bar)**2
+print(f"within-strata variance:  {var_in:.0f}  (sd {np.sqrt(var_in):.1f})")
+print(f"BETWEEN-strata variance: {var_betw:.0f}  (sd {np.sqrt(var_betw):.1f})")
+print(f"total variance:          {var_in+var_betw:.0f}  "
+      f"(sd {np.sqrt(var_in+var_betw):.1f})")
+print(f"between share:           {var_betw/(var_in+var_betw):.0%}")
+```
+
+**39% of the variance** the t-test fights is the difference **between** strata.
+But we know the loyalty status **before** the experiment: paying for that part
+in sample size is a waste. Stratification "cuts off" the *between* term and
+leaves the test only the genuine *within* noise.
+
+::: {.callout-tip icon="false"}
+## 🔮 Guess first
+The stratified mean is a weighted sum of stratum means with **population**
+weights $w_s$: $\hat{Y}_{str} = \sum_s w_s \bar{Y}_s$. Its variance
+$\sum_s w_s^2 \sigma_s^2 / n_s$ has **no** *between* term. By how much do you
+think power rises if the effective $sd$ drops from 80 to 62?
+:::
+
+## Tool v1: `strat_ttest`
+
+```{python}
+#| label: strat-fn
+
+def strat_ttest(stratum_c, y_c, stratum_t, y_t, w=(0.5, 0.5)):
+    """Two-sample t-test on stratified means.
+
+    w — population shares of the strata (unregistered, registered).
+    Returns a two-sided p-value.
+    """
+    means, vars = [], []
+    for reg, y in ((stratum_c, y_c), (stratum_t, y_t)):
+        groups = [y[~reg], y[reg]]                       # [unregistered, registered]
+        means.append(sum(wi * g.mean() for wi, g in zip(w, groups)))
+        vars.append(sum(wi**2 * g.var(ddof=1) / g.size for wi, g in zip(w, groups)))
+    t = (means[1] - means[0]) / np.sqrt(vars[0] + vars[1])
+    return 2 * tdist.sf(abs(t), y_c.size + y_t.size - 2)
+```
+
+Validate with Monte Carlo as always: generate A/A worlds (no effect → we
+should see FPR $\approx \alpha$) and A/B worlds (effect +10 UAH → power), for
+the plain and stratified tests on the **same** data.
+
+```{python}
+#| label: strat-mc
+
+rng, MC = np.random.default_rng(11), 400
+n = n_per_arm(sigma, mde)               # 1005
+cnt = dict.fromkeys(["plain FPR", "plain power", "strat FPR", "strat power"], 0)
+
+for _ in range(MC):
+    a  = greenbowl_users(n, rng)
+    b  = greenbowl_users(n, rng)
+    t_ = greenbowl_users(n, rng, uplift=mde)
+    cnt["plain FPR"]   += ttest_ind(a["arpu"], b["arpu"],  equal_var=False).pvalue < alpha
+    cnt["plain power"] += ttest_ind(a["arpu"], t_["arpu"], equal_var=False).pvalue < alpha
+    cnt["strat FPR"]   += strat_ttest(a["stratum"], a["arpu"], b["stratum"], b["arpu"]) < alpha
+    cnt["strat power"] += strat_ttest(a["stratum"], a["arpu"], t_["stratum"], t_["arpu"]) < alpha
+
+for k, v in cnt.items():
+    print(f"{k:12s}: {wilson(v, MC)}")
+```
+
+Both tests are honest (FPR covers $\alpha$), and power jumped from
+$\approx 0.79$ to $\approx 0.97$ — **same users, same effect**. In sample-size
+terms: effective $sd$ dropped from 80 to 62, and the design that needed 1005
+now needs `{python} n_per_arm(62.0, mde)`.
+
+::: {.callout-tip icon="false"}
+## Your turn 1
+1. **Post-stratification.** `strat_ttest` does not require controlling the
+   arm composition: it can be applied to a plain random split. Run the A/A
+   bench, but pass the actual arm composition from `greenbowl_users`. Does
+   FPR stay on $\alpha$?
+2. **Useless stratum.** Imagine a stratum that does **not** correlate with
+   ARPU (say, parity of `user_id`). How much power will it add?
+3. **Case.** State one sentence for the PM: why "the same test on the same
+   data" suddenly catches an effect that was insignificant yesterday.
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 1
+
+```{python}
+#| label: sol1
+
+# (1) post-stratification on a random split — FPR should stay on alpha
+rng_ps, rej = np.random.default_rng(1), 0
+for _ in range(400):
+    a = greenbowl_users(n, rng_ps)
+    b = greenbowl_users(n, rng_ps)
+    rej += strat_ttest(a["stratum"], a["arpu"], b["stratum"], b["arpu"]) < alpha
+print(f"(1) post-strat A/A FPR: {wilson(rej, 400)}")
+
+# (2) useless stratum: a random label unrelated to ARPU
+rng_u, rej = np.random.default_rng(2), 0
+for _ in range(400):
+    a  = greenbowl_users(n, rng_u)
+    t_ = greenbowl_users(n, rng_u, uplift=mde)
+    fake_a = rng_u.random(n) < 0.5
+    fake_t = rng_u.random(n) < 0.5
+    rej += strat_ttest(fake_a, a["arpu"], fake_t, t_["arpu"]) < alpha
+print(f"(2) useless stratum, power: {wilson(rej, 400)}  (≈ plain t-test 0.79)")
+```
+
+**Interpretation.** (1) FPR stays on $\alpha$: post-stratification
+asymptotically gives nearly the same gain as stratified randomization — as
+long as the stratum is **pre-treatment**. (2) A useless stratum does not cut
+variance ($\sigma_s \approx \sigma$ in each subgroup), so power returns to the
+plain-test level: the gain is capped by the *between*-strata share of variance.
+(3) "We didn't grow the sample — we stopped paying variance for what we
+already knew about customers: registered users spend more. Removing that known
+spread let the test see the effect."
+:::
+
+---
+
+# Part II — CUPED {#sec-cuped}
+
+> **Case.** Stratification used a coarse label. But we have something far
+> richer — each user's **own history**: how much they spent **before** the
+> experiment (`pre`). Use it to compare every user with their own past.
+
+**CUPED** (Controlled-experiment Using Pre-Experiment Data) adjusts the metric
+$Y$ with a pre-experiment covariate $X$:
+
+$$
+Y_{cuped} = Y - \theta X, \qquad
+\theta = \frac{\operatorname{Cov}(X, Y)}{\operatorname{Var}(X)}, \qquad
+\operatorname{Var}(Y_{cuped}) = \operatorname{Var}(Y)\,(1 - r^2).
+$$
+
+$\theta$ is a constant **shared by both arms**, so thanks to randomization the
+difference of means stays unbiased: we don't move the effect estimate, we only
+remove its predictable noise.
+
+::: {.callout-tip icon="false"}
+## 🔮 Guess first
+CUPED's gain is exactly $1 - r^2$. In our world `pre` correlates with `arpu`
+at $0.7$ within a stratum. But `pre` also "knows" the stratum (registered
+users are higher on both `pre` and `arpu`). Will the **overall** correlation
+of `pre` with `arpu` be exactly $0.7$ or higher? And what variance ratio
+follows?
+:::
+
+## Tool v2: `calculate_theta` + `cuped`
+
+```{python}
+#| label: cuped-fn
+
+def calculate_theta(x, y):
+    return np.cov(x, y)[0, 1] / x.var(ddof=1)
+
+def cuped(y, x, theta):
+    return y - theta * x
+```
+
+```{python}
+#| label: cuped-demo
+
+rng = np.random.default_rng(0)
+a = greenbowl_users(200_000, rng)                    # big cohort to estimate r
+r_full = np.corrcoef(a["pre"], a["arpu"])[0, 1]
+theta  = calculate_theta(a["pre"], a["arpu"])
+vr     = cuped(a["arpu"], a["pre"], theta).var() / a["arpu"].var()
+print(f"overall corr r(pre, arpu): {r_full:.3f}")
+print(f"1 - r^2:                   {1 - r_full**2:.3f}")
+print(f"measured variance ratio:   {vr:.3f}")
+```
+
+The correlation turned out $\approx 0.82$, not $0.7$: `pre` carries **both**
+the within-stratum history **and** the stratum itself. So CUPED alone shaves
+$\approx 67\%$ of the variance — more than stratification. Remember this fact:
+in @sec-compose it explains why "stratification + CUPED" barely adds anything
+over CUPED alone.
+
+```{python}
+#| label: cuped-mc
+
+rng, MC = np.random.default_rng(5), 400
+cnt = dict.fromkeys(["cuped FPR", "cuped power", "plain power"], 0)
+
+for _ in range(MC):
+    a  = greenbowl_users(n, rng)
+    b  = greenbowl_users(n, rng)
+    t_ = greenbowl_users(n, rng, uplift=mde)
+
+    th = calculate_theta(np.r_[a["pre"], b["pre"]], np.r_[a["arpu"], b["arpu"]])
+    cnt["cuped FPR"]   += ttest_ind(cuped(a["arpu"], a["pre"], th),
+                                    cuped(b["arpu"], b["pre"], th), equal_var=False).pvalue < alpha
+    th2 = calculate_theta(np.r_[a["pre"], t_["pre"]], np.r_[a["arpu"], t_["arpu"]])
+    cnt["cuped power"] += ttest_ind(cuped(a["arpu"],  a["pre"],  th2),
+                                    cuped(t_["arpu"], t_["pre"], th2), equal_var=False).pvalue < alpha
+    cnt["plain power"] += ttest_ind(a["arpu"], t_["arpu"], equal_var=False).pvalue < alpha
+
+for k, v in cnt.items():
+    print(f"{k:12s}: {wilson(v, MC)}")
+```
+
+FPR sits on $\alpha$ — CUPED does not cheat. Power at the +10 UAH effect is
+practically $1.0$ vs $0.79$ for the plain test: the covariate ate two thirds
+of the noise.
+
+::: {.callout-tip icon="false"}
+## Your turn 2
+1. **The $1 - r^2$ law in the clean case.** Generate a covariate with a
+   **given overall** correlation to `arpu` (`make_cov` below) and check the
+   variance ratio for $r = 0.2, 0.5, 0.7$. Below which $r$ is CUPED not worth
+   the pipeline complexity?
+2. **Case: new users.** New users have no `pre` history. What is the simplest
+   correct trick to keep them in the analysis without breaking unbiasedness?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 2
+
+```{python}
+#| label: sol2
+
+def make_cov(y, r, rng):
+    """A covariate with a given OVERALL correlation r to y."""
+    zy = (y - y.mean()) / y.std()
+    return r * zy + np.sqrt(1 - r**2) * rng.standard_normal(y.size)
+
+rng_c = np.random.default_rng(3)
+a = greenbowl_users(200_000, rng_c)
+for r in (0.2, 0.5, 0.7):
+    x = make_cov(a["arpu"], r, rng_c)
+    th = calculate_theta(x, a["arpu"])
+    ratio = cuped(a["arpu"], x, th).var() / a["arpu"].var()
+    print(f"(1) r = {r}: variance ratio {ratio:.3f}  (1 - r^2 = {1 - r**2:.2f})")
+```
+
+**Interpretation.** (1) The law holds exactly: $r=0.2 \to 0.96$ (only 4% shaved
+— not worth a pipeline), $r=0.5 \to 0.75$, $r=0.7 \to 0.51$. The sanity floor
+is $|r| \gtrsim 0.3$. (2) For new users substitute $X = \bar X$ (the covariate
+mean): then $Y_{cuped} = Y - \theta \bar X$ — they simply get no adjustment,
+and unbiasedness holds because the constant is the same in both arms. At
+Netflix new users give 5–15% variance reduction vs 40% for existing ones,
+precisely due to missing history.
+:::
+
+::: {.callout-important icon="false"}
+## Careful: the covariate must be pre-treatment
+CUPED and stratification are **safe only on pre-experiment** features. A
+covariate measured **during** the experiment (sessions, visits) can absorb
+part of the effect — and **silently bias** the estimate. Simple rule:
+anything fixed before launch is fine; anything the treatment could move is not.
+:::
+
+---
+
+# Part III — Ratio metrics and linearization {#sec-ratio}
+
+> **Case.** The PM asks for a different metric: **session→order conversion** —
+> "of all sessions, how many ended with a purchase?". The temptation: unroll
+> every session into $0/1$ and compare two proportions with a z-test. But we
+> randomized **users**, while we count over **sessions**.
+
+::: {.callout-warning icon="false"}
+## Catch the error 🕵️
+GreenBowl ran an A/A conversion test (no effect). Two analysts argue about how
+to compute it.
+
+```{python}
+#| label: catch-pooled
+
+def pooled_session_pvalue(sessions_c, orders_c, sessions_t, orders_t):
+    """t-test on unrolled 0/1 outcomes over SESSIONS (Analyst A's analysis)."""
+    out = []
+    for sess, ordr in ((sessions_c, orders_c), (sessions_t, orders_t)):
+        ns, k = sess.sum(), ordr.sum()
+        mean  = k / ns
+        var   = (k*(1 - mean)**2 + (ns - k)*mean**2) / (ns - 1)
+        out.append((mean, var, ns))
+    (m1, v1, n1), (m2, v2, n2) = out
+    t = (m2 - m1) / np.sqrt(v1/n1 + v2/n2)
+    return 2 * tdist.sf(abs(t), n1 + n2 - 2)
+
+rng, MC_r = np.random.default_rng(7), 300
+fpr_pool = 0
+for _ in range(MC_r):
+    a = greenbowl_users(2000, rng)
+    b = greenbowl_users(2000, rng)
+    fpr_pool += pooled_session_pvalue(a["sessions"], a["orders"],
+                                      b["sessions"], b["orders"]) < alpha
+print(f"A/A FPR (pooled sessions): {wilson(fpr_pool, MC_r)}")
+```
+
+**Analyst A:** "Tens of thousands of sessions, tiny standard errors — take a
+z-test of proportions and let big $n$ do its thing."
+
+**Analyst B:** "Sessions of one user are **not i.i.d.**: each has their own
+propensity to buy. The effective unit is the **user**, not the session. Look:
+on a clean A/A the pooled test rejects the null in half the cases — a machine
+for shipping placebo features."
+
+**Who is right?** Analyst B: FPR $\approx 0.5$ instead of $0.05$. Sessions
+multiply the **volume** of data, not the **evidence** — the unit of analysis
+must equal the unit of randomization.
+:::
+
+The honest per-arm metric is the **ratio**
+$K = \sum \text{orders} / \sum \text{sessions}$ (users stay whole). In the
+lecture we built its CI with a **user-level bootstrap**; today — faster
+algebra, **linearization**: turn each pair $(O_i, M_i)$ into a single per-user
+number $Z_i$ to which a plain t-test applies.
+
+## Tool v3: `linearize`
+
+$$
+Z_i = K + \frac{1}{\overline{O}}\big(M_i - K\,O_i\big),
+\qquad K = \frac{\overline{M}}{\overline{O}}
+$$
+
+```{python}
+#| label: linearize-fn
+
+def linearize(num, den):
+    """Per-user linearized ratio metric (delta method).
+
+    num = orders (numerator), den = sessions (denominator).
+    """
+    k = num.sum() / den.sum()
+    return k + (num - k * den) / den.mean()
+```
+
+```{python}
+#| label: linearize-check
+
+rng = np.random.default_rng(1)
+a = greenbowl_users(5000, rng)
+z = linearize(a["orders"], a["sessions"])
+print(f"K       = {a['orders'].sum()/a['sessions'].sum():.5f}")
+print(f"mean(Z) = {z.mean():.5f}   <- reproduces K exactly")
+```
+
+`mean(Z)` equals $K$ **exactly**, so the t-test on $Z$ compares precisely the
+quantity the PM asks about. Check honesty and power:
+
+```{python}
+#| label: linearize-mc
+
+rng, MC_r = np.random.default_rng(7), 300
+fpr_lin = agree = 0
+for _ in range(MC_r):
+    a = greenbowl_users(2000, rng)
+    b = greenbowl_users(2000, rng)
+    pv = ttest_ind(linearize(a["orders"], a["sessions"]),
+                   linearize(b["orders"], b["sessions"]), equal_var=False).pvalue
+    fpr_lin += pv < alpha
+print(f"A/A FPR (linearization): {wilson(fpr_lin, MC_r)}")
+```
+
+The linearized t-test's FPR sits on $\alpha$ — unlike Analyst A's pooled test.
+And it costs one line of algebra instead of thousands of bootstrap resamples:
+on a platform running thousands of metrics nightly, that is the difference
+between hours and seconds.
+
+::: {.callout-tip icon="false"}
+## Your turn 3
+1. **The denominator danger.** The treatment can move the numerator *and* the
+   denominator: an easier checkout → more short sessions → $\sum O$ grows →
+   conversion $K$ can **fall** while the business grows. How do you diagnose
+   this? (Which metric to test separately, and with what test?)
+2. **Case: $Z$ as a covariate.** The linearized $Z$ is an ordinary per-user
+   column. What happens if you take the **pre-experiment** $Z$ as a CUPED
+   covariate for conversion?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 3
+
+**Interpretation.** (1) Test the **denominator** separately — the average
+number of sessions per user — with a plain t-test (sessions per user are
+i.i.d. by user). If the denominator moved, you cannot read the ratio blindly:
+in a report the ratio never travels alone — numerator, denominator, ratio.
+Rule: if you're not sure the treatment leaves the denominator alone, test it.
+(2) The pre-period $Z$ is a legitimate pre-treatment covariate, independent of
+the treatment, so CUPED on it reduces conversion variance just as it does for
+ARPU. This is how the methods **compose** — see @sec-compose next.
+:::
+
+---
+
+# Part IV — Everything composes + Monte Carlo {#sec-compose}
+
+The linearized $Z$, stratification and CUPED are all operations on a per-user
+column, so they **stack**. Let's combine CUPED + stratification into one
+criterion `vr_ci` returning a variance-reduced CI for the ARPU difference.
+
+```{python}
+#| label: vr-ci
+
+def vr_ci(control, test, stratum_c=None, stratum_t=None,
+          cov_c=None, cov_t=None, alpha=0.05):
+    """Variance-reduced CI for the difference of means test - control.
+
+    First CUPED (if a covariate is given), then a stratified/plain mean.
+    Returns (diff, (lo, hi), se).
+    """
+    yc, yt = np.asarray(control, float), np.asarray(test, float)
+    if cov_c is not None:                                    # CUPED step
+        th = calculate_theta(np.r_[cov_c, cov_t], np.r_[yc, yt])
+        yc, yt = yc - th*cov_c, yt - th*cov_t
+
+    def mean_var(reg, y):
+        if reg is None:
+            return y.mean(), y.var(ddof=1) / y.size
+        w, g = (0.5, 0.5), [y[~reg], y[reg]]                 # stratification step
+        m = sum(wi*x.mean() for wi, x in zip(w, g))
+        v = sum(wi**2 * x.var(ddof=1)/x.size for wi, x in zip(w, g))
+        return m, v
+
+    mc, vc = mean_var(stratum_c, yc)
+    mt, vt = mean_var(stratum_t, yt)
+    diff, se = mt - mc, np.sqrt(vc + vt)
+    z = norm.ppf(1 - alpha/2)
+    return diff, (diff - z*se, diff + z*se), se
+```
+
+::: {.callout-tip icon="false"}
+## 🔮 Guess first
+The power order is clear: plain < strat < cuped. But **strat + CUPED** —
+markedly better than CUPED alone, or nearly the same?
+:::
+
+```{python}
+#| label: bench-mc
+
+def strat_cuped_p(sc, xc, yc, st, xt, yt):
+    th = calculate_theta(np.r_[xc, xt], np.r_[yc, yt])
+    return strat_ttest(sc, yc - th*xc, st, yt - th*xt)
+
+rng, MC = np.random.default_rng(17), 400
+mde5 = 5.0                              # design-MDE the baseline test can't see
+cnt = dict.fromkeys(["plain", "strat", "cuped", "strat+cuped"], 0)
+for _ in range(MC):
+    a  = greenbowl_users(n, rng)
+    t_ = greenbowl_users(n, rng, uplift=mde5)
+    cnt["plain"] += ttest_ind(a["arpu"], t_["arpu"], equal_var=False).pvalue < alpha
+    cnt["strat"] += strat_ttest(a["stratum"], a["arpu"], t_["stratum"], t_["arpu"]) < alpha
+    th = calculate_theta(np.r_[a["pre"], t_["pre"]], np.r_[a["arpu"], t_["arpu"]])
+    cnt["cuped"] += ttest_ind(cuped(a["arpu"], a["pre"], th),
+                              cuped(t_["arpu"], t_["pre"], th), equal_var=False).pvalue < alpha
+    cnt["strat+cuped"] += strat_cuped_p(a["stratum"], a["pre"], a["arpu"],
+                                        t_["stratum"], t_["pre"], t_["arpu"]) < alpha
+
+for k, v in cnt.items():
+    print(f"power {k:12s}: {wilson(v, MC)}")
+```
+
+`strat + CUPED` barely adds anything over CUPED alone — because `pre` **already
+knows** the stratum (the same 0.82 correlation from @sec-cuped). Information
+can't be counted twice: when adding a method, ask not "does the covariate
+correlate?" but "how much **new** variance does it explain?".
+
+## The bill in users
+
+```{python}
+#| label: users-saved
+
+rng = np.random.default_rng(21)
+big = greenbowl_users(200_000, rng)
+th  = calculate_theta(big["pre"], big["arpu"])
+sds = {"plain":       np.sqrt(SD_W**2 + 0.25*(MU_R - MU_U)**2),
+       "strat":       SD_W,
+       "cuped":       cuped(big["arpu"], big["pre"], th).std(),
+       "strat+cuped": SD_W * np.sqrt(1 - R_XY**2)}
+
+print("method        | eff. sd | n per arm (MDE = 5 UAH)")
+for k, sd in sds.items():
+    print(f"{k:13s} |  {sd:5.1f}  | {n_per_arm(sd, mde5):>6d}")
+```
+
+The same MDE = 5 UAH that would cost the baseline design $\approx 3980$ users
+per arm fits into $\approx 1300$ with CUPED — **a third of the traffic** with
+zero new users.
+
+::: {.callout-tip icon="false"}
+## Your turn 4
+1. Build `vr_ci` with only `cov_*` (CUPED without stratification) on an A/A
+   world and confirm the CI covers $0$ in $\approx 95\%$ of cases. This
+   validates the final engine.
+2. **Case.** The manager needs to catch +5 UAH, but the traffic budget is 1300
+   users per arm. Which single row of the table above makes this plan real,
+   and what does it mean for the experiment deadline?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 4
+
+```{python}
+#| label: sol4
+
+rng_v, rej = np.random.default_rng(31), 0
+for _ in range(300):
+    a = greenbowl_users(n, rng_v)
+    b = greenbowl_users(n, rng_v)
+    _, (lo, hi), _ = vr_ci(a["arpu"], b["arpu"], cov_c=a["pre"], cov_t=b["pre"])
+    rej += (lo > 0) or (hi < 0)
+print(f"(1) CUPED-vr_ci A/A FPR: {wilson(rej, 300)}")
+```
+
+**Interpretation.** (1) The CI covers zero in $\approx 95\%$ of worlds — the
+engine is honest, safe to use. (2) The `cuped` row (sd $\approx 46$, $n \approx
+1300$): CUPED alone makes the plan real. Deadline: instead of waiting four
+times longer for 4000 users, the experiment finishes within the current
+weekly traffic — "power for free" becomes **saved weeks**.
+:::
+
+---
+
+# Part V — Finale: `vr_report` {#sec-report}
+
+> **Case.** The Kyiv email-campaign A/B is done: **1005** users per arm. The
+> promo-bundle subsidy costs **6 UAH per user** — that's the **breakeven**: the
+> feature pays off only if it lifts ARPU by more than 6 UAH. The CFO awaits a
+> decision.
+
+```{python}
+#| label: ab-report
+
+BASE, PERIODS = 80_000, 26              # Kyiv base; 2-week periods per year
+
+def vr_report(control, test, breakeven, stratum_c=None, stratum_t=None,
+              cov_c=None, cov_t=None, base=BASE, periods=PERIODS):
+    """Final report: variance-reduced effect, three-zone decision, P(pays off), EV."""
+    diff, (lo, hi), se = vr_ci(control, test, stratum_c, stratum_t, cov_c, cov_t)
+    zone = ("SHIP"                   if lo > breakeven else
+            "KILL"                   if hi < breakeven else
+            "GREY ZONE — need data")
+    p_be = norm.sf((breakeven - diff) / se)          # P(effect >= breakeven)
+    ev   = base * periods * (diff - breakeven)        # expected net value per year
+    print(f"ARPU effect: {diff:+.2f} UAH   95% CI ({lo:+.2f}, {hi:+.2f})")
+    print(f"effective SE: {se:.2f} UAH   breakeven {breakeven:+.0f} UAH")
+    print(f"decision:    {zone}")
+    print(f"P(pays off): {p_be:.0%}")
+    print(f"EV per year: {ev/1e6:+.1f}M UAH")
+    return {"diff": diff, "ci": (lo, hi), "zone": zone, "p": p_be, "ev": ev}
+
+
+rng = np.random.default_rng(9)
+control = greenbowl_users(1005, rng)
+test    = greenbowl_users(1005, rng, uplift=11.0)
+
+print(">>> Plain t-test (no variance reduction):")
+_ = vr_report(control["arpu"], test["arpu"], breakeven=6)
+```
+
+```{python}
+#| label: ab-report-vr
+
+print(">>> Stratification + CUPED on the same data:")
+_ = vr_report(control["arpu"], test["arpu"], breakeven=6,
+              stratum_c=control["stratum"], stratum_t=test["stratum"],
+              cov_c=control["pre"], cov_t=test["pre"])
+```
+
+The same data, the same breakeven — but **different** decisions. The plain
+test gives a wide CI straddling breakeven: **grey zone**, payoff in doubt.
+Variance reduction narrowed the CI almost twofold (SE $3.6 \to 2.1$), the lower
+bound cleared 6 UAH: **SHIP**, payoff practically certain, and EV around
+10M UAH per year. Variance reduction is not an academic exercise — it is the
+**difference between "we don't know" and "we ship"**.
+
+::: {.callout-tip icon="false"}
+## Your turn 5 — final case
+1. Run `vr_report` (the strat + CUPED variant) with **breakeven = 12 UAH** (a
+   costlier subsidy). What zone now? What about P(pays off) and EV?
+2. State a one-sentence decision for the CFO for breakeven **6** and **12**
+   UAH. What changed — the statistics or the economics?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Solution 5
+
+```{python}
+#| label: sol5
+
+print(">>> breakeven = 12 UAH:")
+_ = vr_report(control["arpu"], test["arpu"], breakeven=12,
+              stratum_c=control["stratum"], stratum_t=test["stratum"],
+              cov_c=control["pre"], cov_t=test["pre"])
+```
+
+**Interpretation.** The effect is $\approx +11$ UAH: at breakeven 6 — **SHIP**
+(payoff certain, EV positive); at breakeven 12 — the CI now straddles the
+threshold, $P(\text{pays off}) < 50\%$, EV negative → **don't ship**. The
+statistics are the **same** — the decision was flipped by **economics**. "At a
+6 UAH/user subsidy — ship: the effect reliably clears the payoff. At 12 UAH —
+no: less than a coin-flip chance to pay off, need a cheaper subsidy or a bigger
+effect." No post-hoc power in the report: the decision is the CI vs breakeven,
+not "observed power".
+:::
+
+---
+
+# Pitfalls + checklist {.unnumbered}
+
+| Pitfall | Why it hurts | What to do |
+|---|---|---|
+| Stratify / CUPED on a treatment-affected feature | the covariate absorbs the effect → biased estimate | pre-treatment features only |
+| Pool sessions into 0/1 and z-test proportions | one user's sessions aren't i.i.d. → FPR ≫ α | unit of analysis = unit of randomization; `linearize` |
+| Read the ratio without the denominator | the treatment moves $\sum O$ too | test the denominator separately with a t-test |
+| Compare the CI to zero when the feature costs money | "significant" ≠ "pays off" | decision threshold is **breakeven**, three zones |
+| Require "lower bound > design-MDE" | systematic false negatives on paying features | MDE sizes $n$, breakeven decides |
+| "Power at the observed effect" | a deterministic function of the $p$-value | power is computed **before** the experiment |
+| Trust an engine because "the code looks right" | a small change can break calibration | A/A Monte-Carlo bench: FPR ≈ α |
+
+**Variance-reduction A/B checklist:**
+
+- [ ] The covariate / stratum is **pre-treatment**, independent of the effect.
+- [ ] Ratio metrics are computed at the **user** level (`linearize` or a
+  user-level bootstrap), not at the session level.
+- [ ] Every engine is validated by **Monte Carlo**: A/A FPR $\approx \alpha$.
+- [ ] Methods don't "double-count" the same signal — ask about **new** variance.
+- [ ] Report the gain as **effective $sd$ / users saved**.
+- [ ] The decision is **three-zone** vs **breakeven** (+ P(pays off), EV), with
+  no post-hoc power.
+
+If even one "no" — the report isn't ready to meet the CFO.

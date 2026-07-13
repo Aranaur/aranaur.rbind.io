@@ -1,0 +1,1237 @@
+---
+title: "Sharper experiments: variance reduction & ratio metrics"
+subtitle: "Applied Statistics"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .09-var-reduce_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=4049">🔗Applied Statistics</a>
+format:
+  revealjs:
+    code-line-numbers: false
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+jupyter: python3
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import time
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+from scipy.stats import norm, ttest_ind
+from statsmodels.stats.proportion import proportion_confint
+
+# Define colors (shared palette across the slides)
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+# Minimal theme defaults — close to ggplot2 theme_minimal()
+plt.rcParams.update({
+    "figure.facecolor": "white",
+    "axes.facecolor":   "white",
+    "axes.edgecolor":   slate,
+    "axes.labelcolor":  slate,
+    "axes.titlesize":   13,
+    "axes.spines.top":   False,
+    "axes.spines.right": False,
+    "axes.grid":        True,
+    "grid.color":       "#dddddd",
+    "grid.alpha":       0.6,
+    "xtick.color":      slate,
+    "ytick.color":      slate,
+    "font.size":        11,
+    "legend.frameon":   False,
+})
+```
+
+# The last wall {background-iframe=".09-var-reduce_files/libs/colored-particles/index.html"}
+
+## 🛒 The task {.smaller}
+
+> You are an analyst at an **online grocery store** with delivery. Marketing wants to raise the **average revenue per user** and proposes an **email campaign**: a personalised promo bundle for active customers. Before sending anything to everyone, the team runs an **A/B test** — and you own the design.
+
+. . .
+
+The design pipeline — the one this course has been building since lecture 1:
+
+1. **Target metric**: ARPU — average revenue per user over the experiment window.
+2. **Hypotheses**: $H_0\!: \mu_T = \mu_C$ vs $H_1\!: \mu_T \neq \mu_C$ (two-sided, as always).
+3. **Minimum detectable effect**: historical ARPU is $\approx 250$ UAH with $\sigma \approx 80$ UAH; the campaign pays for itself from $\Delta = 10$ UAH.
+4. **Error budget**: $\alpha = 0.05$, power $1-\beta = 0.8$.
+5. **Sample size** → **assignment** → **experiment** → **t-test**.
+
+::: {.notes}
+Фінальна лекція курсу. Наскрізний кейс: онлайн-магазин продуктів із доставкою. Маркетинг хоче підняти середню виручку на користувача (ARPU) і пропонує email-кампанію з персональним промо-набором. Перед повною розсилкою — A/B-тест, і ми відповідаємо за дизайн. Проговоріть пайплайн, який курс збирав від першої лекції: метрика ARPU, двостороння гіпотеза (наголосіть: саме двостороння — торік у матеріалах був різнобій між «більше» в тексті та ≠ у формулі, тут все консистентно), MDE = 10 грн (з юніт-економіки кампанії: дешевші ефекти не окупаються), α = 0.05, потужність 0.8, історичні σ ≈ 80 і середнє ≈ 250. Це «рутинна» частина — вона займе три слайди. А далі почнеться справжня тема лекції: що робити, коли цього пайплайна НЕ ВИСТАЧАЄ.
+:::
+
+## 🧮 Sample size {.smaller}
+
+For a two-sample t-test with equal arms:
+
+$$
+n \;=\; \frac{\left(z_{1-\alpha/2} + z_{1-\beta}\right)^2 \cdot 2\sigma^2}{\Delta^2}
+\qquad\text{per arm.}
+$$
+
+```{python}
+#| label: design-params
+#| output-location: column
+
+alpha, beta   = 0.05, 0.20
+mu, sigma     = 250.0, 80.0     # historical ARPU
+mde           = 10.0            # breakeven effect, UAH
+
+z_a = norm.ppf(1 - alpha/2)
+z_b = norm.ppf(1 - beta)
+
+def n_per_arm(sd, delta):
+    return int(np.ceil((z_a + z_b)**2 * 2*sd**2 / delta**2))
+
+n = n_per_arm(sigma, mde)
+print(f"users per arm: {n}")
+```
+
+. . .
+
+::: {.callout-note icon=false}
+$n \propto \sigma^2 / \Delta^2$. Remember this shape — the whole lecture lives inside it.
+:::
+
+::: {.notes}
+Формула розміру груп для двовибіркового t-тесту з рівними плечима — та сама, що в лекціях про t-тест. Підставляємо: σ = 80, Δ = 10, α = 0.05, β = 0.2 → 1005 користувачів на групу. Функцію n_per_arm ми ще використаємо не раз. Головне на слайді — НЕ число 1005, а форма залежності: n пропорційне σ²/Δ². Квадрати означають: щоб ловити вдвічі менший ефект, треба вчетверо більше людей; щоб компенсувати вдвічі більший шум — теж вчетверо. Уся лекція житиме всередині цієї формули: ми не можемо чіпати Δ (його диктує бізнес), тому будемо тиснути на σ.
+:::
+
+## 🎰 Does the plan keep its promises? {.smaller}
+
+Habit from the Monte Carlo lecture: **simulate the design before running it**.
+
+```{python}
+#| label: mc-baseline
+#| code-fold: true
+#| output-location: column
+
+def wilson(k, n_trials):
+    lo, hi = proportion_confint(k, n_trials, method="wilson")
+    return f"{k/n_trials:.3f}  [{lo:.3f}, {hi:.3f}]"
+
+rng = np.random.default_rng(42)
+MC  = 1000
+
+ctrl_1 = rng.normal(mu, sigma, (MC, n))
+ctrl_2 = rng.normal(mu, sigma, (MC, n))
+test   = rng.normal(mu + mde, sigma, (MC, n))
+
+p_aa = ttest_ind(ctrl_1, ctrl_2, axis=1, equal_var=False).pvalue
+p_ab = ttest_ind(ctrl_1, test,   axis=1, equal_var=False).pvalue
+
+print("A/A FPR  :", wilson((p_aa < alpha).sum(), MC))
+print("A/B power:", wilson((p_ab < alpha).sum(), MC))
+```
+
+. . .
+
+FPR sits on $\alpha$, power sits on $0.8$ — the design is honest. `wilson()` will chaperone every simulated rate today, as usual.
+
+::: {.notes}
+Звичка з лекції про Монте-Карло: перш ніж запускати експеримент — симулюємо його. Векторизовано: матриці MC×n, ttest_ind по axis=1, жодних циклів — 1000 симульованих експериментів за частки секунди. A/A-тест дає FPR ≈ 0.05, A/B з ефектом 10 грн — потужність ≈ 0.8. Дизайн чесний. І зверніть увагу на wilson(): частка відхилень сама є оцінкою з шумом, тому до кожного симульованого FPR і power ми, як завжди в цьому курсі, чіпляємо інтервал Уілсона. Ця функція супроводжуватиме нас усю лекцію. Поки що все йде за підручником — інтрига на наступному слайді.
+:::
+
+## 🧱 The wall {.smaller}
+
+You bring the plan to the PM. The answer:
+
+> "1005 users per arm is fine. But finance says the campaign is worth shipping even at **+5 UAH**. And we can't hold the promo budget for longer — **no extra users**."
+
+```{python}
+#| label: wall-math
+#| output-location: column
+
+for delta in (10, 5):
+    print(f"MDE = {delta:>2} UAH -> "
+          f"{n_per_arm(sigma, delta)} users per arm")
+```
+
+. . .
+
+Halve the effect → **quadruple** the sample. That's the wall: $n \propto \sigma^2/\Delta^2$, and
+
+- $\Delta$ is set by **economics** — not yours to touch;
+- $n$ is set by **traffic and time** — the PM just froze it;
+- $\sigma$ … is set by **how you analyse the data**. [The only free lever.]{.hi}
+
+::: {.callout-tip icon=false}
+Today's promise: keep the same users, the same weeks, the same honest $\alpha$ — and detect smaller effects, by making $\sigma$ *effectively* smaller. **Variance reduction = power for free.**
+:::
+
+::: {.notes}
+Стіна, з якої починається лекція. PM повертається: фінансисти кажуть, що кампанія окупна вже від +5 грн, а бюджету тримати промо довше немає — більше користувачів не буде. Рахуємо: для MDE = 5 треба ≈4020 на групу — вчетверо більше. Розкладаємо формулу на три важелі. Δ диктує економіка — ми його не обираємо. n диктують трафік і час — PM щойно їх заморозив. Лишається σ. І ось ключова думка лекції: σ у формулі — це НЕ «природна мінливість користувачів», це дисперсія ТІЄЇ ВЕЛИЧИНИ, ЯКУ МИ ЗАНОСИМО В ТЕСТ. Її можна зменшити, не чіпаючи ані даних, ані чесності критерію — просто розумніше аналізуючи. Це і є variance reduction: потужність задарма. План лекції — три способи: використати те, що ми ЗНАЄМО про користувачів (стратифікація), те, що вони РОБИЛИ раніше (CUPED), і правильно обрати САМУ метрику (ratio-метрики та лінеаризація). Наприкінці — очний турнір усіх методів і підсумкова карта курсу.
+:::
+
+## 🗺️ Roadmap {.smaller}
+
+| # | Lever | Method | Section |
+|---|-------|--------|---------|
+| 1 | what we **know** about users | stratification | next |
+| 2 | what users **did before** | CUPED | after that |
+| 3 | what we **measure** at all | ratio metrics & linearization | then |
+| 4 | all of it at once | head-to-head bench | — |
+| 5 | the whole course | one map | finale |
+
+::: {.notes}
+Дорожня карта фінальної лекції. Три важелі зниження дисперсії: (1) стратифікація — використовуємо відому структуру аудиторії; (2) CUPED — використовуємо передекспериментальну історію; (3) ratio-метрики та лінеаризація — правильно обираємо одиницю аналізу й саму метрику (тут же чатується найпідступніша пастка лекції). Потім очний турнір методів на одному світі й фінальна карта всього курсу. Поїхали.
+:::
+
+# Stratification {background-iframe=".09-var-reduce_files/libs/colored-particles/index.html"}
+
+## 🏷️ The store has structure {.smaller}
+
+The store runs a **loyalty program**. From historical data:
+
+- **registered** users: mean ARPU $\approx 300$ UAH, sd $\approx 62$;
+- **unregistered**: mean ARPU $\approx 200$ UAH, sd $\approx 62$;
+- shares in the population: $50\%/50\%$.
+
+```{python}
+#| label: strata-plot
+#| code-fold: true
+#| fig-align: center
+
+mu_u, mu_r, sd_w, w_r = 200.0, 300.0, 62.0, 0.5
+
+x = np.linspace(0, 500, 500)
+fig, axes = plt.subplots(1, 2, figsize=(12.5, 3.8), sharey=True)
+axes[0].plot(x, norm.pdf(x, mu_u, sd_w), color=red_pink,  lw=2.5, label="unregistered")
+axes[0].plot(x, norm.pdf(x, mu_r, sd_w), color=turquoise, lw=2.5, label="registered")
+axes[0].set_title("What we know: two strata, sd = 62 each")
+axes[0].legend()
+mix = w_r*norm.pdf(x, mu_r, sd_w) + (1-w_r)*norm.pdf(x, mu_u, sd_w)
+axes[1].plot(x, mix, color=blue, lw=2.5)
+axes[1].set_title("What the t-test sees: one blob, sd ≈ 80")
+for ax in axes:
+    ax.set_xlabel("ARPU, UAH")
+axes[0].set_ylabel("density")
+plt.tight_layout()
+plt.show()
+```
+
+The "$\sigma \approx 80$" from our design is not one population — it is **two well-separated groups glued together**.
+
+::: {.notes}
+Перший важіль — структура, яку ми і так знаємо. У магазину є програма лояльності: зареєстровані користувачі витрачають у середньому 300 грн, незареєстровані — 200, у кожної підгрупи власне sd = 62, частки 50/50. Лівий графік — те, що знаємо ми: дві добре розділені страти. Правий — те, що «бачить» звичайний t-тест: один розмазаний горб зі стандартним відхиленням близько 80. Ось звідки взялося σ = 80 у нашому дизайні: це не «природна мінливість покупця», це ДВІ групи, склеєні докупи. Реєстрація в лояльності — ковариата: вона корелює з метрикою і НЕ залежить від трітменту. Зараз ми цю інформацію перетворимо на потужність.
+:::
+
+## 🧩 Variance decomposition {.smaller}
+
+For a mixture of strata with weights $w_s$, means $\mu_s$ and variances $\sigma_s^2$:
+
+$$
+\underbrace{\operatorname{Var}(Y)}_{\text{what the t-test fights}}
+= \underbrace{\textstyle\sum_s w_s \sigma_s^2}_{\text{within strata}}
+\;+\; \underbrace{\textstyle\sum_s w_s (\mu_s - \bar\mu)^2}_{\text{between strata}}
+$$
+
+```{python}
+#| label: variance-decomp
+#| output-location: column
+
+mu_bar      = w_r*mu_r + (1 - w_r)*mu_u
+var_within  = sd_w**2
+var_between = w_r*(mu_r - mu_bar)**2 + (1 - w_r)*(mu_u - mu_bar)**2
+
+print(f"within  : {var_within:7.0f}  (sd {np.sqrt(var_within):.1f})")
+print(f"between : {var_between:7.0f}  (sd {np.sqrt(var_between):.1f})")
+total = var_within + var_between
+print(f"total   : {total:7.0f}  (sd {np.sqrt(total):.1f})")
+```
+
+. . .
+
+**40% of the design variance** ($2500/6344$) is *between* strata — and that part is **not noise**: we know each user's stratum before the experiment starts. Paying sample size for it is a waste.
+
+::: {.notes}
+Ключова формула секції — розклад дисперсії суміші: повна дисперсія = дисперсія всередині страт + дисперсія між стратами. Числа: всередині 62² = 3844, між — 0.5·50² + 0.5·50² = 2500, разом 6344, тобто sd ≈ 79.6 ≈ наші 80. Сорок відсотків дисперсії, з якою бореться наш t-тест, — це різниця МІЖ стратами. І ця частина — не шум! Ми знаємо статус лояльності кожного користувача ЩЕ ДО експерименту. Платити за неї розміром вибірки — марнотратство. Стратифікація — це спосіб «відрізати» доданок between і лишити тесту тільки справжній шум within.
+:::
+
+## 🎲 Where the extra noise bites {.smaller}
+
+Randomize $1005$ users into an arm → the **share of registered users in the arm is itself random**:
+
+```{python}
+#| label: mix-noise
+#| output-location: column
+
+rng = np.random.default_rng(1)
+shares = rng.binomial(n, 0.5, 100_000) / n
+
+sd_mix    = shares.std() * (mu_r - mu_u)
+sd_sample = sd_w / np.sqrt(n)
+
+print(f"sd of registered share : {shares.std():.4f}")
+print(f"arm-mean noise from mix: {sd_mix:.2f} UAH")
+print(f"arm-mean noise within  : {sd_sample:.2f} UAH")
+```
+
+. . .
+
+In an A/A test the arm means differ **not only** because users are random, but because one arm got a *slightly richer loyalty mix*. That mix-luck contributes almost as much noise as genuine sampling — and we can remove it **exactly**, because the mix is observable.
+
+::: {.notes}
+Де саме ця «зайва» дисперсія кусає? При рандомізації 1005 людей у групу частка зареєстрованих У ГРУПІ — сама випадкова величина: біноміальний розкид ≈ 1.6 п.п. Кожен відсоток перекосу зсуває середнє групи на 1 грн (бо різниця страт — 100 грн). Разом: шум середнього групи від «пощастило з міксом» ≈ 1.6 грн, а класичний вибірковий шум усередині страт ≈ 2.0 грн. Тобто ледь не ПОЛОВИНА хиткості групового середнього в A/A — це просто лотерея складу групи. І цю лотерею можна прибрати точно, бо склад групи спостережуваний: ми знаємо, хто зареєстрований. Два способи: балансувати склад на етапі призначення (стратифікована рандомізація) або виправити зважуванням на етапі аналізу (пост-стратифікація). Математика оцінки одна й та сама — наступний слайд.
+:::
+
+## ⚖️ Stratified mean and its variance {.smaller}
+
+Estimate the arm mean as a **weighted sum of stratum means**, weights = *population* shares $w_s$:
+
+$$
+\hat{Y}_{str} = \sum_{s} w_s \, \bar{Y}_s ,
+\qquad
+\operatorname{Var}\!\big(\hat{Y}_{str}\big) = \sum_{s} w_s^2 \, \frac{\sigma_s^2}{n_s}
+\;\overset{n_s = w_s n}{=}\;
+\frac{1}{n} \sum_{s} w_s \sigma_s^2 .
+$$
+
+Compare the two estimators of the same arm mean:
+
+$$
+\operatorname{Var}(\bar Y) \approx \frac{6344}{n}
+\qquad\text{vs}\qquad
+\operatorname{Var}(\hat Y_{str}) \approx \frac{3844}{n} .
+$$
+
+. . .
+
+The between-strata term is **gone**: the weights are fixed constants, so the loyalty-mix lottery no longer shakes the estimate. The t-statistic just swaps in the new mean and variance:
+
+$$
+t = \frac{\hat{Y}_{str,T} - \hat{Y}_{str,C}}{\sqrt{\widehat{\operatorname{Var}}(\hat Y_{str,T}) + \widehat{\operatorname{Var}}(\hat Y_{str,C})}}
+$$
+
+::: {.notes}
+Оцінювач: стратифіковане середнє — зважена сума середніх по стратах, ваги = частки страт у ПОПУЛЯЦІЇ (константи, не частки у вибірці!). Його дисперсія: Σ w² σ²/n_s; за пропорційної алокації n_s = w·n це (1/n)·Σ w σ² — тобто в чисельнику лишилась ЛИШЕ внутрішньостратова дисперсія 3844 замість повної 6344. Доданок between зник не магією: ваги — фіксовані числа, тому лотерея складу групи більше не хитає оцінку. Порівняйте з торішнім записом формули: там было Var_str = (1/N)Σw σ² без пояснення, звідки взялося, — тут ми чесно пройшли через Σ w² σ²/n_s. Стратифікований t-тест — та сама t-статистика, лише з новими середнім і дисперсією; ступені свободи беремо як n_T + n_C − 2, на таких розмірах це не принципово.
+:::
+
+## 🐍 `strat_ttest` {.smaller}
+
+```{python}
+#| label: strat-fn
+
+def draw_arm_strat(size, rng, effect=0.0):
+    """One arm of the grocery experiment: loyalty stratum + ARPU."""
+    reg = rng.random(size) < w_r                     # True = registered
+    y   = np.where(reg, mu_r, mu_u) + sd_w*rng.standard_normal(size) + effect
+    return reg, y
+
+def strat_ttest(reg_c, y_c, reg_t, y_t, w=(0.5, 0.5)):
+    """Two-sample t-test on stratified means; w = population shares."""
+    m, v = [], []
+    for reg, y in ((reg_c, y_c), (reg_t, y_t)):
+        groups = [y[~reg], y[reg]]
+        m.append(sum(wi * g.mean() for wi, g in zip(w, groups)))
+        v.append(sum(wi**2 * g.var(ddof=1) / g.size for wi, g in zip(w, groups)))
+    t_stat = (m[1] - m[0]) / np.sqrt(v[0] + v[1])
+    df = y_c.size + y_t.size - 2
+    return 2 * stats.t.sf(abs(t_stat), df)
+```
+
+Population shares $w$ come **from outside the experiment** (the user base), not from the arm itself.
+
+::: {.notes}
+Реалізація — дюжина рядків. draw_arm_strat генерує одну групу нашого світу: статус лояльності Бернуллі(0.5) і ARPU з відповідної страти (+effect для тестової групи). strat_ttest рахує для кожної групи стратифіковане середнє й дисперсію за формулами з попереднього слайда і повертає двосторонній p-value. Тонкість, на яку варто вказати студентам: ваги w — це частки страт у ПОПУЛЯЦІЇ (їх знаємо з бази користувачів), а не в конкретній групі. Саме через це фіксування і зникає «лотерея складу». Перевіряємо чесність — наступний слайд, як завжди, Монте-Карло.
+:::
+
+## 🔬 Monte Carlo: plain vs stratified {.smaller}
+
+```{python}
+#| label: mc-strat
+#| code-fold: true
+#| output-location: column
+
+rng = np.random.default_rng(11)
+MC  = 1000
+cnt = dict.fromkeys(
+    ["plain FPR", "plain power", "strat FPR", "strat power"], 0)
+
+for _ in range(MC):
+    reg_a, y_a = draw_arm_strat(n, rng)
+    reg_b, y_b = draw_arm_strat(n, rng)
+    reg_t, y_t = draw_arm_strat(n, rng, effect=mde)
+
+    cnt["plain FPR"]   += ttest_ind(y_a, y_b, equal_var=False).pvalue < alpha
+    cnt["plain power"] += ttest_ind(y_a, y_t, equal_var=False).pvalue < alpha
+    cnt["strat FPR"]   += strat_ttest(reg_a, y_a, reg_b, y_b) < alpha
+    cnt["strat power"] += strat_ttest(reg_a, y_a, reg_t, y_t) < alpha
+
+for k, v in cnt.items():
+    print(f"{k:12s}: {wilson(v, MC)}")
+```
+
+. . .
+
+::: {.callout-important icon=false}
+Same users, same effect, same $\alpha$ — and power jumps from $\approx 0.80$ to $\approx 0.95$. Effective sd dropped from $79.6$ to $62$; the design that needed $1005$ users now needs `{python} n_per_arm(62.0, 10.0)`.
+:::
+
+::: {.notes}
+Стенд: 1000 світів, у кожному — A/A і A/B для обох критеріїв на ТИХ САМИХ даних. Результат: FPR обох тестів на рівні α (інтервали Уілсона накривають 0.05) — обидва чесні. А потужність: звичайний t-тест ≈ 0.80 (як і проєктували), стратифікований ≈ 0.95. Ті самі користувачі, той самий ефект 10 грн, той самий рівень значущості — п'ятнадцять пунктів потужності задарма. Мовою розміру вибірки: ефективне sd впало з 79.6 до 62, і дизайн, якому було потрібно 1005 користувачів, тепер обходиться 604-ма. Це і є «потужність задарма» з обіцянки лекції — ми просто перестали платити за дисперсію, яку самі ж могли пояснити.
+:::
+
+## 📎 Post-stratification & fine print {.smaller}
+
+- **Didn't control the assignment?** Apply the *same* weighted estimator to a plain random split — [post-stratification]{.hi}. Asymptotically it captures nearly the same gain.
+- **More strata**: city × platform × loyalty… works the same way; each stratum needs a decent $n_s$ for $\bar Y_s$ and $s_s^2$ to be stable.
+- **The stratum must be pre-treatment**: defined *before* the experiment and unaffected by it. Stratifying on something the treatment can move destroys the test.
+- **The gain is capped** by how much of the variance is *between* strata — here $40\%$; a useless covariate buys you nothing.
+
+::: {.callout-note icon=false}
+A nuance we inherit honestly: the stratified test answers the question about the **population-weighted** mean. That is *exactly* the ARPU the business cares about — but it is a different estimand than "mean of whoever landed in my sample".
+:::
+
+::: {.notes}
+Дрібний шрифт секції. (1) Якщо рандомізацію вже провели простим жеребом — не біда: той самий зважений оцінювач, застосований постфактум, називається пост-стратифікацією і асимптотично дає майже той самий виграш. (2) Страт може бути багато (місто × платформа × лояльність), аби в кожній лишалося достатньо спостережень для стабільних оцінок середнього й дисперсії. (3) Критично: страта має бути ПЕРЕДтрітментною характеристикою — визначеною до експерименту і незалежною від нього. Стратифікувати за тим, що трітмент може змінити, — зруйнувати тест. (4) Виграш обмежений часткою between-дисперсії: у нас 40%, а від марної коваріати виграшу нуль. І нюанс, який торік був сформульований як «ми отримали не зовсім той тест»: стратифікований критерій відповідає на питання про ПОПУЛЯЦІЙНО зважене середнє. Для бізнесу це якраз і є ARPU, тож для нас це фіча, а не баг, — але формально це інший естиманд, ніж «середнє тих, хто випадково потрапив у вибірку».
+:::
+
+# CUPED {background-iframe=".09-var-reduce_files/libs/colored-particles/index.html"}
+
+## 👀 Week 5: who won? {.smaller}
+
+Stratification used a **coarse** label. But we have something far richer: every user's **own history**. Ten users, revenue in the experiment week:
+
+```{python}
+#| label: cuped-toy1
+#| echo: false
+#| fig-align: center
+
+base   = np.array([100, 120, 110, 130, 140, 150, 160, 170, 180, 190], dtype=float)
+week5  = np.array([100, 125, 110, 132, 140, 151, 160, 172, 180, 195], dtype=float)
+group  = np.array(["A", "B"] * 5)
+users  = np.arange(1, 11)
+
+fig, ax = plt.subplots(figsize=(11, 4.2))
+for g, color in (("A", red_pink), ("B", turquoise)):
+    m = group == g
+    ax.scatter(np.full(m.sum(), 5), week5[m], s=110, color=color, label=f"group {g}",
+               edgecolor="white", linewidth=1.5)
+for u, y5 in zip(users, week5):
+    ax.annotate(str(int(y5)), (5, y5), textcoords="offset points",
+                xytext=(14, -3), fontsize=9, color=slate)
+ax.set_xticks([1, 2, 3, 4, 5], [f"week {i}" for i in range(1, 6)])
+ax.set_xlim(0.5, 5.9)
+ax.set_ylabel("revenue, UAH")
+ax.set_title("Experiment week: B looks... maybe higher? Hard to say")
+ax.legend(loc="upper left")
+plt.tight_layout()
+plt.show()
+```
+
+Between-user spread ($100$–$195$ UAH) dwarfs any treatment effect. A t-test compares *these* clouds.
+
+::: {.notes}
+Другий важіль. Стратифікація використовувала грубу мітку — зареєстрований чи ні. Але в нас є значно багатше знання: ВЛАСНА історія кожного користувача. Іграшковий приклад: десять користувачів, виручка за тиждень експерименту, групи A і B чергуються. Дивимось на хмару тижня 5: розкид між користувачами — від 100 до 195 грн, і на його тлі жоден ефект трітменту не видно. Звичайний t-тест порівнює саме ЦІ дві хмари — і тоне в міжкористувацькому розкиді. Питання до аудиторії: а що, як подивитись, скільки кожен витрачав РАНІШЕ?
+:::
+
+## 👀 …and now with the past {.smaller}
+
+```{python}
+#| label: cuped-toy2
+#| echo: false
+#| fig-align: center
+
+diffs = week5 - base
+fig, ax = plt.subplots(figsize=(11, 4.2))
+weeks = np.arange(1, 6)
+for i, (u, g) in enumerate(zip(users, group)):
+    color = red_pink if g == "A" else turquoise
+    path = np.array([base[i]]*4 + [week5[i]])
+    ax.plot(weeks, path, color=color, lw=1.8, alpha=0.85)
+    ax.scatter(weeks, path, color=color, s=28)
+    ax.annotate(f"+{int(diffs[i])}" if diffs[i] else "0",
+                (5, week5[i]), textcoords="offset points",
+                xytext=(14, -3), fontsize=10, fontweight="bold",
+                color=slate if diffs[i] == 0 else red)
+ax.set_xticks(weeks, [f"week {i}" for i in range(1, 6)])
+ax.set_xlim(0.5, 5.9)
+ax.set_ylabel("revenue, UAH")
+ax.set_title("Each user vs their own past: every B ticked up, every A stayed flat")
+plt.tight_layout()
+plt.show()
+```
+
+Against each user's own baseline the picture is unambiguous: **every** B-user gained, **every** A-user stayed flat. [Compare users to their own past — the noise between users cancels out.]{.hi}
+
+::: {.notes}
+Ті самі дані, але тепер із тижнями 1–4. Кожна лінія — один користувач; видно, що витрати людини стабільні в часі, а на тижні 5 КОЖЕН користувач групи B підріс (+5, +2, +1, +2, +5), і КОЖЕН користувач A лишився на місці. Проти власного бейзлайна кожного користувача картина однозначна. Ідея CUPED саме така: відняти від метрики те, що передбачувано з минулого користувача, — і міжкористувацький розкид скоротиться, лишивши ефект видимим. Залишилось формалізувати «відняти минуле» так, щоб тест лишився незміщеним і мінімізував дисперсію.
+:::
+
+## 📐 CUPED {.smaller}
+
+**CUPED** — **C**ontrolled-experiment **U**sing **P**re-**E**xperiment **D**ata. Adjust the metric $Y$ with a pre-experiment covariate $X$:
+
+$$
+Y_{cuped} = Y - \theta X
+$$
+
+- $Y$ — the target metric during the experiment (ARPU);
+- $X$ — a covariate measured **before** the experiment (e.g. the same user's ARPU over the previous 4 weeks);
+- $\theta$ — a constant, **the same for both arms**, chosen to minimize variance.
+
+. . .
+
+Why is the comparison still fair? Randomization makes $\mathbb{E}X_T = \mathbb{E}X_C$, and $\theta$ is shared, so
+
+$$
+\mathbb{E}\big[\bar Y_{cuped,T} - \bar Y_{cuped,C}\big]
+= \mathbb{E}\big[\bar Y_T - \bar Y_C\big] - \theta\big(\mathbb{E}\bar X_T - \mathbb{E}\bar X_C\big)
+= \mathbb{E}\big[\bar Y_T - \bar Y_C\big].
+$$
+
+[The difference of means is untouched; only its noise shrinks.]{.hi}
+
+::: {.notes}
+CUPED — Controlled-experiment Using Pre-Experiment Data (Microsoft, 2013). Конструкція: від метрики Y віднімаємо θ·X, де X — коваріата, виміряна ДО експерименту (наприклад, ARPU того ж користувача за попередні 4 тижні), а θ — константа, СПІЛЬНА для обох груп. Чому порівняння лишається чесним: завдяки рандомізації очікування X у тесті й контролі однакові, а θ однакова — тож у різниці середніх доданок з X скорочується В ОЧІКУВАННІ. Ми не зсуваємо оцінку ефекту — ми лише прибираємо з неї передбачувану частину шуму. (Примітка: часто пишуть Y − θ(X − X̄), щоб зберегти й масштаб метрики; на різницю груп це не впливає.) Лишилось обрати θ — наступний слайд.
+:::
+
+## 🎚️ The optimal $\theta$ {.smaller}
+
+Choose $\theta$ to minimize the variance:
+
+$$
+\operatorname{Var}(Y_{cuped}) = \operatorname{Var}(Y) - 2\theta \operatorname{Cov}(X, Y) + \theta^2 \operatorname{Var}(X)
+$$
+
+A parabola in $\theta$ — differentiate, set to zero:
+
+$$
+\frac{d}{d\theta}\operatorname{Var}(Y_{cuped}) = 2\theta \operatorname{Var}(X) - 2\operatorname{Cov}(X, Y) = 0
+\quad\Rightarrow\quad
+\boxed{\;\theta = \frac{\operatorname{Cov}(X, Y)}{\operatorname{Var}(X)}\;}
+$$
+
+Substitute back:
+
+$$
+\operatorname{Var}(Y_{cuped}) = \operatorname{Var}(Y)\,\big(1 - r^2\big),
+\qquad r = \operatorname{corr}(X, Y).
+$$
+
+. . .
+
+::: {.callout-tip icon=false}
+The entire method in one number: correlate at $r = 0.7$ → variance $\times\,0.51$ → **half the sample size** for the same power. And $\theta = \operatorname{Cov}/\operatorname{Var}$ is just the **OLS slope** of $Y$ on $X$ — CUPED is regression adjustment wearing a product-analytics badge.
+:::
+
+::: {.notes}
+Оптимальна θ. Дисперсія Y_cuped — парабола за θ: Var(Y) − 2θCov + θ²Var(X). Диференціюємо, прирівнюємо до нуля: θ* = Cov(X,Y)/Var(X). Підставляємо назад — і отримуємо головну формулу методу: Var(Y_cuped) = Var(Y)·(1 − r²), де r — кореляція коваріати з метрикою. Уся сила CUPED в одному числі: r = 0.7 → дисперсія множиться на 0.51 → удвічі менше користувачів за тієї ж потужності. І зверніть увагу: θ* = Cov/Var — це в точності НАХИЛ OLS-регресії Y на X. CUPED — це регресійне коригування, перевдягнене в термінологію продуктової аналітики; для статистика тут немає нової математики, є нова дисципліна застосування.
+:::
+
+## 🧰 What makes a good covariate {.smaller}
+
+> Anything correlated with $Y$ that **cannot be affected by the treatment**.
+
+1. **The same metric, pre-experiment** — the default and usually the best:
+   - for ARPU → ARPU over the previous 4 weeks;
+   - for retention → last month's retention; for CTR → last week's CTR.
+2. **Other pre-experiment behaviour** — sessions, order frequency, average basket before the test.
+3. **ML predictions** of $Y$ built on pre-experiment features (a.k.a. CUPAC) — squeezes several covariates into one.
+4. **Stable attributes** — country, device, cohort.
+
+. . .
+
+Industry calibration:
+
+- **Netflix** (KDD 2016): streaming-hours metric, covariate = pre-experiment streaming hours → **≈40%** variance reduction.
+- **Microsoft** (2022): CTR with a 2-week pre-period → gain equivalent to **adding ~20% traffic**.
+
+::: {.notes}
+Що брати за коваріату? Дефолт і зазвичай найкращий вибір — ТА САМА метрика за передекспериментальний період: для ARPU — ARPU за попередні 4 тижні, для ретеншена — ретеншен минулого місяця, для CTR — CTR минулого тижня. Працює й інша передекспериментальна поведінка (сесії, частота замовлень, середній кошик), ML-прогноз метрики за історичними фічами (це називають CUPAC — корисно, коли хочеться стиснути кілька коваріат в одну), стабільні атрибути типу країни чи девайса. Єдина тверда вимога — трітмент НЕ МОЖЕ впливати на коваріату; усе виміряне до старту експерименту автоматично безпечне. Індустріальні орієнтири: Netflix на KDD-2016 звітував ≈40% зниження дисперсії для годин стрімінгу з коваріатою «години стрімінгу до експерименту»; Microsoft у 2022 — виграш, еквівалентний +20% трафіку для CTR. Посилання — в матеріалах курсу.
+:::
+
+## 🐍 `cuped_ttest` {.smaller}
+
+```{python}
+#| label: cuped-fn
+
+r_xy = 0.7          # historical corr(pre-ARPU, ARPU) at our store
+
+def draw_arm_cuped(size, rng, effect=0.0):
+    """One arm: pre-experiment ARPU x and experiment ARPU y, corr = r_xy."""
+    x = rng.normal(mu, sigma, size)
+    y = mu + r_xy*(x - mu) + sigma*np.sqrt(1 - r_xy**2)*rng.standard_normal(size) + effect
+    return x, y
+
+def calculate_theta(x, y):
+    return np.cov(x, y)[0, 1] / x.var(ddof=1)
+
+def cuped_ttest(x_c, y_c, x_t, y_t):
+    theta = calculate_theta(np.concatenate([x_c, x_t]),
+                            np.concatenate([y_c, y_t]))
+    return ttest_ind(y_c - theta*x_c, y_t - theta*x_t, equal_var=False).pvalue
+```
+
+$\theta$ is estimated on **both arms pooled** — one shared constant, as the unbiasedness argument requires.
+
+::: {.notes}
+Реалізація. draw_arm_cuped генерує пару (X, Y) з кореляцією 0.7 — «історичне» ARPU і ARPU під час експерименту. calculate_theta — формула Cov/Var. cuped_ttest: оцінюємо θ на ОБ'ЄДНАНИХ групах (одна спільна константа — саме цього вимагав аргумент незміщеності), віднімаємо θX у кожній групі і застосовуємо звичайний Welch-тест до скоригованих значень. Три функції, жодної нової статистики — вся новизна в передобробці метрики. Тепер традиційний ритуал: перевіряємо на симуляціях, що FPR не роздуто і скільки потужності це дає.
+:::
+
+## 🔬 Monte Carlo: does CUPED cheat? {.smaller}
+
+```{python}
+#| label: mc-cuped
+#| code-fold: true
+#| output-location: column
+
+rng = np.random.default_rng(5)
+MC  = 1000
+p_cuped_aa, p_cuped_ab, p_plain_ab = (np.empty(MC) for _ in range(3))
+
+for i in range(MC):
+    x_a, y_a = draw_arm_cuped(n, rng)
+    x_b, y_b = draw_arm_cuped(n, rng)
+    x_t, y_t = draw_arm_cuped(n, rng, effect=mde)
+
+    p_cuped_aa[i] = cuped_ttest(x_a, y_a, x_b, y_b)
+    p_cuped_ab[i] = cuped_ttest(x_a, y_a, x_t, y_t)
+    p_plain_ab[i] = ttest_ind(y_a, y_t, equal_var=False).pvalue
+
+print("CUPED A/A FPR :", wilson((p_cuped_aa < alpha).sum(), MC))
+print("CUPED A/B pow :", wilson((p_cuped_ab < alpha).sum(), MC))
+print("plain A/B pow :", wilson((p_plain_ab < alpha).sum(), MC))
+```
+
+```{python}
+#| label: cuped-pplot
+#| code-fold: true
+#| fig-align: center
+
+fig, axes = plt.subplots(1, 3, figsize=(12.5, 3.2), sharey=True)
+for ax, p, ttl, color in zip(
+        axes, (p_cuped_aa, p_cuped_ab, p_plain_ab),
+        ("CUPED A/A", "CUPED A/B", "plain t A/B"),
+        (red_pink, turquoise, orange)):
+    ax.hist(p, bins=20, range=(0, 1), color=color, alpha=0.85)
+    ax.set_title(ttl); ax.set_xlabel("p-value")
+axes[0].set_ylabel("count")
+plt.tight_layout()
+plt.show()
+```
+
+::: {.notes}
+Стенд: 1000 світів, n = 1005 на групу, r = 0.7, ефект 10 грн. Три розподіли p-value. CUPED A/A — рівномірний, FPR ≈ 0.05: метод не махлює, нулю він відхиляє рівно з обіцяною частотою. CUPED A/B — маса біля нуля, потужність ≈ 0.97. Звичайний t-тест на тих самих даних — ≈ 0.80. Сімнадцять пунктів потужності з тієї ж вибірки, і формула не збрехала: виміряний var ratio ≈ 0.51 = 1 − 0.7². Проти стратифікації (0.95) CUPED тут трохи сильніший — бо неперервна історія користувача несе більше інформації, ніж бінарна мітка лояльності. За хвилину ми побачимо, що ці двоє ще й конкурують за одну й ту саму інформацію.
+:::
+
+## ⚠️ CUPED fine print {.smaller}
+
+1. **Correlation is the whole game.** Gain $= 1 - r^2$: at $|r| = 0.3$ you shave only $9\%$ of variance. Below that — not worth the pipeline complexity.
+2. **The covariate must be treatment-free.** Pre-experiment data is safe *by construction*. A covariate measured **during** the experiment (sessions, visits…) can absorb part of the effect — and silently bias the estimate.
+3. **New users have no history.** $X$ missing → CUPED degrades toward the plain test (Netflix: 5–15% reduction for new users vs 40% for existing). Practical fix: set $X = \bar X$ (or $0$ in the centred form) for them.
+4. **It's OLS.** CUPED with pooled $\theta$ ≡ regression adjustment; more covariates → multiple regression / CUPAC.
+
+::: {.notes}
+Дрібний шрифт CUPED. (1) Виграш — це рівно 1 − r²: за |r| = 0.3 ви зрізаєте лише 9% дисперсії; нижче — ускладнення пайплайна того не варте. (2) Коваріата не сміє залежати від трітменту. Передекспериментальні дані безпечні ЗА ПОБУДОВОЮ. А от «кількість сесій під час експерименту» — вже ні: якщо трітмент збільшує і сесії, і виручку, віднімання θ·сесії з'їсть частину ефекту, і оцінка тихо зміститься. Це найпоширеніший спосіб зіпсувати CUPED на практиці. (3) У нових користувачів історії немає: для них X пропущений, і виграш деградує (у Netflix 5–15% проти 40% у старих). Практичний трюк — підставити їм середнє X̄ (у центрованій формі — нуль): вони просто не отримують коригування. (4) І ще раз: це OLS. Хочете кілька коваріат — множинна регресія або CUPAC. Уся «магія» — дисципліна вибору коваріати, не математика.
+:::
+
+# Ratio metrics: the unit-of-analysis trap {background-iframe=".09-var-reduce_files/libs/colored-particles/index.html"}
+
+## 🛍️ A new request {.smaller}
+
+The PM is back with a different metric:
+
+> "The redesigned checkout should make people complete orders more often. Measure the **session→order conversion**: of all sessions, how many end with a purchase?"
+
+Four users of the pilot log:
+
+| user | sessions | orders |
+|:----:|:--------:|:------:|
+| 1 | 5 | 4 |
+| 2 | 4 | 1 |
+| 3 | 1 | 0 |
+| 4 | 6 | 5 |
+| **total** | **16** | **10** |
+
+$$
+\text{CR} = \frac{\text{orders}}{\text{sessions}} = \frac{10}{16} = 0.625
+$$
+
+One number, two levels: **sessions** live inside **users**. Which one is the *unit*?
+
+::: {.notes}
+Третя секція — і найпідступніша пастка лекції. Новий запит PM: редизайн чекаута має підвищити конверсію сесії в замовлення. Метрика — session→order conversion: частка сесій, що закінчились покупкою. Мініатюрний приклад: чотири користувачі, 16 сесій, 10 замовлень, CR = 0.625. Але придивіться до таблиці: у цього числа ДВА рівні — сесії живуть УСЕРЕДИНІ користувачів. Рандомізуємо ми КОРИСТУВАЧІВ (не можна ж показувати одній людині різні чекаути в різних сесіях), а конверсія рахується ПО СЕСІЯХ. Питання, яка з двох сутностей — «одиниця», звучить занудно, але зараз ми побачимо, що неправильна відповідь коштує роздутого вп'ятеро-вдесятеро FPR.
+:::
+
+## 🍬 The tempting analysis {.smaller}
+
+Lecture-2 reflex: conversion = proportion → unroll every session into a $0/1$ outcome and compare two proportions.
+
+$$
+\underbrace{[1,1,1,1,0]}_{\text{user 1}},\;
+\underbrace{[1,0,0,0]}_{\text{user 2}},\;
+\underbrace{[0]}_{\text{user 3}},\;
+\underbrace{[1,1,1,1,1,0]}_{\text{user 4}}
+\;\;\longrightarrow\;\;
+\text{one big } 0/1 \text{ sample, } n = 16
+$$
+
+. . .
+
+Feels legitimate: thousands of sessions, big $n$, tiny standard errors…
+
+::: {.callout-important icon=false}
+But the t-test (and the z-test for proportions) assumes observations are **i.i.d.** Sessions of the *same* user are neither independent nor identically distributed: each user carries their own habit — and *their own* propensity to buy.
+:::
+
+::: {.notes}
+Спокусливий аналіз — рефлекс із другої лекції: конверсія це частка, частки порівнюємо z-тестом. Розгортаємо кожну сесію в нулик-одиничку, отримуємо «вибірку» з 16 (а в реальному тесті — з десятків тисяч) спостережень, стандартні похибки крихітні, все красиво. Пастка в базовому припущенні: t- і z-тести вимагають i.i.d. А сесії ОДНОГО користувача — не незалежні і не однаково розподілені: у кожної людини своя звичка й своя схильність купувати. Сесії користувача 1 «пам'ятають» одна одну через його особистість. Формально: дані кластеровані, а ми робимо вигляд, що кожна сесія — окрема людина. Наскільки це страшно? Спершу мисленнєвий експеримент, потім симуляція.
+:::
+
+## 🙅 Two stubborn users {.smaller}
+
+A thought experiment:
+
+- One user in **test**, one in **control**; each makes $10\,000$ sessions.
+- The test user **always** orders (conversion $1$), the control user **never** does (conversion $0$) — personalities, not treatment.
+
+. . .
+
+The pooled t-test sees two samples of $10\,000$ observations: all ones vs all zeros → $p \approx 0$, "an overwhelming win". Swap the users — an equally overwhelming **loss**.
+
+::: {.callout-note icon=false}
+The effective sample size here is $n = 2$, not $n = 20\,000$. Sessions multiply the *volume* of data, not the *evidence*. Randomization assigned **users** — the experiment cannot know more than the number of users it randomized.
+:::
+
+::: {.notes}
+Мисленнєвий експеримент, який варто запам'ятати назавжди. Один користувач у тесті, один у контролі, кожен зробив по 10 000 сесій. Тестовий завжди замовляє (це його характер, не заслуга чекаута), контрольний — ніколи. Пул-тест бачить 10 000 одиниць проти 10 000 нулів: p ≈ 0, «нищівна перемога тесту». Поміняйте користувачів місцями — «нищівна поразка». Насправді ефективний розмір вибірки тут — ДВА. Сесії множать обсяг даних, але не обсяг ДОКАЗІВ: рандомізація призначала користувачів, і більше інформації, ніж кількість користувачів, в експерименті немає. Правило, яке з цього випливає: одиниця аналізу має збігатися з одиницею рандомізації.
+:::
+
+## 🔬 The trap, measured {.smaller}
+
+A realistic grocery world: heavy-tailed activity, personal conversion propensities.
+
+```{python}
+#| label: mc-pooled
+#| code-fold: true
+#| output-location: column
+
+def draw_group(n_users, rng, lift=1.0):
+    """Sessions and orders per user over the experiment window."""
+    lam      = rng.gamma(1.0, 20.0, n_users)     # user activity
+    sessions = rng.poisson(lam) + 1
+    p        = np.minimum(rng.beta(0.8, 3.2, n_users)*lift, 1.0)
+    orders   = rng.binomial(sessions, p)
+    return sessions, orders
+
+def unroll(sessions, orders):
+    """Per-session 0/1 outcomes (order doesn't matter for a t-test)."""
+    total = sessions.sum()
+    return np.concatenate([np.ones(orders.sum()),
+                           np.zeros(total - orders.sum())])
+
+rng     = np.random.default_rng(7)
+MC, n_u = 1000, 2000
+fpr_cnt = 0
+for _ in range(MC):
+    o_c, m_c = draw_group(n_u, rng)
+    o_t, m_t = draw_group(n_u, rng)
+    pv = ttest_ind(unroll(o_c, m_c), unroll(o_t, m_t),
+                   equal_var=False).pvalue
+    fpr_cnt += pv < alpha
+
+print("pooled-session A/A FPR:",
+      wilson(fpr_cnt, MC))
+```
+
+. . .
+
+::: {.callout-important icon=false}
+An **A/A test** — no effect anywhere — and the pooled-session t-test fires in **half of all experiments**. This is not a subtle bias; it is a machine for shipping placebo features.
+:::
+
+::: {.notes}
+Вимірюємо пастку. Реалістичний світ: активність користувача — важкохвоста (гамма-пуассон: хтось заходить раз, хтось — 60 разів за вікно), особиста схильність купувати — бета(0.8, 3.2), середня конверсія ≈ 20%. Дві групи по 2000 користувачів, ЖОДНОГО ефекту — чистий A/A. Розгортаємо сесії в нулі-одиниці, застосовуємо t-тест… і він відхиляє нуль у ≈51% експериментів замість 5%. Це не «легке заниження похибки» — це машина з ухвалення плацебо-фіч: кожен другий нейтральний реліз буде «статистично значущим». Зверніть увагу на unroll: для t-тесту порядок нулів та одиниць неважливий, тож достатньо M одиниць і O−M нулів. Причина катастрофи — та сама: справжня одиниця — користувач, а ми порахували стандартну похибку так, ніби кожна сесія незалежна.
+:::
+
+## 🧭 The honest target {.smaller}
+
+State the hypothesis about the **ratio metric** of each arm:
+
+$$
+K = \frac{\sum_i M_i}{\sum_i O_i},
+\qquad
+H_0\!: K_T - K_C = 0 \;\;\text{vs}\;\; H_1\!: K_T - K_C \neq 0,
+$$
+
+where $O_i$, $M_i$ are **per-user** sessions and orders — users stay whole.
+
+. . .
+
+But $K$ is a *ratio of two random sums*: no textbook CI, `ttest_ind` does not apply…
+
+<br>
+
+<center>Sound familiar? [**Bootstrap!**]{.hi} — lecture 8's promise: *one universal recipe for almost any statistic*.</center>
+
+::: {.notes}
+Чесна постановка. Гіпотезу формулюємо про ratio-метрику групи: K = сума замовлень / сума сесій, де суми йдуть по КОРИСТУВАЧАХ групи — користувачі лишаються цілими, ніхто не розгортає їх у сесії. K — це session-weighted конверсія: сесія активного користувача важить стільки ж, скільки сесія рідкісного гостя; саме так метрику й бачить бізнес у дашборді. Але K — відношення двох випадкових сум: підручникової формули ДІ немає, ttest_ind не застосуєш. Знайомо звучить? Минула лекція давала обіцянку: бутстреп — один універсальний рецепт довірчого інтервалу майже для будь-якої статистики. Час стягнути дивіденди.
+:::
+
+## ♻️ Bootstrap the *users* {.smaller}
+
+```{python}
+#| label: ratio-boot-fn
+
+def ratio_bootstrap_ci(o_c, m_c, o_t, m_t, rng, B=1000, alpha=0.05):
+    """Central bootstrap CI for K_t - K_c, resampling whole users."""
+    k_hat = m_t.sum()/o_t.sum() - m_c.sum()/o_c.sum()
+
+    ic = rng.integers(0, o_c.size, (B, o_c.size))   # user indices!
+    it = rng.integers(0, o_t.size, (B, o_t.size))
+    k_star = (m_t[it].sum(axis=1) / o_t[it].sum(axis=1)
+              - m_c[ic].sum(axis=1) / o_c[ic].sum(axis=1))
+
+    q_lo, q_hi = np.quantile(k_star, [alpha/2, 1 - alpha/2])
+    return 2*k_hat - q_hi, 2*k_hat - q_lo
+```
+
+::: {.callout-important icon=false}
+Resample **user indices**, so each draw carries its $(O_i, M_i)$ **pair**. Resampling orders and sessions *separately* would break the within-user link — the exact dependence the whole section is about.
+:::
+
+::: {.notes}
+Двовибірковий бутстреп із восьмої лекції, з одним вирішальним нюансом: ресемплимо ІНДЕКСИ КОРИСТУВАЧІВ, щоб кожне витягування тягло за собою ПАРУ (сесії, замовлення) цієї людини. Ресемплити замовлення і сесії окремими choice-ами — значить розірвати внутрішньокористувацький зв'язок, тобто саме ту залежність, довкола якої вся секція. Технічно: матриці індексів B×n, fancy indexing, суми по axis=1 — і B значень K* за один прохід; ДІ — центральний, як ми домовилися минулого разу. Одиниця ресемплінгу = одиниця рандомізації = користувач. Це правило працює і для будь-яких інших кластерованих даних: ресемплюємо кластери цілком.
+:::
+
+## 🔬 Calibration and power {.smaller}
+
+```{python}
+#| label: mc-ratio
+#| code-fold: true
+#| output-location: column
+
+rng = np.random.default_rng(3)
+MC_b = 500
+fpr = pwr_ratio = pwr_user_t = 0
+
+for _ in range(MC_b):
+    o_a, m_a = draw_group(n_u, rng)
+    o_b, m_b = draw_group(n_u, rng)
+    o_t, m_t = draw_group(n_u, rng, lift=1.10)
+
+    lo, hi = ratio_bootstrap_ci(o_a, m_a, o_b, m_b, rng)
+    fpr += (lo > 0) | (hi < 0)
+    lo, hi = ratio_bootstrap_ci(o_a, m_a, o_t, m_t, rng)
+    pwr_ratio += (lo > 0) | (hi < 0)
+    pwr_user_t += ttest_ind(m_a, m_t,
+                            equal_var=False).pvalue < alpha
+
+print("ratio bootstrap A/A FPR :", wilson(fpr, MC_b))
+print("ratio bootstrap power   :", wilson(pwr_ratio, MC_b))
+print("orders-per-user t power :", wilson(pwr_user_t, MC_b))
+```
+
+. . .
+
+The user-level bootstrap is **calibrated** (FPR $\approx \alpha$). And against the honest fallback — a t-test on *orders per user* — the ratio metric wins power: orders per user $= O_i \cdot p_i$ drags the noisy activity $O_i$ into the metric, while $K$ mostly cancels it.
+
+::: {.notes}
+Перевіряємо обидві обіцянки. Калібрування: у A/A користувацький бутстреп спрацьовує хибно ≈5% — рівно за прейскурантом (порівняйте з 54% у пул-тесту!). Потужність: підіймаємо конверсію в тесті на 10% і порівнюємо з чесною альтернативою — t-тестом по «замовлень на користувача» (це валідний критерій: одиниця — користувач, i.i.d. дотримано; саме його торік називали бейзлайном). Ratio-метрика виграє: ≈0.62 проти ≈0.42. Причина: замовлення на користувача = O_i·p_i, тобто в метрику затягнуто гучний шум активності O_i (гамма з важким хвостом); а в K активність здебільшого скорочується — чисельник і знаменник ходять разом. Це знову зниження дисперсії, тільки досягнуте вибором МЕТРИКИ. Важливо: це різні гіпотези (session-weighted конверсія vs середні замовлення) — обирати треба ту, що відповідає бізнес-питанню, і тут питання PM саме про конверсію сесій.
+:::
+
+## 🕳️ The denominator danger {.smaller}
+
+The ratio hides a second moving part: the treatment can move the **denominator** too.
+
+> Checkout redesign → orders are easier → users come back for *extra quick sessions* → $\sum O$ grows → $K$ can **fall** while the business booms (or rise while it burns).
+
+. . .
+
+The working rule from practice:
+
+- Sure the treatment **can't touch the denominator**? → test the ratio metric alone.
+- Any chance it can? → **test the denominator separately** (a per-user t-test on $O_i$ — it's i.i.d. by user), and read the ratio only alongside it.
+
+::: {.callout-warning icon=false}
+A ratio metric is a *fraction of two experiments*. Report numerator, denominator and the ratio — never the ratio alone.
+:::
+
+::: {.notes}
+Остання міна секції — знаменник. Трітмент може рухати не лише чисельник: зручний чекаут → замовляти легше → користувачі повертаються за додатковими короткими сесіями → сума сесій росте → конверсія K може ВПАСТИ на тлі процвітаючого бізнесу. Або навпаки: фіча, що відлякує казуальних відвідувачів, зріже знаменник і «підніме конверсію» на пожежі. Робоче правило: якщо ви впевнені, що трітмент не чіпає знаменник, — тестуйте ratio-метрику саму; якщо є хоч шанс — окремо тестуйте знаменник (t-тест по сесіях на користувача — це i.i.d. по користувачах, звичайний критерій) і читайте ratio тільки поруч із ним. У звіті ratio-метрика ніколи не ходить сама: чисельник, знаменник, відношення — три числа, інакше рішення наосліп.
+:::
+
+# Linearization {background-iframe=".09-var-reduce_files/libs/colored-particles/index.html"}
+
+## 🏗️ The scaling problem {.smaller}
+
+You join a company to build the **A/B platform**: hundreds of experiments, thousands of metrics, automatic reports every morning.
+
+The bootstrap served us well, but at platform scale it hurts:
+
+- $B = 10\,000$ resamples **per metric per experiment**, daily;
+- memory: index matrices of size $B \times n$ for every ratio metric;
+- and the rest of the platform machinery — CUPED, stratification, sequential monitors — expects a **per-user column**, not a resampling loop.
+
+. . .
+
+Dream: transform $(O_i, M_i)$ into a single per-user value $Z_i$ such that a plain **t-test on $Z$** answers the question about the ratio $K$.
+
+::: {.notes}
+Мотивація лінеаризації — інженерна. Уявіть, що ви будуєте корпоративну A/B-платформу: сотні експериментів, тисячі метрик, автоматичні ранкові звіти. Бутстреп чудовий, але на такому масштабі болить: десять тисяч ресемплів на кожну метрику кожного експерименту щодня, матриці індексів B×n у пам'яті, а головне — вся інша машинерія платформи (CUPED, стратифікація, секвенційні монітори) очікує на вхід КОЛОНКУ ЗНАЧЕНЬ по користувачах, а не цикл ресемплінгу. Мрія: перетворити пару (сесії, замовлення) кожного користувача на одне число Z_i так, щоб звичайний t-тест по Z відповідав на питання про ratio-метрику K. Ця мрія має назву — лінеаризація (дельта-метод), і коштує вона один рядок Тейлора.
+:::
+
+## 📐 One line of Taylor {.tiny}
+
+First-order Taylor expansion of $f(x, y) = x/y$ around $(x_0, y_0)$:
+
+$$
+\frac{x}{y} \;\approx\; \frac{x_0}{y_0} + \frac{1}{y_0}(x - x_0) - \frac{x_0}{y_0^2}(y - y_0)
+\;=\; \frac{x_0}{y_0} + \frac{1}{y_0}\left(x - \frac{x_0}{y_0}\, y\right)
+$$
+
+Our statistic is exactly such a ratio — of two **means**: $K = \dfrac{\sum M_i}{\sum O_i} = \dfrac{\overline{M}}{\overline{O}}$. Expand around $(\mathbb{E}M, \mathbb{E}O)$ (LLN drives the means there):
+
+$$
+\frac{\overline M}{\overline O}
+\;\approx\; \frac{\mathbb{E}M}{\mathbb{E}O} + \frac{1}{\mathbb{E}O}\left(\overline M - \frac{\mathbb{E}M}{\mathbb{E}O}\,\overline O\right)
+\;=\; \frac{1}{n}\sum_{i=1}^{n} \underbrace{\left[\frac{\mathbb{E}M}{\mathbb{E}O} + \frac{1}{\mathbb{E}O}\left(M_i - \frac{\mathbb{E}M}{\mathbb{E}O}\, O_i\right)\right]}_{Z_i'}
+$$
+
+. . .
+
+The ratio of means became a **mean of per-user values** $Z_i'$ — i.i.d., because users are. Plug in the estimates ($\mathbb{E}M \to \overline M$, $\mathbb{E}O \to \overline O$, consistent by LLN):
+
+$$
+\boxed{\;Z_i = K + \frac{1}{\overline O}\big(M_i - K\, O_i\big), \qquad K = \overline M / \overline O\;}
+$$
+
+::: {.notes}
+Вся математика лінеаризації — один рядок Тейлора. Розкладаємо f(x,y) = x/y до перших похідних довкола точки (x₀, y₀) і згортаємо в компактну форму. Далі помічаємо: наша K — це відношення двох СЕРЕДНІХ (поділіть чисельник і знаменник на n). Розкладаємо довкола (EM, EO) — саме туди середні збігаються за ЗВЧ — і диво: відношення середніх перетворилося на СЕРЕДНЄ по-користувацьких значень Z'_i. А Z'_i — i.i.d., бо i.i.d. користувачі! Справжніх EM і EO ми не знаємо — підставляємо їхні консистентні оцінки, отримуємо робочу формулу Z_i = K + (M_i − K·O_i)/Ō. Інтуїція для студентів: Z_i вимірює, наскільки користувач i «перевиконує» групову конверсію K на своїх сесіях, у масштабі внеску в K. Хто конвертить вище середнього — Z вище K, хто нижче — нижче. При великих n усе це строго обґрунтовується дельта-методом.
+:::
+
+## 🐍 `linearize` — and a free lunch check {.smaller}
+
+```{python}
+#| label: linearize-fn
+#| output-location: column
+
+def linearize(num, den):
+    """Per-user linearized ratio metric."""
+    k = num.sum() / den.sum()
+    return k + (num - k*den) / den.mean()
+
+rng = np.random.default_rng(2)
+o, m = draw_group(5000, rng)
+z = linearize(m, o)
+
+print(f"K        : {m.sum()/o.sum():.5f}")
+print(f"mean(Z)  : {z.mean():.5f}")
+print(f"sd(Z)    : {z.std():.4f}")
+```
+
+. . .
+
+`mean(Z)` reproduces $K$ **exactly** (not just asymptotically — check the algebra), so the t-test on $Z$ compares the right quantity. And $Z$ is an ordinary per-user column: feed it to `ttest_ind`, to `strat_ttest`, to `cuped_ttest`…
+
+::: {.notes}
+Реалізація — три рядки. Приємний факт для перевірки: середнє Z відтворює K ТОЧНО, не лише асимптотично — підставте формулу й переконайтеся (сума M_i − K·O_i дорівнює нулю за означенням K). Тобто t-тест по Z порівнює саме ту величину, про яку питає PM. І головний бонус: Z — звичайна по-користувацька колонка. Її можна віддати ttest_ind, можна стратифікувати нашим strat_ttest, можна CUPED-ити нашим cuped_ttest із Z за минулий місяць як коваріатою. Лінеаризація вбудовує ratio-метрики в УСЮ машинерію лекції. Лишилось перевірити чесність і швидкість.
+:::
+
+## 🔬 Linearization vs bootstrap {.smaller}
+
+```{python}
+#| label: mc-lin
+#| code-fold: true
+#| output-location: column
+
+rng = np.random.default_rng(9)
+fpr_lin = agree = pwr_lin = 0
+
+for _ in range(MC_b):
+    o_a, m_a = draw_group(n_u, rng)
+    o_b, m_b = draw_group(n_u, rng)
+    o_t, m_t = draw_group(n_u, rng, lift=1.10)
+
+    pv = ttest_ind(linearize(m_a, o_a), linearize(m_b, o_b),
+                   equal_var=False).pvalue
+    fpr_lin += pv < alpha
+    lo, hi = ratio_bootstrap_ci(o_a, m_a, o_b, m_b, rng)
+    agree += (pv < alpha) == ((lo > 0) | (hi < 0))
+    pwr_lin += ttest_ind(linearize(m_t, o_t), linearize(m_a, o_a),
+                         equal_var=False).pvalue < alpha
+
+print("linearized t A/A FPR:", wilson(fpr_lin, MC_b))
+print("agrees with bootstrap:", wilson(agree, MC_b))
+print("linearized t power  :", wilson(pwr_lin, MC_b))
+```
+
+```{python}
+#| label: lin-timing
+#| code-fold: true
+#| output-location: column
+
+rng = np.random.default_rng(4)
+o_c, m_c = draw_group(10_000, rng)
+o_t, m_t = draw_group(10_000, rng)
+
+t0 = time.time()
+ratio_bootstrap_ci(o_c, m_c, o_t, m_t, rng, B=10_000)
+t_boot = time.time() - t0
+
+t0 = time.time()
+ttest_ind(linearize(m_c, o_c), linearize(m_t, o_t), equal_var=False)
+t_lin = time.time() - t0
+
+print(f"bootstrap (B=10k) : {t_boot:.3f} s")
+print(f"linearized t-test : {t_lin*1000:.2f} ms  "
+      f"(~{t_boot/t_lin:,.0f}x faster)")
+```
+
+::: {.notes}
+Очна ставка з бутстрепом на тому самому світі. FPR лінеаризованого t-тесту ≈ 0.05 — чесний. Рішення (відхилити/не відхилити) збігаються з бутстрепом майже завжди — на A/A ≈99–100% згоди: це два способи порахувати одне й те саме. Потужність — та сама, що в бутстрепа. А тепер ціна: на 10 000 користувачів бутстреп із B=10 000 — секунди, лінеаризація — мілісекунди, три-чотири порядки швидкості. Для платформи, що жене тисячі метрик щоночі, це різниця між «рахуємо годину» і «рахуємо секунду». Асимптотика проти обчислень: на малих вибірках (сотні користувачів) чесніший бутстреп, на платформних масштабах — лінеаризація без вагань.
+:::
+
+## 🔗 Everything composes {.tiny}
+
+The linearized $Z_i$ is a first-class per-user metric. The lecture's toolbox stacks:
+
+```{dot}
+//| echo: false
+//| fig-align: center
+//| fig-width: 9
+digraph compose {
+  rankdir=LR
+  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5",
+        fontname="Arial", fontsize=13, color="#314f4f"]
+  raw  [label="(Oᵢ, Mᵢ)\nper user"]
+  lin  [label="linearize\n→ Zᵢ"]
+  cuped[label="CUPED\nZᵢ − θXᵢ"]
+  strat[label="stratified\nt-test"]
+  raw -> lin -> cuped -> strat
+}
+```
+
+- ratio metric → `linearize` → per-user column;
+- pre-experiment $Z$ of the same user → **CUPED** covariate;
+- loyalty stratum → **stratified** weighting of the result.
+
+Each step removes its own share of variance; none of them touches the expected difference.
+
+::: {.notes}
+Місток, що зшиває лекцію докупи. Лінеаризована Z — повноцінна по-користувацька метрика, тож конвеєр складається: ratio-метрика → linearize → колонка Z; Z того ж користувача за передекспериментальний період → коваріата для CUPED; статус лояльності → стратифіковане зважування результату. Кожен крок прибирає СВОЮ частку дисперсії: лінеаризація — шум знаменника, CUPED — міжкористувацьку сталу складову, стратифікація — міжстратову. І жоден не чіпає очікувану різницю груп. Саме так це і влаштовано у великих платформах (у Яндекса лінеаризація ratio-метрик + CUPED — стандартний конвеєр). Тепер — обіцяний турнір: скільки кожен метод дає на одному й тому самому світі.
+:::
+
+# Head-to-head: the bench {background-iframe=".09-var-reduce_files/libs/colored-particles/index.html"}
+
+## 🏟️ One world, four analyses {.smaller}
+
+Back to the PM's frozen budget: $n = 1005$ per arm, target effect **5 UAH** — the one our plain design cannot see. The world now contains **both** structures:
+
+```{python}
+#| label: bench-fn
+
+def draw_arm_full(size, rng, effect=0.0):
+    """Loyalty stratum + pre-experiment ARPU (r = 0.7 within stratum)."""
+    reg = rng.random(size) < w_r
+    mus = np.where(reg, mu_r, mu_u)
+    x   = mus + sd_w*rng.standard_normal(size)
+    y   = (mus + r_xy*(x - mus)
+           + sd_w*np.sqrt(1 - r_xy**2)*rng.standard_normal(size) + effect)
+    return reg, x, y
+
+def strat_cuped_ttest(reg_c, x_c, y_c, reg_t, x_t, y_t):
+    theta = calculate_theta(np.concatenate([x_c, x_t]),
+                            np.concatenate([y_c, y_t]))
+    return strat_ttest(reg_c, y_c - theta*x_c, reg_t, y_t - theta*x_t)
+```
+
+Four analysts get the same CSV: **plain t** / **stratified** / **CUPED** / **stratified + CUPED**.
+
+::: {.notes}
+Фінальний експеримент лекції. Повертаємось до замороженого бюджету PM: 1005 користувачів на групу і цільовий ефект 5 грн — той, якого наш базовий дизайн не бачить (потужність ~0.26). Світ тепер повний: у користувача є страта лояльності (200/300, sd 62 всередині) І передекспериментальне ARPU з кореляцією 0.7 всередині страти. Зверніть увагу: X корелює з Y двома шляхами — через особисту історію (0.7 всередині страти) і через саму страту (зареєстровані більші за обома координатами). Це реалістично — і зараз дасть повчальний ефект. Четверо аналітиків отримують один CSV: звичайний t-тест, стратифікація, CUPED, стратифікація+CUPED (θ на об'єднаних групах, потім стратифікований тест на резидуалах).
+:::
+
+## 🔬 The tournament {.smaller}
+
+```{python}
+#| label: mc-bench
+#| code-fold: true
+#| output-location: column
+
+rng = np.random.default_rng(17)
+MC  = 1000
+mde_small = 5.0
+cnt = dict.fromkeys(["plain", "stratified", "CUPED", "strat+CUPED"], 0)
+
+for _ in range(MC):
+    rc, xc, yc = draw_arm_full(n, rng)
+    rt, xt, yt = draw_arm_full(n, rng, effect=mde_small)
+
+    cnt["plain"]       += ttest_ind(yc, yt, equal_var=False).pvalue < alpha
+    cnt["stratified"]  += strat_ttest(rc, yc, rt, yt) < alpha
+    cnt["CUPED"]       += cuped_ttest(xc, yc, xt, yt) < alpha
+    cnt["strat+CUPED"] += strat_cuped_ttest(rc, xc, yc, rt, xt, yt) < alpha
+
+power   = {k: v/MC for k, v in cnt.items()}
+bands   = {k: proportion_confint(v, MC, method="wilson") for k, v in cnt.items()}
+for k, v in cnt.items():
+    print(f"power {k:12s}: {wilson(v, MC)}")
+```
+
+```{python}
+#| label: bench-plot
+#| code-fold: true
+#| fig-align: center
+
+fig, ax = plt.subplots(figsize=(11, 3.9))
+names  = list(power)
+vals   = [power[k] for k in names]
+colors = [slate, turquoise, red_pink, green]
+err = np.array([[power[k] - bands[k][0], bands[k][1] - power[k]] for k in names]).T
+ax.bar(names, vals, color=colors, alpha=0.9)
+ax.errorbar(names, vals, yerr=err, fmt="none", ecolor=navy, capsize=5, lw=1.8)
+ax.axhline(0.8, color=red, lw=2, ls="--", label="target power 0.8")
+ax.set_ylabel("power at MDE = 5 UAH, n = 1005")
+ax.set_title("Same data, same α — four analyses")
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+::: {.notes}
+Результати турніру на MDE = 5 грн, n = 1005: звичайний t-тест ≈ 0.26, стратифікація ≈ 0.41, CUPED ≈ 0.66, стратифікація+CUPED ≈ 0.68. Ті самі дані, той самий α — а відстань між найгіршим і найкращим аналізом два з половиною рази. Два уроки з графіка. Перший: найдорожча помилка — взагалі не використовувати додаткову інформацію. Другий, тонший: чому strat+CUPED майже нічого не додав понад CUPED? Бо в цьому світі передекспериментальне ARPU уже «знає» страту користувача: зареєстровані більші і за X, і за Y, тож θ·X виносить міжстратову різницю автоматично. Інформацію не можна порахувати двічі. Звідси практичне правило: додаючи метод чи коваріату, питайте не «чи корелює вона з метрикою», а «скільки НОВОЇ дисперсії вона пояснює понад те, що вже пояснено».
+:::
+
+## 💰 The bill in users {.smaller}
+
+Translate residual sd into the sample size the *same* design would need:
+
+```{python}
+#| label: bench-table
+#| code-fold: true
+#| output-location: column
+
+sds = {
+    "plain":       np.sqrt(sd_w**2 + 0.25*(mu_r-mu_u)**2),
+    "stratified":  sd_w,
+    "CUPED":       None,   # measure below
+    "strat+CUPED": sd_w*np.sqrt(1 - r_xy**2),
+}
+rng = np.random.default_rng(21)
+rc, xc, yc = draw_arm_full(200_000, rng)
+theta = calculate_theta(xc, yc)
+sds["CUPED"] = (yc - theta*xc).std()
+
+print("        method | eff. sd |  n per arm (MDE=5)")
+for k, sd in sds.items():
+    print(f"{k:>14s} |   {sd:5.1f} | {n_per_arm(sd, mde_small):>6d}")
+```
+
+. . .
+
+::: {.callout-tip icon=false}
+The PM asked to *detect 5 UAH with ~1000 users*. The plain design needs $\approx 4000$; strat+CUPED needs $\approx 1200$ — the impossible experiment became a **one-week reality**, with zero extra traffic. That's the whole lecture in one table.
+:::
+
+::: {.notes}
+Той самий турнір мовою грошей. Ефективні sd: 79.6 → 62 → ~46 → 44.3; підставляємо в стару добру формулу розміру вибірки для MDE = 5: ≈3980 → ≈2410 → ≈1320 → ≈1230 користувачів на групу. PM просив «ловити 5 грн на ~1000 користувачів»: базовий дизайн вимагав учетверо більше, а стратифікація+CUPED вкладаються майже в наявний трафік. Неможливий експеримент став тижневою реальністю — без жодного додаткового користувача, лише за рахунок аналізу. Це вся лекція в одній таблиці. Еквівалентне формулювання для звітів: CUPED тут «коштує» як потроєння трафіку. Зверніть увагу, що CUPED і strat+CUPED знову майже нерозрізненні — та сама причина, що й на попередньому слайді.
+:::
+
+# The course in one map {background-iframe=".09-var-reduce_files/libs/colored-particles/index.html"}
+
+## 🗺️ Which tool, when? {.tiny}
+
+| Your situation | Reach for | Watch out for |
+|---|---|---|
+| one proportion vs a benchmark | **binomial test**, Wilson CI | peeking, multiple looks |
+| two proportions (conversion A/B) | **z-test** / `proportion_confint` | tiny $n$, $\hat p$ near 0/1 |
+| means of a metric (ARPU, minutes) | **t-test** (Welch by default) | heavy skew on small $n$ |
+| *any* criterion before you trust it | **Monte Carlo**: simulate FPR & power | Wilson CI on the rates |
+| "does the data follow distribution $F$?" | **KS / QQ-plots / GOF** | estimated parameters shift the null |
+| categories × arms (basket tiers) | **χ² homogeneity**, Cramér's V | tiny expected counts; big-$n$ triviality |
+| skewed/ordinal, outliers, no means | **Mann–Whitney** | it tests order, not the mean |
+| CI for a weird statistic (P75, Gini) | **bootstrap** (central CI) | edge quantiles, tiny $n$ |
+| metric = ratio with per-user structure | **user-level bootstrap / linearization** | unit of analysis = unit of randomization |
+| experiment too expensive to power | **stratification / CUPED** | covariate must be treatment-free |
+
+::: {.notes}
+Карта всього курсу — від першої лекції до сьогоднішньої. Пройдіться рядками: одна частка проти бенчмарка — біноміальний тест та інтервал Уілсона (і пастка підглядання); дві частки — z-тест; середні — t-тест Велча; БУДЬ-ЯКИЙ критерій перед використанням — Монте-Карло-перевірка FPR і потужності; відповідність розподілу — KS і компанія; категорії на групи — χ² з розміром ефекту Крамера і пастками малих очікуваних та величезних n; скошене/порядкове — Манн–Уітні (пам'ятаючи, що він про порядок, не про середнє); дивна статистика — бутстреп; ratio-метрики — сьогоднішні користувацький бутстреп і лінеаризація; дорогий експеримент — сьогоднішні стратифікація і CUPED. Ця таблиця — і є курс. Роздрукуйте, повісьте біля монітора, і половина робочих питань «а який тест» вирішується за десять секунд.
+:::
+
+## 🧠 The meta-lessons {.smaller}
+
+Four habits worth more than any single test:
+
+1. [Validate with Monte Carlo.]{.hi} A method without formulas is not a method without assumptions. Twenty lines of simulation tell you the truth about *your* data shape — no textbook required.
+2. [A confidence interval beats a verdict.]{.hi} "p < 0.05" is one bit; the CI reports direction, size and uncertainty — the things a decision actually needs.
+3. [Sensitivity is designed, not rescued.]{.hi} Power lives at the *design* stage: MDE, $\sigma$, $n$ — and, since today, variance reduction. Post-hoc "observed power" is a deterministic function of the p-value and carries no new information.
+4. [The unit of analysis is the unit of randomization.]{.hi} Sessions inside users, orders inside users — resample and test at the level you randomized.
+
+::: {.notes}
+Чотири мета-уроки, що переживуть будь-який конкретний критерій. (1) Валідуйте Монте-Карло: метод без формул — не метод без припущень; двадцять рядків симуляції скажуть правду про ВАШУ форму даних. Ми робили це з t-тестом, KS, χ², Манном–Уітні, бутстрепом і сьогоднішніми методами — це головна професійна звичка курсу. (2) Довірчий інтервал сильніший за вердикт: «p < 0.05» — один біт, а рішенню потрібні напрямок, розмір і невизначеність. (3) Чутливість проєктується, а не рятується: потужність живе на етапі дизайну — MDE, σ, n і, віднині, зниження дисперсії. Пост-хок «спостережена потужність» — детермінована функція p-value, вона не несе жодної нової інформації, женіть її зі звітів. (4) Одиниця аналізу = одиниця рандомізації: сесії всередині користувачів — ресемплimo і тестуємо на рівні, який рандомізували. Хто забере з курсу лише ці чотири звички — уже забере головне.
+:::
+
+## 🚀 Where to go next {.smaller}
+
+This course ends where three big roads begin:
+
+- **Causal inference** — what to do when you *cannot* randomize: difference-in-differences, instrumental variables, regression discontinuity, synthetic control.
+- **Sequential testing** — peeking *done right*: always-valid p-values, mSPRT, group-sequential designs. (We learned *why* naive peeking burns $\alpha$; there is a theory of how to peek legally.)
+- **Heterogeneous effects & uplift** — not "did it work on average?" but "*for whom* did it work?": quantile effects you met in the bootstrap lecture, then causal forests and uplift models.
+
+<br>
+
+<center>*Design honestly, simulate before you trust, report intervals — and may your denominators stay still.* 🎓</center>
+
+::: {.notes}
+Куди далі. Три великі дороги, що починаються там, де закінчується цей курс. Перша — казуальний інферанс: що робити, коли рандомізувати НЕ МОЖНА, — difference-in-differences, інструментальні змінні, regression discontinuity, синтетичний контроль. Друга — секвенційне тестування: ми вивчили, ЧОМУ наївне підглядання спалює α, а існує теорія, як підглядати легально — always-valid p-values, mSPRT, групові секвенційні дизайни. Третя — гетерогенні ефекти й uplift: не «чи спрацювало в середньому», а «НА КОМУ спрацювало» — від квантильних ефектів з лекції про бутстреп до causal forests та uplift-моделей. Дякую за семестр. Проєктуйте чесно, симулюйте перед тим як вірити, звітуйте інтервалами — і нехай ваші знаменники стоять на місці.
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe=".09-var-reduce_files/libs/colored-particles/index.html"}
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=4049)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

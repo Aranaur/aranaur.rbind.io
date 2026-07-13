@@ -1,0 +1,753 @@
+---
+title: "Практика 10"
+subtitle: "Variance reduction"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+date: today
+lang: ua
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    highlight-style: github
+    code-line-numbers: false
+    code-fold: false
+execute:
+  echo: true
+  warning: false
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+from scipy.stats import norm, ttest_ind, t as tdist
+from statsmodels.stats.proportion import proportion_confint
+
+# ---- Параметри світу GreenBowl -----------------------------------------
+MU_U, MU_R, SD_W = 200.0, 300.0, 62.0   # ARPU незареєстр./зареєстр., sd усередині страти
+R_XY = 0.7                              # кореляція pre з arpu УСЕРЕДИНІ страти
+
+
+def greenbowl_users(n, rng, uplift=0.0):
+    """Одна когорта користувачів GreenBowl за 2 тижні.
+
+    Повертає по-користувацькі колонки:
+      stratum  — реєстрація в лояльності (True/False),
+      pre      — ARPU за попередній період (коваріата),
+      arpu     — виручка за період експерименту (цільова метрика),
+      sessions — кількість сесій, orders — кількість замовлень.
+    uplift додає ефект (грн) до arpu тестової групи.
+    """
+    reg   = rng.random(n) < 0.5
+    mu_s  = np.where(reg, MU_R, MU_U)
+    pre   = mu_s + SD_W * rng.standard_normal(n)
+    arpu  = (mu_s + R_XY * (pre - mu_s)
+             + SD_W * np.sqrt(1 - R_XY**2) * rng.standard_normal(n) + uplift)
+    lam      = rng.gamma(1.0, 20.0, n)          # активність користувача
+    sessions = rng.poisson(lam) + 1
+    p        = rng.beta(0.8, 3.2, n)            # особиста конверсія
+    orders   = rng.binomial(sessions, p)
+    return {"stratum": reg, "pre": pre, "arpu": arpu,
+            "sessions": sessions, "orders": orders}
+
+
+def wilson(k, n):
+    lo, hi = proportion_confint(k, n, method="wilson")
+    return f"{k/n:.3f}  Уілсон ({lo:.3f}, {hi:.3f})"
+```
+
+# Що ми робимо сьогодні {.unnumbered}
+
+На лекції ми побачили головну формулу планування A/B: розмір групи
+$n \propto \sigma^2 / \Delta^2$. Ефект $\Delta$ диктує економіка, трафік $n$
+обмежений часом — і лишається **єдиний вільний важіль: $\sigma$**. Сьогодні
+збираємо власноруч інструменти, що **зменшують дисперсію** метрики, не
+чіпаючи ані даних, ані чесності критерію: *ту саму вибірку робимо
+чутливішою*.
+
+- **`strat_ttest`** — стратифікація за відомою структурою аудиторії;
+- **`calculate_theta` + `cuped`** — коригування метрики передекспериментальною
+  історією користувача;
+- **`linearize`** — правильна одиниця аналізу для ratio-метрик;
+- **`vr_ci`** — компонуємо все в один критерій і валідуємо **Монте-Карло**;
+- **`vr_report`** — фінал: наскільки менше користувачів треба та яке
+  бізнес-рішення це дає.
+
+::: {.callout-note icon="false"}
+## Правила гри
+- Наскрізний кейс: **GreenBowl** (той самий, що в Практиках 4–9) запускає
+  **email-кампанію** з персональним промо-набором. Головна метрика —
+  **ARPU за 2 тижні**; наприкінці зачепимо й **конверсію сесій**.
+- **Будуємо один інструмент поступово**: кожна частина додає одну нову
+  здатність — від `strat_ttest` до фінального `vr_report`.
+- Дані **генеруємо самі** (`greenbowl_users`) — знаємо «правду» і можемо
+  перевіряти чесність кожної версії **Монте-Карло** (звичка з Практики 5).
+- Перед кожним результатом — **🔮 «Спершу вгадайте»**: запишіть відповідь
+  до запуску коду. Після — **«Ваша черга»** зі згорнутим розв'язанням.
+- **Дизайн ≠ рішення**: `design-MDE` — для розрахунку $n$ *до* запуску;
+  `breakeven` — поріг рішення *після*. Пост-хок потужності у звіті немає.
+:::
+
+```{python}
+#| label: design-baseline
+
+alpha = 0.05
+z_a, z_b = norm.ppf(1 - alpha/2), norm.ppf(1 - 0.20)
+
+def n_per_arm(sd, delta):
+    """Розмір групи для двовибіркового t-тесту (потужність 80%, alpha 5%)."""
+    return int(np.ceil((z_a + z_b)**2 * 2 * sd**2 / delta**2))
+
+sigma, mde = 80.0, 10.0                 # історичне sd ARPU; breakeven-ефект
+print(f"базовий дизайн: sd = {sigma:.0f}, MDE = {mde:.0f} грн "
+      f"-> {n_per_arm(sigma, mde)} користувачів на групу")
+```
+
+---
+
+# Частина I — Стратифікація {#sec-strat}
+
+> **Кейс.** GreenBowl має **програму лояльності**. З історії: зареєстровані
+> користувачі витрачають у середньому **300 грн** за 2 тижні, незареєстровані
+> — **200 грн**, у кожної підгрупи $sd \approx 62$, частки $50/50$. Звичайний
+> t-тест бачить один розмазаний розподіл зі $\sigma \approx 80$ — і платить за
+> це розміром вибірки.
+
+```{python}
+#| label: strata-decomp
+
+mu_bar   = 0.5*MU_R + 0.5*MU_U
+var_in   = SD_W**2
+var_betw = 0.5*(MU_R - mu_bar)**2 + 0.5*(MU_U - mu_bar)**2
+print(f"дисперсія всередині страт: {var_in:.0f}  (sd {np.sqrt(var_in):.1f})")
+print(f"дисперсія МІЖ стратами:    {var_betw:.0f}  (sd {np.sqrt(var_betw):.1f})")
+print(f"повна дисперсія:           {var_in+var_betw:.0f}  "
+      f"(sd {np.sqrt(var_in+var_betw):.1f})")
+print(f"частка 'між' у дисперсії:  {var_betw/(var_in+var_betw):.0%}")
+```
+
+**39% дисперсії**, з якою бореться t-тест, — це різниця **між** стратами. Але
+статус лояльності ми знаємо **до** експерименту: платити за цю частину
+розміром вибірки — марно. Стратифікація «відрізає» доданок *між* і лишає
+тесту лише справжній шум *усередині*.
+
+::: {.callout-tip icon="false"}
+## 🔮 Спершу вгадайте
+Стратифіковане середнє — це зважена сума середніх по стратах з
+**популяційними** вагами $w_s$: $\hat{Y}_{str} = \sum_s w_s \bar{Y}_s$. Його
+дисперсія $\sum_s w_s^2 \sigma_s^2 / n_s$ **не містить** доданка «між». На
+скільки, по-вашому, зросте потужність, якщо ефективне $sd$ впаде з 80 до 62?
+:::
+
+## Інструмент v1: `strat_ttest`
+
+```{python}
+#| label: strat-fn
+
+def strat_ttest(stratum_c, y_c, stratum_t, y_t, w=(0.5, 0.5)):
+    """Двовибірковий t-тест на стратифікованих середніх.
+
+    w — популяційні частки страт (незареєстровані, зареєстровані).
+    Повертає двосторонній p-value.
+    """
+    means, vars = [], []
+    for reg, y in ((stratum_c, y_c), (stratum_t, y_t)):
+        groups = [y[~reg], y[reg]]                       # [незареєстр., зареєстр.]
+        means.append(sum(wi * g.mean() for wi, g in zip(w, groups)))
+        vars.append(sum(wi**2 * g.var(ddof=1) / g.size for wi, g in zip(w, groups)))
+    t = (means[1] - means[0]) / np.sqrt(vars[0] + vars[1])
+    return 2 * tdist.sf(abs(t), y_c.size + y_t.size - 2)
+```
+
+Валідуємо, як завжди, Монте-Карло: генеруємо A/A-світи (без ефекту → маємо
+бачити FPR $\approx \alpha$) і A/B-світи (ефект +10 грн → потужність), для
+звичайного і стратифікованого тестів на **тих самих** даних.
+
+```{python}
+#| label: strat-mc
+
+rng, MC = np.random.default_rng(11), 400
+n = n_per_arm(sigma, mde)               # 1005
+cnt = dict.fromkeys(["plain FPR", "plain power", "strat FPR", "strat power"], 0)
+
+for _ in range(MC):
+    a  = greenbowl_users(n, rng)
+    b  = greenbowl_users(n, rng)
+    t_ = greenbowl_users(n, rng, uplift=mde)
+    cnt["plain FPR"]   += ttest_ind(a["arpu"], b["arpu"],  equal_var=False).pvalue < alpha
+    cnt["plain power"] += ttest_ind(a["arpu"], t_["arpu"], equal_var=False).pvalue < alpha
+    cnt["strat FPR"]   += strat_ttest(a["stratum"], a["arpu"], b["stratum"], b["arpu"]) < alpha
+    cnt["strat power"] += strat_ttest(a["stratum"], a["arpu"], t_["stratum"], t_["arpu"]) < alpha
+
+for k, v in cnt.items():
+    print(f"{k:12s}: {wilson(v, MC)}")
+```
+
+Обидва тести чесні (FPR накриває $\alpha$), а потужність стрибнула з
+$\approx 0.79$ до $\approx 0.97$ — **ті самі користувачі, той самий ефект**.
+Мовою розміру вибірки: ефективне $sd$ впало з 80 до 62, і дизайн, якому було
+потрібно 1005, тепер обходиться `{python} n_per_arm(62.0, mde)`.
+
+::: {.callout-tip icon="false"}
+## Ваша черга 1
+1. **Пост-стратифікація.** `strat_ttest` не вимагає керувати розподілом
+   груп: його можна застосувати до звичайного випадкового спліту. Проженіть
+   A/A-стенд, але передавайте у `strat_ttest` реальний склад груп із
+   `greenbowl_users`. Чи лишається FPR на $\alpha$?
+2. **Марна страта.** Уявіть страту, що **не** корелює з ARPU (наприклад,
+   парність `user_id`). Скільки потужності вона додасть?
+3. **Кейс.** Сформулюйте PM одне речення: чому «той самий тест на тих самих
+   даних» раптом ловить ефект, який учора був незначущим.
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 1
+
+```{python}
+#| label: sol1
+
+# (1) пост-стратифікація на випадковому спліті — FPR має лишитись на alpha
+rng_ps, rej = np.random.default_rng(1), 0
+for _ in range(400):
+    a = greenbowl_users(n, rng_ps)
+    b = greenbowl_users(n, rng_ps)
+    rej += strat_ttest(a["stratum"], a["arpu"], b["stratum"], b["arpu"]) < alpha
+print(f"(1) пост-страт. A/A FPR: {wilson(rej, 400)}")
+
+# (2) марна страта: випадкова мітка, не пов'язана з ARPU
+rng_u, rej = np.random.default_rng(2), 0
+for _ in range(400):
+    a  = greenbowl_users(n, rng_u)
+    t_ = greenbowl_users(n, rng_u, uplift=mde)
+    fake_a = rng_u.random(n) < 0.5
+    fake_t = rng_u.random(n) < 0.5
+    rej += strat_ttest(fake_a, a["arpu"], fake_t, t_["arpu"]) < alpha
+print(f"(2) марна страта, потужність: {wilson(rej, 400)}  (≈ звичайний t-тест 0.79)")
+```
+
+**Інтерпретація.** (1) FPR лишається на $\alpha$: пост-стратифікація
+асимптотично дає майже той самий виграш, що й стратифікована рандомізація —
+головне, щоб страта була **передекспериментальною**. (2) Марна страта не
+зменшує дисперсію ($\sigma_s \approx \sigma$ у кожній підгрупі), тож
+потужність повертається до рівня звичайного тесту: виграш обмежений часткою
+дисперсії *між* стратами. (3) «Ми не збільшили вибірку — ми перестали
+платити дисперсією за те, що й так знали про клієнтів: зареєстровані
+витрачають більше. Прибравши цей відомий розкид, тест побачив ефект.»
+:::
+
+---
+
+# Частина II — CUPED {#sec-cuped}
+
+> **Кейс.** Стратифікація використала грубу мітку. Але в нас є значно
+> багатше знання — **власна історія** кожного користувача: скільки він
+> витрачав **до** експерименту (`pre`). Використаймо її, щоб порівнювати
+> кожного з його ж минулим.
+
+**CUPED** (Controlled-experiment Using Pre-Experiment Data) коригує метрику
+$Y$ передекспериментальною коваріатою $X$:
+
+$$
+Y_{cuped} = Y - \theta X, \qquad
+\theta = \frac{\operatorname{Cov}(X, Y)}{\operatorname{Var}(X)}, \qquad
+\operatorname{Var}(Y_{cuped}) = \operatorname{Var}(Y)\,(1 - r^2).
+$$
+
+$\theta$ — **спільна для обох груп** константа, тож завдяки рандомізації
+різниця середніх лишається незміщеною: ми не рухаємо оцінку ефекту, лише
+прибираємо з неї передбачувану частину шуму.
+
+::: {.callout-tip icon="false"}
+## 🔮 Спершу вгадайте
+Виграш CUPED — це рівно $1 - r^2$. У нашому світі `pre` корелює з `arpu`
+всередині страти на $0.7$. Але `pre` ще й «знає» страту (зареєстровані
+більші і за `pre`, і за `arpu`). Якою буде **повна** кореляція `pre` з
+`arpu` — рівно $0.7$ чи більше? І яким тоді буде відношення дисперсій?
+:::
+
+## Інструмент v2: `calculate_theta` + `cuped`
+
+```{python}
+#| label: cuped-fn
+
+def calculate_theta(x, y):
+    return np.cov(x, y)[0, 1] / x.var(ddof=1)
+
+def cuped(y, x, theta):
+    return y - theta * x
+```
+
+```{python}
+#| label: cuped-demo
+
+rng = np.random.default_rng(0)
+a = greenbowl_users(200_000, rng)                    # велика когорта для оцінки r
+r_full = np.corrcoef(a["pre"], a["arpu"])[0, 1]
+theta  = calculate_theta(a["pre"], a["arpu"])
+vr     = cuped(a["arpu"], a["pre"], theta).var() / a["arpu"].var()
+print(f"повна кореляція r(pre, arpu): {r_full:.3f}")
+print(f"1 - r^2:                      {1 - r_full**2:.3f}")
+print(f"виміряне відношення дисперсій: {vr:.3f}")
+```
+
+Кореляція виявилась $\approx 0.82$, а не $0.7$: `pre` несе в собі **і**
+внутрішньостратову історію, **і** саму страту. Тому CUPED сам по собі зрізає
+$\approx 67\%$ дисперсії — більше, ніж стратифікація. Запам'ятаймо цей факт:
+у @sec-compose він пояснить, чому «стратифікація + CUPED» майже не додає
+понад самий CUPED.
+
+```{python}
+#| label: cuped-mc
+
+rng, MC = np.random.default_rng(5), 400
+cnt = dict.fromkeys(["cuped FPR", "cuped power", "plain power"], 0)
+
+for _ in range(MC):
+    a  = greenbowl_users(n, rng)
+    b  = greenbowl_users(n, rng)
+    t_ = greenbowl_users(n, rng, uplift=mde)
+
+    th = calculate_theta(np.r_[a["pre"], b["pre"]], np.r_[a["arpu"], b["arpu"]])
+    cnt["cuped FPR"]   += ttest_ind(cuped(a["arpu"], a["pre"], th),
+                                    cuped(b["arpu"], b["pre"], th), equal_var=False).pvalue < alpha
+    th2 = calculate_theta(np.r_[a["pre"], t_["pre"]], np.r_[a["arpu"], t_["arpu"]])
+    cnt["cuped power"] += ttest_ind(cuped(a["arpu"],  a["pre"],  th2),
+                                    cuped(t_["arpu"], t_["pre"], th2), equal_var=False).pvalue < alpha
+    cnt["plain power"] += ttest_ind(a["arpu"], t_["arpu"], equal_var=False).pvalue < alpha
+
+for k, v in cnt.items():
+    print(f"{k:12s}: {wilson(v, MC)}")
+```
+
+FPR на $\alpha$ — CUPED не махлює. Потужність на ефекті +10 грн — практично
+$1.0$ проти $0.79$ у звичайного тесту: коваріата з'їла дві третини шуму.
+
+::: {.callout-tip icon="false"}
+## Ваша черга 2
+1. **Закон $1 - r^2$ у чистому вигляді.** Згенеруйте коваріату із **заданою
+   повною** кореляцією до `arpu` (`make_cov` нижче) і перевірте відношення
+   дисперсій для $r = 0.2, 0.5, 0.7$. За якого $r$ CUPED уже не вартий
+   ускладнення пайплайна?
+2. **Кейс: нові користувачі.** У новачків історії `pre` немає. Який
+   найпростіший коректний трюк дозволяє лишити їх в аналізі, не зламавши
+   незміщеність?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 2
+
+```{python}
+#| label: sol2
+
+def make_cov(y, r, rng):
+    """Коваріата із заданою ПОВНОЮ кореляцією r до y."""
+    zy = (y - y.mean()) / y.std()
+    return r * zy + np.sqrt(1 - r**2) * rng.standard_normal(y.size)
+
+rng_c = np.random.default_rng(3)
+a = greenbowl_users(200_000, rng_c)
+for r in (0.2, 0.5, 0.7):
+    x = make_cov(a["arpu"], r, rng_c)
+    th = calculate_theta(x, a["arpu"])
+    ratio = cuped(a["arpu"], x, th).var() / a["arpu"].var()
+    print(f"(1) r = {r}: відношення дисперсій {ratio:.3f}  (1 - r^2 = {1 - r**2:.2f})")
+```
+
+**Інтерпретація.** (1) Закон тримається точно: $r=0.2 \to 0.96$ (зрізали
+лише 4% — не вартує пайплайна), $r=0.5 \to 0.75$, $r=0.7 \to 0.51$. Мінімум
+здорового глузду — $|r| \gtrsim 0.3$. (2) Для новачків підставляємо
+$X = \bar X$ (середнє коваріати): тоді $Y_{cuped} = Y - \theta \bar X$ — вони
+просто не отримують коригування, а незміщеність зберігається, бо константа
+однакова в обох групах. У Netflix новачки дають 5–15% зниження дисперсії
+проти 40% у старих саме через брак історії.
+:::
+
+::: {.callout-important icon="false"}
+## Обережно: коваріата має бути «до» трітменту
+CUPED і стратифікація **безпечні лише на передекспериментальних** ознаках.
+Коваріата, виміряна **під час** експерименту (сесії, візити), може ввібрати
+частину ефекту — і **тихо змістити** оцінку. Правило просте: усе, що
+зафіксовано до старту, — можна; усе, на що міг вплинути трітмент, — ні.
+:::
+
+---
+
+# Частина III — Ratio-метрики та лінеаризація {#sec-ratio}
+
+> **Кейс.** Продукт-менеджер просить іншу метрику: **конверсію сесії в
+> замовлення** — «з усіх сесій скільки закінчились покупкою?». Спокуса —
+> розгорнути кожну сесію в $0/1$ і порівняти дві частки z-тестом. Але
+> рандомізували ми **користувачів**, а рахуємо по **сесіях**.
+
+::: {.callout-warning icon="false"}
+## Спіймай помилку 🕵️
+GreenBowl запустив A/A-тест конверсії (ефекту немає). Два аналітики
+сперечаються, як рахувати.
+
+```{python}
+#| label: catch-pooled
+
+def pooled_session_pvalue(sessions_c, orders_c, sessions_t, orders_t):
+    """t-тест на розгорнутих 0/1 по СЕСІЯХ (аналіз Аналітика А)."""
+    out = []
+    for sess, ordr in ((sessions_c, orders_c), (sessions_t, orders_t)):
+        ns, k = sess.sum(), ordr.sum()
+        mean  = k / ns
+        var   = (k*(1 - mean)**2 + (ns - k)*mean**2) / (ns - 1)
+        out.append((mean, var, ns))
+    (m1, v1, n1), (m2, v2, n2) = out
+    t = (m2 - m1) / np.sqrt(v1/n1 + v2/n2)
+    return 2 * tdist.sf(abs(t), n1 + n2 - 2)
+
+rng, MC_r = np.random.default_rng(7), 300
+fpr_pool = 0
+for _ in range(MC_r):
+    a = greenbowl_users(2000, rng)
+    b = greenbowl_users(2000, rng)
+    fpr_pool += pooled_session_pvalue(a["sessions"], a["orders"],
+                                      b["sessions"], b["orders"]) < alpha
+print(f"A/A FPR (пул сесій): {wilson(fpr_pool, MC_r)}")
+```
+
+**Аналітик А:** «Десятки тисяч сесій, крихітні похибки — беремо z-тест
+часток, і хай живе велике $n$.»
+
+**Аналітик Б:** «Сесії одного користувача **не i.i.d.**: у кожного своя
+схильність купувати. Ефективна одиниця — **користувач**, а не сесія. Дивись:
+на чистому A/A пул-тест відхиляє нуль у половині випадків — це машина з
+ухвалення плацебо-фіч.»
+
+**Хто має рацію?** Аналітик Б: FPR $\approx 0.5$ замість $0.05$. Сесії
+множать **обсяг** даних, а не **докази** — одиниця аналізу має збігатися з
+одиницею рандомізації.
+:::
+
+Чесна метрика групи — **ratio** $K = \sum \text{orders} / \sum \text{sessions}$
+(користувачі лишаються цілими). На лекції ми будували для неї ДІ **бутстрепом
+по користувачах**; сьогодні — швидша алгебра, **лінеаризація**: перетворити
+пару $(O_i, M_i)$ на одне по-користувацьке число $Z_i$, до якого застосовний
+звичайний t-тест.
+
+## Інструмент v3: `linearize`
+
+$$
+Z_i = K + \frac{1}{\overline{O}}\big(M_i - K\,O_i\big),
+\qquad K = \frac{\overline{M}}{\overline{O}}
+$$
+
+```{python}
+#| label: linearize-fn
+
+def linearize(num, den):
+    """По-користувацька лінеаризована ratio-метрика (дельта-метод).
+
+    num = замовлення (чисельник), den = сесії (знаменник).
+    """
+    k = num.sum() / den.sum()
+    return k + (num - k * den) / den.mean()
+```
+
+```{python}
+#| label: linearize-check
+
+rng = np.random.default_rng(1)
+a = greenbowl_users(5000, rng)
+z = linearize(a["orders"], a["sessions"])
+print(f"K       = {a['orders'].sum()/a['sessions'].sum():.5f}")
+print(f"mean(Z) = {z.mean():.5f}   <- відтворює K точно")
+```
+
+`mean(Z)` дорівнює $K$ **точно**, тож t-тест по $Z$ порівнює саме ту
+величину, про яку питає PM. Перевіримо чесність і потужність:
+
+```{python}
+#| label: linearize-mc
+
+rng, MC_r = np.random.default_rng(7), 300
+fpr_lin = agree = 0
+for _ in range(MC_r):
+    a = greenbowl_users(2000, rng)
+    b = greenbowl_users(2000, rng)
+    pv = ttest_ind(linearize(a["orders"], a["sessions"]),
+                   linearize(b["orders"], b["sessions"]), equal_var=False).pvalue
+    fpr_lin += pv < alpha
+print(f"A/A FPR (лінеаризація): {wilson(fpr_lin, MC_r)}")
+```
+
+FPR лінеаризованого t-тесту сидить на $\alpha$ — на відміну від пул-тесту
+Аналітика А. І коштує це один рядок алгебри замість тисяч ресемплів
+бутстрепа: на платформі, що жене тисячі метрик щоночі, це різниця між
+годинами і секундами.
+
+::: {.callout-tip icon="false"}
+## Ваша черга 3
+1. **Небезпека знаменника.** Трітмент може рухати не лише чисельник:
+   зручніший чекаут → більше коротких сесій → $\sum O$ росте → конверсія
+   $K$ може **впасти** на тлі зростання бізнесу. Як це діагностувати? (Яку
+   метрику протестувати окремо і яким тестом?)
+2. **Кейс: $Z$ як коваріата.** Лінеаризована $Z$ — звичайна по-користувацька
+   колонка. Що станеться, якщо взяти $Z$ за **передекспериментальний** період
+   як коваріату для CUPED конверсії?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 3
+
+**Інтерпретація.** (1) Окремо тестуємо **знаменник** — середню кількість
+сесій на користувача — звичайним t-тестом (сесії на користувача — це
+i.i.d. по користувачах). Якщо знаменник зрушився, читати ratio наосліп
+не можна: у звіті ratio ніколи не ходить сама — чисельник, знаменник,
+відношення. Правило: не впевнені, що трітмент не чіпає знаменник, — тестуйте
+його окремо. (2) $Z$-минулого — легітимна передекспериментальна коваріата,
+не залежна від трітменту, тож CUPED на ній зменшить дисперсію конверсії так
+само, як для ARPU. Саме так методи **компонуються** — до цього в @sec-compose.
+:::
+
+---
+
+# Частина IV — Все компонується + Монте-Карло {#sec-compose}
+
+Лінеаризована $Z$, стратифікація і CUPED — це все операції над
+по-користувацькою колонкою, тож вони **стекаються**. Зберемо CUPED +
+стратифікацію в один критерій `vr_ci`, що повертає варіанс-редукований ДІ
+для різниці ARPU.
+
+```{python}
+#| label: vr-ci
+
+def vr_ci(control, test, stratum_c=None, stratum_t=None,
+          cov_c=None, cov_t=None, alpha=0.05):
+    """Варіанс-редукований ДІ для різниці середніх test - control.
+
+    Спершу CUPED (якщо задано коваріату), потім стратифіковане/звичайне
+    середнє. Повертає (diff, (lo, hi), se).
+    """
+    yc, yt = np.asarray(control, float), np.asarray(test, float)
+    if cov_c is not None:                                    # крок CUPED
+        th = calculate_theta(np.r_[cov_c, cov_t], np.r_[yc, yt])
+        yc, yt = yc - th*cov_c, yt - th*cov_t
+
+    def mean_var(reg, y):
+        if reg is None:
+            return y.mean(), y.var(ddof=1) / y.size
+        w, g = (0.5, 0.5), [y[~reg], y[reg]]                 # крок стратифікації
+        m = sum(wi*x.mean() for wi, x in zip(w, g))
+        v = sum(wi**2 * x.var(ddof=1)/x.size for wi, x in zip(w, g))
+        return m, v
+
+    mc, vc = mean_var(stratum_c, yc)
+    mt, vt = mean_var(stratum_t, yt)
+    diff, se = mt - mc, np.sqrt(vc + vt)
+    z = norm.ppf(1 - alpha/2)
+    return diff, (diff - z*se, diff + z*se), se
+```
+
+::: {.callout-tip icon="false"}
+## 🔮 Спершу вгадайте
+Порядок методів за потужністю зрозумілий: plain < strat < cuped. А
+**strat + CUPED** — помітно кращий за самий CUPED чи майже такий самий?
+:::
+
+```{python}
+#| label: bench-mc
+
+def strat_cuped_p(sc, xc, yc, st, xt, yt):
+    th = calculate_theta(np.r_[xc, xt], np.r_[yc, yt])
+    return strat_ttest(sc, yc - th*xc, st, yt - th*xt)
+
+rng, MC = np.random.default_rng(17), 400
+mde5 = 5.0                              # design-MDE, якого базовий тест не бачить
+cnt = dict.fromkeys(["plain", "strat", "cuped", "strat+cuped"], 0)
+for _ in range(MC):
+    a  = greenbowl_users(n, rng)
+    t_ = greenbowl_users(n, rng, uplift=mde5)
+    cnt["plain"] += ttest_ind(a["arpu"], t_["arpu"], equal_var=False).pvalue < alpha
+    cnt["strat"] += strat_ttest(a["stratum"], a["arpu"], t_["stratum"], t_["arpu"]) < alpha
+    th = calculate_theta(np.r_[a["pre"], t_["pre"]], np.r_[a["arpu"], t_["arpu"]])
+    cnt["cuped"] += ttest_ind(cuped(a["arpu"], a["pre"], th),
+                              cuped(t_["arpu"], t_["pre"], th), equal_var=False).pvalue < alpha
+    cnt["strat+cuped"] += strat_cuped_p(a["stratum"], a["pre"], a["arpu"],
+                                        t_["stratum"], t_["pre"], t_["arpu"]) < alpha
+
+for k, v in cnt.items():
+    print(f"power {k:12s}: {wilson(v, MC)}")
+```
+
+`strat + CUPED` майже не додає понад самий CUPED — бо `pre` **уже знає**
+страту (та сама кореляція 0.82 з @sec-cuped). Інформацію не можна порахувати
+двічі: додаючи метод, питайте не «чи корелює коваріата», а «скільки **нової**
+дисперсії вона пояснює».
+
+## Рахунок у користувачах
+
+```{python}
+#| label: users-saved
+
+rng = np.random.default_rng(21)
+big = greenbowl_users(200_000, rng)
+th  = calculate_theta(big["pre"], big["arpu"])
+sds = {"plain":       np.sqrt(SD_W**2 + 0.25*(MU_R - MU_U)**2),
+       "strat":       SD_W,
+       "cuped":       cuped(big["arpu"], big["pre"], th).std(),
+       "strat+cuped": SD_W * np.sqrt(1 - R_XY**2)}
+
+print("метод         | ефект. sd | n на групу (MDE = 5 грн)")
+for k, sd in sds.items():
+    print(f"{k:13s} |   {sd:5.1f}   | {n_per_arm(sd, mde5):>6d}")
+```
+
+Той самий MDE = 5 грн, який базовому дизайну коштував би $\approx 3980$
+користувачів на групу, з CUPED вкладається у $\approx 1300$ — **утричі
+менше трафіку** без жодного нового користувача.
+
+::: {.callout-tip icon="false"}
+## Ваша черга 4
+1. Побудуйте `vr_ci` тільки з `cov_*` (CUPED без стратифікації) на A/A-світі
+   й переконайтесь, що ДІ накриває $0$ у $\approx 95\%$ випадків. Це
+   валідація фінального движка.
+2. **Кейс.** Менеджеру потрібно ловити +5 грн, а бюджет трафіку — 1300
+   користувачів на групу. Який єдиний рядок таблиці вище робить цей план
+   реальним, і що це означає для дедлайну експерименту?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 4
+
+```{python}
+#| label: sol4
+
+rng_v, rej = np.random.default_rng(31), 0
+for _ in range(300):
+    a = greenbowl_users(n, rng_v)
+    b = greenbowl_users(n, rng_v)
+    _, (lo, hi), _ = vr_ci(a["arpu"], b["arpu"], cov_c=a["pre"], cov_t=b["pre"])
+    rej += (lo > 0) or (hi < 0)
+print(f"(1) CUPED-vr_ci A/A FPR: {wilson(rej, 300)}")
+```
+
+**Інтерпретація.** (1) ДІ накриває нуль у $\approx 95\%$ світів — движок
+чесний, можна користуватись. (2) Рядок `cuped` (sd $\approx 46$, $n \approx
+1300$): CUPED сам робить план реальним. Дедлайн: замість чекати вчетверо
+довше на 4000 користувачів, експеримент завершується у межах наявного
+тижневого трафіку — «потужність задарма» перетворюється на **зекономлені
+тижні**.
+:::
+
+---
+
+# Частина V — Фінал: `vr_report` {#sec-report}
+
+> **Кейс.** Київський A/B email-кампанії завершено: по **1005** користувачів
+> у групі. Субсидія промо-набору коштує **6 грн на користувача** — це
+> **breakeven**: фіча окупна, лише якщо піднімає ARPU більш ніж на 6 грн.
+> CFO чекає рішення.
+
+```{python}
+#| label: ab-report
+
+BASE, PERIODS = 80_000, 26              # київська база; 2-тижневих періодів на рік
+
+def vr_report(control, test, breakeven, stratum_c=None, stratum_t=None,
+              cov_c=None, cov_t=None, base=BASE, periods=PERIODS):
+    """Фінальний звіт: варіанс-редукований ефект, тризонне рішення, P(окупно), EV."""
+    diff, (lo, hi), se = vr_ci(control, test, stratum_c, stratum_t, cov_c, cov_t)
+    zone = ("SHIP — котимо"          if lo > breakeven else
+            "KILL — вимикаємо"       if hi < breakeven else
+            "СІРА ЗОНА — треба даних")
+    p_be = norm.sf((breakeven - diff) / se)          # P(ефект >= breakeven)
+    ev   = base * periods * (diff - breakeven)        # очікувана чиста цінність за рік
+    print(f"ефект ARPU:  {diff:+.2f} грн   95% ДІ ({lo:+.2f}, {hi:+.2f})")
+    print(f"ефективне SE: {se:.2f} грн   breakeven {breakeven:+.0f} грн")
+    print(f"рішення:     {zone}")
+    print(f"P(окупно):   {p_be:.0%}")
+    print(f"EV за рік:   {ev/1e6:+.1f} млн грн")
+    return {"diff": diff, "ci": (lo, hi), "zone": zone, "p": p_be, "ev": ev}
+
+
+rng = np.random.default_rng(9)
+control = greenbowl_users(1005, rng)
+test    = greenbowl_users(1005, rng, uplift=11.0)
+
+print(">>> Звичайний t-тест (жодної варіанс-редукції):")
+_ = vr_report(control["arpu"], test["arpu"], breakeven=6)
+```
+
+```{python}
+#| label: ab-report-vr
+
+print(">>> Стратифікація + CUPED на тих самих даних:")
+_ = vr_report(control["arpu"], test["arpu"], breakeven=6,
+              stratum_c=control["stratum"], stratum_t=test["stratum"],
+              cov_c=control["pre"], cov_t=test["pre"])
+```
+
+Ті самі дані, той самий breakeven — а рішення **різні**. Звичайний тест дає
+широкий ДІ, що обіймає breakeven: **сіра зона**, окупність під питанням.
+Варіанс-редукція звузила ДІ майже вдвічі (SE $3.6 \to 2.1$), нижня межа
+перетнула 6 грн: **SHIP**, окупність практично певна, а EV — близько
+10 млн грн на рік. Зменшення
+дисперсії — це не академічна вправа, а **різниця між «не знаємо» і
+«котимо»**.
+
+::: {.callout-tip icon="false"}
+## Ваша черга 5 — фінальний кейс
+1. Прогоніть `vr_report` (варіант strat + CUPED) з **breakeven = 12 грн**
+   (дорожча субсидія). Яка зона тепер? Що з P(окупно) та EV?
+2. Сформулюйте по одному реченню рішення для CFO для breakeven **6** і **12**
+   грн. Що змінилось — статистика чи економіка?
+:::
+
+::: {.callout-note collapse="true" icon="false"}
+## Розв'язання 5
+
+```{python}
+#| label: sol5
+
+print(">>> breakeven = 12 грн:")
+_ = vr_report(control["arpu"], test["arpu"], breakeven=12,
+              stratum_c=control["stratum"], stratum_t=test["stratum"],
+              cov_c=control["pre"], cov_t=test["pre"])
+```
+
+**Інтерпретація.** Ефект $\approx +11$ грн: при breakeven 6 — **SHIP**
+(окупність певна, EV додатний); при breakeven 12 — ДІ вже обіймає поріг,
+$P(\text{окупно}) < 50\%$, EV від'ємний → **не котимо**. Статистика **та
+сама** — рішення перевернула **економіка**. «За субсидії 6 грн/користувача —
+викочуємо: ефект надійно перевищує окупність. За субсидії 12 грн — ні:
+шансів окупитися менше половини, потрібна дешевша субсидія або більший
+ефект.» Пост-хок потужності у звіті немає: рішення — це ДІ проти breakeven,
+а не «спостережена потужність».
+:::
+
+---
+
+# Пастки + чек-лист {.unnumbered}
+
+| Пастка | Чому це боляче | Що робити |
+|---|---|---|
+| Стратифікувати / CUPED на ознаці, зміненій трітментом | коваріата вбирає ефект → зміщена оцінка | лише **передекспериментальні** ознаки |
+| Пул сесій у 0/1 і z-тест часток | сесії одного юзера не i.i.d. → FPR ≫ α | одиниця аналізу = одиниця рандомізації; `linearize` |
+| Читати ratio без знаменника | трітмент рухає і $\sum O$ | тестувати знаменник окремо t-тестом |
+| Порівнювати ДІ з нулем, коли фіча коштує грошей | «значуще» ≠ «окупно» | поріг рішення — **breakeven**, три зони |
+| Вимагати «нижня межа > design-MDE» | систематичні хибнонегативи на окупних фічах | MDE — для $n$, breakeven — для рішення |
+| «Потужність при спостереженому ефекті» | детермінована функція $p$-value | потужність рахують **до** експерименту |
+| Повірити движку, бо «код виглядає правильно» | дрібна зміна може зламати калібрування | A/A-стенд Монте-Карло: FPR ≈ α |
+
+**Чек-лист варіанс-редукції в A/B:**
+
+- [ ] Коваріата / страта — **передекспериментальна**, не залежить від трітменту.
+- [ ] Ratio-метрика рахується на рівні **користувача** (`linearize` або
+  бутстреп по користувачах), не на рівні сесій.
+- [ ] Кожен рушій провалідовано **Монте-Карло**: A/A FPR $\approx \alpha$.
+- [ ] Методи не «подвоюють» той самий сигнал — питаємо про **нову** дисперсію.
+- [ ] Виграш звітуємо як **ефективне $sd$ / зекономлені користувачі**.
+- [ ] Рішення — **тризонне** проти **breakeven** (+ P(окупно), EV), без
+  пост-хок потужності.
+
+Якщо хоч на одне «ні» — звіт ще не готовий до зустрічі з CFO.
