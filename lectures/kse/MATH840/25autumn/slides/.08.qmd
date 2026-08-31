@@ -1,0 +1,1447 @@
+---
+title: "Advanced forecasting methods"
+subtitle: "MATH840 | Time Series"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: .08_files/libs/colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=3416">🔗MATH840 | Time Series</a>
+format:
+  revealjs: 
+    code-line-numbers: false
+    code-fold: true
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350  
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute: 
+  echo: true
+  warning: false
+  cache: true
+editor_options: 
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+
+```{python}
+#| label: setup
+#| include: false
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    category=UserWarning,
+    message=".*FigureCanvasAgg is non-interactive.*"
+)
+import os
+os.environ["NIXTLA_ID_AS_COL"] = "true"
+import numpy as np
+np.set_printoptions(suppress=True)
+np.random.seed(1)
+import random
+random.seed(1)
+import pandas as pd
+pd.set_option("max_colwidth", 100)
+pd.set_option("display.precision", 3)
+from utilsforecast.plotting import plot_series as plot_series_utils
+import seaborn as sns
+sns.set_style("whitegrid")
+import matplotlib.pyplot as plt
+plt.style.use("ggplot")
+plt.rcParams.update({
+    "figure.figsize": (8, 5),
+    "figure.dpi": 100,
+    "savefig.dpi": 300,
+    "figure.constrained_layout.use": True,
+    "axes.titlesize": 12,
+    "axes.labelsize": 10,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+    "legend.fontsize": 9,
+    "legend.title_fontsize": 10,
+})
+import matplotlib as mpl
+from cycler import cycler
+mpl.rcParams['axes.prop_cycle'] = cycler(color=["#000000", "#4E4EFA"])
+from fpppy.utils import plot_series
+
+import statsmodels.api as sm
+
+from functools import partial, reduce
+from prophet import Prophet
+from statsforecast import StatsForecast
+from statsforecast.models import MSTL, AutoETS, AutoARIMA, ARIMA
+from statsforecast.adapters.prophet import AutoARIMAProphet
+from statsmodels.tsa.api import VAR
+from statsmodels.graphics.tsaplots import plot_acf
+from utilsforecast.evaluation import evaluate
+from utilsforecast.losses import rmse, mae, mape, mase
+from utilsforecast.feature_engineering import trend, fourier, pipeline
+from utilsforecast.preprocessing import fill_gaps
+```
+
+# Complex seasonality
+
+## From Simple to Complex
+
+**Simple Seasonality:**
+
+We have mostly considered low-frequency data:
+
+-   Quarterly data (Period $m=4$)
+-   Monthly data (Period $m=12$)
+
+**Complex Seasonality:**
+
+High-frequency data often exhibit multiple, overlapping patterns.
+
+## Multiple Seasonal Patterns
+
+As frequency increases, patterns layer on top of each other:
+
+| Data Frequency | Potential Patterns |
+|----------------|--------------------|
+| **Daily** | Weekly + Annual |
+| **Hourly** | Daily + Weekly + Annual |
+| **Weekly** | Annual (Non-integer) |
+
+::: callout-note
+Most standard forecasting methods cannot handle multiple seasonal periods simultaneously.
+:::
+
+## The Challenge of Weekly Data
+
+Weekly data presents a unique mathematical challenge because years are not composed of exact weeks.
+
+$$ \text{Period} = \frac{365.25}{7} \approx 52.179 $$
+
+Since the seasonal period is not an integer (whole number), traditional methods often fail to capture the annual pattern accurately.
+
+## Selecting Seasonal Periods
+
+We do not necessarily include *all* possible periods in our models. We select based on:
+
+1.  **Data Availability:**
+    *   If we have only 180 days of data, we ignore annual seasonality.
+2.  **Nature of the Data:**
+    *   **Natural phenomena:** (e.g., temperature) $\rightarrow$ Ignore weekly seasonality.
+    *   **Social phenomena:** (e.g., sales) $\rightarrow$ Include weekly seasonality.
+
+## Case Study: Call Center Data
+
+```{python}
+#| output-location: slide
+#| fig-align: center
+url = "https://docs.google.com/spreadsheets/d/1R0sSN9K8dg8X8Gy5aiMtjeoPTBciPBAUNQo2HNKqyQY/edit?usp=sharing"
+gsheet_id = url.split("/d/")[1].split("/")[0]
+data_url = f"https://docs.google.com/spreadsheets/d/{gsheet_id}/export?format=csv"
+
+call_center_data = pd.read_csv(data_url, parse_dates=['ds'])
+call_center_data_fill = fill_gaps(call_center_data, freq="5T")
+
+plot_series(call_center_data_fill, title="Call Center Data", xlabel="DateTime [5m]", ylabel="Number of Calls")
+```
+
+**Context:**
+Number of calls to a North American commercial bank.
+
+-   **Granularity:** 5-minute intervals.
+-   **Window:** 7:00 am to 9:05 pm (weekdays only).
+-   **Duration:** 33 weeks.
+
+---
+
+```{python}
+# First four weeks of data from the North American commercial bank.
+
+plot_series(call_center_data_fill[call_center_data_fill['ds'] < '2003-03-29'], title="Call Center Data (First 4 Weeks)", xlabel="DateTime [5m]", ylabel="Number of Calls")
+```
+
+## Analyzing the Call Patterns
+
+The data exhibits two distinct seasonal periods:
+
+1.  **Strong Daily Pattern:**
+    *   Period = **169** (There are 169 5-minute intervals per workday).
+
+2.  **Weak Weekly Pattern:**
+    *   Period = $169 \times 5 = \mathbf{845}$.
+    *   *Observation:* Monday volumes are higher than the rest of the week.
+
+::: {.callout-note}
+Note: Annual seasonality is ignored due to insufficient data length (only 33 weeks).
+:::
+
+## MSTL with multiple seasonal periods
+
+**MSTL**: **M**ultiple **S**easonal-**T**rend decomposition using **L**oess.
+
+Unlike standard STL, the `MSTL()` function is explicitly designed to handle complex time series with **multiple seasonal periods**.
+
+It decomposes a series into:
+
+1.  **Trend**
+2.  **Multiple Seasonal Components** (e.g., Daily, Weekly)
+3.  **Remainder** (Noise)
+
+## Decomposing the Bank Data
+
+When applying MSTL to the call center data, we observe specific components:
+
+-   **Time of Day:** Represented in the decomposition plot (often the 3rd panel).
+-   **Time of Week:** Represented in the subsequent panel.
+
+**Key Observations:**
+
+-   There is **little trend** visible in this specific dataset.
+-   The **weekly seasonality** is relatively weak compared to the daily pattern.
+
+---
+
+```{python}
+#| fig-align: center
+call_center_data_orig = call_center_data.copy()
+
+call_center_data_orig['y'] = np.sqrt(call_center_data_orig['y'])
+call_center_data_orig = call_center_data_orig[call_center_data_orig['y'] > 0]
+call_center_data_orig['ds'] = range(len(call_center_data_orig))
+
+sf = StatsForecast(models=[MSTL(season_length=[169, 169 * 5])], freq=5)
+
+sf = sf.fit(call_center_data_orig)
+dcmp = sf.fitted_[0, 0].model_
+
+fig, axes = plt.subplots(nrows=5, ncols=1, sharex=True)
+sns.lineplot(data=dcmp, x=dcmp.index, y="data", ax=axes[0], color="black")
+sns.lineplot(data=dcmp, x=dcmp.index, y="trend", ax=axes[1], color="black")
+sns.lineplot(data=dcmp, x=dcmp.index, y="seasonal169", ax=axes[2], 
+  color="black")
+sns.lineplot(data=dcmp, x=dcmp.index, y="seasonal845", ax=axes[3], 
+  color="black")
+sns.lineplot(data=dcmp, x=dcmp.index, y="remainder", ax=axes[4], 
+  color="black")
+fig.suptitle("STL decomposition")
+fig.text(0.5, 0.94, 
+  "sqrt(Calls) = trend + seasonal169 + seasonal845 + remainder",
+  ha='center'
+)
+plt.xlabel("")
+plt.show()
+```
+
+---
+
+```{python}
+#| fig-align: center
+fc = sf.predict(h=169 * 5, level=[80, 95])
+fc[fc.select_dtypes(include=np.number).columns] = \
+  fc.select_dtypes(include=np.number).transform(lambda x: x ** 2)
+dates = pd.date_range(
+  start="2003-10-27 07:00:00",  periods = 169 * 5, freq="5T"
+)
+fc["ds"] = dates
+fc = fc[fc["ds"].dt.weekday <= 4]
+fc = fill_gaps(fc, freq="5T")
+plot_series(
+  fill_gaps(call_center_data, freq="5T"), fc, level=[80, 95],
+  max_insample_length=169 * (14 + 5),
+  xlabel="DateTime [5m]", ylabel="Calls",
+  title="Five-minute call volume to bank", rm_legend=False
+)
+```
+
+## The Fourier Approach
+
+When dealing with multiple seasonalities, we can extend the Fourier method used in earlier lectures.
+
+**The Strategy:**
+
+Add Fourier terms (sine and cosine pairs) for **each** distinct seasonal period present in the data.
+
+-   **Daily Period:** 169
+-   **Weekly Period:** 845
+
+## Mathematical Formulation
+
+For the bank call data, the regression model includes terms of the form:
+
+$$ \sin\left(\frac{2\pi k t}{169}\right), \cos\left(\frac{2\pi k t}{169}\right) $$
+$$ \sin\left(\frac{2\pi k t}{845}\right), \cos\left(\frac{2\pi k t}{845}\right) $$
+
+for $k = 1, 2, \dots$
+
+::: callout-tip
+You do not need to calculate these manually. The `fourier()` function generates these regressors automatically.
+:::
+
+## Selecting $K$ (Number of Terms)
+
+How many sine/cosine pairs ($K$) should we use?
+
+-   **AICc Method:** Usually minimizes AICc to find $K$.
+-   **The Problem:** For high seasonal periods, AICc tends to **over-estimate** the number of terms required.
+
+**Our Approach (Subjective):**
+
+We manually select a parsimonious number of terms:
+
+-   **Daily Seasonality:** $K=10$
+-   **Weekly Seasonality:** $K=5$
+
+## ARIMA Configuration
+
+We fit a Dynamic Harmonic Regression model with an **ARIMA error structure**.
+
+**Key Constraints:**
+To force the regression terms to handle the patterns, we restrict the ARIMA components:
+
+1.  **Stationarity:** Set $D=d=0$ (Regression handles the trend/level).
+2.  **Seasonality:** Set $P=Q=0$ (Regression handles the seasonality).
+
+**Implementation:**
+Use `seasonal=False` when instantiating `AutoARIMA()`.
+
+---
+
+```{python}
+#| fig-align: center
+features = [
+  partial(fourier, season_length=12, k=12),
+  partial(fourier, season_length=5 * 169, k=5),
+]
+bank_calls_fourier, bank_calls_futr_fourier = pipeline(
+  call_center_data_orig, features=features, freq=1, h=169 * 5
+)
+sf = StatsForecast(
+  models=[AutoARIMA(max_d=0, seasonal=False, nmodels=5)], freq=1
+)
+sf = sf.fit(bank_calls_fourier)
+fc_fourier = sf.predict(
+  h=169 * 5, X_df=bank_calls_futr_fourier, level=[80, 95]
+)
+fc_fourier[fc_fourier.select_dtypes(include=np.number).columns] = \
+  fc_fourier.select_dtypes(include=np.number).transform(lambda x: x ** 2)
+dates = pd.date_range(start="2003-10-27 07:00:00", 
+  end="2003-10-31 21:00:00", freq="5min")
+dates = dates[
+  (dates.time >= pd.Timestamp("07:00").time())
+  & (dates.time <= pd.Timestamp("21:00").time())
+]
+fc_fourier["ds"] = dates
+plot_series(
+  fill_gaps(call_center_data, freq="5T"), fc_fourier, level=[80, 95], max_insample_length=169 * 15,
+  xlabel="DateTime [5m]", ylabel="Calls", 
+  title="Five-minute call volume to bank", rm_legend=False
+)
+```
+
+# Prophet model
+
+## What is Facebook Prophet?
+
+**Prophet** is an open-source forecasting tool developed by Facebook (Meta) in 2017.
+
+*   **Core Philosophy:** "Forecasting at Scale".
+*   **Target Audience:** Analysts with domain knowledge but not necessarily deep time-series expertise.
+*   **Key Characteristic:** It works best with time series that have strong seasonal effects and several seasons of historical data.
+
+::: footer
+Source: Taylor & Letham (2017), "[Forecasting at Scale](https://peerj.com/preprints/3190.pdf)"
+:::
+
+## The "Analyst in the Loop"
+
+Prophet is designed to bridge the gap between automated forecasting and judgmental forecasting.
+
+*   **Automated:** Robust to missing data, shifts in trend, and outliers.
+*   **Judgmental:** Allows analysts to inject domain knowledge (holidays, changepoints, capacity constraints).
+
+## The Mathematical Model
+
+Prophet uses a **Decomposable Time Series Model** (similar to a Generalized Additive Model - GAM).
+
+$$ y(t) = g(t) + s(t) + h(t) + \epsilon_t $$
+
+Where:
+
+1.  $g(t)$: **Trend** function (non-periodic changes).
+2.  $s(t)$: **Seasonality** (periodic changes like weekly/yearly).
+3.  $h(t)$: **Holidays** (irregular events).
+4.  $\epsilon_t$: **Error** term (idiosyncratic changes).
+
+## Curve Fitting vs. Time Series
+
+::: callout-important
+**Prophet frames forecasting as a curve-fitting exercise**, not a temporal dependence problem (like ARIMA).
+:::
+
+**Implications:**
+
+*   $\checkmark$ Does not require regularly spaced data.
+*   $\checkmark$ No need to interpolate missing values.
+*   $\checkmark$ Fast fitting (allowing for many iterations).
+*   $\times$ Ignores local context (e.g., $y_{t-1}$ is not directly used to predict $y_t$).
+
+## Loading Data: Peyton Manning Example
+
+Let's look at the log daily page views for the Wikipedia page for Peyton Manning.
+
+```{python}
+#| output-location: slide
+#| code-fold: false
+url = 'https://raw.githubusercontent.com/facebook/prophet/main/examples/example_wp_log_peyton_manning.csv'
+df = pd.read_csv(url)
+df.head()
+
+# Visualizing the raw data
+plt.figure(figsize=(14, 6))
+plt.plot(pd.to_datetime(df['ds']), df['y'], 'k.')
+plt.title("Log Page Views: Peyton Manning")
+plt.xlabel("Date")
+plt.ylabel("Log Views")
+plt.show()
+```
+
+## Basic Model Fitting {.smaller}
+
+::: {.columns}
+::: {.column}
+The API is Scikit-Learn compatible.
+
+1.  Instantiate `Prophet()`
+2.  Call `.fit(df)`
+3.  Use `.make_future_dataframe()`
+4.  Call `.predict()`
+:::
+::: {.column}
+```{python}
+m = Prophet()
+m.fit(df)
+
+# Create future dataframe for 365 days
+future = m.make_future_dataframe(periods=365)
+
+# Forecast
+forecast = m.predict(future)
+
+# Display forecast tail
+forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail()
+```
+:::
+:::
+
+## Visualizing the Forecast
+
+Prophet has built-in plotting capabilities. The black dots are actuals, the blue line is the forecast, and the shaded area is the uncertainty interval.
+
+```{python}
+#| fig-align: center
+fig1 = m.plot(forecast)
+```
+
+## The Philosophy of $g(t)$
+
+Prophet treats forecasting as a **curve-fitting** exercise, not an auto-regressive one.
+
+The trend $g(t)$ is designed to be **piecewise**:
+
+1.  Real-world business data does not follow a single straight line forever.
+2.  Trajectories change due to product launches, market shifts, or external shocks.
+3.  The model consists of distinct segments connected at **changepoints**.
+
+---
+
+## Model 1: Piecewise Linear Trend
+
+This is the default model for problems without a saturation point.
+
+$$g(t) = (k + \mathbf{a}(t)^\top\boldsymbol{\delta})t + (m + \mathbf{a}(t)^\top\boldsymbol{\gamma})$$
+
+This is a generalized form of the line equation $y = kx + m$, where the slope $k$ and offset $m$ vary over time.
+
+---
+
+### Linear Trend: Decoding the Formula (1/2)
+
+$$g(t) = (\underbrace{k + \mathbf{a}(t)^\top\boldsymbol{\delta}}_{\text{Current Growth Rate}})t + (\dots)$$
+
+*   **$k$**: The base growth rate (slope) of the first segment.
+*   **$\boldsymbol{\delta}$**: A vector of rate adjustments. $\delta_j$ is the change in rate at changepoint $j$.
+*   **$\mathbf{a}(t)$**: An activation vector $\{0, 1\}^S$.
+    *   $a_j(t) = 1$ if time $t \ge s_j$ (changepoint $j$).
+    *   $a_j(t) = 0$ otherwise.
+
+---
+
+### Linear Trend: Decoding the Formula (2/2)
+
+$$g(t) = (\dots)t + (\underbrace{m + \mathbf{a}(t)^\top\boldsymbol{\gamma}}_{\text{Current Offset}})$$
+
+*   **$m$**: The offset parameter (intercept) for the first segment.
+*   **$\boldsymbol{\gamma}$**: A vector required to make the function continuous.
+*   **Why is $\gamma$ needed?**
+    *   When the slope changes at time $s_j$, the new line segment would disjoint from the old one.
+    *   $\gamma_j = -s_j\delta_j$ ensures the segments connect seamlessly.
+
+---
+
+## Model 2: Saturating Growth
+
+Used when growth is physically limited (e.g., total population, internet access).
+
+Based on the **Logistic Growth** curve:
+
+$$g(t) = \frac{C}{1 + \exp(-k(t-m))}$$
+
+**Prophet's innovations:**
+
+1.  Carrying capacity $C$ varies with time: $C(t)$.
+2.  The growth rate $k$ is piecewise (changes over time).
+
+---
+
+### Saturating Growth Formula
+
+$$g(t) = \frac{C(t)}{1 + \exp\left( -(k + \mathbf{a}(t)^\top\boldsymbol{\delta}) (t - (m + \mathbf{a}(t)^\top\boldsymbol{\gamma})) \right)}$$
+
+**Key Elements:**
+
+*   **$C(t)$**: The **Carrying Capacity**. Users can provide this as an external regressor (e.g., market size).
+*   **$k + \mathbf{a}(t)^\top\boldsymbol{\delta}$**: The time-varying growth rate (steepness of the curve).
+*   **$m + \mathbf{a}(t)^\top\boldsymbol{\gamma}$**: The time-varying offset to keep the curve continuous.
+
+---
+
+## Automatic Changepoint Selection
+
+How does Prophet know *when* the trend changes?
+
+1.  **Candidates**: The model places a grid of potential changepoints (default: 25) uniformly across the first 80% of the history.
+2.  **Selection**: It fits the model using a **Sparse Prior** on the rate adjustments $\boldsymbol{\delta}$.
+
+---
+
+## The Sparse Prior (Regularization)
+
+We model the rate adjustments using a Laplace distribution:
+
+$$\delta_j \sim \text{Laplace}(0, \tau)$$
+
+*   The Laplace distribution has a sharp peak at zero (heavier tails than Normal).
+*   This acts like **L1 Regularization (Lasso)**.
+*   **Result**: The model forces most $\delta_j$ to be exactly 0. Only the points with significant trend changes get non-zero values.
+
+---
+
+## Visualizing Changepoints
+
+```{python}
+#| fig-align: center
+from prophet.plot import add_changepoints_to_plot
+fig = m.plot(forecast)
+a = add_changepoints_to_plot(fig.gca(), m, forecast)
+```
+
+---
+
+## Trend Forecast Uncertainty
+
+When forecasting into the future, the trend is extrapolated using the last known rate. **But what about uncertainty?**
+
+Prophet assumes the future will see frequency and magnitude of changes similar to the history.
+
+1.  Infer the scale parameter $\lambda$ from historical $\delta_j$.
+2.  Sample future changepoints randomly from a Laplace distribution.
+3.  Simulate multiple future trend paths to generate prediction intervals.
+
+---
+
+## Analyst-in-the-Loop Controls
+
+The analyst interacts with the trend via hyperparameters:
+
+*   **Capacities ($C(t)$)**: Manually setting the ceiling for growth (Crucial for the Logistic model).
+*   **Changepoints ($s_j$)**: Manually specifying dates of known events (e.g., product launch).
+*   **`changepoint_prior_scale` ($\tau$)**:
+    *   **High $\tau$**: More flexible trend (risk of overfitting).
+    *   **Low $\tau$**: Stiffer trend (risk of underfitting).
+
+---
+
+## Adjusting Trend Flexibility
+
+You can control the trend flexibility using `changepoint_prior_scale`.
+
+*   **High value (e.g., 0.5):** Flexible trend (risk of overfitting).
+*   **Low value (e.g., 0.001):** Stiff trend (risk of underfitting).
+
+```{python}
+#| output-location: slide
+# Flexible trend
+m_flex = Prophet(changepoint_prior_scale=0.5)
+m_flex.fit(df)
+forecast_flex = m_flex.predict(future)
+
+# Stiff trend
+m_stiff = Prophet(changepoint_prior_scale=0.001)
+m_stiff.fit(df)
+forecast_stiff = m_stiff.predict(future)
+
+# Plotting comparison
+fig, ax = plt.subplots(figsize=(14, 6))
+ax.plot(pd.to_datetime(df['ds']), df['y'], 'k.', alpha=0.2, label='Data')
+ax.plot(forecast_flex['ds'], forecast_flex['yhat'], 'r-', label='Flexible (0.5)')
+ax.plot(forecast_stiff['ds'], forecast_stiff['yhat'], 'b-', label='Stiff (0.001)')
+ax.legend()
+plt.show()
+```
+
+## Component 2: Seasonality $s(t)$
+
+Prophet relies on **Fourier Series** to model periodic effects.
+
+$$ s(t) = \sum_{n=1}^{N} \left( a_n \cos\left(\frac{2\pi n t}{P}\right) + b_n \sin\left(\frac{2\pi n t}{P}\right) \right) $$
+
+*   **P:** Period (e.g., 365.25 for yearly, 7 for weekly).
+*   **N:** Order of Fourier series (higher N = more complex patterns).
+
+Defaults:
+
+*   Yearly: $N=10$
+*   Weekly: $N=3$
+
+## Component Analysis {.tiny}
+
+We can decompose the forecast into its components using `plot_components`.
+
+```{python}
+#| output-location: column
+#| code-fold: false
+#| fig-align: center
+fig2 = m.plot_components(forecast)
+```
+
+## Custom Seasonality
+
+You can add custom seasonalities (e.g., monthly, quarterly, or hourly) using `add_seasonality`.
+
+```{python}
+#| eval: false
+#| code-fold: false
+# Example of adding a monthly seasonality
+m = Prophet(weekly_seasonality=False)
+m.add_seasonality(name='monthly', period=30.5, fourier_order=5)
+m.fit(df)
+```
+
+::: callout-tip
+This is excellent for high-frequency data (like the call center data) where you might have daily, weekly, and yearly patterns simultaneously.
+:::
+
+## Component 3: Holidays $h(t)$
+
+Holidays provide predictable shocks. They are modeled as indicator functions.
+
+Prophet allows you to:
+
+1.  Use built-in country holidays.
+2.  Pass a custom dataframe of events.
+
+## Adding Built-in Holidays
+
+```{python}
+#| code-fold: false
+#| output-location: column
+m_holidays = Prophet()
+# Add US holidays
+m_holidays.add_country_holidays(country_name='US')
+m_holidays.fit(df)
+
+forecast_h = m_holidays.predict(future)
+
+# Check which holidays were found
+m_holidays.train_holiday_names.to_list()[:5]
+```
+
+## Visualizing Holiday Effects {.smaller}
+
+```{python}
+#| fig-align: center
+#| code-fold: false
+#| output-location: column
+fig = m_holidays.plot_components(forecast_h)
+```
+
+## Cross-Validation (Diagnostics)
+
+Prophet includes functionality for time series cross-validation using a sliding window approach.
+
+*   **Initial:** Training period.
+*   **Period:** Spacing between cutoff dates.
+*   **Horizon:** Forecast distance.
+
+```{python}
+#| output-location: slide
+#| code-fold: false
+from prophet.diagnostics import cross_validation, performance_metrics
+
+# This takes time, reducing initial window for demo speed
+df_cv = cross_validation(m, initial='730 days', period='180 days', horizon='365 days')
+
+df_cv.head()
+```
+
+## Performance Metrics
+
+```{python}
+#| fig-align: center
+#| code-fold: false
+df_p = performance_metrics(df_cv)
+df_p.head()
+```
+
+## Visualizing RMSE over Horizon
+
+```{python}
+#| fig-align: center
+#| code-fold: false
+from prophet.plot import plot_cross_validation_metric
+fig = plot_cross_validation_metric(df_cv, metric='rmse')
+```
+
+## Limitations of Prophet
+
+While powerful, Prophet has distinct limitations:
+
+1.  **Lacks Local Context:** No autoregressive (AR) terms. It doesn't know that $y_t$ depends on $y_{t-1}$.
+2.  **Extension Difficulty:** Built on Stan (Probabilistic programming), which is hard to customize for non-experts.
+3.  **Stationarity Assumption:** Assumes error variance is constant (unless using multiplicative mode).
+4.  **Forecast Horizon:** Error accumulates differently than recursive models.
+
+## Example: Quarterly cement production
+
+```{python}
+#| echo: true
+#| code-fold: false
+url = "https://docs.google.com/spreadsheets/d/1IfqpCIO9uSxaSvSJUjTQ0WgpSs8NFyCk1GOHw7ghWUo/edit?usp=sharing"
+gsheet_id = url.split("/d/")[1].split("/")[0]
+data_url = f"https://docs.google.com/spreadsheets/d/{gsheet_id}/export?format=csv"
+
+aus_production = pd.read_csv(
+  data_url, parse_dates=["ds"]
+)
+cement = (
+  aus_production[["ds", "Cement"]]
+  .query('ds >= "1988-01-01"')
+  .reset_index(drop=True)
+  .assign(unique_id="aus_production")
+)
+cement.rename(columns={"Cement": "y"}, inplace=True)
+train = cement.query('ds < "2008-01-01"')
+test = cement.query('ds >= "2008-01-01"')
+m = Prophet(weekly_seasonality=False)
+m.add_seasonality(name="quarterly", period=4, fourier_order=2)
+m.fit(train)
+future = m.make_future_dataframe(periods=10, freq="QS")
+fc_prophet = m.predict(future)
+fc_prophet = fc_prophet[["ds", "yhat", "yhat_lower", "yhat_upper"]]
+fc_prophet.rename(
+  columns={
+    "yhat": "Prophet",
+    "yhat_lower": "Prophet-lo-80",
+    "yhat_upper": "Prophet-hi-80",
+  },
+  inplace=True,
+)
+```
+
+## Example: Quarterly cement production
+
+```{python}
+#| fig-align: center
+#| output-location: slide
+#| echo: true
+#| code-fold: false
+
+sf = StatsForecast(
+  models=[AutoARIMA(season_length=4), AutoETS(season_length=4)], freq="QS"
+)
+fc_stats = sf.forecast(df=train, h=10, level=[80])
+
+fc = fc_stats.merge(fc_prophet, on=["ds"])
+plot_series(
+  cement, fc, level=[80],
+  xlabel="Quarter", ylabel="Cement",
+  rm_legend=False, title="Cement production: Australia"
+)
+```
+
+## Example: Quarterly cement production {.smaller}
+
+```{python}
+#| code-fold: false
+result_df = evaluate(
+  fc.merge(test, on=["unique_id", "ds"]),
+  metrics=[rmse, mae, mape, partial(mase, seasonality=4)],
+  train_df=cement,
+)
+result_df
+```
+
+## Example: Half-hourly electricity demand {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+url = "https://docs.google.com/spreadsheets/d/162yp2yvcpUt33vU3I2oIpTVJYXKuihRScyUS96Q7Rbk/edit?usp=sharing"
+gsheet_id = url.split("/d/")[1].split("/")[0]
+data_url = f"https://docs.google.com/spreadsheets/d/{gsheet_id}/export?format=csv"
+
+elec = pd.read_csv(data_url, parse_dates=["ds"])
+vic_demand = elec.query('unique_id == "Demand"').drop("Holiday", axis=1)[
+  ["unique_id", "ds", "y"]
+]
+train = vic_demand.iloc[:-48]
+test = vic_demand.iloc[-48:]
+m = Prophet()
+m.add_seasonality(name="hourly", period=48, fourier_order=5)
+m.add_seasonality(name="subhourly", period=48 * 7, fourier_order=5)
+m.fit(train)
+future = m.make_future_dataframe(periods=48 * 2, freq="30T")
+fc_prophet = m.predict(future)
+fc_prophet.rename(
+  columns={
+    "yhat": "Prophet",
+    "yhat_lower": "Prophet-lo-80",
+    "yhat_upper": "Prophet-hi-80",
+  },
+  inplace=True,
+)
+fc_prophet["resid"] = train["y"] - fc_prophet["Prophet"]
+```
+
+## Example: Half-hourly electricity demand
+
+```{python}
+#| fig-align: center
+fig, axes = plt.subplots(nrows=5, ncols=1, sharex=True, figsize=(8, 7))
+sns.lineplot(data=train, x=fc_prophet["ds"], y="y", ax=axes[0], 
+  color="black")
+sns.lineplot(data=fc_prophet, x=fc_prophet["ds"], y="trend", ax=axes[1], 
+  color="black")
+sns.lineplot(data=fc_prophet, x=fc_prophet["ds"], y="multiplicative_terms", 
+  ax=axes[2], color="black")
+axes[2].set_ylabel("multiplicative_term")
+sns.lineplot(data=fc_prophet, x=fc_prophet["ds"], y="additive_terms", 
+  ax=axes[3], color="black")
+axes[3].set_ylabel("additive_term")
+sns.lineplot(data=fc_prophet, x=fc_prophet["ds"], y="resid", ax=axes[4], 
+  color="black")
+fig.suptitle("Prophet decomposition")
+fig.text(0.5, 0.955,
+  "Demand = trend * (1 + multiplicative_terms) + additive_terms + resid",
+  ha='center'
+)
+plt.xlabel("")
+plt.show()
+```
+
+## Example: Half-hourly electricity demand
+
+```{python}
+#| fig-align: center
+
+residuals = fc_prophet["resid"]
+fig = plt.figure()
+gs = fig.add_gridspec(2, 2)
+ax1 = fig.add_subplot(gs[0, :])
+ax2 = fig.add_subplot(gs[1, 0])
+ax3 = fig.add_subplot(gs[1, 1])
+ax1.plot(fc_prophet["ds"], residuals, marker="o")
+ax1.set_ylabel("Innovation Residuals")
+ax1.set_xlabel("Year")
+plot_acf(
+  residuals.dropna(), ax2,
+  zero=False, bartlett_confint=False, auto_ylims=True
+)
+ax2.set_ylabel("acf")
+ax2.set_xlabel("lag")
+ax3.hist(residuals, bins=20)
+ax3.set_ylabel("count")
+ax3.set_xlabel("residuals")
+plt.show()
+```
+
+## Example: Half-hourly electricity demand
+
+```{python}
+#| fig-align: center
+
+sf = StatsForecast(models=[MSTL(season_length=[48, 48 * 7])], freq="30T")
+fc_stats = sf.forecast(df=train, h=48, level=[80])
+fc = fc_stats.merge(
+  fc_prophet[["ds", "Prophet", "Prophet-lo-80", "Prophet-hi-80"]], on=["ds"]
+)
+plot_series(
+  vic_demand, fc, level=[80],
+  max_insample_length=48 * 7,
+  xlabel="Date", ylabel="Demand (MWh)",
+  title = "Demand (MWh)", rm_legend=False
+)
+```
+
+## Example: Half-hourly electricity demand {.smaller}
+
+```{python}
+result_df = evaluate(
+  fc.merge(test, on=["unique_id", "ds"]),
+  metrics=[rmse, mae, mape, partial(mase, seasonality=4)],
+  train_df=vic_demand,
+)
+result_df
+```
+
+# Some practical forecasting issues
+
+## Handling Weekly Data
+
+The Challenge of $m \approx 52.18$
+
+Weekly data presents specific difficulties:
+
+1.  **Non-Integer Period:** The average year has $52.18$ weeks.
+2.  **Large Period:** Most standard methods (standard ARIMA/ETS) struggle with long seasonal lags ($m=52$).
+
+**Two Best Practices:**
+
+*   **Approach A:** STL Decomposition + Non-seasonal model.
+*   **Approach B:** Dynamic Harmonic Regression (Fourier terms).
+
+---
+
+## Handling Weekly Data
+
+Approach A: STL Decomposition
+
+Decompose the series using LOESS (MSTL). Use a non-seasonal model (e.g., ETS) to forecast the seasonally adjusted data.
+
+**When to use:** Preferred when seasonality **changes over time**.
+
+---
+
+```{python}
+url = "https://docs.google.com/spreadsheets/d/1fEhRugQNf71QKBCPg6cwTpSZ3mRRVAJe19hnQ9KduGU/edit?usp=sharing"
+gsheet_id = url.split("/d/")[1].split("/")[0]
+data_url = f"https://docs.google.com/spreadsheets/d/{gsheet_id}/export?format=csv"
+
+barrels = pd.read_csv(data_url, parse_dates=["ds"])
+sf = StatsForecast(
+  models=[MSTL(season_length=52, trend_forecaster=AutoETS(model="ZZN"))], 
+  freq="W"
+)
+fc = sf.forecast(df=barrels, h=104, level=[80, 95])
+plot_series(
+  barrels, fc, level=[80, 95],
+  xlabel="Week", ylabel="Millions of barrels per day",
+  title="Weekly US gasoline production",
+  rm_legend=False,
+)
+```
+
+---
+
+## Handling Weekly Data
+
+Approach B: Dynamic Harmonic Regression
+
+Use **Fourier terms** (pairs of sines and cosines) as external regressors in an ARIMA model.
+
+$$y_t = b_t + \sum_{j=1}^{K} \left[ \alpha_j \sin\left(\frac{2\pi j t}{52.18}\right) + \beta_j \cos\left(\frac{2\pi j t}{52.18}\right) \right] + \eta_t$$
+
+**When to use:** Preferred if seasonality is fixed or if you need to include **other covariates** (e.g., price, temperature).
+
+---
+
+```{python}
+barrels_fourier, barrels_futr_fourier = pipeline(
+  barrels,
+  features=[partial(fourier, k=5, season_length=1)],
+  freq='W', h=2 * 52,
+)
+sf = StatsForecast(
+  models=[AutoARIMA(d=0, seasonal=False)], freq='W'
+)
+sf = sf.fit(barrels_fourier)
+fc_fourier = sf.predict(h=2 * 52, X_df=barrels_futr_fourier, level=[80, 95])
+plot_series(
+  barrels_fourier, fc_fourier, level=[80, 95],
+  xlabel="Week", ylabel="Millions of barrels per day",
+  title="Weekly US gasoline production",
+  rm_legend=False,
+)
+```
+
+## Time Series of Counts {.smaller}
+
+Most forecasting methods assume data is **continuous** (can take any decimal value).
+However, real data often comes as **integers** (counts):
+
+*   Number of customers.
+*   Number of items sold.
+
+**When does it matter?**
+
+*   **Large counts ($>100$):** Not a problem. The difference between 100 and 100.1 is negligible.
+*   **Small counts ($0, 1, 2...$):** Critical. Standard models might predict 0.5 items, which is impossible.
+*   **Intermittent Demand:** Many periods with **zero** values.
+
+## Croston's Method {.smaller}
+
+Designed specifically for **intermittent demand** (series with many zeros).
+
+**Key Idea:** Split the original series into two separate component series:
+
+1.  **Demand ($q$):** The value of non-zero quantities.
+2.  **Inter-arrival time ($a$):** The time gap between non-zero demands.
+
+Forecasts are generated by applying **Simple Exponential Smoothing (SES)** to both $q$ and $a$ independently.
+
+## Croston's Method: The Math {.smaller}
+
+Let $q_i$ be the $i$-th non-zero demand and $a_i$ be the time since the previous demand.
+
+$$
+\begin{align}
+\hat{q}_{i+1|i} &= (1-\alpha_q)\hat{q}_{i|i-1} + \alpha_q q_i \\
+\hat{a}_{i+1|i} &= (1-\alpha_a)\hat{a}_{i|i-1} + \alpha_a a_i
+\end{align}
+$$
+
+**Final Forecast:**
+The forecast rate (demand per period) is the ratio:
+$$ \hat{y}_{T+h|T} = \frac{\hat{q}_{j+1|j}}{\hat{a}_{j+1|j}} $$
+
+::: {.callout-note}
+Croston's method produces a "forecast rate" (average demand over time), not a specific integer prediction for a specific day.
+:::
+
+## Variants & Limitations
+
+**Limitations:**
+
+1.  **No Prediction Intervals:** The method is heuristic, not based on a probabilistic model.
+2.  **Bias:** The original Croston method slightly overestimates demand.
+
+**Variants in `StatsForecast`:**
+
+1.  `CrostonClassic()`: The original method.
+2.  `CrostonOptimized()`: Automatically selects optimal $\alpha$ between [0.1, 0.3].
+3.  `CrostonSBA()`: (Syntetos-Boylan Approximation) Applies a correction factor to fix the bias. **Recommended.**
+
+## Example: Pharmaceutical sales
+
+```{python}
+from statsforecast.models import CrostonClassic, CrostonOptimized, CrostonSBA
+
+url = "https://docs.google.com/spreadsheets/d/1HqWRMOGNTJB006NL7n12pjGCZIKKTbW0MZpvXEOgFxs/edit?usp=sharing"
+gsheet_id = url.split("/d/")[1].split("/")[0]
+data_url = f"https://docs.google.com/spreadsheets/d/{gsheet_id}/export?format=csv"
+
+j06 = (
+  pd.read_csv(data_url, parse_dates=["Month"])
+  .query('ATC2 == "J06"')
+  .groupby("Month")["Scripts"]
+  .sum()
+  .reset_index()
+  .rename(columns={"Month": "ds", "Scripts": "y"})
+  .assign(unique_id="J06")
+)
+
+plot_series(
+  j06,
+  xlabel="Month [1M]", ylabel="Number of scripts",
+  title="Sales for immune sera and immunoglobulins",
+)
+```
+
+## Example: Pharmaceutical sales
+
+```{python}
+sf = StatsForecast(
+  models=[CrostonClassic(), CrostonOptimized(), CrostonSBA()], 
+  freq="M"
+)
+fc = sf.forecast(df=j06, h=6)
+print(fc.head())
+```
+
+## Example: Pharmaceutical sales
+
+```{python}
+plot_series(j06, fc, title="Forecasts for J06", xlabel="Month [1M]", ylabel="Number of scripts")
+```
+
+## Ensuring Forecasts Stay Within Limits
+
+It is common to require forecasts to satisfy specific bounds:
+
+1.  **Positive only ($y > 0$):** Sales, production, prices.
+2.  **Bounded Interval ($a < y < b$):** Percentages, market share, physical capacity.
+
+**The Strategy:**
+
+1.  **Transform** data to the whole real line $(-\infty, \infty)$.
+2.  **Forecast** using a standard model.
+3.  **Back-transform** the point forecasts and prediction intervals.
+
+## Important Note on Transformations
+
+When we back-transform a forecast:
+
+*   **Prediction Intervals:** Remain correct. Quantiles are preserved under monotonic transformations.
+*   **Point Forecasts:** The back-transformed forecast is the **Median**, not the Mean.
+    *   Example: $\exp(\text{mean}(x)) \neq \text{mean}(\exp(x))$.
+    *   If you need the Mean, a bias adjustment is required. Usually, the Median is sufficient.
+
+## The Log Transformation
+
+To ensure $y > 0$, use a **Log transformation** (Box-Cox with $\lambda=0$).
+
+**Forward:**
+$$w_t = \log(y_t)$$
+
+**Inverse:**
+$$y_t = \exp(w_t)$$
+
+This creates a distribution that is bounded at 0 and becomes skewed as the mean approaches 0.
+
+## Example: Egg Prices (Log)
+
+```{python}
+url = "https://docs.google.com/spreadsheets/d/1V2HAc5bwBXq1KJg9Dv7dX0R0C3s1mcGxfWmEVwoI1bs/edit?usp=sharing"
+gsheet_id = url.split("/d/")[1].split("/")[0]
+data_url = f"https://docs.google.com/spreadsheets/d/{gsheet_id}/export?format=csv"
+
+egg_prices = pd.read_csv(data_url, parse_dates=["ds"])
+log_prices = egg_prices.copy()
+log_prices["y"] = np.log(egg_prices["y"])
+
+sf = StatsForecast(models=[AutoETS(season_length=1, model="ZAZ")], freq="Y")
+fc = sf.forecast(df=log_prices, h=50, level=[80, 95])
+fc.iloc[:, 2:] = np.exp(fc.iloc[:, 2:])
+plot_series(
+  egg_prices, fc, level=[80, 95],
+  xlabel="year", ylabel="$US (in cents adjusted for inflation)",
+  title="Annual egg prices", rm_legend=False,
+)
+```
+
+## The Scaled Logit Transformation
+
+To constrain data between $a$ and $b$ (e.g., $50 < y < 400$).
+
+**Forward Transform (Map $[a, b] \to (-\infty, \infty)$):**
+
+$$y_{new} = \log\left(\frac{x - a}{b - x}\right)$$
+
+**Inverse Transform:**
+
+$$x = \frac{(b-a)e^{y_{new}}}{1+e^{y_{new}}} + a$$
+
+## Example: Egg Prices (Interval)
+
+```{python}
+def scaled_logit(df, target_col="y", lower=0, upper=1):
+  Y_df = df.copy()
+  Y_df[target_col] = np.log(
+    (Y_df[target_col] - lower) / (upper - Y_df[target_col])
+  )
+  return Y_df
+def inv_scaled_logit(fc, lower=0, upper=1):
+  Y_df = fc.copy()
+  Y_df.iloc[:, 2:] = (upper - lower) * np.exp(Y_df.iloc[:, 2:]) / \
+    (1 + np.exp(Y_df.iloc[:, 2:])) + lower
+  return Y_df
+
+scaled_logit_prices = scaled_logit(egg_prices, target_col="y", 
+  lower=50, upper=400)
+sf = StatsForecast(models=[AutoETS(season_length=1, model="ZAZ")], freq="Y")
+fc = sf.forecast(df=scaled_logit_prices, h=50, level=[80, 95])
+fc = inv_scaled_logit(fc, lower=50, upper=400)
+plot_series(
+  egg_prices, fc, level=[80, 95],
+  xlabel="year", ylabel="$US (in cents adjusted for inflation)",
+  title="Annual egg prices", rm_legend=False,
+)
+```
+
+## Forecast Combinations {.smaller}
+
+An easy and robust way to improve accuracy is to use several different methods on the same time series and **average** the results.
+
+**Historical Context:**
+
+*   **Bates & Granger (1969):** Seminal paper showing combined forecasts often outperform individual ones.
+*   **Clemen (1989):** "The results have been virtually unanimous: combining multiple forecasts leads to increased forecast accuracy."
+
+**Why it works:**
+
+*   Reduces variance of the error.
+*   Protects against selecting a single misspecified model.
+
+## Simple vs. Weighted Averages
+
+There is extensive research on assigning **weights** to models (giving more weight to the "better" model).
+
+However, empirical evidence (e.g., Wang et al., 2023) suggests:
+
+::: {.callout-tip}
+**Simple Average is hard to beat.**
+:::
+
+$$ \hat{y}_{combined} = \frac{1}{K} \sum_{k=1}^{K} \hat{y}^{(k)} $$
+
+Ideally, you want to combine models that are fundamentally different (e.g., ARIMA + ETS + Decomposition) so their errors are uncorrelated.
+
+## Example: Take-away Food Revenue
+
+```{python}
+url = "https://docs.google.com/spreadsheets/d/1nXrDE4Sevc6z8pW7SH255eAI3OO6HAby2Y6RPTnS4Yw/edit?usp=sharing"
+gsheet_id = url.split("/d/")[1].split("/")[0]
+data_url = f"https://docs.google.com/spreadsheets/d/{gsheet_id}/export?format=csv"
+
+auscafe = (
+  pd.read_csv(data_url, parse_dates=["Month"])
+  .query('Industry.str.contains("Takeaway")')
+  .groupby("Month")["Turnover"]
+  .sum()
+  .reset_index()
+  .rename(columns={"Turnover": "y", "Month": "ds"})
+  .sort_values("ds")
+)
+auscafe.insert(0, "unique_id", "auscafe")
+train = auscafe.query('ds <= "2013-12-01"')
+validation = auscafe.query('ds > "2013-12-01" & ds <= "2015-12-01"')
+test = auscafe.query('ds > "2015-12-01"')
+log_train = train.copy()
+log_train["y"] = np.log(train["y"])
+sf = StatsForecast(
+  models=[
+    AutoETS(season_length=12),
+    MSTL(season_length=12),
+    AutoARIMA(season_length=12),
+  ],
+  freq="MS",
+)
+fc = sf.forecast(df=log_train, h=60, level=[80, 95], fitted=True)
+fc.iloc[:, 2:] = np.exp(fc.iloc[:, 2:])
+
+fc["Combination"] = fc[["AutoETS", "MSTL", "AutoARIMA"]].mean(axis=1)
+plot_series(
+  auscafe.query('ds > "2008-12-01"'), fc,
+  xlabel="Month",
+  ylabel="$ billion",
+  title="Australian monthly expenditure on eating out",
+  rm_legend=False,
+)
+```
+
+## Example: Take-away Food Revenue
+
+```{python}
+res = fc.merge(test, on=["unique_id", "ds"])
+result_df = evaluate(res, 
+  metrics=[rmse, mae, mape, partial(mase, seasonality=1)], 
+  train_df=train
+)
+result_df
+```
+
+## Forecast Combination Distributions {.smaller}
+
+We have averaged the *point* forecasts ($\hat{y}$). But how do we get prediction intervals (the shaded regions)?
+
+Since "Combination" is not a standard probabilistic model, we cannot simply ask for standard deviation.
+
+**Solution: Conformal Prediction**
+We use the empirical errors (residuals) from a **validation set** to estimate uncertainty.
+
+1.  Forecast on a validation set (historical data held back).
+2.  Calculate Residuals: $e_t = y_t - \hat{y}_{combined}$.
+3.  Compute Quantiles of these residuals (e.g., 5th and 95th percentiles).
+4.  Add these quantiles to the future point forecast.
+
+## Step 1: Compute Residuals (Validation)
+
+We calculate the combined forecast for the validation period and compare it to actuals.
+
+```{python}
+#| code-fold: false
+# 1. Forecast on TRAINING set (to validate against held-out data)
+fc_val = sf.forecast(df=train, h=24)
+
+# 2. Average the models
+fc_val["Combination"] = fc_val[["AutoETS", "MSTL", "AutoARIMA"]].mean(axis=1)
+
+# 3. Calculate Residuals (Actual - Forecast)
+fc_val = fc_val.merge(validation, on=["unique_id", "ds"])
+residuals = fc_val["y"] - fc_val["Combination"]
+```
+
+## Step 2: Generate Intervals (Test)
+
+We apply the quantiles of those historical residuals to the new forecast.
+
+```{python}
+#| code-fold: false
+# 1. Forecast Future
+fc_cp = sf.forecast(df=pd.concat([train, validation]), h=36, level=[80, 90])
+fc_cp["Combination"] = fc_cp[["AutoETS", "MSTL", "AutoARIMA"]].mean(axis=1)
+fc_cp["Combination-lo-90"] = fc_cp["Combination"] + \
+  np.quantile(residuals, 0.1 / 2)
+fc_cp["Combination-hi-90"] = fc_cp["Combination"] + \
+  np.quantile(residuals, 1 - 0.1 / 2)
+fc_cp["Combination-lo-80"] = fc_cp["Combination"] + \
+  np.quantile(residuals, 0.2 / 2)
+fc_cp["Combination-hi-80"] = fc_cp["Combination"] + \
+  np.quantile(residuals, 1 - 0.2 / 2)
+```
+
+---
+
+```{python}
+plot_series(
+  auscafe.query('ds > "2008-12-01"'), fc_cp, models=["Combination"],
+  level=[80, 90],
+  xlabel="Month", ylabel="$ billion",
+  title="Australian monthly expenditure on eating out",
+  rm_legend=False,
+)
+```
+
+---
+
+## Evaluating Intervals: The Winkler Score
+
+How do we know if a prediction interval is "good"?
+*   If it's too wide, it's useless.
+*   If it's too narrow, it misses the truth.
+
+The **Winkler Score** penalizes both width and missing the target.
+**Lower is better.**
+
+$$
+W(L_t, U_t, y_t) = \begin{cases} 
+(U_t - L_t) & \text{if } L_t \le y_t \le U_t \\
+(U_t - L_t) + \frac{2}{\alpha}(L_t - y_t) & \text{if } y_t < L_t \\
+(U_t - L_t) + \frac{2}{\alpha}(y_t - U_t) & \text{if } y_t > U_t
+\end{cases}
+$$
+
+
+## Python: Winkler Score Implementation {.tiny}
+
+```{python}
+def winkler_score(y_true, lower, upper, alpha=0.05):
+  interval_width = upper - lower
+  penalties = np.zeros_like(y_true)
+  for i in range(len(y_true)):
+    if y_true[i] < lower[i]:
+      penalties[i] = (2 / alpha) * (lower[i] - y_true[i])
+    elif y_true[i] > upper[i]:
+      penalties[i] = (2 / alpha) * (y_true[i] - upper[i])
+  return np.mean(interval_width + penalties)
+
+res = fc_cp.merge(test, on=["unique_id", "ds"])
+alpha = {"90": 0.1, "80": 0.2}
+models = ["Combination", "AutoETS", "MSTL", "AutoARIMA"]
+results = []
+for alpha_key, alpha_value in alpha.items():
+  for model in models:
+    score = winkler_score(
+      res["y"],
+      res[f"{model}-lo-{alpha_key}"],
+      res[f"{model}-hi-{alpha_key}"],
+      alpha=alpha_value,
+    )
+    results.append(
+      {
+        "Model": model, 
+        "Prediction Interval": alpha_key, 
+        "Winkler Score": score
+      }
+    )
+winkler_score_df = pd.DataFrame(results)
+result_df = winkler_score_df.pivot(
+  index="Model", columns="Prediction Interval", values="Winkler Score"
+)
+result_df
+```
+
+## Backcasting
+
+```{python}
+#| code-fold: false
+#| output-location: slide
+backcasts = auscafe.copy()
+backcasts["y"] = auscafe["y"].iloc[::-1].values
+sf = StatsForecast(models=[AutoETS(season_length=12)], freq="MS")
+fc = sf.forecast(df=backcasts, h=15, level=[80, 95])
+fc_reversed = fc.copy()[::-1]
+fc_reversed["ds"] = pd.date_range(end="1982-03-01", periods=15, freq="MS")
+
+plot_series(
+  auscafe.query('ds < "1990-01-01"'), fc_reversed, level=[80, 95],
+  xlabel="Month", ylabel="$ (billions)",
+  title="Backcasts of Australian food expenditure",
+  rm_legend=False,
+)
+```
+
+# Questions? {.unnumbered .unlisted background-iframe=".08_files/libs/colored-particles/index.html"}
+
+<br><br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=3416)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

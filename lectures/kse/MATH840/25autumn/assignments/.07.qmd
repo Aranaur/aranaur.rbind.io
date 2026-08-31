@@ -1,0 +1,129 @@
+---
+title: "Assignment 07: Prophet"
+subtitle: "MATH840: Time Series"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+format:
+  html: 
+    highlight-style: github
+    theme: [default, custom.scss]
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+---
+
+## 👋Introduction
+
+In this assignment, you will expand your forecasting toolkit beyond standard ARIMA and ETS models. You will focus on:
+
+1.  **Facebook Prophet:** Applying the "Analyst-in-the-Loop" philosophy to your own dataset.
+2.  **Model Comparison:** Rigorously comparing Prophet against AutoARIMA/AutoETS.
+
+## 🧙‍♂️Part 1: Prophet on Your Own Data
+
+**Objective:** Apply the Prophet model to the personal time series dataset you selected at the beginning of the course.
+
+### 1.1 Data Preparation
+
+Prophet has strict requirements for input data:
+
+1.  The time column must be named **`ds`** (datestamp).
+2.  The value column must be named **`y`**.
+
+**Instructions:**
+
+*   Load your dataset.
+*   Rename your columns to `ds` and `y`.
+*   Perform the same Train/Test split as you did in **Assignment 06** (ARIMA) to ensure a fair comparison later.
+
+### 1.2 Basic Prophet Model
+
+Prophet models the time series as: $y(t) = g(t) + s(t) + h(t) + \epsilon_t$.
+
+**Instructions:**
+
+1.  Initialize and fit a basic `Prophet()` model on the training set.
+2.  Create a `future` dataframe that covers the length of your test set.
+3.  Generate the forecast.
+4.  Plot the forecast using `model.plot(forecast)`.
+
+### 1.3 Component Analysis
+
+Use `model.plot_components(forecast)` to inspect the decomposition.
+
+**Questions:**
+
+*   **Trend:** Is the trend linear or saturating? Does it change direction significantly?
+*   **Seasonality:** What seasonal patterns (weekly, yearly) did the model detect? Do they make sense for your specific domain?
+
+## 🔧Part 2: Tuning and "Analyst in the Loop"
+
+Prophet allows you to inject domain knowledge.
+
+### 2.1 Holidays (Optional but Recommended)
+
+If your data is daily and affected by human behavior (sales, traffic), holidays are crucial.
+
+*   If your data is suitable, add country-specific holidays using `add_country_holidays(country_name='US')` (replace 'US' with the relevant country code or use special datasets).
+*   If your data is not daily/suitable, skip the code execution but **explain in text** how holidays would theoretically affect your data.
+
+### 2.2 Trend Flexibility (Changepoints)
+
+The `changepoint_prior_scale` parameter controls how flexible the trend is.
+
+*   **Default:** 0.05
+*   **High (e.g., 0.5):** Very flexible (risk of overfitting).
+*   **Low (e.g., 0.001):** Stiff trend (risk of underfitting).
+
+**Instructions:**
+
+Experiment with one value *different* from the default that you think suits your data better. Fit a "Tuned" model.
+
+### 2.3 Cross-Validation
+
+Perform time-series cross-validation using Prophet's built-in tools.
+
+*   Select an `initial` training period, a `period` (spacing), and a `horizon` (forecast distance).
+*   Plot the RMSE metric over the horizon.
+
+## 🆚Part 3: Model Comparison (Prophet vs. ARIMA/ETS)
+
+**Objective:** Compare your new Prophet model against the classic statistical models from the previous assignment.
+
+### 3.1 Re-run AutoARIMA/AutoETS
+
+To ensure the comparison is valid, re-run `AutoARIMA` and `AutoETS` on the *exact same* training set used for Prophet.
+
+### 3.2 Error Metrics Table
+
+Calculate RMSE and MAE for:
+
+1.  AutoARIMA
+2.  AutoETS
+3.  Prophet (Basic)
+4.  Prophet (Tuned)
+
+Create a summary table.
+
+### 3.3 Visualization
+
+Plot the Actual values (Test set) vs. the forecasts from AutoARIMA, AutoETS, and Prophet on one chart.
+
+**Conclusion:**
+
+*   Which model performed best?
+*   Did Prophet's flexibility (changepoints/holidays) give it an advantage over ARIMA/ETS, or did the statistical models win?
+*   Why do you think this happened for *your* specific dataset?
+
+
+## 📤 **Submission Requirements**
+
+Submit a Quarto document (`.qmd`) or Jupyter Notebook (`.ipynb`), along with the rendered HTML file, containing:
+
+*   The code for all steps of the analysis.
+*   All generated plots and tables.
+*   Detailed interpretations and conclusions for each step.
+
+Good luck with your research!

@@ -1,0 +1,145 @@
+---
+title: "Assignment 06: ARIMA Models"
+subtitle: "MATH840: Time Series"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+format:
+  html: 
+    highlight-style: github
+    theme: [default, custom.scss]
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+---
+
+## 👋Introduction
+
+In this assignment, we delve into **ARIMA (AutoRegressive Integrated Moving Average)** models. Unlike the exponential smoothing methods covered in Assignment 05, which are based on a description of the trend and seasonality in the data, ARIMA models aim to describe the autocorrelations in the data.
+
+**Objectives:**
+
+1.  Analyze stationarity and determine necessary differencing ($d, D$).
+2.  Manually identify potential model candidates using ACF and PACF plots.
+3.  Estimate models using `statsforecast` and compare with `AutoARIMA`.
+4.  Perform diagnostic checking on residuals.
+5.  Compare ARIMA performance against ETS and simple benchmarks from previous assignments.
+
+**Textbook Reference:** [Chapter 9: ARIMA models](https://otexts.com/fpppy/nbs/09-arima.html)
+
+## ⚙️Setup
+
+Load the necessary libraries and your personal time series dataset (the one you selected in Assignment 01). Also you can use other packages as needed.
+
+```{python}
+#| eval: false
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.stattools import adfuller, kpss
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsforecast import StatsForecast
+from statsforecast.models import AutoARIMA, ARIMA
+from statsforecast.utils import AirPassengersDF 
+```
+
+## ⚖️Task 1: Stationarity and Differencing
+
+ARIMA models require the data to be stationary. As discussed in the lecture, this involves stabilizing the variance and the mean.
+
+### 1.1 Variance Stabilization
+
+Plot your time series. Does the variance change over time? If so, apply a Box-Cox transformation (or Log transformation).
+
+*Your interpretation: [Does the variance look constant? Do you need a log transform?]*
+
+### 1.2 Stationarity Tests
+
+Perform the **KPSS test** (Null Hypothesis: Stationary) and/or **ADF test** (Null Hypothesis: Non-Stationary) on your data (or transformed data).
+
+### 1.3 Differencing
+
+If the data is non-stationary, determine the order of differencing required.
+
+1.  Check for **Seasonal Differencing ($D$)**: Is there a strong seasonal pattern?
+2.  Check for **First Differencing ($d$)**: After seasonal differencing, is the series stationary?
+
+You can use `ndiffs` and `nsdiffs` from `pmdarima` or `statsforecast.utils` logic, or simply manually difference the pandas series and re-run the tests.
+
+*Your Conclusion: What are your selected values for $d$ (first difference) and $D$ (seasonal difference)?*
+
+---
+
+## 🤖Task 2: Manual Model Selection
+
+Now that you have a stationary series (after differencing), examine the ACF and PACF plots to identify potential AR ($p, P$) and MA ($q, Q$) terms.
+
+### 2.1 ACF and PACF Analysis
+
+Plot the ACF and PACF of your **differenced/stationary** series.
+
+### 2.2 Model Identification
+
+*   **AR($p$):** ACF decays, PACF cuts off after lag $p$.
+*   **MA($q$):** PACF decays, ACF cuts off after lag $q$.
+*   **Seasonal components:** Look at lags $m, 2m, 3m$ (e.g., 12, 24, 36 for monthly data).
+
+*Your Selection:*
+Based on the plots, I propose the following candidate model(s): 
+**ARIMA(p, d, q)(P, D, Q)[m]** = ...
+
+## 🧮Task 3: Estimation and AutoARIMA
+
+### 3.1 Manual Fit
+
+Fit your manually selected model using `statsforecast.models.ARIMA`.
+
+### 3.2 AutoARIMA
+
+Use the `AutoARIMA` model from `statsforecast`. This uses the Hyndman-Khandakar algorithm to minimize AICc.
+
+Compare the AIC/AICc (if accessible) or simply the coefficients. Did `AutoARIMA` choose a different model than you? Why might that be?
+
+## 🩺Task 4: Diagnostic Checking
+
+Analyze the residuals of the best-performing model (likely the `AutoARIMA` or your best manual guess). 
+
+1.  Plot the residuals (should look like white noise).
+2.  Plot the ACF of the residuals (should contain no significant spikes).
+3.  Perform a **Ljung-Box test** (or Portmanteau test).
+
+*Interpretation: Do the residuals look like white noise? Is there any information left in the errors?*
+
+## 🔮Task 5: Forecasting and Evaluation
+
+Perform Cross-Validation (rolling window forecasting) to evaluate the performance of your models on unseen data. Use a horizon $h$ appropriate for your data frequency.
+
+Calculate error metrics (RMSE, MAE, MAPE) for both your manual ARIMA and AutoARIMA.
+
+## 🆚Task 6: Synthesis and Comparison
+
+### 6.1 Comparison with Previous Methods
+
+Compare the accuracy metrics of your **AutoARIMA** model with the **AutoETS** model you created in Assignment 05.
+
+| Model | RMSE | MAE | MAPE |
+|-------|------|-----|------|
+| ARIMA | ... | ... | ... |
+| ETS | ... | ... | ... |
+
+### 6.2 Conclusion
+
+*   Which model performed best?
+*   Refer to the "ARIMA vs ETS" section of the lecture. Is your series purely trend/seasonal (where ETS often shines), or does it have complex autocorrelation dynamics (where ARIMA shines)?
+*   Did the prediction intervals increase with the horizon as expected?
+
+## 📤 **Submission Requirements**
+
+Submit a Quarto document (`.qmd`) or Jupyter Notebook (`.ipynb`), along with the rendered HTML file, containing:
+
+*   The code for all steps of the analysis.
+*   All generated plots and tables.
+*   Detailed interpretations and conclusions for each step.
+
+Good luck with your research!

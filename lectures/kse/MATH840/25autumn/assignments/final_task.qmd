@@ -1,0 +1,182 @@
+---
+title: "Final Project: Energy Consumption Forecasting"
+subtitle: "MATH840: Time Series"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+format:
+  html: 
+    highlight-style: github
+    theme: [default, custom.scss]
+execute: 
+  echo: true
+  warning: false
+editor_options: 
+  chunk_output_type: console
+---
+
+# Introduction & Scenario
+
+You are acting as a Data Scientist for a regional energy distributor. The company needs to plan reserve power generation for the next **48 hours** to ensure grid stability and minimize costs.
+
+Your task is to predict electricity consumption (in kWh) based on historical data. However, point predictions are not enough—grid operators need to know the **uncertainty** of your forecast to manage risks. Therefore, you must provide both a forecast and a **95% Prediction Interval**.
+
+# Data Description
+
+You are provided with a training dataset [`train.csv`](https://docs.google.com/spreadsheets/d/182acVDJGWXB9y4831VId4NEizo6RI7hg36y-rt7cYlc/edit?usp=sharing) containing historical energy consumption recorded every **15 minutes**.
+
+### Dataset Structure
+
+| Column | Description | Format |
+|--------|-------------|--------|
+| `Date` | Date of observation | `MM/DD/YYYY` |
+| `Time` | Time of observation | `HH:MM:SS` |
+| `Value` | Energy consumption (kWh) | Float |
+
+**Data Preview:**
+```csv
+Date,Time,Value
+8/28/2025,22:00:00,33.33
+8/28/2025,22:15:00,44.44
+8/28/2025,22:30:00,55.55
+...
+```
+
+# Part 1: In-Class Prediction (Tuesday)
+
+**Objective:** Build a model and generate a forecast for the "Hidden Test Set".
+
+## Technical Requirements
+
+1.  **Forecast Horizon:** The next **48 hours** immediately following the last timestamp in your training data (Total: **192 steps**).
+2.  **Output:**
+    *   **Point Forecast:** The expected value.
+    *   **Prediction Interval (95%):** Lower and Upper bounds.
+
+## Submission Format
+
+You must upload a CSV file named `SURNAME_submission.csv` containing exactly **192 rows** with the following columns:
+
+*   `Date`
+*   `Time`
+*   `Forecast` (Predicted Value)
+*   `Lower_95` (Lower Bound of 95% CI)
+*   `Upper_95` (Upper Bound of 95% CI)
+
+## Evaluation Metrics
+
+Your submission will be evaluated automatically against the ground truth using three metrics.
+
+### 1. Accuracy: RMSE (Root Mean Squared Error)
+
+Penalizes large errors significantly.
+$$
+RMSE = \sqrt{\frac{1}{n}\sum_{t=1}^{n}(y_t - \hat{y}_t)^2}
+$$
+
+### 2. Interpretability: MAPE (Mean Absolute Percentage Error)
+
+Shows the error relative to the actual value.
+$$
+MAPE = \frac{100\%}{n}\sum_{t=1}^{n}\left| \frac{y_t - \hat{y}_t}{y_t} \right|
+$$
+
+### 3. Uncertainty: Winkler Score
+
+Evaluates the quality of your prediction intervals. It rewards narrow intervals but penalizes heavily if the true value falls outside the interval. For a $(1-\alpha)$ interval (where $\alpha=0.05$):
+
+$$
+S_t = \begin{cases} 
+U_t - L_t & \text{if } L_t \le y_t \le U_t \\
+(U_t - L_t) + \frac{2}{\alpha}(L_t - y_t) & \text{if } y_t < L_t \\
+(U_t - L_t) + \frac{2}{\alpha}(y_t - U_t) & \text{if } y_t > U_t
+\end{cases}
+$$
+
+$$
+\text{Winkler Score} = \frac{1}{n} \sum_{t=1}^{n} S_t
+$$
+
+*   **Goal:** Minimize all three metrics.
+*   **Ranking:** The final rank will be a weighted average of rankings in these three categories.
+
+### 4. FINAL SCORE
+
+The final score will be computed as follows:
+
+$$
+R_{final} = 0.3 \cdot Rank_{RMSE} + 0.3 \cdot Rank_{MAPE} + 0.4 \cdot Rank_{Winkler}
+$$
+
+# Part 2: Final Report (Friday)
+
+After the initial submission, you have time until Friday to improve your model and prepare a report.
+
+**Deliverables:**
+
+1.  **Updated Forecast:** (Optional) If you improved your model, submit a new CSV.
+2.  **Report / Presentation:** A Jupyter Notebook or PDF covering:
+    *   **EDA:** What patterns (seasonality, trend) did you find?
+    *   **Methodology:** Why did you choose this model?
+    *   **Diagnostics:** Residual analysis.
+    *   **Evaluation:** Local cross-validation results.
+    *   **Improvement:** How did you handle the prediction intervals?
+
+# Rules & Tips
+
+1.  **Tools:** You may use any programming language (Python, R) and any library.
+2.  **External Data:** Use of external datasets (weather, holidays) is allowed but must be documented.
+3.  **Negative Values:** Energy consumption cannot be negative. Ensure your Lower Bound $\ge 0$.
+
+---
+
+# Assessment and Grading
+
+The final project contributes **32 points** to the total course grade. The grade is based on individual performance and consists of two main components: quantitative forecast accuracy (Model Performance) and qualitative analysis (Analytical Quality).
+
+1. **Model Performance (20 points):** This score is determined by the accuracy of the forecast on a hidden test set. Grading follows a **benchmark-based approach**:
+    *   **Baseline Threshold (15 points):** Awarded to any student whose model outperforms a standard baseline (e.g., Seasonal Naive method). This ensures that a scientifically sound model receives a high grade regardless of peer performance.
+    *   **Competitive Bonus (up to 5 points):** Additional points are awarded to the top-performing models that demonstrate significant accuracy improvements over the baseline.
+2. **Analytical Quality (12 points):** This component evaluates the depth of the research, the correctness of the methodology, code reproducibility, and the clarity of the final report.
+
+The final deliverables include:
+
+1. Submission CSV file (generated during the in-class session).
+2. A written report (Jupyter Notebook or PDF).
+3. Reproducible code (submitted via GitHub or archive).
+4. Presentation slides (summary of findings).
+
+**Criteria and Point Breakdown (Total: 32 points):**
+
+| Criteria | Points | Description |
+| :--- | :---: | :--- |
+| **Forecast Accuracy** | **20** | **Base (15 pts):** Beating the baseline benchmark (proving the model captures signal better than a naive approach).<br>**Bonus (5 pts):** Top-tier accuracy ranking relative to the class distribution (RMSE/MAPE/Winkler). |
+| **Methodology & Diagnostics** | **5** | Justification of model selection, correctness of cross-validation setup, residual analysis (ACF/PACF), and proper handling of seasonality. |
+| **EDA & Visualization** | **3** | Quality of data exploration, identification of key patterns (trends, cycles, anomalies), and clarity of graphical representation. |
+| **Code Quality** | **2** | Code structure, reproducibility (must run without errors), and readability (comments/documentation). |
+| **Report & Presentation** | **2** | Structure of the narrative, clarity of conclusions, and quality of presentation materials. |
+
+---
+
+### Appendix: Submission Template Generation (Python)
+
+You can use this snippet to generate your submission file structure:
+
+```{python}
+import pandas as pd
+
+future_index = pd.date_range(
+    start='2025-08-27 00:00:00',
+    periods=192, 
+    freq='15min'
+)
+
+submission = pd.DataFrame({
+    'Date': future_index.date,
+    'Time': future_index.time,
+    'Forecast': 0.0,   # Replace with your predictions
+    'Lower_95': 0.0,   # Replace with your lower bound
+    'Upper_95': 0.0    # Replace with your upper bound
+})
+
+submission.to_csv('SURNAME_submission.csv', index=False)
+```
