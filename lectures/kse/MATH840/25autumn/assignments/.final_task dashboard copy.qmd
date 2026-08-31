@@ -1,0 +1,533 @@
+---
+title: "MATH840: Final Results (Updated)"
+format: 
+  dashboard:
+    theme: [cosmo, style.css]
+logo: data/math840.png
+---
+
+<style>
+/* Стилі для відображення змін у таблиці */
+.diff-good { color: green; font-size: 0.85em; font-weight: bold; }
+.diff-bad { color: red; font-size: 0.85em; }
+.diff-neutral { color: gray; font-size: 0.85em; }
+</style>
+
+<style>
+/* Виправлення, щоб довга легенда не обрізалася */
+.legend .scrollbox {
+  clip-path: none !important;
+}
+</style>
+
+```{python}
+#| label: setup
+#| include: false
+
+import pandas as pd
+import numpy as np
+from pathlib import Path
+import plotly.graph_objects as go
+import plotly.express as px
+
+# --- CONFIGURATION ---
+INITIAL_DIR = Path('data/submissions/')
+FINAL_DIR = Path('data/final_submissions/') # Нова папка
+DEFAULT_TRUTH = 'data/ground_truth.csv'
+ALPHA = 0.05
+
+# Special cases logic
+SPECIAL_CASES = {
+    'MYKHAILOV_submission': 'data/ground_truth_MYKHAILOV.csv'
+}
+
+# --- METRIC FUNCTIONS ---
+def calculate_rmse(y_true, y_pred):
+    return np.sqrt(np.mean((y_true - y_pred)**2))
+
+def calculate_mape(y_true, y_pred):
+    mask = y_true != 0
+    return np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
+
+def calculate_winkler(y_true, lower, upper, alpha=0.05):
+    score = upper - lower
+    mask_low = y_true < lower
+    mask_up = y_true > upper
+    score[mask_low] += (2/alpha) * (lower[mask_low] - y_true[mask_low])
+    score[mask_up] += (2/alpha) * (y_true[mask_up] - upper[mask_up])
+    return np.mean(score)
+
+def load_data(filepath):
+    try:
+        df = pd.read_csv(filepath)
+        # Стандартна очистка дат
+        if 'Datetime' not in df.columns and 'Date' in df.columns and 'Time' in df.columns:
+            df['Datetime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'])
+        elif 'Datetime' in df.columns:
+            df['Datetime'] = pd.to_datetime(df['Datetime'])
+        return df.sort_values('Datetime').reset_index(drop=True)
+    except Exception as e:
+        print(f"Error loading {filepath}: {e}")
+        return pd.DataFrame()
+
+def process_submissions(directory_path):
+    """Обробляє всі файли в папці та повертає DataFrame з метриками"""
+    results = []
+    if not directory_path.exists():
+        print(f"Directory not found: {directory_path}")
+        return pd.DataFrame()
+        
+    files = list(directory_path.glob('*.csv'))
+    
+    for file in files:
+        raw_name = file.stem
+        
+        # Нормалізація імен
+        if 'SNAIVE' in raw_name.upper():
+            student_name = '----SNAIVE----'
+        else:
+            student_name = raw_name.replace('_', ' ').title()
+
+        try:
+            truth_path = SPECIAL_CASES.get(raw_name, DEFAULT_TRUTH)
+            df_sub = load_data(file)
+            df_true = load_data(truth_path)
+            
+            if df_sub.empty: continue
+
+            merged = pd.merge(df_true[['Datetime', 'Value']], df_sub, on='Datetime', how='inner', suffixes=('_true', '_pred'))
+            
+            if merged.empty: continue
+
+            # Перевірка довжини
+            is_partial = False
+            if len(merged) < len(df_true) * 0.99:
+                is_partial = True
+                
+            y_true = merged['Value'].values
+            y_pred = merged['Forecast'].values
+            
+            metrics = {
+                'RawName': raw_name, # Для пошуку файлів пізніше
+                'Name': student_name,
+                'IsPartial': is_partial,
+                'RMSE': calculate_rmse(y_true, y_pred),
+                'MAPE': calculate_mape(y_true, y_pred),
+                'Winkler': calculate_winkler(y_true, merged['Lower_95'].values, merged['Upper_95'].values, ALPHA)
+            }
+            results.append(metrics)
+        except Exception as e:
+            print(f"Error processing {student_name}: {e}")
+            
+    return pd.DataFrame(results)
+
+# --- EXECUTION ---
+
+# 1. Рахуємо метрики для обох раундів
+df_initial = process_submissions(INITIAL_DIR)
+df_final = process_submissions(FINAL_DIR)
+
+# Якщо студент не подав оновлення, беремо старий файл (опціонально)
+# Або якщо це SNAIVE, він може бути лише в одній папці
+# Тут припустимо, що final має містити всіх, або ми об'єднуємо їх.
+# Для коректного порівняння краще взяти df_final як базу.
+
+# Щоб не загубити SNAIVE, якщо його немає в новій папці:
+if not df_initial.empty and not df_final.empty:
+    # Зливаємо, пріоритет у final
+    df_combined = df_final.set_index('Name').combine_first(df_initial.set_index('Name')).reset_index()
+    
+    # Для розрахунку змін нам треба окремо merged
+    comparison = pd.merge(
+        df_combined, 
+        df_initial[['Name', 'RMSE', 'MAPE', 'Winkler', 'Score'] if 'Score' in df_initial else ['Name', 'RMSE', 'MAPE', 'Winkler']], 
+        on='Name', 
+        how='left', 
+        suffixes=('', '_old')
+    )
+else:
+    comparison = df_final.copy() if not df_final.empty else df_initial.copy()
+    for col in ['RMSE_old', 'MAPE_old', 'Winkler_old']:
+        comparison[col] = np.nan
+
+# 2. Розрахунок рангів для фінального результату
+for col in ['RMSE', 'MAPE', 'Winkler']:
+    comparison[f'Rank_{col}'] = comparison[col].rank(ascending=True)
+
+comparison['Score'] = (
+    0.3 * comparison['Rank_RMSE'] + 
+    0.3 * comparison['Rank_MAPE'] + 
+    0.4 * comparison['Rank_Winkler']
+)
+
+comparison = comparison.sort_values('Score')
+comparison['Numeric_Rank'] = range(1, len(comparison) + 1)
+
+# Розрахунок зміни рангу (якщо є старі дані)
+# Нам треба порахувати "старий" Score, щоб знати старий ранг
+if 'RMSE_old' in comparison.columns:
+    # Тимчасовий розрахунок старого рангу
+    old_ranks_df = df_initial.copy()
+    for col in ['RMSE', 'MAPE', 'Winkler']:
+        old_ranks_df[f'Rank_{col}'] = old_ranks_df[col].rank(ascending=True)
+    old_ranks_df['Old_Score'] = 0.3*old_ranks_df['Rank_RMSE'] + 0.3*old_ranks_df['Rank_MAPE'] + 0.4*old_ranks_df['Rank_Winkler']
+    old_ranks_df['Old_Rank_Num'] = old_ranks_df['Old_Score'].rank(ascending=True)
+    
+    comparison = pd.merge(comparison, old_ranks_df[['Name', 'Old_Rank_Num']], on='Name', how='left')
+    comparison['Rank_Change'] = comparison['Old_Rank_Num'] - comparison['Numeric_Rank'] # Позитивне значення = ріст
+else:
+    comparison['Rank_Change'] = 0
+
+# KPI Variables
+best_student = comparison.iloc[0]['Name']
+best_rmse = comparison.iloc[0]['RMSE']
+best_mape = comparison.iloc[0]['MAPE']
+best_winkler = comparison.iloc[0]['Winkler']
+
+# Функція для форматування зміни
+def format_change(row, metric):
+    current = row[metric]
+    old = row[f'{metric}_old']
+    
+    if pd.isna(old):
+        return f"{current:.2f}"
+    
+    delta = current - old
+    # Для помилок (RMSE, MAPE, Winkler) менше = краще.
+    # Тому якщо Delta < 0 (зменшилась), це добре (зелене).
+    
+    if abs(delta) < 0.001:
+        color_class = "diff-neutral"
+        sign = ""
+    elif delta < 0:
+        color_class = "diff-good"
+        sign = "" # Мінус вже буде в числі
+    else:
+        color_class = "diff-bad"
+        sign = "+"
+
+    # Для MAPE додаємо %
+    suffix = "%" if metric == 'MAPE' else ""
+    
+    return f'{current:.2f}{suffix} <span class="{color_class}">({sign}{delta:.2f})</span>'
+
+# Підготовка DataFrame для відображення
+display_df = comparison.copy()
+display_df['RMSE_Display'] = display_df.apply(lambda x: format_change(x, 'RMSE'), axis=1)
+display_df['MAPE_Display'] = display_df.apply(lambda x: format_change(x, 'MAPE'), axis=1)
+display_df['Winkler_Display'] = display_df.apply(lambda x: format_change(x, 'Winkler'), axis=1)
+
+# Додаємо Partial warning до імені
+display_df.loc[display_df['IsPartial'], 'Name'] = display_df.loc[display_df['IsPartial'], 'Name'] + " ⚠️(Partial)"
+
+```
+
+# Dashboard {scrolling="true"}
+
+## Row
+
+```{python}
+#| content: valuebox
+#| title: "Winner (Updated)"
+dict(
+  icon = "trophy",
+  color = "primary",
+  value = best_student
+)
+```
+
+```{python}
+#| content: valuebox
+#| title: "Best RMSE"
+dict(
+  icon = "graph-down",
+  color = "success",
+  value = f"{best_rmse:.2f}"
+)
+```
+
+```{python}
+#| content: valuebox
+#| title: "Best MAPE"
+dict(
+  icon = "percent",
+  color = "info",
+  value = f"{best_mape:.2f}%"
+)
+```
+
+```{python}
+#| content: valuebox
+#| title: "Best Winkler"
+dict(
+  icon = "shield-check",
+  color = "warning",
+  value = f"{best_winkler:.2f}"
+)
+```
+
+## Row
+
+### Column {width=40%}
+
+```{python}
+def add_medals(rank):
+    if rank == 1: return "🥇 1"
+    elif rank == 2: return "🥈 2"
+    elif rank == 3: return "🥉 3"
+    else: return str(int(rank))
+
+def add_rank_change_icon(change):
+    if pd.isna(change) or change == 0:
+        return "-"
+    elif change > 0:
+        return f"⬆️ {int(change)}"
+    else:
+        return f"⬇️ {int(abs(change))}"
+
+def highlight_rows(row):
+    styles = []
+    # SNAIVE logic
+    is_snaive = 'SNAIVE' in str(row['Name'])
+    
+    base_style = ''
+    if is_snaive:
+        base_style = 'background-color: #d1ecf1; color: #0c5460; font-weight: bold;'
+    
+    # Заповнюємо стиль для всіх колонок
+    return [base_style] * len(row)
+
+display_df['Rank_Label'] = display_df['Numeric_Rank'].apply(add_medals)
+display_df['Trend'] = display_df['Rank_Change'].apply(add_rank_change_icon)
+
+# Вибираємо колонки для відображення
+final_table = display_df[['Rank_Label', 'Trend', 'Name', 'RMSE_Display', 'MAPE_Display', 'Winkler_Display', 'Score']]
+
+(final_table.style
+ .apply(highlight_rows, axis=1)
+ .format({'Score': '{:.2f}'})
+ .hide(axis="index")
+ .set_properties(**{'text-align': 'left'})
+ .set_table_styles([
+    {'selector': 'th', 'props': [('text-align', 'left')]},
+ ])
+)
+```
+
+### Column {width=60%}
+
+```{python}
+def create_main_plot():
+    truth = load_data(DEFAULT_TRUTH)
+    # Беремо топ студентів з NEW лідерборду
+    top_students_names = comparison.nsmallest(19, 'Numeric_Rank')['Name'].values
+    
+    # Mapping for raw filenames to create paths
+    # Створюємо словник: Display Name -> Path to FINAL file
+    # Спочатку пробуємо знайти у FINAL_DIR, якщо ні - INITIAL
+    name_to_path = {}
+    
+    for _, row in comparison.iterrows():
+        # Спроба знайти файл
+        raw = row['RawName'] # це з того файлу, звідки прийшли дані
+        
+        # Шукаємо у фінальній папці
+        candidate = FINAL_DIR / f"{raw}.csv"
+        if not candidate.exists():
+            # Пробуємо знайти case-insensitive у final
+            found = False
+            for f in FINAL_DIR.glob("*.csv"):
+                if f.stem.lower() == raw.lower():
+                    candidate = f
+                    found = True
+                    break
+            if not found:
+                 # Fallback to initial
+                 candidate = INITIAL_DIR / f"{raw}.csv"
+        
+        name_to_path[row['Name']] = candidate
+
+    fig = go.Figure()
+
+    # Ground Truth
+    fig.add_trace(go.Scatter(
+        x=truth['Datetime'], 
+        y=truth['Value'], 
+        mode='lines', 
+        name='Ground Truth', 
+        line=dict(color='black', width=3),
+    ))
+
+    colors = px.colors.qualitative.Plotly
+    while len(colors) < len(top_students_names):
+        colors += px.colors.qualitative.Plotly
+
+    for i, name in enumerate(top_students_names):
+        try:
+            # Очищуємо ім'я від (Partial) для пошуку в словнику шляхів
+            # Але в name_to_path ключі - це вже display names (без partial suffix якщо ми його там не додали)
+            # В process_submissions ми додали suffix у Display DF, але в comparison 'Name' чисте?
+            # Ні, в comparison 'Name' чисте (без partial). В display_df ми додали суфікс.
+            # Тому top_students_names тут чисті (з comparison).
+            
+            clean_name = name # Це має бути ключ
+            
+            if clean_name not in name_to_path:
+                continue
+                
+            file_path = name_to_path[clean_name]
+            
+            if not file_path.exists():
+                continue
+
+            df = load_data(file_path)
+            
+            color = colors[i]
+            fill_color = f"rgba{tuple(int(color.lstrip('#')[j:j+2], 16) for j in (0, 2, 4)) + (0.1,)}"
+            
+            # Group name for legend interactivity
+            legend_group = f"group_{i}"
+            
+            # Forecast Line
+            fig.add_trace(go.Scatter(
+                x=df['Datetime'], y=df['Forecast'],
+                mode='lines',
+                line=dict(color=color, width=2),
+                name=name, 
+                legendgroup=legend_group,
+                showlegend=True 
+            ))
+            
+            # Confidence Interval (Upper) - invisible line
+            fig.add_trace(go.Scatter(
+                x=df['Datetime'], y=df['Upper_95'],
+                mode='lines',
+                line=dict(width=0),
+                showlegend=False,
+                hoverinfo='skip',
+                legendgroup=legend_group
+            ))
+            
+            # Confidence Interval (Lower) - fill to Upper
+            fig.add_trace(go.Scatter(
+                x=df['Datetime'], y=df['Lower_95'],
+                mode='lines',
+                line=dict(width=0),
+                fill='tonexty', 
+                fillcolor=fill_color,
+                showlegend=False,
+                hoverinfo='skip',
+                legendgroup=legend_group
+            ))
+
+        except Exception as e:
+            print(f"Could not plot {name}: {e}")
+
+    fig.update_layout(
+        title='Final Forecasts (Updated) vs Ground Truth', 
+        xaxis_title='Datetime', 
+        yaxis_title='Energy Consumption (kWh)',
+        hovermode="x unified",
+        template="plotly_white",
+        # 1. Повертаємо великий відступ справа, щоб легенда влазила фізично
+        margin=dict(r=150), 
+        legend=dict(
+            yanchor="top", 
+            y=1,
+            xanchor="left", 
+            x=1.02,
+            font=dict(size=10),
+            # 2. Повертаємо параметри, які запобігають стисканню
+            traceorder="normal",
+            itemwidth=30
+        )
+    )
+
+    return fig
+
+final_fig = create_main_plot()
+final_fig.show()
+```
+
+# About {orientation="columns" scrolling="false"}
+
+## Column {width=30%}
+
+### Row {height="25%"}
+
+#### Course Information
+
+**Course:** MATH840 Time Series | **KSE**
+
+::: {.callout-note icon="false"}
+- `----SNAIVE----` is the benchmark.  
+- **Green numbers** in brackets indicate improvement (reduction in error) vs previous submission.
+- **Red numbers** indicate worse performance.
+:::
+
+### Row {height="75%"}
+
+#### Metrics Explained
+
+**1. RMSE (30%)**
+Accuracy of point forecast.
+$$
+RMSE = \sqrt{\frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2}
+$$
+
+**2. MAPE (30%)**
+Relative accuracy percentage.
+$$
+MAPE = \frac{100\%}{n} \sum_{i=1}^{n} \left| \frac{y_i - \hat{y}_i}{y_i} \right|
+$$
+
+**3. Winkler Score (40%)**
+Penalty for wide intervals.
+$$
+S_i = \begin{cases} (U_i - L_i) & \text{if } L_i \le y_i \le U_i \\ (U_i - L_i) + \frac{2}{\alpha}(L_i - y_i) & \text{if } y_i < L_i \\ (U_i - L_i) + \frac{2}{\alpha}(y_i - U_i) & \text{if } y_i > U_i \end{cases}
+$$
+
+## Column {width=70%}
+
+```{python}
+#| title: "Efficiency: Accuracy vs Uncertainty"
+
+def create_efficiency_plot():
+    plot_df = comparison.copy()
+    plot_df['ShortName'] = plot_df['Name'].apply(lambda x: x.split()[0] if len(x.split()) > 0 else x)
+
+    fig = px.scatter(
+        plot_df, 
+        x='RMSE', 
+        y='Winkler',
+        size='Score', 
+        color='Score', 
+        text='ShortName',
+        hover_name='Name',
+        hover_data={'MAPE': ':.2f%', 'Score': ':.2f', 'ShortName': False},
+        color_continuous_scale='RdYlGn_r',
+    )
+
+    fig.update_traces(textposition='top center', marker=dict(size=15, line=dict(width=1, color='DarkSlateGrey')))
+    
+    fig.update_layout(
+        template='plotly_white',
+        xaxis_title="RMSE (Point Accuracy)",
+        yaxis_title="Winkler Score (Interval Width)",
+        margin=dict(t=20, l=20, r=20, b=20)
+    )
+
+    fig.add_vline(x=plot_df['RMSE'].mean(), line_dash="dash", line_color="grey")
+    fig.add_hline(y=plot_df['Winkler'].mean(), line_dash="dash", line_color="grey")
+    
+    # Arrow for improvement direction
+    fig.add_annotation(
+        x=plot_df['RMSE'].min(), y=plot_df['Winkler'].min(),
+        text="🏆 Best Region", showarrow=False, yshift=-20,
+        font=dict(color="green", weight="bold")
+    )
+
+    return fig
+
+create_efficiency_plot().show()
+```
