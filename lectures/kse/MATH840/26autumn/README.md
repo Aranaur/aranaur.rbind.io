@@ -10,6 +10,8 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 1 — Introduction to Forecasting & Time Series Graphics | <https://01a05924-a704-8747-1dda-9917ad1a3d63.share.connect.posit.cloud> |
 | Week 2 — Time Series Decomposition | <https://01a0784c-f128-848e-7cc4-a140ab0a2965.share.connect.posit.cloud> |
 | Week 1 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab01.ipynb) |
+| Week 2 — lab handout | <https://01a07874-b74d-873c-a106-e68a78304698.share.connect.posit.cloud> |
+| Week 2 — worked example (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab02_worked_example.ipynb) |
 | Week 2 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab02.ipynb) |
 | Moodle | <https://teaching.kse.org.ua/course/view.php?id=4432> |
 
@@ -41,6 +43,7 @@ export RSCONNECT_LIB=/path/to/r/library   # a library containing rsconnect >= 1.
 cd lectures/kse/MATH840/26autumn/infra
 python publish_deck.py .00            # update the syllabus deck
 python publish_deck.py .01 --render   # re-render the lecture, then update it
+python publish_deck.py .lab02 --dir labs   # lab handouts live in labs/, rendered to html
 ```
 
 The URL never changes between deployments: `infra/rsconnect-records/` holds the

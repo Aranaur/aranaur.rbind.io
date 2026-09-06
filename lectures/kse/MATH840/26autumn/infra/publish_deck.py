@@ -10,8 +10,9 @@ Two things the bundle needs fixing for:
 So the staging copy renames the deck to `index.html` and rewrites those references.
 
 Usage:
-    python publish_deck.py .00                # publish/update the syllabus deck
-    python publish_deck.py .01 --render       # re-render first, then publish
+    python publish_deck.py .00                     # publish/update the syllabus deck
+    python publish_deck.py .01 --render            # re-render first, then publish
+    python publish_deck.py .lab02 --dir labs       # publish a lab handout
 
 Credentials come from the environment (never commit them):
     POSIT_CC_CLIENT_ID, POSIT_CC_CLIENT_SECRET, POSIT_CC_ACCOUNT
@@ -31,7 +32,6 @@ import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SLIDES = HERE.parent / "slides"
 RECORD = HERE / "published.json"
 
 RSCRIPT = os.environ.get("RSCRIPT", r"C:\Program Files\R\R-4.5.2\bin\Rscript.exe")
@@ -74,10 +74,10 @@ cat("DEPLOY_ID=", d$appId[nrow(d)], "\n", sep = "")
 """
 
 
-def stage(stem: str, out: Path) -> None:
-    """Copy the rendered deck into `out` under names rsconnect will actually bundle."""
-    html_src = SLIDES / f"{stem}.html"
-    files_src = SLIDES / f"{stem}_files"
+def stage(src: Path, stem: str, out: Path) -> None:
+    """Copy the rendered document into `out` under names rsconnect will actually bundle."""
+    html_src = src / f"{stem}.html"
+    files_src = src / f"{stem}_files"
     if not html_src.exists():
         sys.exit(f"{html_src} not found - render the deck first (--render)")
 
@@ -85,8 +85,8 @@ def stage(stem: str, out: Path) -> None:
     (out / "index.html").write_text(html, encoding="utf-8")
     shutil.copytree(files_src, out / "index_files")
     for side in SIDECARS:
-        if (SLIDES / side).is_dir():
-            shutil.copytree(SLIDES / side, out / side)
+        if (src / side).is_dir():
+            shutil.copytree(src / side, out / side)
 
     refs = {
         r.split("?")[0].replace("%20", " ")
@@ -104,7 +104,8 @@ def stage(stem: str, out: Path) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("stem", help="deck stem, e.g. .00 or .01")
+    ap.add_argument("stem", help="document stem, e.g. .00, .01 or .lab02")
+    ap.add_argument("--dir", default="slides", help="source directory (default: slides)")
     ap.add_argument("--render", action="store_true", help="re-render the deck first")
     ap.add_argument("--name", help="Connect Cloud content name (defaults to the record)")
     ap.add_argument("--title", help="Connect Cloud content title")
@@ -119,10 +120,13 @@ def main() -> None:
     name = args.name or entry.get("name") or f"math840{args.stem.replace('.', '-')}"
     title = args.title or entry.get("title") or name
 
+    src = HERE.parent / args.dir
+    fmt = "revealjs" if args.dir == "slides" else "html"
+
     if args.render:
         subprocess.run(
-            ["quarto", "render", f"{args.stem}.qmd", "--to", "revealjs", "--no-execute-daemon"],
-            cwd=SLIDES, check=True, shell=(os.name == "nt"),
+            ["quarto", "render", f"{args.stem}.qmd", "--to", fmt, "--no-execute-daemon"],
+            cwd=src, check=True, shell=(os.name == "nt"),
         )
 
     # rsconnect tracks "which content did this directory become" next to the sources it
@@ -134,7 +138,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / name
         out.mkdir()
-        stage(args.stem, out)
+        stage(src, args.stem, out)
 
         env = {**os.environ, "RSCONNECT_LIB": RLIB}
         script = Path(tmp) / "deploy.R"
