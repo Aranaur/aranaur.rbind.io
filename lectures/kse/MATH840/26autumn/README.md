@@ -8,13 +8,14 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 |---|---|
 | Week 1 — course syllabus deck | <https://01a05923-e02d-f78b-e75e-cec44127fc5d.share.connect.posit.cloud> |
 | Week 1 — Introduction to Forecasting & Time Series Graphics | <https://01a05924-a704-8747-1dda-9917ad1a3d63.share.connect.posit.cloud> |
+| Week 2 — Time Series Decomposition | <https://01a0784c-f128-848e-7cc4-a140ab0a2965.share.connect.posit.cloud> |
 | Week 1 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab01.ipynb) |
 | Moodle | <https://teaching.kse.org.ua/course/view.php?id=4432> |
 
 ## Layout
 
 ```
-slides/   .00 syllabus, .01 lecture 1 (dot-prefixed: not rendered into the site)
+slides/   .00 syllabus, .01 week 1, .02 week 2 (dot-prefixed: not rendered into the site)
 labs/     .lab01.qmd handout, _lab01.ipynb Colab notebook
 data/     datasets served to students over raw.githubusercontent.com
 infra/    publishing, and later the Track B series pool and scorer
@@ -51,8 +52,23 @@ Credentials are read from the environment and are never stored in this repositor
 
 ## Environment note
 
-Rendering the decks needs `statsforecast`, which pins `pandas < 3`, while the project's
-`pyproject.toml` asks for `pandas >= 3.0.2`. The working environment currently has
-pandas 2.3.3 and renders correctly. **Running `uv sync` will restore pandas 3.0.2 and
-remove statsforecast, duckdb, plotly and seaborn**, after which the lecture no longer
-renders. Resolve the pin before running it.
+The decks need more than `pyproject.toml` declares: `statsforecast`, `utilsforecast`,
+`statsmodels`, `scipy`, `scikit-learn`, `duckdb`, `plotly`, `seaborn`, `tsfeatures`,
+`great_tables` and `fpppy`. They are installed in `.venv` but not recorded as project
+dependencies, so **`uv sync` removes them** and the decks stop rendering. Reinstall with
+`uv pip install --link-mode=copy <packages>` if that happens.
+
+Pandas is 3.0.5, which satisfies the `>= 3.0.2` pin. Pandas 3 dropped the legacy
+frequency aliases, so use `QE`/`QS`, `ME`/`MS`, `YE`/`YS` and lowercase `h` in any new
+material — a bare `Q` or `M` now raises instead of warning.
+
+## Slide numbering
+
+Weeks are offset by one against the 2025/26 decks, because Week 1 merged last year's
+`.01` and `.02` into a single deck:
+
+| Week | 26autumn | 25autumn source |
+|---|---|---|
+| 1 | `.01` | `.01` + `.02` |
+| 2 | `.02` | `.03` |
+| 3 | `.03` | `.04` |
