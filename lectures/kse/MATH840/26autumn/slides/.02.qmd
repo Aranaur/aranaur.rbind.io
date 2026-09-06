@@ -1134,48 +1134,28 @@ ani.save("img/stl_trend_animation.gif", writer=writer)
 
 # What decomposition buys you {background-iframe="colored-particles/index.html"}
 
-## Last week, four lines of code placed 5th {.smaller}
+## Every benchmark is a claim about components {.smaller}
 
-Recall the leaderboard from the 2025/26 final project: a **seasonal naive** forecast of
-half-hourly electricity demand finished 5th out of 19, ahead of fourteen people with a
-trimester of modelling behind them.
-
-::: {.fragment}
-Now you can say *why* in one sentence.
-
-Electricity demand is dominated by a **large, stable seasonal component** — the daily and
-weekly rhythm barely changes from one week to the next — while the trend moves slowly
-relative to a 48-hour horizon.
-:::
-
-::: {.fragment}
-Seasonal naive copies exactly that component forward. It captures the dominant structure
-of the series for free. [Whatever you build has to beat the dominant component, not the
-series.]{.hi}
-:::
-
-## What each simple method assumes {.smaller}
-
-Every benchmark is a claim about which components matter. Decomposition is how you check
-the claim before you spend an hour modelling.
+Last year a seasonal naive forecast placed 5th of 19 in the final project. Now you can say
+why in one sentence: electricity demand is dominated by a **large, stable seasonal
+component**, and seasonal naive copies exactly that component forward.
 
 | Method | Implicit claim about the components |
 |---|---|
-| **Mean** | No trend, no seasonality. The level is constant and everything else is noise. |
-| **Naive** | The trend is a random walk; there is no seasonality worth carrying forward. |
+| **Mean** | No trend, no seasonality. The level is constant, the rest is noise. |
+| **Naive** | The trend is a random walk; no seasonality worth carrying forward. |
 | **Drift** | The trend is roughly linear and continues; seasonality is negligible. |
-| **Seasonal naive** | The seasonal component is stable and dominates; the trend moves slowly over the horizon. |
+| **Seasonal naive** | Seasonality is stable and dominates; the trend moves slowly over the horizon. |
 
 ::: {.fragment}
-So "which benchmark will be hard to beat?" is not a question about forecasting. It is a
-question about **which component carries the variance** — and that is exactly what an STL
-decomposition tells you.
+So *"which benchmark will be hard to beat?"* is not a forecasting question. It asks
+**which component carries the variance** — which is what a decomposition tells you.
 :::
 
-## Measuring how strong a component is {.smaller}
+## Strength of trend and seasonality {.smaller}
 
-STL splits $y_t = T_t + S_t + R_t$. If a component is strong, removing it leaves much less
-variance than keeping it:
+STL splits $y_t = T_t + S_t + R_t$. A component is strong when removing it leaves much
+less variance than keeping it:
 
 $$
 F_T = \max\left(0,\; 1 - \frac{\operatorname{Var}(R_t)}{\operatorname{Var}(T_t + R_t)}\right)
@@ -1183,42 +1163,23 @@ F_T = \max\left(0,\; 1 - \frac{\operatorname{Var}(R_t)}{\operatorname{Var}(T_t +
 F_S = \max\left(0,\; 1 - \frac{\operatorname{Var}(R_t)}{\operatorname{Var}(S_t + R_t)}\right)
 $$
 
-::: {.incremental}
-- Both live in $[0, 1]$.
-- $F_T$ near 1: the trend explains almost everything the remainder does not.
-- $F_S$ near 0: the "seasonal" component is indistinguishable from noise — there is no
-  seasonality to copy forward.
-- These two numbers summarise a decomposition in a form you can compare across series.
-:::
+- Both live in $[0, 1]$. $F_S$ near 0 means the "seasonal" component is indistinguishable
+  from noise — there is nothing to copy forward.
+- Two numbers that summarise a decomposition, comparable across series.
+- Chapter 4 material, borrowed a week early because it answers a question we already have.
 
-::: {.fragment}
-This pair belongs to Chapter 4 (features), one chapter ahead of us. We borrow it now
-because it answers a question we already have.
-:::
+## Tested on 204 real series {.smaller}
 
-## An experiment on 204 real series {.smaller}
-
-Take every series in three collections you have already met — Australian retail turnover,
-Australian domestic tourism, US employment by sector. For each one:
-
-::: {.incremental}
-1. hold out the last year (12 months, or 8 quarters);
-2. decompose the **training part** with STL and record $F_T$ and $F_S$;
-3. run all four simple methods and record which one wins on the holdout.
-:::
-
-::: {.fragment}
-No modelling, no tuning. The question is only whether the components tell you in advance
-which benchmark you are up against.
-:::
-
-## The experiment in code {.smaller}
+Every series in three collections you have met — retail turnover, domestic tourism, US
+employment. Hold out the last year, decompose the training part, run all four simple
+methods, record the winner.
 
 ```{python}
 #| echo: true
 #| code-fold: true
 #| code-summary: "Code"
 #| label: benchmark-experiment
+#| output: false
 
 import numpy as np
 import pandas as pd
@@ -1269,11 +1230,7 @@ for _, g in jobs.groupby("unique_id"):
     evaluate(g.sort_values("ds")["y"].to_numpy(), m=12, h=12)
 
 experiment = pd.DataFrame(results)
-print(f"series evaluated: {len(experiment)}")
-print(experiment["winner"].value_counts().to_string())
 ```
-
-## The result {.smaller}
 
 ```{python}
 #| echo: true
@@ -1286,67 +1243,35 @@ import matplotlib.pyplot as plt
 
 palette = {"snaive": red_pink, "drift": turquoise, "naive": orange, "mean": purple}
 
-fig, ax = plt.subplots(figsize=(11, 4.6))
+fig, ax = plt.subplots(figsize=(11, 3.6))
 for name, g in experiment.groupby("winner"):
-    ax.scatter(g["F_S"], g["F_T"], s=26, alpha=0.75,
+    ax.scatter(g["F_S"], g["F_T"], s=22, alpha=0.75,
                color=palette[name], label=f"{name} ({len(g)})")
 ax.axvline(0.6, ls="--", color="grey", lw=1)
 ax.set_xlabel("strength of seasonality $F_S$")
 ax.set_ylabel("strength of trend $F_T$")
-ax.legend(title="best simple method", loc="lower left")
+ax.legend(title="best simple method", loc="lower left", fontsize=8)
 ax.grid(alpha=0.3)
 plt.show()
 ```
 
-## Read the picture {.smaller}
+Right of the line ($F_S \geq 0.6$) seasonal naive wins **92%** of the time; left of it,
+**64%**. [Seasonality is the exploitable structure; trend is nearly universal.]{.hi} And
+because the bar swings that much, your benchmark is the **best of the four** on a
+validation window — fixing it to seasonal naive would be an unfairly hard bar on some
+series and an unfairly soft one on others.
 
-::: {.incremental}
-- **Right of the dashed line** ($F_S \geq 0.6$): seasonal naive wins **92%** of the time.
-  When seasonality is strong, copying last season forward is close to unbeatable among
-  simple methods.
-- **Left of it** ($F_S < 0.6$): seasonal naive still wins 64%, but drift, naive and mean
-  take the remaining third.
-- $F_T$ alone separates almost nothing — nearly every real series here has a strong trend.
-  [Seasonality is the exploitable structure; trend is nearly universal.]{.hi}
-:::
+## In the practice session {.smaller}
 
-::: {.fragment}
-Note what this is not: a rule that tells you the winner. It is a **prior**. Out of 204
-series, the components pointed the wrong way often enough that guessing would cost you.
-:::
+Today's lab is the first graded one. On your own series:
 
-## Why your benchmark is the best of four {.smaller}
-
-This is why the course does not fix the benchmark to seasonal naive:
-
-::: {.incremental}
-- On a strongly seasonal series, seasonal naive would be an [unfairly hard]{.hi} bar —
-  it already captures the dominant component.
-- On a weakly seasonal one it would be an [unfairly soft]{.hi} bar — it copies noise
-  forward, and almost anything beats it.
-- Selecting the best of the four on a validation window makes the bar mean the same thing
-  on every student's series, which is the only way the same 3 points can be fair across 39
-  different datasets.
-:::
-
-## What you do with this in the practice session {.smaller}
-
-Today's lab is the first graded one. On your own series you will:
-
-::: {.incremental}
 1. stabilise the variance if it needs it, and say why;
 2. decompose it — classical and STL — and read the components;
 3. report $F_T$ and $F_S$;
-4. **commit to a prediction**: which of the four simple methods will be hardest to beat on
-   your series, and on what evidence.
-:::
+4. **commit to a prediction**: which simple method will be hardest to beat, on what evidence.
 
-::: {.fragment}
-Next week you will actually run them and find out whether you were right. The prediction is
-marked on the reasoning, not on being correct.
-:::
-
-
+Next week you run them and find out. The prediction is marked on the reasoning, not on
+being right.
 
 # Questions? {.unnumbered .unlisted background-iframe="colored-particles/index.html"}
 
