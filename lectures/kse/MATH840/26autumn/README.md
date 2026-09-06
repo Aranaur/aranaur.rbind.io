@@ -10,13 +10,14 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 1 — Introduction to Forecasting & Time Series Graphics | <https://01a05924-a704-8747-1dda-9917ad1a3d63.share.connect.posit.cloud> |
 | Week 2 — Time Series Decomposition | <https://01a0784c-f128-848e-7cc4-a140ab0a2965.share.connect.posit.cloud> |
 | Week 1 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab01.ipynb) |
+| Week 2 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab02.ipynb) |
 | Moodle | <https://teaching.kse.org.ua/course/view.php?id=4432> |
 
 ## Layout
 
 ```
 slides/   .00 syllabus, .01 week 1, .02 week 2 (dot-prefixed: not rendered into the site)
-labs/     .lab01.qmd handout, _lab01.ipynb Colab notebook
+labs/     .labNN.qmd handouts, _labNN.ipynb Colab notebooks
 data/     datasets served to students over raw.githubusercontent.com
 infra/    publishing, and later the Track B series pool and scorer
 project/  final project (Week 10)
