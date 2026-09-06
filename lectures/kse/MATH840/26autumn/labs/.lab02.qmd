@@ -99,6 +99,26 @@ Load your series and put it on a regular time grid.
 
 You did all of this in Week 1. It should take ten minutes.
 
+::: {.callout-warning collapse="false"}
+## ⚠️ Where this goes wrong: the frequency string
+
+- `"W"` does not mean "weekly". It means *week ending Sunday*. If your timestamps are
+  Mondays, a grid built with `"W"` lines up with nothing and your series comes back empty.
+  Use the anchored form, `"W-MON"` — which is what `spec["freq"]` already gives you.
+- pandas 3 removed the bare `"M"`, `"Q"`, `"Y"` and `"H"` aliases. Use `"MS"`/`"ME"`,
+  `"QS"`/`"QE"`, `"YS"`/`"YE"` and lowercase `"h"`. A bare `"Q"` now raises rather than warns.
+- `"MS"` is month **start**, `"ME"` is month **end**. Pick the one your timestamps already
+  use, or every row misses the grid by a few days.
+
+After building a grid, check that you did not lose everything:
+`s["y"].notna().sum()` should be close to the number of rows you started with.
+
+📖 [offset aliases](https://pandas.pydata.org/docs/user_guide/timeseries.html#offset-aliases) · [anchored offsets](https://pandas.pydata.org/docs/user_guide/timeseries.html#anchored-offsets) ·
+[`date_range`](https://pandas.pydata.org/docs/reference/api/pandas.date_range.html) · [`reindex`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reindex.html) ·
+[`duplicated`](https://pandas.pydata.org/docs/reference/api/pandas.Series.duplicated.html) · [`interpolate`](https://pandas.pydata.org/docs/reference/api/pandas.Series.interpolate.html)
+:::
+
+
 ## 📊 Section 2 — EDA and visualisation (4 points)
 
 This is the heaviest section. Four plots and two decompositions, each with a sentence
@@ -106,6 +126,19 @@ saying what you see — a plot with no reading attached earns nothing.
 
 **Graphics.** Time plot, seasonal plot, seasonal subseries plot, ACF. Name the patterns:
 trend, seasonality, cycles, level shifts, outliers.
+
+::: {.callout-warning collapse="false"}
+## ⚠️ Where this goes wrong
+
+- `plot_acf` raises once `lags` reaches the length of the series. Keep it well below —
+  `lags=min(40, len(y) // 3)` is a safe default, and for weekly data you want at least
+  `lags=60` to see the annual spike.
+- Plot the ACF of the series **with missing values removed**; `plot_acf` will not handle
+  `NaN` for you.
+
+📖 [`plot_acf`](https://www.statsmodels.org/stable/generated/statsmodels.graphics.tsaplots.plot_acf.html)
+:::
+
 
 **Variance.** Does the size of the seasonal swing grow with the level of the series? If it
 does, the additive decompositions below are the wrong model for it.
@@ -115,6 +148,11 @@ does, the additive decompositions below are the wrong model for it.
 - **Decide** whether to work transformed or untransformed, and justify the decision in a
   sentence. A defensible "no transformation needed" is worth full marks; an unexplained
   transformation is not.
+
+📖 [`boxcox` / `boxcox_lambda`](https://nixtlaverse.nixtla.io/coreforecast/) · [`scipy.stats.boxcox`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.boxcox.html, an
+alternative that returns the transform and λ together) · [FPP 3.1 transformations](https://otexts.com/fpp3/transformations.html) ·
+[FPP the Pythonic Way, ch. 3](https://otexts.com/fpppy/nbs/03-decomposition.html)
+
 
 ::: {.callout-warning}
 ## If your series contains zeros
@@ -135,6 +173,23 @@ of judgement the point is for.
 
 Then compare them. Where do they disagree, and which do you trust more on this series?
 
+::: {.callout-warning collapse="false"}
+## ⚠️ Where this goes wrong
+
+- `seasonal_decompose` returns `NaN` for the first and last `period / 2` observations —
+  six months at each end of a monthly series. That is the centred moving average, not a
+  bug, and it is one of the differences you are asked to comment on.
+- `model="multiplicative"` refuses zeros and negative values outright.
+- `STL(...)` needs `seasonal` to be an **odd** integer ≥ 3, and it must be an `int`, not a
+  float. `robust=True` costs a little accuracy and buys resistance to outliers.
+- Both need `period` — the number of observations in one cycle, which is `mine["season"]`,
+  not the number of years.
+
+📖 [`seasonal_decompose`](https://www.statsmodels.org/stable/generated/statsmodels.tsa.seasonal.seasonal_decompose.html) · [`STL`](https://www.statsmodels.org/stable/generated/statsmodels.tsa.seasonal.STL.html) ·
+[FPP 3.4 classical decomposition](https://otexts.com/fpp3/classical-decomposition.html) · [FPP 3.6 STL](https://otexts.com/fpp3/stl.html)
+:::
+
+
 ::: {.callout-note}
 ## What "reading the components" means
 
@@ -154,6 +209,13 @@ F_S = \max\left(0,\; 1 - \frac{\operatorname{Var}(R_t)}{\operatorname{Var}(S_t +
 $$
 
 Report both, rounded to two decimals.
+
+📖 [FPP 4.3 — where $F_T$ and $F_S$ come from](https://otexts.com/fpp3/stlfeatures.html)
+
+Both come out of a **fitted** STL object: `fit.trend`, `fit.seasonal`, `fit.resid`. If you
+get a value outside $[0, 1]$, you have almost certainly passed the STL object instead of
+the result of `.fit()`.
+
 
 **Seasonally adjusted series.** Produce and plot it. Say what it is useful for and what it
 hides.

@@ -281,17 +281,60 @@ Warning
 <li>State the frequency, the span, and how many complete seasonal cycles you have.</li>
 </ul>
 <p>You did all of this in Week 1. It should take ten minutes.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-5-contents" aria-controls="callout-5" aria-expanded="true" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>⚠️ Where this goes wrong: the frequency string
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-5" class="callout-5-contents callout-collapse collapse show">
+<div class="callout-body-container callout-body">
+<ul>
+<li><code>"W"</code> does not mean “weekly”. It means <em>week ending Sunday</em>. If your timestamps are Mondays, a grid built with <code>"W"</code> lines up with nothing and your series comes back empty. Use the anchored form, <code>"W-MON"</code> — which is what <code>spec["freq"]</code> already gives you.</li>
+<li>pandas 3 removed the bare <code>"M"</code>, <code>"Q"</code>, <code>"Y"</code> and <code>"H"</code> aliases. Use <code>"MS"</code>/<code>"ME"</code>, <code>"QS"</code>/<code>"QE"</code>, <code>"YS"</code>/<code>"YE"</code> and lowercase <code>"h"</code>. A bare <code>"Q"</code> now raises rather than warns.</li>
+<li><code>"MS"</code> is month <strong>start</strong>, <code>"ME"</code> is month <strong>end</strong>. Pick the one your timestamps already use, or every row misses the grid by a few days.</li>
+</ul>
+<p>After building a grid, check that you did not lose everything: <code>s["y"].notna().sum()</code> should be close to the number of rows you started with.</p>
+<p>📖 <a href="https://pandas.pydata.org/docs/user_guide/timeseries.html#offset-aliases">offset aliases</a> · <a href="https://pandas.pydata.org/docs/user_guide/timeseries.html#anchored-offsets">anchored offsets</a> · <a href="https://pandas.pydata.org/docs/reference/api/pandas.date_range.html"><code>date_range</code></a> · <a href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reindex.html"><code>reindex</code></a> · <a href="https://pandas.pydata.org/docs/reference/api/pandas.Series.duplicated.html"><code>duplicated</code></a> · <a href="https://pandas.pydata.org/docs/reference/api/pandas.Series.interpolate.html"><code>interpolate</code></a></p>
+</div>
+</div>
+</div>
 </section>
 <section id="section-2-eda-and-visualisation-4-points" class="level2">
 <h2 class="anchored" data-anchor-id="section-2-eda-and-visualisation-4-points">📊 Section 2 — EDA and visualisation (4 points)</h2>
 <p>This is the heaviest section. Four plots and two decompositions, each with a sentence saying what you see — a plot with no reading attached earns nothing.</p>
 <p><strong>Graphics.</strong> Time plot, seasonal plot, seasonal subseries plot, ACF. Name the patterns: trend, seasonality, cycles, level shifts, outliers.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-6-contents" aria-controls="callout-6" aria-expanded="true" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>⚠️ Where this goes wrong
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-6" class="callout-6-contents callout-collapse collapse show">
+<div class="callout-body-container callout-body">
+<ul>
+<li><code>plot_acf</code> raises once <code>lags</code> reaches the length of the series. Keep it well below — <code>lags=min(40, len(y) // 3)</code> is a safe default, and for weekly data you want at least <code>lags=60</code> to see the annual spike.</li>
+<li>Plot the ACF of the series <strong>with missing values removed</strong>; <code>plot_acf</code> will not handle <code>NaN</code> for you.</li>
+</ul>
+<p>📖 <a href="https://www.statsmodels.org/stable/generated/statsmodels.graphics.tsaplots.plot_acf.html"><code>plot_acf</code></a></p>
+</div>
+</div>
+</div>
 <p><strong>Variance.</strong> Does the size of the seasonal swing grow with the level of the series? If it does, the additive decompositions below are the wrong model for it.</p>
 <ul>
 <li>Estimate a Box-Cox <span class="math inline">\(\lambda\)</span> (<code>boxcox_lambda</code> from <code>coreforecast</code>, as in the lecture).</li>
 <li>Plot the transformed series next to the original.</li>
 <li><strong>Decide</strong> whether to work transformed or untransformed, and justify the decision in a sentence. A defensible “no transformation needed” is worth full marks; an unexplained transformation is not.</li>
 </ul>
+<p>📖 <a href="https://nixtlaverse.nixtla.io/coreforecast/"><code>boxcox</code> / <code>boxcox_lambda</code></a> · <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.boxcox.html,%20an%20alternative%20that%20returns%20the%20transform%20and%20λ%20together"><code>scipy.stats.boxcox</code></a> · <a href="https://otexts.com/fpp3/transformations.html">FPP 3.1 transformations</a> · <a href="https://otexts.com/fpppy/nbs/03-decomposition.html">FPP the Pythonic Way, ch.&nbsp;3</a></p>
 <div class="callout callout-style-default callout-warning callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -312,6 +355,28 @@ Warning
 <li>STL (<code>STL</code>), with a stated choice of <code>seasonal</code> and <code>robust</code>.</li>
 </ul>
 <p>Then compare them. Where do they disagree, and which do you trust more on this series?</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-8-contents" aria-controls="callout-8" aria-expanded="true" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>⚠️ Where this goes wrong
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-8" class="callout-8-contents callout-collapse collapse show">
+<div class="callout-body-container callout-body">
+<ul>
+<li><code>seasonal_decompose</code> returns <code>NaN</code> for the first and last <code>period / 2</code> observations — six months at each end of a monthly series. That is the centred moving average, not a bug, and it is one of the differences you are asked to comment on.</li>
+<li><code>model="multiplicative"</code> refuses zeros and negative values outright.</li>
+<li><code>STL(...)</code> needs <code>seasonal</code> to be an <strong>odd</strong> integer ≥ 3, and it must be an <code>int</code>, not a float. <code>robust=True</code> costs a little accuracy and buys resistance to outliers.</li>
+<li>Both need <code>period</code> — the number of observations in one cycle, which is <code>mine["season"]</code>, not the number of years.</li>
+</ul>
+<p>📖 <a href="https://www.statsmodels.org/stable/generated/statsmodels.tsa.seasonal.seasonal_decompose.html"><code>seasonal_decompose</code></a> · <a href="https://www.statsmodels.org/stable/generated/statsmodels.tsa.seasonal.STL.html"><code>STL</code></a> · <a href="https://otexts.com/fpp3/classical-decomposition.html">FPP 3.4 classical decomposition</a> · <a href="https://otexts.com/fpp3/stl.html">FPP 3.6 STL</a></p>
+</div>
+</div>
+</div>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -335,6 +400,8 @@ F_T = \max\left(0,\; 1 - \frac{\operatorname{Var}(R_t)}{\operatorname{Var}(T_t +
 F_S = \max\left(0,\; 1 - \frac{\operatorname{Var}(R_t)}{\operatorname{Var}(S_t + R_t)}\right)
 \]</span></p>
 <p>Report both, rounded to two decimals.</p>
+<p>📖 <a href="https://otexts.com/fpp3/stlfeatures.html">FPP 4.3 — where <span class="math inline">\(F_T\)</span> and <span class="math inline">\(F_S\)</span> come from</a></p>
+<p>Both come out of a <strong>fitted</strong> STL object: <code>fit.trend</code>, <code>fit.seasonal</code>, <code>fit.resid</code>. If you get a value outside <span class="math inline">\([0, 1]\)</span>, you have almost certainly passed the STL object instead of the result of <code>.fit()</code>.</p>
 <p><strong>Seasonally adjusted series.</strong> Produce and plot it. Say what it is useful for and what it hides.</p>
 <p><strong>Your prediction.</strong> Of the four simple methods — mean, naive, drift, seasonal naive — which will be <strong>hardest to beat</strong> on your series?</p>
 <p>Set <code>PREDICTION</code> to one of <code>"mean"</code>, <code>"naive"</code>, <code>"drift"</code>, <code>"snaive"</code>, and argue for it in three or four sentences using <span class="math inline">\(F_T\)</span>, <span class="math inline">\(F_S\)</span> and what you saw in the decomposition.</p>
