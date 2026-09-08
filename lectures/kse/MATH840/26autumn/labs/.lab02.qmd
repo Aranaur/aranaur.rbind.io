@@ -1,5 +1,5 @@
 ---
-title: "Lab 2: Decomposing your series"
+title: "Lab 2: Reading a series, and the bar it sets"
 subtitle: "MATH840 | Time Series | Week 2 — graded assignment 1 of 7"
 author: "Ihor Miroshnychenko"
 institute: Kyiv School of Economics
@@ -25,30 +25,31 @@ editor_options:
 Click **Copy to Drive** before you start working, otherwise nothing you write is saved.
 :::
 
-::: {.callout-note appearance="simple"}
-## Want to see it done first?
+::: {.callout-important}
+## This lab is on last week's lecture, not today's
 
-[Worked example](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab02_worked_example.ipynb)
-— the whole assignment, start to finish, on Queensland clothing retailing. That series is
-drawn from `aus_retail`, which is **not** in the pool your own series comes from, so it
-demonstrates the method without handing you any of your answers.
+From now on the practice session runs one week behind the lecture. Everything you need
+today was covered in [Week 1](https://01a05924-a704-8747-1dda-9917ad1a3d63.share.connect.posit.cloud) and has been published since — so missing a
+lecture no longer costs you the lab that follows it, and you have a week to prepare
+rather than ninety minutes.
+
+Today's lecture on decomposition is next week's lab.
 :::
 
 ## 🎯 The task
 
-You have a series. This week you find out **what is in it**, and then you commit to a claim
-about it.
+You have a series. Today you look at it properly, commit to a claim about it, and then
+find out what the claim was worth.
 
-Concretely: stabilise its variance if it needs it, decompose it two ways, quantify how
-strong its trend and seasonality are, and predict which of the four simple methods will be
-hardest to beat on it. Next week you run those methods and find out whether you were right.
+The claim: of the four simple methods from Week 1 — mean, naive, drift, seasonal naive —
+**which will be hardest to beat on your series?** You answer from the graphics, before you
+run anything. Then you run all four and see.
 
 ::: {.callout-important}
 ## This one counts
 
 8 points, produced and submitted **within the session**. Deadline is the end of the
-practice slot; there is no homework phase. Work is marked afterwards and returned before
-the next practice session.
+practice slot. Work is marked afterwards and returned before the next practice session.
 :::
 
 ## 📋 What you are marked on
@@ -61,17 +62,17 @@ the next practice session.
 | 4 | Code quality and reproducibility | 1 |
 | | **Total** | **8** |
 
-The notebook has one section per row. **Keep those headings.** They are how the work is
-marked, and a report that reorders or drops them is slower to read and scores worse for it.
+The notebook has one section per row. **Keep those headings** — they are how the work is
+marked.
 
 ## 🗂 Your series
 
-The same one you were assigned in Week 1 — the same student identifier produces the same
+The same one you were assigned in Week 1: the same student identifier produces the same
 dataset. If you have lost your notebook, the assignment function is in the template again.
 
 ::: {.callout-warning}
-Do not switch datasets. Weeks 2 and 3 are two halves of the same exercise: this week you
-predict, next week you test the prediction on the same series.
+Do not switch datasets. This series stays yours through Week 3, and next week you explain
+today's result on it.
 :::
 
 ## ⏱ Suggested pacing (80 minutes)
@@ -79,14 +80,14 @@ predict, next week you test the prediction on the same series.
 | Minutes | What |
 |---:|---|
 | 0–10 | Setup, load your series, repair the calendar |
-| 10–30 | Time plot, seasonal plot, subseries plot, ACF |
-| 30–45 | Variance: does it need a transformation? Decide and justify |
-| 45–60 | Classical decomposition and STL; read the components |
-| 60–70 | $F_T$, $F_S$, seasonally adjusted series |
-| 70–80 | Your prediction, export, submit |
+| 10–35 | Time plot, seasonal plot, subseries plot, ACF — with readings |
+| 35–45 | Commit to your prediction, in writing, before running anything |
+| 45–65 | Implement the four methods, hold out the last cycle, score them |
+| 65–75 | Compare against your prediction, and account for the difference |
+| 75–80 | Export and submit |
 
-If you are behind at minute 70, **submit what you have**. A valid partial submission scores;
-a perfect missing one does not.
+If you are behind at minute 75, **submit what you have**. A valid partial submission
+scores; a perfect missing one does not.
 
 ## 📐 Section 1 — Data preparation (1 point)
 
@@ -100,6 +101,19 @@ Load your series and put it on a regular time grid.
 You did all of this in Week 1. It should take ten minutes.
 
 ::: {.callout-warning collapse="false"}
+## ⚠️ If your series ends with missing values
+
+Some series in the pool stop being reported years before their last row: the file ends
+with a long run of blanks. `interpolate()` will happily fill those by repeating the last
+value, and then your holdout is a flat line you invented — every method "predicts" it
+perfectly and the exercise is meaningless.
+
+**Trim to the last real observation** before you split, and say in your report that you did
+and how much you dropped. Filling interior gaps is repair; filling the tail is fabrication.
+:::
+
+
+::: {.callout-warning collapse="false"}
 ## ⚠️ Where this goes wrong: the frequency string
 
 - `"W"` does not mean "weekly". It means *week ending Sunday*. If your timestamps are
@@ -110,132 +124,84 @@ You did all of this in Week 1. It should take ten minutes.
 - `"MS"` is month **start**, `"ME"` is month **end**. Pick the one your timestamps already
   use, or every row misses the grid by a few days.
 
-After building a grid, check that you did not lose everything:
-`s["y"].notna().sum()` should be close to the number of rows you started with.
+After building a grid, check you did not lose everything: `s["y"].notna().sum()` should be
+close to the number of rows you started with.
 
-📖 [offset aliases](https://pandas.pydata.org/docs/user_guide/timeseries.html#offset-aliases) · [anchored offsets](https://pandas.pydata.org/docs/user_guide/timeseries.html#anchored-offsets) ·
-[`date_range`](https://pandas.pydata.org/docs/reference/api/pandas.date_range.html) · [`reindex`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reindex.html) ·
-[`duplicated`](https://pandas.pydata.org/docs/reference/api/pandas.Series.duplicated.html) · [`interpolate`](https://pandas.pydata.org/docs/reference/api/pandas.Series.interpolate.html)
+📖 [offset aliases](https://pandas.pydata.org/docs/user_guide/timeseries.html#offset-aliases) ·
+[anchored offsets](https://pandas.pydata.org/docs/user_guide/timeseries.html#anchored-offsets) ·
+[`date_range`](https://pandas.pydata.org/docs/reference/api/pandas.date_range.html) ·
+[`reindex`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reindex.html) ·
+[`duplicated`](https://pandas.pydata.org/docs/reference/api/pandas.Series.duplicated.html)
 :::
-
 
 ## 📊 Section 2 — EDA and visualisation (4 points)
 
-This is the heaviest section. Four plots and two decompositions, each with a sentence
-saying what you see — a plot with no reading attached earns nothing.
+Four plots, each with a sentence saying what you see. A plot with no reading attached earns
+nothing.
 
 **Graphics.** Time plot, seasonal plot, seasonal subseries plot, ACF. Name the patterns:
-trend, seasonality, cycles, level shifts, outliers.
+trend, seasonality, cycles, level shifts, outliers. Say whether the seasonal swing grows
+with the level of the series — you will need that observation next week.
 
 ::: {.callout-warning collapse="false"}
 ## ⚠️ Where this goes wrong
 
-- `plot_acf` raises once `lags` reaches the length of the series. Keep it well below —
-  `lags=min(40, len(y) // 3)` is a safe default, and for weekly data you want at least
-  `lags=60` to see the annual spike.
-- Plot the ACF of the series **with missing values removed**; `plot_acf` will not handle
-  `NaN` for you.
+- `plot_acf` raises once `lags` reaches the length of the series. `lags=min(40, len(y) // 3)`
+  is a safe default; for weekly data use at least 60 so the annual spike is visible.
+- Plot the ACF with missing values removed — `plot_acf` will not handle `NaN` for you.
 
 📖 [`plot_acf`](https://www.statsmodels.org/stable/generated/statsmodels.graphics.tsaplots.plot_acf.html)
 :::
 
+**Then commit.** Which of the four methods will be hardest to beat, and why? Write three or
+four sentences citing what is *in the plots* — the size of the seasonal swing against the
+size of the trend, whether the pattern repeats in the same shape, whether the level moved
+recently.
 
-**Variance.** Does the size of the seasonal swing grow with the level of the series? If it
-does, the additive decompositions below are the wrong model for it.
-
-- Estimate a Box-Cox $\lambda$ (`boxcox_lambda` from `coreforecast`, as in the lecture).
-- Plot the transformed series next to the original.
-- **Decide** whether to work transformed or untransformed, and justify the decision in a
-  sentence. A defensible "no transformation needed" is worth full marks; an unexplained
-  transformation is not.
-
-📖 [`boxcox` / `boxcox_lambda`](https://nixtlaverse.nixtla.io/coreforecast/) · [`scipy.stats.boxcox`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.boxcox.html, an
-alternative that returns the transform and λ together) · [FPP 3.1 transformations](https://otexts.com/fpp3/transformations.html) ·
-[FPP the Pythonic Way, ch. 3](https://otexts.com/fpppy/nbs/03-decomposition.html)
-
-
-::: {.callout-warning}
-## If your series contains zeros
-
-`boxcox_lambda(..., method="loglik")` refuses non-positive values outright. `method="guerrero"`
-accepts them but may return $\lambda = 0$, which *is* the log transform — undefined at zero.
-A multiplicative decomposition refuses them for the same reason.
-
-That is information about your series, not an obstacle. Find out where the zeros come from
-before deciding what to do about them, and say what you concluded. This is exactly the kind
-of judgement the point is for.
-:::
-
-**Decomposition.** Two of them, on whichever version of the series you settled on:
-
-- classical decomposition (`seasonal_decompose`);
-- STL (`STL`), with a stated choice of `seasonal` and `robust`.
-
-Then compare them. Where do they disagree, and which do you trust more on this series?
-
-::: {.callout-warning collapse="false"}
-## ⚠️ Where this goes wrong
-
-- `seasonal_decompose` returns `NaN` for the first and last `period / 2` observations —
-  six months at each end of a monthly series. That is the centred moving average, not a
-  bug, and it is one of the differences you are asked to comment on.
-- `model="multiplicative"` refuses zeros and negative values outright.
-- `STL(...)` needs `seasonal` to be an **odd** integer ≥ 3, and it must be an `int`, not a
-  float. `robust=True` costs a little accuracy and buys resistance to outliers.
-- Both need `period` — the number of observations in one cycle, which is `mine["season"]`,
-  not the number of years.
-
-📖 [`seasonal_decompose`](https://www.statsmodels.org/stable/generated/statsmodels.tsa.seasonal.seasonal_decompose.html) · [`STL`](https://www.statsmodels.org/stable/generated/statsmodels.tsa.seasonal.STL.html) ·
-[FPP 3.4 classical decomposition](https://otexts.com/fpp3/classical-decomposition.html) · [FPP 3.6 STL](https://otexts.com/fpp3/stl.html)
-:::
-
-
-::: {.callout-note}
-## What "reading the components" means
-
-Not "the trend goes up". Something a colleague could act on: *the seasonal component is
-stable until 2008 and shifts afterwards*, *the remainder is flat except for three spikes
-which line up with the crisis*, *the trend flattens in the last two years*.
+::: {.callout-important}
+Write this **before** you run Section 3. The point is not the guess; it is whether you can
+read a series. A well-argued wrong prediction earns full marks — an unargued right one
+earns nothing.
 :::
 
 ## 🔢 Section 3 — Implementation (2 points)
 
-**Strength of components.** Compute, from the STL fit:
+**The four methods.** Implement them yourself — they are four lines each, and they are on
+the [Week 1 slides](https://01a05924-a704-8747-1dda-9917ad1a3d63.share.connect.posit.cloud) if you need them.
 
 $$
-F_T = \max\left(0,\; 1 - \frac{\operatorname{Var}(R_t)}{\operatorname{Var}(T_t + R_t)}\right)
+\hat{y}_{T+h} = \bar{y}
 \qquad
-F_S = \max\left(0,\; 1 - \frac{\operatorname{Var}(R_t)}{\operatorname{Var}(S_t + R_t)}\right)
+\hat{y}_{T+h} = y_T
+\qquad
+\hat{y}_{T+h} = y_{T+h-m}
+\qquad
+\hat{y}_{T+h} = y_T + h\,\frac{y_T - y_1}{T-1}
 $$
 
-Report both, rounded to two decimals.
+**The holdout.** Cut off the last full seasonal cycle — one year of data — fit nothing, and
+forecast that span with all four. Report the RMSE of each, and the ratio of each to the
+best. That ratio is the skill score from the lecture: it says how much worse a method is
+than the bar.
 
-📖 [FPP 4.3 — where $F_T$ and $F_S$ come from](https://otexts.com/fpp3/stlfeatures.html)
+**The verdict.** Which won? Did your prediction hold? If it did not, say what in the plots
+you misread — that sentence is worth more than the prediction was.
 
-Both come out of a **fitted** STL object: `fit.trend`, `fit.seasonal`, `fit.resid`. If you
-get a value outside $[0, 1]$, you have almost certainly passed the STL object instead of
-the result of `.fit()`.
+::: {.callout-warning collapse="false"}
+## ⚠️ Where this goes wrong
 
-
-**Seasonally adjusted series.** Produce and plot it. Say what it is useful for and what it
-hides.
-
-**Your prediction.** Of the four simple methods — mean, naive, drift, seasonal naive —
-which will be **hardest to beat** on your series?
-
-Set `PREDICTION` to one of `"mean"`, `"naive"`, `"drift"`, `"snaive"`, and argue for it in
-three or four sentences using $F_T$, $F_S$ and what you saw in the decomposition.
-
-::: {.callout-important}
-The prediction is marked on the **reasoning**, not on being right. A well-argued wrong
-prediction scores full marks; "snaive, because it usually wins" scores nothing, even
-though it is usually true.
+- `snaive` needs the last `m` observations of the **training** part, not of the whole
+  series. If your forecast looks suspiciously perfect, you are forecasting with the answer.
+- Drop or interpolate missing values before scoring: an `NaN` anywhere in the holdout makes
+  every RMSE `NaN`.
+- RMSE is in the units of your series, so it is only comparable *between methods on the same
+  series* — never between your series and a classmate's. That is what the ratio is for.
 :::
 
 ## 🧹 Section 4 — Code quality and reproducibility (1 point)
 
 - The notebook runs top to bottom on a fresh kernel without errors.
-- No dead cells, no leftover experiments, no `df2_final_v3`.
+- No dead cells, no leftover experiments.
 - Every number in your text comes from a cell, not from your memory of an earlier run.
 
 ## 📤 Submission
@@ -244,16 +210,13 @@ Upload three files to the Week 2 activity on Moodle **before the end of the sess
 
 - `SURNAME_lab02.pdf` — the rendered report;
 - `SURNAME_lab02.ipynb` — the source;
-- `SURNAME_lab02_summary.csv` — written by the last cell of the template: your identifier,
-  $F_T$, $F_S$ and your prediction.
+- `SURNAME_lab02_summary.csv` — written by the last cell of the template.
 
-The summary file is what makes next week's check instant, so do not skip it.
+## 📚 For next week
 
-## 📚 Reading for next week
+Today's lecture covers decomposition, and next week's lab is built on it: you will take
+**this same series**, decompose it, and explain the result you got today — why that method
+won, in terms of the components of your series.
 
-Chapter 5 of [Forecasting: Principles and Practice, the Pythonic Way](https://otexts.com/fpppy/)
-— the forecaster's toolbox: simple methods, fitted values and residuals, residual
-diagnostics, prediction intervals, accuracy evaluation.
-
-Next week you implement those four benchmarks on your own series and find out what your
-prediction was worth.
+Read Chapter 3 of [FPP, the Pythonic Way](https://otexts.com/fpppy/nbs/03-decomposition.html)
+before then.
