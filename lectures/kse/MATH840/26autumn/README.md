@@ -46,6 +46,20 @@ python publish_deck.py .01 --render   # re-render the lecture, then update it
 python publish_deck.py .lab02 --dir labs   # lab handouts live in labs/, rendered to html
 ```
 
+### Assignment PDFs for AI grading
+
+Moodle links to the handout, but the grading platform reads the assignment *file* and does not
+follow links. Each lab handout therefore also ships as a PDF, printed from the rendered HTML with
+Quarto's bundled headless Chrome — the same page students see, formulas included:
+
+```bash
+python handout_pdf.py .lab02            # print an already-rendered handout
+python handout_pdf.py .lab03 --render   # render the .qmd first
+```
+
+The script checks the result before accepting it: every heading must be present in the extracted
+text, and no raw TeX may remain (which would mean MathJax had not finished when the page was printed).
+
 The URL never changes between deployments: `infra/rsconnect-records/` holds the
 rsconnect deployment record for each deck, which is what tells it to update existing
 content instead of creating new content with a new address. Do not delete that
