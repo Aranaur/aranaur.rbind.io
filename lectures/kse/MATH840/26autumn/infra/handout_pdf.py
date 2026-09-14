@@ -52,7 +52,7 @@ def raw_tex(pdf: Path) -> int:
     return sum(text.count(token) for token in RAW_TEX)
 
 
-def print_pdf(url: str, pdf: Path, budget_ms: int = 30000, attempts: int = 6) -> int:
+def print_pdf(url: str, pdf: Path, budget_ms: int = 30000, attempts: int = 10) -> int:
     """Print `url` to `pdf`, retrying until no formula is left untypeset.
 
     MathJax loads from a CDN, and whether it has finished when Chrome decides to print is a
