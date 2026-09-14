@@ -39,9 +39,9 @@ demonstrates the method without handing you any of your answers.
 You have a series, and in Lab 2 you found out which of the four simple methods wins on it.
 This week you find out **why**.
 
-Concretely: stabilise its variance if it needs it, decompose it two ways, quantify how
-strong its trend and seasonality are, and explain last week's winner in terms of those
-components.
+Concretely: stabilise its variance if it needs it, decompose it two ways and compare the
+two, quantify how strong its trend and seasonality are, and explain last week's winner in
+terms of those components.
 
 ::: {.callout-important}
 ## This one counts
@@ -70,78 +70,40 @@ The same one you have used since Week 1 — the same student identifier produces
 dataset. If you have lost your notebook, the assignment function is in the template again.
 
 ::: {.callout-warning}
-Do not switch datasets. This is the same series you used last week: last week you found out which simple
-method wins on it, this week you explain why.
+Do not switch datasets. This is the same series you used last week: last week you found out
+which simple method wins on it, this week you explain why.
+:::
+
+::: {.callout-note}
+## What is not marked again
+
+Loading your series and repairing its calendar were marked in Lab 2, so they are not marked
+twice. The template prepares the series for you exactly the way Lab 2 asked — duplicates
+averaged, a regular calendar, a missing tail trimmed, interior gaps interpolated. If you made
+different choices in Lab 2, replace that cell with your own code and carry on.
+
+Your Lab 2 graphics are not repeated either. Refer back to them whenever they help an
+explanation — they are yours.
 :::
 
 ## ⏱ Suggested pacing (80 minutes)
 
 | Minutes | What |
 |---:|---|
-| 0–10 | Setup, load your series, repair the calendar |
-| 10–30 | Time plot, seasonal plot, subseries plot, ACF |
-| 30–45 | Variance: does it need a transformation? Decide and justify |
-| 45–60 | Classical decomposition and STL; read the components |
-| 60–70 | $F_T$, $F_S$, seasonally adjusted series |
-| 70–80 | Explain last week's winner, export, submit |
+| 0–10 | Setup: open the template, load your prepared series |
+| 10–25 | Section 1: does the variance need stabilising? Decide and justify |
+| 25–55 | Section 2: classical decomposition, STL, the two compared, the seasonally adjusted series |
+| 55–70 | Section 3: $F_T$, $F_S$, and the explanation of last week's winner |
+| 70–80 | Export and submit |
 
 If you are behind at minute 70, **submit what you have**. A valid partial submission scores;
 a perfect missing one does not.
 
 ## 📐 Section 1 — Data preparation (1 point)
 
-Load your series and put it on a regular time grid.
-
-- Resolve duplicated timestamps if there are any, and say in one sentence what you decided
-  and why.
-- Fill the calendar so gaps become visible missing values rather than absent rows.
-- State the frequency, the span, and how many complete seasonal cycles you have.
-
-You did all of this in Week 1. It should take ten minutes.
-
-::: {.callout-warning collapse="false"}
-## ⚠️ Where this goes wrong: the frequency string
-
-- `"W"` does not mean "weekly". It means *week ending Sunday*. If your timestamps are
-  Mondays, a grid built with `"W"` lines up with nothing and your series comes back empty.
-  Use the anchored form, `"W-MON"` — which is what `spec["freq"]` already gives you.
-- pandas 3 removed the bare `"M"`, `"Q"`, `"Y"` and `"H"` aliases. Use `"MS"`/`"ME"`,
-  `"QS"`/`"QE"`, `"YS"`/`"YE"` and lowercase `"h"`. A bare `"Q"` now raises rather than warns.
-- `"MS"` is month **start**, `"ME"` is month **end**. Pick the one your timestamps already
-  use, or every row misses the grid by a few days.
-
-After building a grid, check that you did not lose everything:
-`s["y"].notna().sum()` should be close to the number of rows you started with.
-
-📖 [offset aliases](https://pandas.pydata.org/docs/user_guide/timeseries.html#offset-aliases) · [anchored offsets](https://pandas.pydata.org/docs/user_guide/timeseries.html#anchored-offsets) ·
-[`date_range`](https://pandas.pydata.org/docs/reference/api/pandas.date_range.html) · [`reindex`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reindex.html) ·
-[`duplicated`](https://pandas.pydata.org/docs/reference/api/pandas.Series.duplicated.html) · [`interpolate`](https://pandas.pydata.org/docs/reference/api/pandas.Series.interpolate.html)
-:::
-
-
-## 📊 Section 2 — EDA and visualisation (4 points)
-
-This is the heaviest section. Four plots and two decompositions, each with a sentence
-saying what you see — a plot with no reading attached earns nothing.
-
-**Graphics.** Time plot, seasonal plot, seasonal subseries plot, ACF. Name the patterns:
-trend, seasonality, cycles, level shifts, outliers.
-
-::: {.callout-warning collapse="false"}
-## ⚠️ Where this goes wrong
-
-- `plot_acf` raises once `lags` reaches the length of the series. Keep it well below —
-  `lags=min(40, len(y) // 3)` is a safe default, and for weekly data you want at least
-  `lags=60` to see the annual spike.
-- Plot the ACF of the series **with missing values removed**; `plot_acf` will not handle
-  `NaN` for you.
-
-📖 [`plot_acf`](https://www.statsmodels.org/stable/generated/statsmodels.graphics.tsaplots.plot_acf.html)
-:::
-
-
-**Variance.** Does the size of the seasonal swing grow with the level of the series? If it
-does, the additive decompositions below are the wrong model for it.
+**Does the variance need stabilising?** Does the size of the seasonal swing grow with the
+level of the series? If it does, the additive decompositions in Section 2 are the wrong model
+for it.
 
 - Estimate a Box-Cox $\lambda$ (`boxcox_lambda` from `coreforecast`, as in the lecture).
 - Plot the transformed series next to the original.
@@ -149,10 +111,11 @@ does, the additive decompositions below are the wrong model for it.
   sentence. A defensible "no transformation needed" is worth full marks; an unexplained
   transformation is not.
 
-📖 [`boxcox` / `boxcox_lambda`](https://nixtlaverse.nixtla.io/coreforecast/) · [`scipy.stats.boxcox`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.boxcox.html, an
-alternative that returns the transform and λ together) · [FPP 3.1 transformations](https://otexts.com/fpp3/transformations.html) ·
+📖 [`boxcox` / `boxcox_lambda`](https://nixtlaverse.nixtla.io/coreforecast/) ·
+[`scipy.stats.boxcox`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.boxcox.html)
+(an alternative that returns the transform and λ together) ·
+[FPP 3.1 transformations](https://otexts.com/fpp3/transformations.html) ·
 [FPP the Pythonic Way, ch. 3](https://otexts.com/fpppy/nbs/03-decomposition.html)
-
 
 ::: {.callout-warning}
 ## If your series contains zeros
@@ -166,29 +129,36 @@ before deciding what to do about them, and say what you concluded. This is exact
 of judgement the point is for.
 :::
 
-**Decomposition.** Two of them, on whichever version of the series you settled on:
+## 📊 Section 2 — EDA and visualisation (4 points)
 
-- classical decomposition (`seasonal_decompose`);
-- STL (`STL`), with a stated choice of `seasonal` and `robust`.
+Two decompositions, their comparison and an adjusted series — one point each, all on the
+version of the series you settled on in Section 1. Every plot needs a reading: a plot with no
+reading attached earns nothing.
 
-Then compare them. Where do they disagree, and which do you trust more on this series?
+| Item | What earns the point |
+|---|---|
+| 2.1 Classical decomposition | `seasonal_decompose`, and a reading of its components |
+| 2.2 STL | `STL` with a stated choice of `seasonal` and `robust` and the reason for it, and a reading of its components |
+| 2.3 Classical versus STL | where the two disagree, and which you trust more on this series — with the reason visible in the plots |
+| 2.4 Seasonally adjusted series | the series with the STL seasonal component removed: what it is useful for, and what it hides |
 
 ::: {.callout-warning collapse="false"}
 ## ⚠️ Where this goes wrong
 
 - `seasonal_decompose` returns `NaN` for the first and last `period / 2` observations —
   six months at each end of a monthly series. That is the centred moving average, not a
-  bug, and it is one of the differences you are asked to comment on.
+  bug, and it is one of the differences 2.3 asks you to comment on.
 - `model="multiplicative"` refuses zeros and negative values outright.
 - `STL(...)` needs `seasonal` to be an **odd** integer ≥ 3, and it must be an `int`, not a
   float. `robust=True` costs a little accuracy and buys resistance to outliers.
 - Both need `period` — the number of observations in one cycle, which is `mine["season"]`,
   not the number of years.
 
-📖 [`seasonal_decompose`](https://www.statsmodels.org/stable/generated/statsmodels.tsa.seasonal.seasonal_decompose.html) · [`STL`](https://www.statsmodels.org/stable/generated/statsmodels.tsa.seasonal.STL.html) ·
-[FPP 3.4 classical decomposition](https://otexts.com/fpp3/classical-decomposition.html) · [FPP 3.6 STL](https://otexts.com/fpp3/stl.html)
+📖 [`seasonal_decompose`](https://www.statsmodels.org/stable/generated/statsmodels.tsa.seasonal.seasonal_decompose.html) ·
+[`STL`](https://www.statsmodels.org/stable/generated/statsmodels.tsa.seasonal.STL.html) ·
+[FPP 3.4 classical decomposition](https://otexts.com/fpp3/classical-decomposition.html) ·
+[FPP 3.6 STL](https://otexts.com/fpp3/stl.html)
 :::
-
 
 ::: {.callout-note}
 ## What "reading the components" means
@@ -200,7 +170,7 @@ which line up with the crisis*, *the trend flattens in the last two years*.
 
 ## 🔢 Section 3 — Implementation (2 points)
 
-**Strength of components.** Compute, from the STL fit:
+**3.1 Strength of components (1 point).** Compute, from the STL fit:
 
 $$
 F_T = \max\left(0,\; 1 - \frac{\operatorname{Var}(R_t)}{\operatorname{Var}(T_t + R_t)}\right)
@@ -216,12 +186,8 @@ Both come out of a **fitted** STL object: `fit.trend`, `fit.seasonal`, `fit.resi
 get a value outside $[0, 1]$, you have almost certainly passed the STL object instead of
 the result of `.fit()`.
 
-
-**Seasonally adjusted series.** Produce and plot it. Say what it is useful for and what it
-hides.
-
-**Explaining last week's winner.** In Lab 2 you found which simple method won on your
-series. Now explain **why**, with the decomposition.
+**3.2 Explaining last week's winner (1 point).** In Lab 2 you found which simple method won
+on your series. Now explain **why**, with the decomposition.
 
 - Set `LAB2_WINNER` to the method that won in your Lab 2 — it is in your
   `SURNAME_lab02_summary.csv`.
@@ -239,7 +205,7 @@ though it is usually true.
 ## Missed Lab 2?
 
 The template has an optional cell that recomputes the four methods on the same holdout
-Lab 2 used. Run it after Section 1, and use its winner.
+Lab 2 used. Run it after the setup cell, and use its winner.
 :::
 
 ## 🧹 Section 4 — Code quality and reproducibility (1 point)
