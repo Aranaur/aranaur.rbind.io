@@ -9,6 +9,7 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 1 — course syllabus deck | <https://01a05923-e02d-f78b-e75e-cec44127fc5d.share.connect.posit.cloud> |
 | Week 1 — Introduction to Forecasting & Time Series Graphics | <https://01a05924-a704-8747-1dda-9917ad1a3d63.share.connect.posit.cloud> |
 | Week 2 — Time Series Decomposition | <https://01a0784c-f128-848e-7cc4-a140ab0a2965.share.connect.posit.cloud> |
+| Week 3 — The Forecaster's Toolbox | <https://01a09fdb-5a7c-a2ec-2f40-2979b1d48c0d.share.connect.posit.cloud> |
 | Week 1 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab01.ipynb) |
 | Week 2 — lab handout | <https://01a07874-b74d-873c-a106-e68a78304698.share.connect.posit.cloud> |
 | Week 2 — worked example (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab02_worked_example.ipynb) |
@@ -18,7 +19,7 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 ## Layout
 
 ```
-slides/   .00 syllabus, .01 week 1, .02 week 2 (dot-prefixed: not rendered into the site)
+slides/   .00 syllabus, .01–.03 weeks 1–3 (dot-prefixed: not rendered into the site)
 labs/     .labNN.qmd handouts, _labNN.ipynb Colab notebooks
 data/     datasets served to students over raw.githubusercontent.com
 infra/    publishing, and later the Track B series pool and scorer
