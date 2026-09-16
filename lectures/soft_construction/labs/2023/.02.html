@@ -2,13 +2,16 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.3.433">
+<meta name="generator" content="quarto-1.9.37">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
 <title>Завдання №2</title>
 <style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
 div.columns{display: flex; gap: min(4vw, 1.5em);}
@@ -24,20 +27,21 @@ ul.task-list li input[type="checkbox"] {
 
 
 <script src=".02_files/libs/clipboard/clipboard.min.js"></script>
-<script src=".02_files/libs/quarto-html/quarto.js"></script>
+<script src=".02_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src=".02_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
 <script src=".02_files/libs/quarto-html/popper.min.js"></script>
 <script src=".02_files/libs/quarto-html/tippy.umd.min.js"></script>
 <script src=".02_files/libs/quarto-html/anchor.min.js"></script>
 <link href=".02_files/libs/quarto-html/tippy.css" rel="stylesheet">
-<link href=".02_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href=".02_files/libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src=".02_files/libs/bootstrap/bootstrap.min.js"></script>
 <link href=".02_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href=".02_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<link href=".02_files/libs/bootstrap/bootstrap-efbb37e9afcc02144ebbc7afd12a776f.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 
 
 </head>
 
-<body class="fullcontent">
+<body class="fullcontent quarto-light">
 
 <div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
 
@@ -59,76 +63,404 @@ ul.task-list li input[type="checkbox"] {
   </div>
   
 
+
 </header>
 
+
 <section id="мета" class="level1">
-<h1>Мета:</h1>
-<p>В ході роботи Вам необхідно розказати про бази даних, їх типи та використання у Вашій системі.</p>
+<h1>Мета</h1>
+<p>Спроєктувати зберігання даних для системи із <a href="https://01a0ac59-cc73-d3a9-2e5c-7a777946e3f7.share.connect.posit.cloud">Завдання №1</a>: обрати бази даних під конкретні дані й запити, розрахувати, скільки машин вони потребують, і спланувати реплікацію, балансування навантаження та кешування.</p>
+<p>Беріть числа із Завдання №1: RPS на читання і запис, обсяг даних за 5 років, співвідношення читання до запису. Якщо за цей час вони змінилися, оновіть їх і поясніть чому.</p>
+</section>
+<section id="орієнтири-для-розрахунків" class="level1">
+<h1>Орієнтири для розрахунків</h1>
+<p>Доповнюють орієнтири із Завдання №1:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Величина</th>
+<th style="text-align: left;">Орієнтир</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Одна машина БД</td>
+<td style="text-align: left;">10k RPS читань або 1k RPS записів, 50 ТБ SSD, 1 ТБ RAM</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Один вузол кешу в RAM (Redis)</td>
+<td style="text-align: left;">порядку 100 тис. операцій на секунду</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Звернення до пам’яті</td>
+<td style="text-align: left;">100 нс</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Запит туди й назад у межах дата-центру</td>
+<td style="text-align: left;">0.5 мс</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Позиціювання головки HDD</td>
+<td style="text-align: left;">10 мс</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Навантаження на БД з кешем</td>
+<td style="text-align: left;">читання × (1 − частка влучань у кеш)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Пікове навантаження</td>
+<td style="text-align: left;">у 2–3 рази більше за середнє</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Реплікація</td>
+<td style="text-align: left;">кожен запис зберігається у 3 копіях</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="розминка-знайдіть-помилки" class="level1">
+<h1>Розминка: знайдіть помилки 🕵️</h1>
+<p>Студент проєктує зберігання для хостингу текстів із лекції (на кшталт Pastebin):</p>
+<ul>
+<li>1 млн нових текстів на день по 10 кБ;</li>
+<li>12 RPS на запис і 120 RPS на читання;</li>
+<li>за 5 років — 1.8 млрд текстів, або 18 ТБ;</li>
+<li>нефункціональна вимога: завантажені тексти не повинні зникати.</li>
+</ul>
+<p>Його рішення:</p>
+<ol type="1">
+<li><strong>Масштабування.</strong> 18 ТБ — це багато, тому розбиваємо тексти на 18 шардів по 1 ТБ, кожен на окремому сервері.</li>
+<li><strong>Тип БД.</strong> Текст завжди читають за коротким посиланням, тобто за ключем, тож метадані можна тримати в key-value сховищі або в реляційній БД з індексом за ключем.</li>
+<li><strong>Кеш.</strong> Щоб читання були швидкими, кешуємо в Redis усі тексти.</li>
+<li><strong>Балансування.</strong> Балансувальник рівномірно розподіляє всі запити, зокрема записи, між трьома репліками БД.</li>
+<li><strong>Надійність.</strong> Щоб записи були швидкими, пишемо текст спершу в Redis, а в БД переносимо раз на годину.</li>
+</ol>
+<p>В одному рядку все правильно, у решті — помилки. Знайдіть їх, перш ніж відкривати відповідь.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-1-contents" aria-controls="callout-1" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Відповідь
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-1" class="callout-1-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>❌ <strong>Шардування не потрібне.</strong> 120 RPS читань і 12 RPS записів — це ≈ 1% можливостей однієї машини (10k і 1k), а 18 ТБ вміщаються на її 50 ТБ SSD. Потрібні не шарди, а <strong>репліки</strong> — для доступності й збереження даних. А ще краще класти самі тексти в об’єктне сховище (на кшталт S3), а в БД тримати лише метадані: ключ, автора, дату, термін дії.</li>
+<li>✅ Правильно: вибір типу БД випливає із запиту, який вона обслуговує.</li>
+<li>❌ <strong>Кешувати все — дорого й марно.</strong> 18 ТБ RAM коштують ≈ $180 тис. і займуть 18 машин. Здебільшого читають свіжі тексти: за день їх з’являється 10 ГБ, і якщо кешувати найпопулярніші 20%, вистачить ≈ 2 ГБ.</li>
+<li>❌ <strong>Записи йдуть лише на лідера.</strong> У реплікації «лідер — послідовники» репліки приймають тільки читання. Балансувати можна читання, а записи — ні.</li>
+<li>❌ <strong>Кеш не є джерелом правди.</strong> Якщо вузол Redis впаде між перенесеннями, тексти за годину можуть загубитися, а це прямо порушує вимогу «завантажені тексти не повинні зникати». Спершу запис у БД, потім — у кеш.</li>
+</ol>
+</div>
+</div>
+</div>
 </section>
 <section id="етапи" class="level1">
-<h1>Етапи:</h1>
-<p>Детально опишіть бази даних для вашої системи. Питання, які мають бути розкриті:</p>
-<ol type="1">
-<li>Типи баз даних.</li>
-<li>Масштабування.</li>
-<li>Балансування навантаження.</li>
-<li>Кеш.</li>
-</ol>
-<p>Матеріали для підготовки:</p>
+<h1>Етапи</h1>
+<section id="дані-та-запити" class="level2">
+<h2 class="anchored" data-anchor-id="дані-та-запити">1. Дані та запити</h2>
+<p>Базу даних обирають під запити, тому почніть із них.</p>
 <ul>
-<li><a href="https://github.com/donnemartin/system-design-primer">The System Design Primer</a></li>
-<li><a href="https://eugeneyan.com/writing/more-patterns/">More Design Patterns For Machine Learning Systems</a></li>
-<li><a href="https://github.com/G33kzD3n/Catalogue/blob/master/System%20Design%20Interview%20An%20Insider%E2%80%99s%20Guide%20by%20Alex%20Xu%20(z-lib.org).pdf">System Design Interview</a><a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></li>
+<li><p>Випишіть 3–6 основних сутностей і заповніть таблицю:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Сутність</th>
+<th style="text-align: left;">Розмір запису</th>
+<th style="text-align: left;">Записів за 5 років</th>
+<th style="text-align: left;">Обсяг</th>
+<th style="text-align: left;">Читань/с</th>
+<th style="text-align: left;">Записів/с</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">…</td>
+<td style="text-align: left;">…</td>
+<td style="text-align: left;">…</td>
+<td style="text-align: left;">…</td>
+<td style="text-align: left;">…</td>
+<td style="text-align: left;">…</td>
+</tr>
+</tbody>
+</table></li>
+<li><p>Випишіть основні запити до даних і вимоги до них:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Запит</th>
+<th style="text-align: left;">Приклад</th>
+<th style="text-align: left;">RPS (середнє / пік)</th>
+<th style="text-align: left;">Допустима затримка</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">за ключем</td>
+<td style="text-align: left;">отримати замовлення за номером</td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">список</td>
+<td style="text-align: left;">останні 20 замовлень користувача, новіші спершу</td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">…</td>
+<td style="text-align: left;">…</td>
+<td style="text-align: left;">…</td>
+<td style="text-align: left;">…</td>
+</tr>
+</tbody>
+</table></li>
+<li><p>Окремо позначте великі файли (фото, відео, документи): їхнє місце — в об’єктному сховищі, а не в БД.</p></li>
+</ul>
+</section>
+<section id="типи-баз-даних" class="level2">
+<h2 class="anchored" data-anchor-id="типи-баз-даних">2. Типи баз даних</h2>
+<p>Для кожної сутності оберіть тип сховища і поясніть вибір через запити з етапу 1, а не через популярність.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Тип</th>
+<th style="text-align: left;">Коли пасує</th>
+<th style="text-align: left;">Приклади</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Реляційна (SQL)</td>
+<td style="text-align: left;">транзакції, зв’язки між сутностями, складні запити, стабільна схема</td>
+<td style="text-align: left;">PostgreSQL, MySQL</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Документна</td>
+<td style="text-align: left;">записи з різним набором атрибутів, читання документа цілком</td>
+<td style="text-align: left;">MongoDB</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Key-value</td>
+<td style="text-align: left;">читання й запис за ключем з мінімальною затримкою</td>
+<td style="text-align: left;">Redis, DynamoDB</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Широкостовпцева</td>
+<td style="text-align: left;">дуже багато записів, читання за ключем і діапазоном (наприклад, за часом)</td>
+<td style="text-align: left;">Cassandra, ScyllaDB</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Пошукова</td>
+<td style="text-align: left;">повнотекстовий пошук, фільтри, ранжування</td>
+<td style="text-align: left;">Elasticsearch, OpenSearch</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Графова</td>
+<td style="text-align: left;">запити зі зв’язків: друзі друзів, рекомендації</td>
+<td style="text-align: left;">Neo4j</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Часових рядів</td>
+<td style="text-align: left;">метрики й події з часовою міткою, агрегація за періодами</td>
+<td style="text-align: left;">TimescaleDB, InfluxDB</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Об’єктне сховище</td>
+<td style="text-align: left;">великі файли</td>
+<td style="text-align: left;">Amazon S3</td>
+</tr>
+</tbody>
+</table>
+<p>Для кожної сутності також визначте:</p>
+<ul>
+<li><strong>Чи потрібні транзакції.</strong> Наприклад, списання грошей і резервування товару — так, лічильник переглядів — ні.</li>
+<li><strong>Що важливіше під час збою мережі — консистентність чи доступність.</strong> Вибір має збігатися з тим, що ви зробили в Завданні №1.</li>
+</ul>
+<p>Приклади таких рішень: <a href="https://01a0ac5a-1a0b-3722-03fc-9faa0e03a0a8.share.connect.posit.cloud">онлайн-магазин</a> (MongoDB для каталогу, MySQL для замовлень, Cassandra для архіву, S3 для зображень) і <a href="https://01a0ac5a-72cd-826b-0cfd-0e48590c57e6.share.connect.posit.cloud">платформа ШІ-оцінювання</a> (одна таблиця DynamoDB з TTL і умовними записами, щоб оцінку не надіслали двічі).</p>
+</section>
+<section id="реплікація-і-масштабування" class="level2">
+<h2 class="anchored" data-anchor-id="реплікація-і-масштабування">3. Реплікація і масштабування</h2>
+<p>🔮 <strong>Спершу вгадайте:</strong> скільки машин БД знадобиться вашій системі? Запишіть число, а наприкінці порівняйте з розрахунком.</p>
+<ol type="1">
+<li><p><strong>Розрахуйте кількість машин</strong> для кожної БД окремо за трьома обмеженнями і візьміть найбільше значення:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Обмеження</th>
+<th style="text-align: left;">Формула</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Обсяг</td>
+<td style="text-align: left;">обсяг за 5 років з реплікацією / 50 ТБ</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Записи</td>
+<td style="text-align: left;">пікові записи / 1k RPS</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Читання</td>
+<td style="text-align: left;">пікові читання після кешу / 10k RPS</td>
+</tr>
+</tbody>
+</table></li>
+<li><p><strong>Опишіть реплікацію.</strong> Скільки реплік і навіщо: доступність, резервні копії, розподіл читань. Якщо читання йдуть із реплік, поясніть, що станеться, коли репліка відстає від лідера і показує застарілі дані.</p></li>
+<li><p><strong>Якщо даних чи записів забагато для однієї машини, спроєктуйте шардування:</strong></p>
+<ul>
+<li>ключ шардування (ідентифікатор користувача, хеш ключа, діапазон дат) і чому саме він;</li>
+<li>чи не з’являться «гарячі» шарди, куди потрапить непропорційно багато запитів;</li>
+<li>які запити стануть дорогими: об’єднання даних з різних шардів, запити «по всіх користувачах».</li>
+</ul>
+<p>Якщо все вміщається на одну машину, шардування не робіть: зазначте, за якого зростання навантаження воно знадобиться.</p></li>
+</ol>
+</section>
+<section id="балансування-навантаження" class="level2">
+<h2 class="anchored" data-anchor-id="балансування-навантаження">4. Балансування навантаження</h2>
+<ul>
+<li>Покажіть, де стоять балансувальники: перед сервісами, між репліками читання.</li>
+<li>Оберіть алгоритм (round robin, least connections, consistent hashing) і поясніть вибір. Consistent hashing, наприклад, пасує кешу й шардам: коли додається вузол, переїжджає лише невелика частина ключів.</li>
+<li>Опишіть перевірки стану (health checks): як балансувальник дізнається, що вузол недоступний, і що відбувається із запитами до нього.</li>
+<li>Записи — лише на лідера. Поясніть, що станеться, якщо лідер відмовить.</li>
+</ul>
+</section>
+<section id="кеш" class="level2">
+<h2 class="anchored" data-anchor-id="кеш">5. Кеш</h2>
+<ul>
+<li><strong>Що кешуємо і де:</strong> CDN для статики й файлів, кеш застосунку (Redis) для гарячих даних.</li>
+<li><strong>Стратегія.</strong> Оберіть одну і поясніть:
+<ul>
+<li><em>cache-aside</em> — застосунок спершу читає кеш, а при промаху читає БД і кладе результат у кеш;</li>
+<li><em>write-through</em> — запис іде одночасно в БД і в кеш.</li>
+</ul></li>
+<li><strong>Інвалідація.</strong> Скільки живе запис у кеші (TTL) і коли його скидають примусово. Скільки часу користувач може бачити застарілі дані і чи це прийнятно для цієї сутності. Приклад свідомого компромісу — кеш Moodle на хвилину в <a href="https://01a0ac5a-72cd-826b-0cfd-0e48590c57e6.share.connect.posit.cloud">платформі ШІ-оцінювання</a>.</li>
+<li><strong>Розрахунок:</strong>
+<ul>
+<li>обсяг кешу — яку частку даних кешуємо і чому (наприклад, 20% найпопулярніших);</li>
+<li>очікувана частка влучань у кеш;</li>
+<li>навантаження на БД: читання × (1 − частка влучань).</li>
+</ul></li>
+<li><strong>Що не кешуємо:</strong> дані, де застарілість неприпустима (залишки товару, баланс рахунку), і чому.</li>
+</ul>
+</section>
+<section id="схема-та-висновки" class="level2">
+<h2 class="anchored" data-anchor-id="схема-та-висновки">6. Схема та висновки</h2>
+<ul>
+<li>Намалюйте схему: сервіси → балансувальники → кеш → БД (лідер і репліки, шарди) → об’єктне сховище.</li>
+<li>Що стане першим вузьким місцем, якщо навантаження зросте вдесятеро? Що ви зробите тоді?</li>
+<li>Наскільки розрахунок кількості машин відрізнився від вашої оцінки з етапу 3?</li>
+</ul>
+</section>
+</section>
+<section id="що-здати" class="level1">
+<h1>Що здати</h1>
+<ol type="1">
+<li><strong>Звіт</strong> з усіма етапами: таблиці даних і запитів, вибір БД з обґрунтуванням, розрахунок машин, реплікація й шардування, балансування, кеш, схема й висновки.</li>
+<li><strong>Коротку презентацію</strong> для обговорення на занятті. Порівнюватимемо, які БД обрали різні команди для схожих даних і чому.</li>
+</ol>
+</section>
+<section id="перед-здачею-перевірте" class="level1">
+<h1>Перед здачею перевірте</h1>
+<ul class="task-list">
+<li><label><input type="checkbox">Для кожної сутності вказано тип сховища й запит, під який його обрано.</label></li>
+<li><label><input type="checkbox">Великі файли лежать в об’єктному сховищі, а не в БД.</label></li>
+<li><label><input type="checkbox">RPS і обсяги взято із Завдання №1 або оновлено з поясненням.</label></li>
+<li><label><input type="checkbox">Кількість машин розраховано за обсягом, записами й читаннями — на пікове навантаження, з реплікацією.</label></li>
+<li><label><input type="checkbox">Шардування є лише там, де без нього не обійтися, і для нього обґрунтовано ключ.</label></li>
+<li><label><input type="checkbox">Записи йдуть на лідера; балансуються лише читання.</label></li>
+<li><label><input type="checkbox">Для кешу вказано стратегію, TTL, частку влучань і навантаження на БД після кешу.</label></li>
+<li><label><input type="checkbox">Кеш не є джерелом правди, а неприпустимо застарілі дані не кешуються.</label></li>
+</ul>
+</section>
+<section id="матеріали-для-підготовки" class="level1">
+<h1>Матеріали для підготовки</h1>
+<ul>
+<li><a href="https://01a0ac59-427d-8338-d03c-f00171d8ef69.share.connect.posit.cloud">Слайди лекції «Збір вимог та оцінка навантаження»</a></li>
+<li><a href="https://01a0ac5a-1a0b-3722-03fc-9faa0e03a0a8.share.connect.posit.cloud">Розбір практики: онлайн-магазин</a> і <a href="https://01a0ac5a-72cd-826b-0cfd-0e48590c57e6.share.connect.posit.cloud">платформа ШІ-оцінювання робіт</a></li>
+<li>The System Design Primer: <a href="https://github.com/donnemartin/system-design-primer#database">бази даних</a>, <a href="https://github.com/donnemartin/system-design-primer#sql-or-nosql">SQL чи NoSQL</a>, <a href="https://github.com/donnemartin/system-design-primer#cache">кеш</a>, <a href="https://github.com/donnemartin/system-design-primer#load-balancer">балансувальник навантаження</a></li>
+<li><a href="https://dataintensive.net/">Designing Data-Intensive Applications</a> (Martin Kleppmann) — розділи про реплікацію та шардування</li>
+<li><a href="https://bytebytego.com/courses/system-design-interview/scale-from-zero-to-millions-of-users">System Design Interview</a> (Alex Xu) — розділ «Scale From Zero To Millions Of Users»</li>
 <li><a href="https://docs.google.com/document/d/1pOarvQbjzLd9tz5ZuxktyrYsZ41mbWba5_LUeFj65lI/edit">Textbook for System Design Interviews</a></li>
 </ul>
 </section>
 
-
-<div id="quarto-appendix" class="default"><section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
-
-<ol>
-<li id="fn1"><p>можна знайти рашистською.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-</ol>
-</section></div></main>
+</main>
 <!-- /main column -->
 <script id="quarto-html-after-body" type="application/javascript">
-window.document.addEventListener("DOMContentLoaded", function (event) {
-  const toggleBodyColorMode = (bsSheetEl) => {
-    const mode = bsSheetEl.getAttribute("data-mode");
-    const bodyEl = window.document.querySelector("body");
-    if (mode === "dark") {
-      bodyEl.classList.add("quarto-dark");
-      bodyEl.classList.remove("quarto-light");
-    } else {
-      bodyEl.classList.add("quarto-light");
-      bodyEl.classList.remove("quarto-dark");
-    }
-  }
-  const toggleBodyColorPrimary = () => {
-    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
-    if (bsSheetEl) {
-      toggleBodyColorMode(bsSheetEl);
-    }
-  }
-  toggleBodyColorPrimary();  
-  const icon = "";
-  const anchorJS = new window.AnchorJS();
-  anchorJS.options = {
-    placement: 'right',
-    icon: icon
-  };
-  anchorJS.add('.anchored');
-  const isCodeAnnotation = (el) => {
-    for (const clz of el.classList) {
-      if (clz.startsWith('code-annotation-')) {                     
-        return true;
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
       }
+      return false;
     }
-    return false;
-  }
-  const clipboard = new window.ClipboardJS('.code-copy-button', {
-    text: function(trigger) {
-      const codeEl = trigger.previousElementSibling.cloneNode(true);
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
       for (const childEl of codeEl.children) {
         if (isCodeAnnotation(childEl)) {
           childEl.remove();
@@ -136,195 +468,348 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       }
       return codeEl.innerText;
     }
-  });
-  clipboard.on('success', function(e) {
-    // button target
-    const button = e.trigger;
-    // don't keep focus
-    button.blur();
-    // flash "checked"
-    button.classList.add('code-copy-button-checked');
-    var currentTitle = button.getAttribute("title");
-    button.setAttribute("title", "Copied!");
-    let tooltip;
-    if (window.bootstrap) {
-      button.setAttribute("data-bs-toggle", "tooltip");
-      button.setAttribute("data-bs-placement", "left");
-      button.setAttribute("data-bs-title", "Copied!");
-      tooltip = new bootstrap.Tooltip(button, 
-        { trigger: "manual", 
-          customClass: "code-copy-button-tooltip",
-          offset: [0, -8]});
-      tooltip.show();    
-    }
-    setTimeout(function() {
-      if (tooltip) {
-        tooltip.hide();
-        button.removeAttribute("data-bs-title");
-        button.removeAttribute("data-bs-toggle");
-        button.removeAttribute("data-bs-placement");
-      }
-      button.setAttribute("title", currentTitle);
-      button.classList.remove('code-copy-button-checked');
-    }, 1000);
-    // clear code selection
-    e.clearSelection();
-  });
-  function tippyHover(el, contentFn) {
-    const config = {
-      allowHTML: true,
-      content: contentFn,
-      maxWidth: 500,
-      delay: 100,
-      arrow: false,
-      appendTo: function(el) {
-          return el.parentElement;
-      },
-      interactive: true,
-      interactiveBorder: 10,
-      theme: 'quarto',
-      placement: 'bottom-start'
-    };
-    window.tippy(el, config); 
-  }
-  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
-  for (var i=0; i<noterefs.length; i++) {
-    const ref = noterefs[i];
-    tippyHover(ref, function() {
-      // use id or data attribute instead here
-      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
-      try { href = new URL(href).hash; } catch {}
-      const id = href.replace(/^#\/?/, "");
-      const note = window.document.getElementById(id);
-      return note.innerHTML;
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
     });
-  }
-      let selectedAnnoteEl;
-      const selectorForAnnotation = ( cell, annotation) => {
-        let cellAttr = 'data-code-cell="' + cell + '"';
-        let lineAttr = 'data-code-annotation="' +  annotation + '"';
-        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
-        return selector;
-      }
-      const selectCodeLines = (annoteEl) => {
-        const doc = window.document;
-        const targetCell = annoteEl.getAttribute("data-target-cell");
-        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
-        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
-        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
-        const lineIds = lines.map((line) => {
-          return targetCell + "-" + line;
-        })
-        let top = null;
-        let height = null;
-        let parent = null;
-        if (lineIds.length > 0) {
-            //compute the position of the single el (top and bottom and make a div)
-            const el = window.document.getElementById(lineIds[0]);
-            top = el.offsetTop;
-            height = el.offsetHeight;
-            parent = el.parentElement.parentElement;
-          if (lineIds.length > 1) {
-            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
-            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
-            height = bottom - top;
-          }
-          if (top !== null && height !== null && parent !== null) {
-            // cook up a div (if necessary) and position it 
-            let div = window.document.getElementById("code-annotation-line-highlight");
-            if (div === null) {
-              div = window.document.createElement("div");
-              div.setAttribute("id", "code-annotation-line-highlight");
-              div.style.position = 'absolute';
-              parent.appendChild(div);
-            }
-            div.style.top = top - 2 + "px";
-            div.style.height = height + 4 + "px";
-            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
-            if (gutterDiv === null) {
-              gutterDiv = window.document.createElement("div");
-              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
-              gutterDiv.style.position = 'absolute';
-              const codeCell = window.document.getElementById(targetCell);
-              const gutter = codeCell.querySelector('.code-annotation-gutter');
-              gutter.appendChild(gutterDiv);
-            }
-            gutterDiv.style.top = top - 2 + "px";
-            gutterDiv.style.height = height + 4 + "px";
-          }
-          selectedAnnoteEl = annoteEl;
-        }
-      };
-      const unselectCodeLines = () => {
-        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
-        elementsIds.forEach((elId) => {
-          const div = window.document.getElementById(elId);
-          if (div) {
-            div.remove();
-          }
-        });
-        selectedAnnoteEl = undefined;
-      };
-      // Attach click handler to the DT
-      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
-      for (const annoteDlNode of annoteDls) {
-        annoteDlNode.addEventListener('click', (event) => {
-          const clickedEl = event.target;
-          if (clickedEl !== selectedAnnoteEl) {
-            unselectCodeLines();
-            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
-            if (activeEl) {
-              activeEl.classList.remove('code-annotation-active');
-            }
-            selectCodeLines(clickedEl);
-            clickedEl.classList.add('code-annotation-active');
-          } else {
-            // Unselect the line
-            unselectCodeLines();
-            clickedEl.classList.remove('code-annotation-active');
-          }
-        });
-      }
-  const findCites = (el) => {
-    const parentEl = el.parentElement;
-    if (parentEl) {
-      const cites = parentEl.dataset.cites;
-      if (cites) {
-        return {
-          el,
-          cites: cites.split(' ')
-        };
-      } else {
-        return findCites(el.parentElement)
-      }
-    } else {
-      return undefined;
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
     }
-  };
-  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
-  for (var i=0; i<bibliorefs.length; i++) {
-    const ref = bibliorefs[i];
-    const citeInfo = findCites(ref);
-    if (citeInfo) {
-      tippyHover(citeInfo.el, function() {
-        var popup = window.document.createElement('div');
-        citeInfo.cites.forEach(function(cite) {
-          var citeDiv = window.document.createElement('div');
-          citeDiv.classList.add('hanging-indent');
-          citeDiv.classList.add('csl-entry');
-          var biblioDiv = window.document.getElementById('ref-' + cite);
-          if (biblioDiv) {
-            citeDiv.innerHTML = biblioDiv.innerHTML;
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
           }
-          popup.appendChild(citeDiv);
-        });
-        return popup.innerHTML;
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
       });
     }
-  }
-});
-</script>
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
 </div> <!-- /content -->
+
 
 
 
