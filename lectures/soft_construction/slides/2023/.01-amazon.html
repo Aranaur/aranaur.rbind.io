@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Розбір практики: онлайн-магазин</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src=".01-amazon_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".01-amazon_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src=".01-amazon_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src=".01-amazon_files/libs/quarto-html/popper.min.js"></script>
+<script src=".01-amazon_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src=".01-amazon_files/libs/quarto-html/anchor.min.js"></script>
+<link href=".01-amazon_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".01-amazon_files/libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".01-amazon_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href=".01-amazon_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href=".01-amazon_files/libs/bootstrap/bootstrap-efbb37e9afcc02144ebbc7afd12a776f.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src=".01-amazon_files/libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href=".01-amazon_files/libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href=".01-amazon_files/libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<meta name="mermaid-theme" content="neutral">
+<script src=".01-amazon_files/libs/quarto-diagram/mermaid.min.js"></script>
+<script src=".01-amazon_files/libs/quarto-diagram/mermaid-init.js"></script>
+<link href=".01-amazon_files/libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Зміст</h2>
+   
+  <ul>
+  <li><a href="#про-цей-розбір" id="toc-про-цей-розбір" class="nav-link active" data-scroll-target="#про-цей-розбір">Про цей розбір</a></li>
+  <li><a href="#межі-системи" id="toc-межі-системи" class="nav-link" data-scroll-target="#межі-системи">1. Межі системи</a></li>
+  <li><a href="#функціональні-вимоги" id="toc-функціональні-вимоги" class="nav-link" data-scroll-target="#функціональні-вимоги">2. Функціональні вимоги</a></li>
+  <li><a href="#нефункціональні-вимоги" id="toc-нефункціональні-вимоги" class="nav-link" data-scroll-target="#нефункціональні-вимоги">3. Нефункціональні вимоги</a>
+  <ul class="collapse">
+  <li><a href="#вимірювані-формулювання" id="toc-вимірювані-формулювання" class="nav-link" data-scroll-target="#вимірювані-формулювання">Вимірювані формулювання</a></li>
+  <li><a href="#консистентність-чи-доступність" id="toc-консистентність-чи-доступність" class="nav-link" data-scroll-target="#консистентність-чи-доступність">Консистентність чи доступність</a></li>
+  </ul></li>
+  <li><a href="#високорівневий-дизайн" id="toc-високорівневий-дизайн" class="nav-link" data-scroll-target="#високорівневий-дизайн">4. Високорівневий дизайн</a>
+  <ul class="collapse">
+  <li><a href="#що-на-дошці" id="toc-що-на-дошці" class="nav-link" data-scroll-target="#що-на-дошці">Що на дошці</a></li>
+  <li><a href="#що-варто-виправити" id="toc-що-варто-виправити" class="nav-link" data-scroll-target="#що-варто-виправити">Що варто виправити</a></li>
+  <li><a href="#оновлена-діаграма" id="toc-оновлена-діаграма" class="nav-link" data-scroll-target="#оновлена-діаграма">Оновлена діаграма</a></li>
+  <li><a href="#оформлення-замовлення" id="toc-оформлення-замовлення" class="nav-link" data-scroll-target="#оформлення-замовлення">Оформлення замовлення</a></li>
+  <li><a href="#основні-api" id="toc-основні-api" class="nav-link" data-scroll-target="#основні-api">Основні API</a></li>
+  </ul></li>
+  <li><a href="#оцінка-навантаження" id="toc-оцінка-навантаження" class="nav-link" data-scroll-target="#оцінка-навантаження">5. Оцінка навантаження</a>
+  <ul class="collapse">
+  <li><a href="#припущення" id="toc-припущення" class="nav-link" data-scroll-target="#припущення">Припущення</a></li>
+  <li><a href="#перевірка-розрахунків-з-дошки" id="toc-перевірка-розрахунків-з-дошки" class="nav-link" data-scroll-target="#перевірка-розрахунків-з-дошки">Перевірка розрахунків з дошки</a></li>
+  <li><a href="#запити" id="toc-запити" class="nav-link" data-scroll-target="#запити">Запити</a></li>
+  <li><a href="#мережа" id="toc-мережа" class="nav-link" data-scroll-target="#мережа">Мережа</a></li>
+  <li><a href="#сховище-на-5-років" id="toc-сховище-на-5-років" class="nav-link" data-scroll-target="#сховище-на-5-років">Сховище на 5 років</a></li>
+  <li><a href="#залізо" id="toc-залізо" class="nav-link" data-scroll-target="#залізо">Залізо</a></li>
+  <li><a href="#вартість-на-5-років" id="toc-вартість-на-5-років" class="nav-link" data-scroll-target="#вартість-на-5-років">Вартість на 5 років</a></li>
+  </ul></li>
+  <li><a href="#висновки" id="toc-висновки" class="nav-link" data-scroll-target="#висновки">Висновки</a></li>
+  <li><a href="#питання-для-обговорення" id="toc-питання-для-обговорення" class="nav-link" data-scroll-target="#питання-для-обговорення">Питання для обговорення</a></li>
+  <li><a href="#матеріали" id="toc-матеріали" class="nav-link" data-scroll-target="#матеріали">Матеріали</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content page-columns page-full" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Розбір практики: онлайн-магазин</h1>
+<p class="subtitle lead">Конструювання програмного забезпечення</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="про-цей-розбір" class="level1">
+<h1>Про цей розбір</h1>
+<p>На практичному занятті ми спроєктували онлайн-магазин на кшталт Amazon: зібрали вимоги, намалювали високорівневий дизайн і оцінили навантаження (<a href="Amazon.pdf">дошка у PDF</a>). Тут перевіряємо кожен крок, виправляємо помилки й доповнюємо те, чого бракувало.</p>
+<p>Позначки: ✅ правильно, ⚠️ неточність або пропуск, ❌ помилка.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="img/amazon-board.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Дошка з практичного заняття"><img src="img/amazon-board.png" class="img-fluid figure-img" alt="Дошка з практичного заняття"></a></p>
+<figcaption>Дошка з практичного заняття</figcaption>
+</figure>
+</div>
+</section>
+<section id="межі-системи" class="level1">
+<h1>1. Межі системи</h1>
+<p><strong>На дошці:</strong></p>
+<ol type="1">
+<li>Онлайн-магазин, а не маркетплейс.</li>
+<li>Доставка, логістика, поповнення складу тощо не входить.</li>
+</ol>
+<p>✅ Добре, що межі задано явно: без цього неможливо зрозуміти, що саме ми проєктуємо.</p>
+<p>⚠️ Два уточнення:</p>
+<ul>
+<li>Доставка поза межами, але на діаграмі є «Сервіс доставки». Суперечності немає, якщо вважати його <strong>зовнішнім</strong> сервісом, якому ми лише передаємо оплачене замовлення. На дошці він, як і сервіс оплати, позначений окремим кольором.</li>
+<li>Поповнення складу поза межами, а от <strong>резервування залишків</strong> під час оформлення замовлення — ні. Без нього магазин продасть товар, якого вже немає на складі.</li>
+</ul>
+</section>
+<section id="функціональні-вимоги" class="level1">
+<h1>2. Функціональні вимоги</h1>
+<p><strong>На дошці:</strong></p>
+<ol type="1">
+<li>Перегляд сторінки товару.</li>
+<li>Пошук товару.</li>
+<li>Головна сторінка магазину.</li>
+<li>Кошик, списки улюбленого, оплата.</li>
+<li>Керування замовленням.</li>
+</ol>
+<p>✅ Основні сценарії покупця охоплено.</p>
+<p>⚠️ Що варто виправити:</p>
+<ul>
+<li>Бракує <strong>реєстрації та профілю користувача</strong>, хоча на діаграмі є інтерфейс, бекенд і БД профілю. Вимоги й діаграма мають збігатися: кожен блок на діаграмі підтримує якусь вимогу.</li>
+<li>Кошик і оплата об’єднані в одному пункті, але мають протилежні вимоги до консистентності (див. <a href="#нефункціональні-вимоги">розділ 3</a>). Їх варто розділити.</li>
+<li>Дрібниці: «Функуціональні» → «Функціональні», «Бєекенд» → «Бекенд», «Корзина» → «Кошик».</li>
+</ul>
+<p><strong>Доповнений список:</strong></p>
+<ol type="1">
+<li>Перегляд сторінки товару.</li>
+<li>Пошук товару з фільтрами.</li>
+<li>Головна сторінка магазину.</li>
+<li>Кошик і списки улюбленого.</li>
+<li>Оформлення та оплата замовлення.</li>
+<li>Керування замовленнями: статус, скасування, історія.</li>
+<li>Реєстрація та профіль користувача з адресами доставки.</li>
+</ol>
+<p><strong>Свідомо винесено за межі:</strong> відгуки й рейтинги, рекомендації, продавці-партнери (це вже маркетплейс), склад і доставка.</p>
+</section>
+<section id="нефункціональні-вимоги" class="level1">
+<h1>3. Нефункціональні вимоги</h1>
+<p><strong>На дошці:</strong></p>
+<ol type="1">
+<li>Низька затримка / швидкий відгук.</li>
+<li>Доступність.</li>
+<li>Консистентність.</li>
+</ol>
+<p>⚠️ Дві проблеми:</p>
+<ol type="1">
+<li><strong>Вимоги неможливо перевірити.</strong> Що таке «низька затримка» — 50 мс чи 2 секунди?</li>
+<li><strong>Доступність і консистентність заявлено одночасно.</strong> За CAP-теоремою під час розділення мережі розподілена система не може гарантувати обидві. Тому вибір робимо окремо для кожної операції.</li>
+</ol>
+<section id="вимірювані-формулювання" class="level2">
+<h2 class="anchored" data-anchor-id="вимірювані-формулювання">Вимірювані формулювання</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Вимога</th>
+<th style="text-align: left;">Формулювання</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Затримка</td>
+<td style="text-align: left;">сторінка товару й пошук відповідають не довше ніж за 200 мс для 99% запитів</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Доступність</td>
+<td style="text-align: left;">каталог і кошик доступні 99.99% часу, тобто не більше ≈ 4 хв простою на місяць</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Надійність</td>
+<td style="text-align: left;">оплачене замовлення не губиться</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Масштаб</td>
+<td style="text-align: left;">система витримує пікове навантаження, утричі більше за середнє</td>
+</tr>
+</tbody>
+</table>
+<p>Сама Amazon формулює вимоги саме так. У <a href="https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf">статті про сховище Dynamo</a> (SOSP 2007) наведено приклад угоди про рівень обслуговування: сервіс гарантує відповідь за 300 мс для 99.9% запитів за пікового навантаження 500 запитів на секунду. Середній час відповіді не показує, що відчувають найповільніше обслужені покупці, тому Amazon вимірює саме 99.9-й перцентиль.</p>
+</section>
+<section id="консистентність-чи-доступність" class="level2">
+<h2 class="anchored" data-anchor-id="консистентність-чи-доступність">Консистентність чи доступність</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Операція</th>
+<th style="text-align: left;">Під час збою мережі обираємо</th>
+<th style="text-align: left;">Чому</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Перегляд товару, пошук, головна сторінка</td>
+<td style="text-align: left;"><strong>Доступність</strong></td>
+<td style="text-align: left;">Ціна чи опис, застарілі на кілька секунд, — не біда. Недоступний магазин — втрачені продажі.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Кошик</td>
+<td style="text-align: left;"><strong>Доступність</strong></td>
+<td style="text-align: left;">Додати товар у кошик можна завжди. Якщо через збій з’явилися дві версії кошика, їх зливають в одну.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Оформлення замовлення й оплата</td>
+<td style="text-align: left;"><strong>Консистентність</strong></td>
+<td style="text-align: left;">Не можна двічі списати гроші або продати товар, якого немає. Краще показати «спробуйте пізніше».</td>
+</tr>
+</tbody>
+</table>
+<p>Вибір для кошика — не вигадка. За словами Amazon, покупці повинні мати змогу переглядати й додавати товари в кошик, «навіть якщо відмовляють диски, мережеві маршрути нестабільні або дата-центри руйнує торнадо», а операція «Додати в кошик» ніколи не має губитися.</p>
+<p>Кошик міг «застаріти», поки покупець вагався, тож ціни й залишки перевіряємо ще раз під час оформлення замовлення.</p>
+</section>
+</section>
+<section id="високорівневий-дизайн" class="level1 page-columns page-full">
+<h1>4. Високорівневий дизайн</h1>
+<section id="що-на-дошці" class="level2">
+<h2 class="anchored" data-anchor-id="що-на-дошці">Що на дошці</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Компонент</th>
+<th style="text-align: left;">Звертається до</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Бекенд товару</td>
+<td style="text-align: left;">БД товару (MongoDB)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Бекенд пошуку</td>
+<td style="text-align: left;">БД товару</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Бекенд головної сторінки</td>
+<td style="text-align: left;">БД товару</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Бекенд кошика</td>
+<td style="text-align: left;">БД товару, БД користувачів (MySQL), сервіс оплати, бекенд замовлень</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Бекенд замовлень</td>
+<td style="text-align: left;">БД замовлень (MySQL), сервіс доставки</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">БД замовлень</td>
+<td style="text-align: left;">архів (Cassandra)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Бекенд профілю</td>
+<td style="text-align: left;">БД користувачів</td>
+</tr>
+</tbody>
+</table>
+<p>Кожен бекенд має свій інтерфейс. Насправді це сторінки одного веб- чи мобільного клієнта, тож на оновленій діаграмі вони об’єднані в один блок.</p>
+<p>✅ Вдалі рішення:</p>
+<ul>
+<li><strong>Сервіси розділено за функціями</strong>, тож кожен можна масштабувати окремо: пошук отримує набагато більше запитів, ніж профіль.</li>
+<li><strong>MongoDB для каталогу.</strong> Товари різних категорій мають різні атрибути (у ноутбука — процесор, у футболки — розмір), і документна модель зберігає їх без порожніх колонок.</li>
+<li><strong>MySQL для користувачів і замовлень.</strong> Тут потрібні транзакції.</li>
+<li><strong>Окремий архів для старих замовлень.</strong> Основна БД не росте безмежно, а Cassandra добре витримує великі обсяги даних і читання за ключем, наприклад історію замовлень користувача.</li>
+</ul>
+</section>
+<section id="що-варто-виправити" class="level2">
+<h2 class="anchored" data-anchor-id="що-варто-виправити">Що варто виправити</h2>
+<ol type="1">
+<li>❌ <strong>Немає сховища зображень і CDN.</strong> Зображення дають майже весь трафік і більшу частину сховища (див. <a href="#оцінка-навантаження">розрахунки</a>), а на діаграмі їх не видно. Зображення зберігаємо в об’єктному сховищі (на кшталт Amazon S3) і роздаємо через CDN, щоб вони не проходили через наші бекенди.</li>
+<li>❌ <strong>Оплату викликає бекенд кошика ще до створення замовлення.</strong> Якщо оплата пройде, а замовлення не збережеться через збій чи тайм-аут, гроші буде списано без замовлення. А повторний запит спише їх удруге. Оформленням має керувати сервіс замовлень: спершу створює замовлення зі статусом «очікує оплати», потім викликає оплату з <strong>ключем ідемпотентності</strong> (див. <a href="#оформлення-замовлення">схему</a>).</li>
+<li>⚠️ <strong>Пошук іде напряму в БД товару.</strong> Повнотекстовий пошук серед 100 млн товарів з фільтрами й сортуванням — окреме завдання для пошукового індексу (Elasticsearch або OpenSearch), який оновлюється зі змін у каталозі.</li>
+<li>⚠️ <strong>Немає залишків товару.</strong> Під час оформлення замовлення товар треба зарезервувати в тій самій транзакції, що й замовлення. Інакше двоє покупців куплять останній примірник.</li>
+<li>⚠️ <strong>Невідомо, де зберігається кошик.</strong> Кошики часто змінюються і мають бути доступні завжди. Тут пасує key-value сховище: сама Amazon зберігає кошики в Dynamo, ідеї якого лягли в основу Amazon DynamoDB.</li>
+<li>⚠️ <strong>Сервіс доставки викликається синхронно.</strong> Якщо зовнішній сервіс доставки недоступний, оформлення замовлення не повинно через це падати. Передаємо подію «замовлення оплачено» через чергу повідомлень, а доставка обробить її, щойно зможе.</li>
+<li>⚠️ <strong>Немає балансувальника та кешу.</strong> Головну сторінку й сторінки товарів читають значно частіше, ніж змінюють, тож їх варто кешувати (наприклад, у Redis), а запити розподіляти між кількома копіями кожного сервісу.</li>
+</ol>
+</section>
+<section id="оновлена-діаграма" class="level2 page-columns page-full">
+<h2 class="anchored" data-anchor-id="оновлена-діаграма">Оновлена діаграма</h2>
+<p>Прямокутники — наші сервіси, циліндри — сховища даних. Жовтим позначено нові компоненти, фіолетовим — зовнішні сервіси.</p>
+<div class="column-page">
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart TB
+  client["Клієнт"]
+  cdn["CDN"]:::new
+  gateway["API Gateway"]:::new
+  images[("S3&lt;br&gt;зображення")]:::new
+
+  home["Головна"]
+  product["Товар"]
+  search["Пошук"]
+  cart["Кошик"]
+  orders["Замовлення"]
+  profile["Профіль"]
+
+  cache[("Redis&lt;br&gt;кеш")]:::new
+  catalog[("MongoDB&lt;br&gt;каталог")]
+  index[("Elasticsearch&lt;br&gt;індекс")]:::new
+  carts[("key-value&lt;br&gt;кошики")]:::new
+  ordersdb[("MySQL&lt;br&gt;замовлення, залишки")]
+  users[("MySQL&lt;br&gt;користувачі")]
+  payment["Оплата"]:::external
+  queue[["Черга подій"]]:::new
+  delivery["Доставка"]:::external
+  archive[("Cassandra&lt;br&gt;архів")]
+
+  client --&gt; cdn --&gt; images
+  client --&gt; gateway
+  gateway --&gt; home &amp; product &amp; search &amp; cart &amp; orders &amp; profile
+
+  home --&gt; cache &amp; catalog
+  product --&gt; cache &amp; catalog
+  catalog -. зміни .-&gt; index
+  search --&gt; index
+  cart --&gt; carts
+  orders --&gt; cart &amp; product &amp; ordersdb &amp; payment &amp; queue
+  queue --&gt; delivery
+  ordersdb -. старі .-&gt; archive
+  profile --&gt; users
+
+  classDef new fill:#fff3bf,stroke:#e0a800,stroke-width:2px
+  classDef external fill:#e5dbff,stroke:#7048e8
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="оформлення-замовлення" class="level2 page-columns page-full">
+<h2 class="anchored" data-anchor-id="оформлення-замовлення">Оформлення замовлення</h2>
+<div class="column-page">
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {"sequence": {"actorFontSize": 16, "messageFontSize": 16, "noteFontSize": 16}}}%%
+sequenceDiagram
+  autonumber
+  participant C as Клієнт
+  participant O as Замовлення
+  participant K as Кошик
+  participant T as Товар
+  participant DB as MySQL
+  participant P as Оплата
+  participant Q as Черга
+  participant D as Доставка
+
+  C-&gt;&gt;O: POST /orders, Idempotency-Key
+  O-&gt;&gt;K: вміст кошика
+  O-&gt;&gt;T: актуальні ціни
+  O-&gt;&gt;DB: резерв і «очікує оплати»
+  O-&gt;&gt;P: списати суму, той самий ключ
+  P--&gt;&gt;O: результат
+  alt оплачено
+    O-&gt;&gt;DB: «оплачено»
+    O-&gt;&gt;Q: подія «оплачено»
+    Q-)D: створити відправлення
+  else відмова
+    O-&gt;&gt;DB: зняти резерв, «скасовано»
+  end
+  O--&gt;&gt;C: результат оформлення
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</div>
+<p>Резерв залишків і створення замовлення виконуються в одній транзакції MySQL, а доставку сервіс замовлень не чекає: подія з черги обробляється асинхронно.</p>
+<p><strong>Навіщо ключ ідемпотентності.</strong> Клієнт генерує унікальний ключ для кожної спроби оформлення. Якщо відповідь загубилася і клієнт повторив запит з тим самим ключем, сервіс замовлень поверне вже створене замовлення, а сервіс оплати не спише гроші вдруге.</p>
+</section>
+<section id="основні-api" class="level2">
+<h2 class="anchored" data-anchor-id="основні-api">Основні API</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Метод</th>
+<th style="text-align: left;">Шлях</th>
+<th style="text-align: left;">Що робить</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><code>GET</code></td>
+<td style="text-align: left;"><code>/home</code></td>
+<td style="text-align: left;">головна сторінка</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>GET</code></td>
+<td style="text-align: left;"><code>/products/{id}</code></td>
+<td style="text-align: left;">сторінка товару</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>GET</code></td>
+<td style="text-align: left;"><code>/search?q=…&amp;category=…&amp;page=…</code></td>
+<td style="text-align: left;">пошук з фільтрами</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>POST</code></td>
+<td style="text-align: left;"><code>/cart/items</code></td>
+<td style="text-align: left;">додати товар у кошик</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>DELETE</code></td>
+<td style="text-align: left;"><code>/cart/items/{id}</code></td>
+<td style="text-align: left;">прибрати товар з кошика</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>POST</code></td>
+<td style="text-align: left;"><code>/wishlist/items</code></td>
+<td style="text-align: left;">додати товар у список улюбленого</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>POST</code></td>
+<td style="text-align: left;"><code>/orders</code></td>
+<td style="text-align: left;">оформити замовлення (заголовок <code>Idempotency-Key</code>)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>GET</code></td>
+<td style="text-align: left;"><code>/orders/{id}</code></td>
+<td style="text-align: left;">статус замовлення</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>POST</code></td>
+<td style="text-align: left;"><code>/orders/{id}/cancel</code></td>
+<td style="text-align: left;">скасувати замовлення</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="оцінка-навантаження" class="level1">
+<h1>5. Оцінка навантаження</h1>
+<section id="припущення" class="level2">
+<h2 class="anchored" data-anchor-id="припущення">Припущення</h2>
+<p><strong>На дошці:</strong></p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Припущення</th>
+<th style="text-align: left;">Коментар</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">MAU 100 млн</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">DAU 10 млн</td>
+<td style="text-align: left;">✅ DAU/MAU = 10% — правдоподібно для магазину, куди заходять не щодня. На дошці «DAu» → «DAU».</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">100 млн товарів</td>
+<td style="text-align: left;">✅</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">100 зображень на активного користувача: 10 переглядів товару × 10 зображень</td>
+<td style="text-align: left;">⚠️ Не вказано, що це <strong>на день</strong>.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">1 покупка на активного користувача</td>
+<td style="text-align: left;">⚠️ Дуже песимістично: конверсія інтернет-магазинів зазвичай вимірюється одиницями відсотків. Якщо купують 3% активних користувачів, це 300 тис. замовлень на день (≈ 3–4 за секунду), а не 10 млн. Залишаємо як верхню межу.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Додано для повного розрахунку:</strong></p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Припущення</th>
+<th style="text-align: left;">Значення</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Пошукових запитів на активного користувача за день</td>
+<td style="text-align: left;">5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Відвідувань головної сторінки на активного користувача за день</td>
+<td style="text-align: left;">2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Дій з кошиком на активного користувача за день</td>
+<td style="text-align: left;">3</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Середня тривалість сесії</td>
+<td style="text-align: left;">15 хв</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Середній розмір зображення</td>
+<td style="text-align: left;">500 кБ (як на дошці)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Зменшені копії зображень (прев’ю)</td>
+<td style="text-align: left;">+20% до обсягу оригіналів</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Запис про товар / замовлення / користувача / кошик</td>
+<td style="text-align: left;">10 кБ / 2 кБ / 10 кБ / 5 кБ</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Усього акаунтів</td>
+<td style="text-align: left;">200 млн (удвічі більше за MAU)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Пікове навантаження</td>
+<td style="text-align: left;">×3 від середнього</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Реплікація</td>
+<td style="text-align: left;">×3</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Горизонт</td>
+<td style="text-align: left;">5 років, каталог не росте (як на дошці)</td>
+</tr>
+</tbody>
+</table>
+<p>Як і на дошці, вважаємо добу ≈ 10<sup>5</sup> с. Точніше це 86 400 с, тож реальні RPS приблизно на 15% вищі, але цю різницю покриває запас на пік.</p>
+</section>
+<section id="перевірка-розрахунків-з-дошки" class="level2">
+<h2 class="anchored" data-anchor-id="перевірка-розрахунків-з-дошки">Перевірка розрахунків з дошки</h2>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>🔮 Спершу перевірте самі
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Перш ніж читати таблицю, перевірте розрахунки на дошці. В одному рядку є груба помилка, ще в кількох — неточності.</p>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">На дошці</th>
+<th style="text-align: left;">Перевірка</th>
+<th style="text-align: left;">Вердикт</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">10 млн × 100 / 10<sup>5</sup> ≈ 10 тис. RPS (читання)</td>
+<td style="text-align: left;">10<sup>9</sup> / 10<sup>5</sup> = 10 тис.</td>
+<td style="text-align: left;">✅ Але це запити <strong>зображень</strong>. До API надходить ≈ 2 тис. RPS (див. нижче).</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Запис : читання = 1 : 100 → 10 тис. / 100 = 100 RPS (запис)</td>
+<td style="text-align: left;">10 млн покупок / 10<sup>5</sup> = 100</td>
+<td style="text-align: left;">✅ Збігається з «1 покупка на активного користувача».</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">10 тис. RPS × 500 кБ = 5 ГБ/с</td>
+<td style="text-align: left;">5 · 10<sup>6</sup> кБ/с = 5 ГБ/с</td>
+<td style="text-align: left;">✅ Це гігабайти. У гігабітах — 40 Gbps, і на дошці це правильно враховано в «≥ 40 машин».</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">5 ГБ/с × 100 000 × 400 = 200 PB на рік</td>
+<td style="text-align: left;">5 ГБ/с × 86 400 с × 365 ≈ 160 PB</td>
+<td style="text-align: left;">✅ З округленням угору.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">100 млн × 10 × 500 кБ = 500 ТБ &lt; 600 ТБ</td>
+<td style="text-align: left;">5 · 10<sup>11</sup> кБ = 500 ТБ</td>
+<td style="text-align: left;">⚠️ Без реплікації. 600 ТБ можна вважати запасом на прев’ю.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Навантаження ≤ 10 машин</td>
+<td style="text-align: left;">6.3 тис. RPS у пік</td>
+<td style="text-align: left;">✅ З запасом. Але якщо тримати кожен сервіс у 2–3 копіях, машин буде ≈ 15.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Мережа ≥ 40 машин</td>
+<td style="text-align: left;">40 Gbps / 1 Gbps</td>
+<td style="text-align: left;">⚠️ Лише якщо роздавати зображення з власних машин по 1 Gbps. З CDN і мережевими картами на 10 Gbps вистачить 2–3 машин.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Сховище ≤ 100 SSD ≈ 100 машин</td>
+<td style="text-align: left;">600 ТБ / 50 ТБ на машину = 12</td>
+<td style="text-align: left;">❌ ≈ 100 — це кількість <strong>дисків</strong> по 8 ТБ (600 / 8 = 75), а не машин. В одну машину ставимо кілька дисків: 12 машин, з реплікацією — 36.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Трафік: $0.1 / 1 ГБ × 200 PT = $20 млн</td>
+<td style="text-align: left;">2 · 10<sup>8</sup> ГБ × $0.1 = $20 млн</td>
+<td style="text-align: left;">✅ За рік. «PT» → «PB». За 5 років — ≈ $80 млн.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Сховище: 600 ТБ × $300 = $180 тис.</td>
+<td style="text-align: left;">✅</td>
+<td style="text-align: left;">⚠️ Без реплікації. І SSD для зображень, які й так роздає CDN, — зайва витрата: на HDD це $18 тис.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="запити" class="level2">
+<h2 class="anchored" data-anchor-id="запити">Запити</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Запити</th>
+<th style="text-align: left;">Формула</th>
+<th style="text-align: right;">Середнє, RPS</th>
+<th style="text-align: right;">Пік (×3), RPS</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Сторінки товарів</td>
+<td style="text-align: left;">10 млн × 10 / 10<sup>5</sup></td>
+<td style="text-align: right;">1 000</td>
+<td style="text-align: right;">3 000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Пошук</td>
+<td style="text-align: left;">10 млн × 5 / 10<sup>5</sup></td>
+<td style="text-align: right;">500</td>
+<td style="text-align: right;">1 500</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Головна сторінка</td>
+<td style="text-align: left;">10 млн × 2 / 10<sup>5</sup></td>
+<td style="text-align: right;">200</td>
+<td style="text-align: right;">600</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Кошик (запис)</td>
+<td style="text-align: left;">10 млн × 3 / 10<sup>5</sup></td>
+<td style="text-align: right;">300</td>
+<td style="text-align: right;">900</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Замовлення (запис)</td>
+<td style="text-align: left;">10 млн × 1 / 10<sup>5</sup></td>
+<td style="text-align: right;">100</td>
+<td style="text-align: right;">300</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>API разом</strong></td>
+<td style="text-align: left;"></td>
+<td style="text-align: right;"><strong>2 100</strong></td>
+<td style="text-align: right;"><strong>6 300</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Зображення (через CDN)</td>
+<td style="text-align: left;">10 млн × 100 / 10<sup>5</sup></td>
+<td style="text-align: right;">10 000</td>
+<td style="text-align: right;">30 000</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Для API співвідношення читання до запису — 1 700 : 400 ≈ 4 : 1. Співвідношення 100 : 1 з дошки виходить, лише якщо порівнювати запити зображень із замовленнями.</li>
+<li><strong>Одночасні користувачі:</strong> 10 млн × 15 хв × 60 / 86 400 ≈ 100 тис. (у пік ≈ 300 тис.), тобто рівень C100k.</li>
+</ul>
+</section>
+<section id="мережа" class="level2">
+<h2 class="anchored" data-anchor-id="мережа">Мережа</h2>
+<ul>
+<li><strong>Зображення:</strong> 10 тис. RPS × 500 кБ = 5 ГБ/с = <strong>40 Gbps</strong>, у пік — 120 Gbps.</li>
+<li><strong>API:</strong> навіть якщо відповідь займає 50 кБ, 2 100 RPS × 50 кБ ≈ 105 МБ/с ≈ <strong>1 Gbps</strong>.</li>
+<li><strong>Вихідний трафік:</strong> 5 ГБ/с × 86 400 с × 365 ≈ <strong>160 PB на рік</strong>, за 5 років ≈ <strong>790 PB ≈ 0.8 EB</strong>.</li>
+<li><strong>З CDN:</strong> якщо CDN віддає з кешу 90% зображень, до наших серверів доходить лише ≈ 4 Gbps, а в пік — 12 Gbps.</li>
+</ul>
+</section>
+<section id="сховище-на-5-років" class="level2">
+<h2 class="anchored" data-anchor-id="сховище-на-5-років">Сховище на 5 років</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Дані</th>
+<th style="text-align: left;">Формула</th>
+<th style="text-align: right;">Обсяг</th>
+<th style="text-align: right;">З реплікацією ×3</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Зображення з прев’ю</td>
+<td style="text-align: left;">100 млн × 10 × 500 кБ × 1.2</td>
+<td style="text-align: right;">600 ТБ</td>
+<td style="text-align: right;">1.8 PB</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Каталог</td>
+<td style="text-align: left;">100 млн × 10 кБ</td>
+<td style="text-align: right;">1 ТБ</td>
+<td style="text-align: right;">3 ТБ</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Замовлення</td>
+<td style="text-align: left;">10 млн × 2 кБ × 1 825 днів</td>
+<td style="text-align: right;">36.5 ТБ</td>
+<td style="text-align: right;">≈ 110 ТБ</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Користувачі</td>
+<td style="text-align: left;">200 млн × 10 кБ</td>
+<td style="text-align: right;">2 ТБ</td>
+<td style="text-align: right;">6 ТБ</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Кошики</td>
+<td style="text-align: left;">10 млн × 5 кБ</td>
+<td style="text-align: right;">50 ГБ</td>
+<td style="text-align: right;">150 ГБ</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Разом</strong></td>
+<td style="text-align: left;"></td>
+<td style="text-align: right;"><strong>≈ 640 ТБ</strong></td>
+<td style="text-align: right;"><strong>≈ 1.9 PB</strong></td>
+</tr>
+</tbody>
+</table>
+<p>У MySQL тримаємо замовлення лише за останній рік: 20 ГБ на день × 365 × 3 ≈ 22 ТБ. Решта, ≈ 88 ТБ з реплікацією, — в архіві.</p>
+</section>
+<section id="залізо" class="level2">
+<h2 class="anchored" data-anchor-id="залізо">Залізо</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Компонент</th>
+<th style="text-align: left;">Розрахунок</th>
+<th style="text-align: right;">Машин</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Сервіси API</td>
+<td style="text-align: left;">6.3 тис. RPS у пік вмістилися б на одну машину, але тримаємо по 2–3 копії кожного з 6 сервісів</td>
+<td style="text-align: right;">≈ 15</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Сховище зображень на HDD</td>
+<td style="text-align: left;">1.8 PB / 200 ТБ = 9, плюс запас на відмови дисків</td>
+<td style="text-align: right;">≈ 10</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">MongoDB (каталог)</td>
+<td style="text-align: left;">3 ТБ, набір із 3 реплік</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">MySQL (користувачі, замовлення за рік, залишки)</td>
+<td style="text-align: left;">≈ 28 ТБ, основна машина й 2 репліки</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Cassandra (архів)</td>
+<td style="text-align: left;">≈ 88 ТБ з реплікацією, по ≈ 30 ТБ на машину</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Пошуковий індекс, кеш, черга</td>
+<td style="text-align: left;">по 3 машини для відмовостійкості</td>
+<td style="text-align: right;">9</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Роздача зображень за CDN</td>
+<td style="text-align: left;">12 Gbps у пік, мережеві карти на 10 Gbps</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Разом</strong></td>
+<td style="text-align: left;"></td>
+<td style="text-align: right;"><strong>≈ 45</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Якби зображення зберігалися на SSD, як на дошці, сховище зайняло б 1.8 PB / 50 ТБ = 36 машин.</p>
+</section>
+<section id="вартість-на-5-років" class="level2">
+<h2 class="anchored" data-anchor-id="вартість-на-5-років">Вартість на 5 років</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Стаття</th>
+<th style="text-align: left;">Розрахунок</th>
+<th style="text-align: right;">Вартість</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Вихідний трафік</td>
+<td style="text-align: left;">0.8 EB × $0.1 за ГБ</td>
+<td style="text-align: right;">≈ $80 млн</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Сервери (для ілюстрації)</td>
+<td style="text-align: left;">45 машин × $10 тис. на рік × 5 років</td>
+<td style="text-align: right;">≈ $2.3 млн</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Диски під зображення, SSD</td>
+<td style="text-align: left;">1 800 ТБ × $300</td>
+<td style="text-align: right;">≈ $540 тис.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Диски під зображення, HDD</td>
+<td style="text-align: left;">1 800 ТБ × $30</td>
+<td style="text-align: right;">≈ $54 тис.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Диски під бази даних, SSD</td>
+<td style="text-align: left;">≈ 120 ТБ × $300</td>
+<td style="text-align: right;">≈ $36 тис.</td>
+</tr>
+</tbody>
+</table>
+<p>Ціни з лекції — це вартість самих дисків. У хмарі за сховище платять щомісяця: в Amazon S3 Standard ≈ $0.022 за ГБ на місяць, тобто 600 ТБ коштуватимуть ≈ $13 тис. на місяць, або ≈ $0.8 млн за 5 років. Реплікація вже входить у цю ціну.</p>
+</section>
+</section>
+<section id="висновки" class="level1">
+<h1>Висновки</h1>
+<ol type="1">
+<li><strong>Трафік зображень — понад 95% вартості системи.</strong> Решта статей разом не дотягує навіть до $3 млн.</li>
+<li><strong>Найсильніший важіль — розмір зображень:</strong> прев’ю у списках товарів, сучасні формати (WebP, AVIF), завантаження лише тих зображень, до яких покупець догорнув. Якщо середній переданий розмір зменшити з 500 до 100 кБ, трафік і його вартість упадуть уп’ятеро: ≈ $16 млн замість $80 млн.</li>
+<li><strong>CDN знімає навантаження з наших серверів</strong> (≈ 4 Gbps замість 40), але трафік усе одно оплачуємо, тільки тепер CDN-провайдеру. За таких обсягів ціна за гігабайт нижча за прайсову.</li>
+<li><strong>Вибір носія теж важливий</strong>, хоча на меншому масштабі: SSD замість HDD для зображень у 10 разів дорожчий.</li>
+<li><strong>Архітектурно найважливіші виправлення:</strong> сховище зображень із CDN, оформлення замовлення через сервіс замовлень з ідемпотентною оплатою та резервування залишків.</li>
+</ol>
+</section>
+<section id="питання-для-обговорення" class="level1">
+<h1>Питання для обговорення</h1>
+<ul>
+<li>Як зміняться розрахунки, якщо магазин стане маркетплейсом і продавці самі завантажуватимуть фото товарів?</li>
+<li>Що станеться в «чорну п’ятницю», коли пік може в рази перевищити звичайний? Які компоненти впадуть першими?</li>
+<li>Які дані можна втратити без шкоди для бізнесу, а які — ні? Як це впливає на вибір реплікації?</li>
+</ul>
+</section>
+<section id="матеріали" class="level1">
+<h1>Матеріали</h1>
+<ul>
+<li><a href="https://01a0ac5a-72cd-826b-0cfd-0e48590c57e6.share.connect.posit.cloud">Розбір практики: платформа ШІ-оцінювання робіт</a> — справжня система з виміряними числами</li>
+<li><a href="https://01a0ac59-427d-8338-d03c-f00171d8ef69.share.connect.posit.cloud">Слайди лекції «Збір вимог та оцінка навантаження»</a></li>
+<li><a href="https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf">Dynamo: Amazon’s Highly Available Key-value Store</a> (SOSP 2007)</li>
+<li><a href="https://github.com/donnemartin/system-design-primer">The System Design Primer</a></li>
+</ul>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","loop":false,"openEffect":"zoom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>

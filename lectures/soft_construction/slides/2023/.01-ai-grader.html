@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Розбір практики: платформа ШІ-оцінювання робіт</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src=".01-ai-grader_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".01-ai-grader_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src=".01-ai-grader_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src=".01-ai-grader_files/libs/quarto-html/popper.min.js"></script>
+<script src=".01-ai-grader_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src=".01-ai-grader_files/libs/quarto-html/anchor.min.js"></script>
+<link href=".01-ai-grader_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".01-ai-grader_files/libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".01-ai-grader_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href=".01-ai-grader_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href=".01-ai-grader_files/libs/bootstrap/bootstrap-efbb37e9afcc02144ebbc7afd12a776f.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<meta name="mermaid-theme" content="neutral">
+<script src=".01-ai-grader_files/libs/quarto-diagram/mermaid.min.js"></script>
+<script src=".01-ai-grader_files/libs/quarto-diagram/mermaid-init.js"></script>
+<link href=".01-ai-grader_files/libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Зміст</h2>
+   
+  <ul>
+  <li><a href="#про-цей-розбір" id="toc-про-цей-розбір" class="nav-link active" data-scroll-target="#про-цей-розбір">Про цей розбір</a></li>
+  <li><a href="#межі-системи" id="toc-межі-системи" class="nav-link" data-scroll-target="#межі-системи">1. Межі системи</a></li>
+  <li><a href="#функціональні-вимоги" id="toc-функціональні-вимоги" class="nav-link" data-scroll-target="#функціональні-вимоги">2. Функціональні вимоги</a></li>
+  <li><a href="#нефункціональні-вимоги" id="toc-нефункціональні-вимоги" class="nav-link" data-scroll-target="#нефункціональні-вимоги">3. Нефункціональні вимоги</a>
+  <ul class="collapse">
+  <li><a href="#консистентність-чи-свіжість" id="toc-консистентність-чи-свіжість" class="nav-link" data-scroll-target="#консистентність-чи-свіжість">Консистентність чи свіжість</a></li>
+  </ul></li>
+  <li><a href="#архітектура" id="toc-архітектура" class="nav-link" data-scroll-target="#архітектура">4. Архітектура</a>
+  <ul class="collapse">
+  <li><a href="#два-lambda-api-і-воркер" id="toc-два-lambda-api-і-воркер" class="nav-link" data-scroll-target="#два-lambda-api-і-воркер">Два Lambda: API і воркер</a></li>
+  <li><a href="#ланцюг-чанків" id="toc-ланцюг-чанків" class="nav-link" data-scroll-target="#ланцюг-чанків">Ланцюг чанків</a></li>
+  <li><a href="#стан-запуску" id="toc-стан-запуску" class="nav-link" data-scroll-target="#стан-запуску">Стан запуску</a></li>
+  <li><a href="#черга-збоїв" id="toc-черга-збоїв" class="nav-link" data-scroll-target="#черга-збоїв">Черга збоїв</a></li>
+  <li><a href="#одна-таблиця-dynamodb" id="toc-одна-таблиця-dynamodb" class="nav-link" data-scroll-target="#одна-таблиця-dynamodb">Одна таблиця DynamoDB</a></li>
+  <li><a href="#s3-лише-на-добу" id="toc-s3-лише-на-добу" class="nav-link" data-scroll-target="#s3-лише-на-добу">S3 лише на добу</a></li>
+  <li><a href="#кеш-moodle-на-хвилину" id="toc-кеш-moodle-на-хвилину" class="nav-link" data-scroll-target="#кеш-moodle-на-хвилину">Кеш Moodle на хвилину</a></li>
+  <li><a href="#код-перевіряє-числа-моделі" id="toc-код-перевіряє-числа-моделі" class="nav-link" data-scroll-target="#код-перевіряє-числа-моделі">Код перевіряє числа моделі</a></li>
+  </ul></li>
+  <li><a href="#оцінка-навантаження" id="toc-оцінка-навантаження" class="nav-link" data-scroll-target="#оцінка-навантаження">5. Оцінка навантаження</a>
+  <ul class="collapse">
+  <li><a href="#що-навантажує-систему" id="toc-що-навантажує-систему" class="nav-link" data-scroll-target="#що-навантажує-систему">Що навантажує систему</a></li>
+  <li><a href="#виміряні-величини" id="toc-виміряні-величини" class="nav-link" data-scroll-target="#виміряні-величини">Виміряні величини</a></li>
+  <li><a href="#квоти-bedrock" id="toc-квоти-bedrock" class="nav-link" data-scroll-target="#квоти-bedrock">Квоти Bedrock</a></li>
+  <li><a href="#пропускна-здатність" id="toc-пропускна-здатність" class="nav-link" data-scroll-target="#пропускна-здатність">Пропускна здатність</a></li>
+  <li><a href="#інші-складові" id="toc-інші-складові" class="nav-link" data-scroll-target="#інші-складові">Інші складові</a></li>
+  <li><a href="#вартість" id="toc-вартість" class="nav-link" data-scroll-target="#вартість">Вартість</a></li>
+  </ul></li>
+  <li><a href="#хронологія-як-знаходилися-обмеження" id="toc-хронологія-як-знаходилися-обмеження" class="nav-link" data-scroll-target="#хронологія-як-знаходилися-обмеження">6. Хронологія: як знаходилися обмеження</a></li>
+  <li><a href="#що-варто-виправити" id="toc-що-варто-виправити" class="nav-link" data-scroll-target="#що-варто-виправити">7. Що варто виправити 🕵️</a></li>
+  <li><a href="#питання-для-обговорення" id="toc-питання-для-обговорення" class="nav-link" data-scroll-target="#питання-для-обговорення">Питання для обговорення</a></li>
+  <li><a href="#матеріали" id="toc-матеріали" class="nav-link" data-scroll-target="#матеріали">Матеріали</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content page-columns page-full" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Розбір практики: платформа ШІ-оцінювання робіт</h1>
+<p class="subtitle lead">Конструювання програмного забезпечення</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="про-цей-розбір" class="level1">
+<h1>Про цей розбір</h1>
+<p><a href="https://01a0ac5a-1a0b-3722-03fc-9faa0e03a0a8.share.connect.posit.cloud">Онлайн-магазин</a> ми проєктували на дошці, і всі його числа — припущення, які ніхто не перевірить. Тут навпаки: справжня система, що працює в Київській школі економіки (KSE). Платформа допомагає викладачам оцінювати роботи студентів за допомогою великої мовної моделі. Усі числа нижче виміряні в продакшені у вересні 2026 року, а кожне обмеження система знайшла на власному досвіді, з датою.</p>
+<p>Тому цей розбір показує те, чого не видно на дошці: яке саме обмеження стає вузьким місцем і як система до нього пристосовується.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>🔮 Спершу вгадайте
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Платформа оцінює скани рукописних робіт з математики. Скільки робіт на день вона може оцінити <strong>на весь університет</strong>? І що стане вузьким місцем: мережа, сховище, сервери чи щось інше? Запишіть відповідь — ми повернемося до неї в <a href="#оцінка-навантаження">розділі 5</a>.</p>
+</div>
+</div>
+</section>
+<section id="межі-системи" class="level1">
+<h1>1. Межі системи</h1>
+<p><strong>Що робить платформа:</strong></p>
+<ol type="1">
+<li>Викладач пише інструкцію з оцінювання звичайним текстом: шкалу, еталонні відповіді, типові помилки, вимоги до відгуку.</li>
+<li>Платформа забирає з Moodle роботи студентів. Здебільшого це сфотографовані або відскановані рукописні розв’язки у PDF.</li>
+<li>Модель Claude Sonnet 4.6 через Amazon Bedrock оцінює кожну роботу за цією інструкцією і пише відгук за критеріями.</li>
+<li>Викладач переглядає результати, виправляє та затверджує. Лише затверджені оцінки потрапляють у Moodle.</li>
+</ol>
+<p><strong>Не входить у систему:</strong></p>
+<ul>
+<li><strong>Moodle</strong> — зовнішня система: з неї беремо роботи й у неї записуємо оцінки.</li>
+<li><strong>Остаточне рішення</strong> про оцінку — його завжди ухвалює викладач.</li>
+<li><strong>Апеляції</strong> — їх розглядають поза платформою, а в ній ведуть лише лічильник.</li>
+</ul>
+<p>Пілот — курс «Вступ до математики» (MATH101), понад 300 студентів.</p>
+</section>
+<section id="функціональні-вимоги" class="level1">
+<h1>2. Функціональні вимоги</h1>
+<p>Відновлені з коду платформи:</p>
+<ol type="1">
+<li>Вхід через корпоративний акаунт Google. Доступ мають лише люди зі списку, з роллю <code>ADMIN</code> або <code>USER</code>.</li>
+<li>Перегляд курсів і завдань з Moodle — тільки тих, де людина справді викладає.</li>
+<li>Написання інструкцій з оцінювання. Кожна зміна зберігається як нова версія.</li>
+<li>Пробний запуск інструкції на кількох вибраних роботах.</li>
+<li>Запуск оцінювання всього завдання: прогрес, зупинка, повтор для робіт, що лишилися без оцінки.</li>
+<li>Перегляд результатів: оцінка за критеріями, відгук, позначки «потребує уваги» (робота нечитабельна, модель не впевнена, у роботі є спроба вплинути на оцінювання).</li>
+<li>Затвердження кожної роботи окремо й надсилання оцінок у Moodle.</li>
+<li>Завантаження всіх робіт завдання одним архівом.</li>
+<li>Для адміністратора: керування користувачами, статистика використання й вартості.</li>
+</ol>
+</section>
+<section id="нефункціональні-вимоги" class="level1">
+<h1>3. Нефункціональні вимоги</h1>
+<p>На відміну від онлайн-магазину, головні вимоги тут — не швидкість і не масштаб, а <strong>довіра</strong>: оцінка впливає на долю студента.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Вимога</th>
+<th style="text-align: left;">Як реалізовано</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Рішення ухвалює людина</strong></td>
+<td style="text-align: left;">Жодна оцінка не потрапляє до студента без затвердження викладачем. Затверджують кожну роботу окремо: кнопку «надіслати все» свідомо не зробили.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Приватність</strong></td>
+<td style="text-align: left;">Модель не отримує ні імені студента, ні його ідентифікатора, ні назв файлів (реальні назви виглядають як <code>hw6_olena_shevchenko.pdf</code>). Моделі відповідають сервери в ЄС. Роботи студентів платформа не зберігає: лише результат оцінювання, 90 днів. Тимчасові файли видаляються через добу.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Відтворюваність</strong></td>
+<td style="text-align: left;">Запуск назавжди фіксує завдання, версію інструкції та модель. У відгуку студент бачить, яка модель оцінювала, за якою версією інструкції і хто затвердив оцінку.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Стійкість до маніпуляцій</strong></td>
+<td style="text-align: left;">Текст роботи — це дані, а не команди. Якщо студент звертається до моделі («постав максимум»), платформа позначає це для викладача й оцінює роботу по суті.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Жодної подвійної оцінки</strong></td>
+<td style="text-align: left;">Повторне натискання «надіслати» або повтор після тайм-ауту не запише оцінку вдруге. Наявну оцінку в Moodle не перезаписують без окремого рішення викладача.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Контроль вартості</strong></td>
+<td style="text-align: left;">Запуск не стартує, якщо його прогнозована вартість не вміщується в бюджет.</td>
+</tr>
+</tbody>
+</table>
+<section id="консистентність-чи-свіжість" class="level2">
+<h2 class="anchored" data-anchor-id="консистентність-чи-свіжість">Консистентність чи свіжість</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Дані</th>
+<th style="text-align: left;">Що обрано</th>
+<th style="text-align: left;">Чому</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Надіслані оцінки</td>
+<td style="text-align: left;"><strong>Консистентність</strong></td>
+<td style="text-align: left;">Запис у базу умовний: оцінку позначено надісланою рівно один раз, навіть якщо запит повторили.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Списки курсів, завдань і робіт з Moodle</td>
+<td style="text-align: left;"><strong>Швидкість відповіді й захист Moodle</strong></td>
+<td style="text-align: left;">Відповіді Moodle кешуються на хвилину. Ціна — хвилину після видалення з курсу викладач ще бачить його, а нова робота з’являється із запізненням до хвилини.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Оцінка, що вже стоїть у Moodle</td>
+<td style="text-align: left;"><strong>Консистентність</strong></td>
+<td style="text-align: left;">Перед записом її завжди читають із Moodle напряму, без кешу, щоб не перезаписати оцінку, яку поставила людина.</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="архітектура" class="level1 page-columns page-full">
+<h1>4. Архітектура</h1>
+<p>Уся система — безсерверна (serverless) на AWS: немає жодного сервера, який працює постійно. Платимо лише за виклики, і це пасує навантаженню, що зростає різкими сплесками перед дедлайнами.</p>
+<div class="column-page">
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart LR
+  teacher["Викладач&lt;br&gt;браузер"]
+  google["Google&lt;br&gt;Workspace"]:::external
+  moodle["Moodle"]:::external
+  bedrock["Amazon Bedrock&lt;br&gt;Claude Sonnet 4.6, ЄС"]:::external
+
+  subgraph aws ["AWS"]
+    cognito["Cognito&lt;br&gt;вхід"]
+    api["API Gateway&lt;br&gt;HTTP API"]
+    apiFn["Lambda API&lt;br&gt;до 29 с, 512 МБ"]
+    worker["Lambda-воркер&lt;br&gt;до 15 хв, 3 ГБ"]
+    table[("DynamoDB")]
+    s3[("S3&lt;br&gt;архіви на добу")]
+    dlq[["SQS&lt;br&gt;черга збоїв"]]
+  end
+
+  teacher --&gt; cognito --&gt; google
+  teacher --&gt; api --&gt; apiFn
+  apiFn --&gt; table
+  apiFn -. запуск .-&gt; worker
+  worker -. наступний чанк .-&gt; worker
+  worker --&gt; table
+  worker --&gt; s3
+  worker -. збій .-&gt; dlq
+  apiFn -- "кеш 60 с" --&gt; moodle
+  worker --&gt; moodle
+  worker --&gt; bedrock
+
+  classDef external fill:#e5dbff,stroke:#7048e8
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</div>
+<p>Фіолетовим позначено зовнішні системи. Готовий архів браузер завантажує з S3 напряму, за посиланням, що діє 15 хвилин. Далі — рішення, які варто розібрати, бо кожне з них відповідає на конкретне обмеження.</p>
+<section id="два-lambda-api-і-воркер" class="level2">
+<h2 class="anchored" data-anchor-id="два-lambda-api-і-воркер">Два Lambda: API і воркер</h2>
+<p>API Gateway обриває HTTP-запит через 30 секунд, і цей ліміт не змінюється. А оцінити курс на 400 студентів — це години. Тому Lambda API лише перевіряє права, записує план запуску в базу і будить окремий Lambda-воркер, який уже не прив’язаний до запиту. Браузер тим часом кожні 4 секунди питає, як просувається запуск.</p>
+</section>
+<section id="ланцюг-чанків" class="level2">
+<h2 class="anchored" data-anchor-id="ланцюг-чанків">Ланцюг чанків</h2>
+<p>Один виклик Lambda живе щонайбільше 15 хвилин, а одна робота оцінюється ≈ 330 секунд: ≈ 43 с на індексацію (що саме студент розв’язував) і ≈ 280 с на оцінювання. Тому запуск розбито на <strong>чанки</strong> (у продакшені — по 6 робіт), і роботи в чанку оцінюються паралельно. Закінчивши, чанк сам викликає воркер для наступного. Чанк триває стільки, скільки найповільніша робота в ньому, — до 7 хвилин, із запасом від ліміту.</p>
+<p>Lambda сама повторює асинхронний виклик, що впав, тож чанк мусить витримувати повторне виконання:</p>
+<ul>
+<li>чанк, уже врахований у прогресі, не додає свої числа вдруге;</li>
+<li>результат роботи записується за ключем роботи, тож повторний запис просто перезаписує сам себе.</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Інцидент 14–15 вересня
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Два екзаменаційні запуски зупинилися на 16-му чанку, тобто після 96 робіт, без жодної помилки. Lambda вважає функцію, яка викликає сама себе понад ≈ 16 разів поспіль, нескінченною рекурсією і зупиняє ланцюг. Рекурсію для воркера дозволили явно, а безпеку забезпечує сам ланцюг: план запуску фіксований, останній чанк зупиняється, а зупинений запуск зупиняє всі чанки.</p>
+</div>
+</div>
+</section>
+<section id="стан-запуску" class="level2 page-columns page-full">
+<h2 class="anchored" data-anchor-id="стан-запуску">Стан запуску</h2>
+<div class="column-page">
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">stateDiagram-v2
+  direction LR
+  [*] --&gt; PREPARING
+  PREPARING --&gt; GRADING
+  GRADING --&gt; REVIEW
+  REVIEW --&gt; SENDING: затверджено
+  SENDING --&gt; COMPLETED
+  PREPARING --&gt; CANCELLED
+  GRADING --&gt; CANCELLED
+  REVIEW --&gt; CANCELLED
+  PREPARING --&gt; FAILED
+  GRADING --&gt; FAILED
+  SENDING --&gt; FAILED
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</div>
+<p>Головне правило: <strong>надсилання не можна скасувати</strong>. Студент міг уже побачити оцінку, тож запуск, зупинений посеред надсилання, — це частково надісланий запуск, і чесно лише так його й показати. А от дослати затверджене пізніше можна з будь-якого завершеного стану (<code>COMPLETED</code>, <code>CANCELLED</code>, <code>FAILED</code> → <code>SENDING</code>; на діаграмі ці переходи не показано): викладачі затверджують роботи порціями.</p>
+<p>Запуск, що понад годину стоїть в активному стані без змін, вважається завислим. Година — це найгірший випадок: контейнер вичерпав 15 хвилин, і Lambda ще двічі повторила виклик.</p>
+</section>
+<section id="черга-збоїв" class="level2">
+<h2 class="anchored" data-anchor-id="черга-збоїв">Черга збоїв</h2>
+<p>Якщо контейнер вичерпав пам’ять або час, жоден рядок коду платформи не виконується: помилку нікому зловити. Lambda двічі повторює виклик і відкидає його. Щоб такий збій не зник безслідно, відкинутий виклик потрапляє в чергу SQS, де його видно 14 днів.</p>
+</section>
+<section id="одна-таблиця-dynamodb" class="level2">
+<h2 class="anchored" data-anchor-id="одна-таблиця-dynamodb">Одна таблиця DynamoDB</h2>
+<p>Усі дані — користувачі, інструкції, запуски, результати — в одній таблиці з ключами <code>pk</code>/<code>sk</code> та одним вторинним індексом, з оплатою за запити. Наприклад, результат роботи має ключ <code>RUN#&lt;запуск&gt;</code> / <code>OUTCOME#&lt;робота&gt;</code>, тож усі результати запуску читаються одним запитом. Інструкції зберігаються назавжди з версіями, а результати видаляються самі через 90 днів (TTL).</p>
+</section>
+<section id="s3-лише-на-добу" class="level2">
+<h2 class="anchored" data-anchor-id="s3-лише-на-добу">S3 лише на добу</h2>
+<p>Екзамен зі 183 сканів займає 1.9 ГБ. Зібрати його в браузері не вдалося: Lambda віддає не більше 6 МБ за раз, а Moodle повертає великий скан цілим, хоч би яку частину попросили. Тепер архів готує воркер у бакеті S3, а браузер завантажує його за посиланням, яке діє 15 хвилин. Усе в бакеті видаляється через добу.</p>
+</section>
+<section id="кеш-moodle-на-хвилину" class="level2">
+<h2 class="anchored" data-anchor-id="кеш-moodle-на-хвилину">Кеш Moodle на хвилину</h2>
+<p>Екран перегляду оновлюється кожні 4 секунди, і кожен запит заново перевіряє права через Moodle. Це ≈ 12 викликів Moodle за 4 секунди, тобто 180 на хвилину від <strong>одного відкритого вікна</strong>. Годинний запуск — понад 10 тисяч викликів від викладача, який просто дивиться на прогрес. 15 вересня Moodle дві години відповідав надто повільно, а кожне відкриття файлу знову просило в нього список робіт: що повільніше працював Moodle, то більше запитів отримував. Відповіді, які за хвилину не змінюються, тепер кешуються.</p>
+</section>
+<section id="код-перевіряє-числа-моделі" class="level2">
+<h2 class="anchored" data-anchor-id="код-перевіряє-числа-моделі">Код перевіряє числа моделі</h2>
+<p>Модель помиляється не лише в судженнях, а й в арифметиці. Платформа перевіряє два типи таких тверджень:</p>
+<ul>
+<li><strong>Збіг з еталоном.</strong> На одній роботі модель оголосила всі відповіді задачі правильними, хоча шість із них були іншими числами: 1/6 замість 0, 0 замість +∞. Модель поставила повний бал, викладач — 6 з 10. Тепер модель мусить повертати обидва числа, а код їх порівнює.</li>
+<li><strong>Суми за блоками.</strong> У таблиці відгуку блок мав 12 з 30 балів, а його критерії давали 11.5. Це межа між двома «треками» оцінювання. Тепер суми рахує код.</li>
+</ul>
+<p>Код нічого не виправляє сам: він позначає розбіжність, а вирішує викладач. Висновок з коду платформи: «Додавання — не те, для чого потрібна модель».</p>
+<p>Відповідь моделі також обмежена JSON-схемою, яку забезпечує Bedrock. Поки модель писала JSON самостійно, одна незаекранована лапка у відгуку ламала всю відповідь, і оцінка губилася.</p>
+</section>
+</section>
+<section id="оцінка-навантаження" class="level1">
+<h1>5. Оцінка навантаження</h1>
+<section id="що-навантажує-систему" class="level2">
+<h2 class="anchored" data-anchor-id="що-навантажує-систему">Що навантажує систему</h2>
+<p>Користувачі платформи — викладачі, тож запитів до API небагато: навіть відкрите вікно перегляду дає менше одного запиту на секунду. Вузьке місце в іншому: кожна робота — це <strong>два запити до моделі</strong>, тисячі токенів і кілька хвилин роботи.</p>
+</section>
+<section id="виміряні-величини" class="level2">
+<h2 class="anchored" data-anchor-id="виміряні-величини">Виміряні величини</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Величина</th>
+<th style="text-align: left;">Значення</th>
+<th style="text-align: left;">Звідки</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Сторінок у роботі</td>
+<td style="text-align: left;">5.2 у середньому (медіана 5, максимум 11)</td>
+<td style="text-align: left;">вибірка 40 робіт із завдання на 258 робіт</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Розмір роботи</td>
+<td style="text-align: left;">≈ 4 МБ</td>
+<td style="text-align: left;">те саме завдання: 258 робіт — 866 МБ</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Запитів до моделі на роботу</td>
+<td style="text-align: left;">2: індексація та оцінювання</td>
+<td style="text-align: left;">код</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Токенів на роботу</td>
+<td style="text-align: left;">≈ 79 тис.</td>
+<td style="text-align: left;">запуск 8 вересня</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Одиниць денної квоти на роботу</td>
+<td style="text-align: left;">≈ 152 тис.</td>
+<td style="text-align: left;">запуск 8 вересня: 71 робота вичерпала добову квоту</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Час на роботу</td>
+<td style="text-align: left;">≈ 330 с, до 400 с</td>
+<td style="text-align: left;">вимірювання</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Вартість роботи</td>
+<td style="text-align: left;">≈ $0.33 у середньому, до $0.65 за довгу рукописну</td>
+<td style="text-align: left;">рахунок AWS за 1–8 вересня</td>
+</tr>
+</tbody>
+</table>
+<p>Сканована сторінка не має текстового шару, тож модель отримує її як зображення: 1 500–3 000 вхідних токенів на сторінку.</p>
+</section>
+<section id="квоти-bedrock" class="level2">
+<h2 class="anchored" data-anchor-id="квоти-bedrock">Квоти Bedrock</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Квота</th>
+<th style="text-align: right;">У платформи</th>
+<th style="text-align: right;">За замовчуванням AWS</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Запитів на хвилину</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">10 000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Токенів на хвилину</td>
+<td style="text-align: right;">6 млн</td>
+<td style="text-align: right;">6 млн</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Токенів на добу</td>
+<td style="text-align: right;">10.8 млн</td>
+<td style="text-align: right;">8.64 млрд</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Чому 79 тис. токенів «важать» 152 тис.</strong> Квота рахує не рахунок, а навантаження: <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/quotas-token-burndown.html">для Claude Sonnet 4.6 кожен вихідний токен списує з квоти 5 одиниць</a>, а платимо лише за фактичні токени. Звідси можна відновити склад роботи:</p>
+<ul>
+<li>вхідні + вихідні = 79 тис.;</li>
+<li>вхідні + 5 × вихідні = 152 тис.;</li>
+<li>отже, вихідних ≈ (152 − 79) / 4 ≈ 18 тис., вхідних ≈ 61 тис.</li>
+</ul>
+<p>Перевірка вартістю: за ціною $3 за мільйон вхідних і $15 за мільйон вихідних токенів це 61 тис. × $3 + 18 тис. × $15 ≈ <strong>$0.46</strong> за роботу. Результат лежить між середнім ($0.33) і максимумом ($0.65), тож виміри узгоджуються між собою.</p>
+</section>
+<section id="пропускна-здатність" class="level2">
+<h2 class="anchored" data-anchor-id="пропускна-здатність">Пропускна здатність</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Відповідь на 🔮
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Вузьке місце — <strong>денна квота токенів</strong>: 10.8 млн / 152 тис. ≈ <strong>71 робота на добу на весь університет</strong>.</p>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Обмеження</th>
+<th style="text-align: left;">Розрахунок</th>
+<th style="text-align: right;">Робіт</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Денна квота токенів</td>
+<td style="text-align: left;">10.8 млн / 152 тис.</td>
+<td style="text-align: right;">≈ 71 на добу</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Квота запитів</td>
+<td style="text-align: left;">10 запитів на хвилину / 2 запити на роботу</td>
+<td style="text-align: right;">≈ 300 на годину</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Час оцінювання</td>
+<td style="text-align: left;">6 робіт у чанку за 6–7 хв</td>
+<td style="text-align: right;">≈ 50–60 на годину</td>
+</tr>
+</tbody>
+</table>
+<p>Квота запитів і час дозволили б оцінити 71 роботу за півтори години, а далі до кінця доби платформа стоїть.</p>
+<p><strong>Що це означає для курсу:</strong></p>
+<ul>
+<li>Екзамен на 89 робіт потребує 89 × 152 тис. ≈ 13.5 млн одиниць квоти — більше за добову. Саме так і сталося 8 вересня.</li>
+<li>Екзамен MATH101 на 300 студентів — 45.6 млн одиниць, тобто ≈ 4 доби квоти всього університету.</li>
+<li>Семестр двох курсів по 10 завдань — ≈ 7 000 робіт, або ≈ 99 днів квоти.</li>
+</ul>
+<p>У зверненні до AWS команда просить 400 млн токенів на добу і 200 запитів на хвилину. Це 4.6% і 2% від стандартних значень AWS, але вже ≈ 2 600 робіт на добу: семестр вміщується менш ніж у три дні квоти.</p>
+</section>
+<section id="інші-складові" class="level2">
+<h2 class="anchored" data-anchor-id="інші-складові">Інші складові</h2>
+<p>Для повноти пройдімо складові з лекції. Вони лише підтверджують, що тут вони не важливі.</p>
+<ul>
+<li><strong>Мережа.</strong> Робота ≈ 4 МБ, у запиті вона закодована в base64 (+33%) і надсилається двічі: ≈ 10.7 МБ на роботу. При 60 роботах на годину це ≈ 1.4 Mbps — дрібниця.</li>
+<li><strong>Сховище.</strong> Роботи не зберігаються. Якщо результат займає ≈ 10 кБ, семестр із 7 000 робіт — 70 МБ, а через 90 днів записи видаляються самі.</li>
+<li><strong>Пам’ять.</strong> Ось це вже важливо: скан на 26 МБ піднімає пам’ять Lambda з 75 до 180 МБ, приблизно на чотири розміри файлу. 12 робіт одночасно — понад гігабайт base64, тому воркер має 3 ГБ пам’яті.</li>
+<li><strong>Пікове навантаження.</strong> Дедлайни кількох курсів збігаються, і саме на ці тижні розраховано запит на підвищення квоти.</li>
+</ul>
+</section>
+<section id="вартість" class="level2">
+<h2 class="anchored" data-anchor-id="вартість">Вартість</h2>
+<ul>
+<li><strong>Модель.</strong> За 1–8 вересня — $54.82, і майже вся сума — Bedrock.</li>
+<li><strong>Інфраструктура.</strong> Lambda, DynamoDB, S3 та API Gateway за ті самі вісім днів разом — менше $1.</li>
+<li><strong>Семестр.</strong> 7 000 робіт × $0.33–0.65 ≈ <strong>$2 300–4 600</strong>.</li>
+</ul>
+<p>Інфраструктура майже нічого не коштує, тож знижувати треба вартість моделі:</p>
+<ul>
+<li><strong>Кешування промптів.</strong> Інструкція викладача й умова завдання однакові для всіх робіт і позначені для кешування. <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html">Прочитане з кешу</a> коштує в 10 разів дешевше і не враховується в квоті.</li>
+<li><strong>Пакетний режим.</strong> <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/batch-inference.html">Batch inference</a> удвічі дешевший і має власні квоти, на які хвилинні й добові обмеження не поширюються. Викладач однаково переглядає результати пізніше, тож чекати кілька годин прийнятно.</li>
+</ul>
+</section>
+</section>
+<section id="хронологія-як-знаходилися-обмеження" class="level1">
+<h1>6. Хронологія: як знаходилися обмеження</h1>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Дата</th>
+<th style="text-align: left;">Що сталося</th>
+<th style="text-align: left;">Причина</th>
+<th style="text-align: left;">Що зробили</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">7 вересня</td>
+<td style="text-align: left;">З 87 робіт оцінено 38</td>
+<td style="text-align: left;">Квота 10 запитів на хвилину, а чанк надсилав запити сплесками: 190 відмов на 203 успішні виклики</td>
+<td style="text-align: left;">Рівномірний темп 8 запитів на хвилину, повтори з експоненційною затримкою і випадковим розкидом, менші чанки</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">8 вересня</td>
+<td style="text-align: left;">Оцінено 66 робіт з 89, решта отримали «Too many tokens per day»</td>
+<td style="text-align: left;">Денна квота 10.8 млн токенів</td>
+<td style="text-align: left;">Програмно — нічого. Запит на підвищення квоти автоматично відхилено за 45 секунд</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">13 вересня</td>
+<td style="text-align: left;">Лапка у відгуку ламала JSON, і оцінка губилася</td>
+<td style="text-align: left;">Модель писала JSON сама</td>
+<td style="text-align: left;">JSON-схема, яку забезпечує Bedrock</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">14–15 вересня</td>
+<td style="text-align: left;">Запуски понад 96 робіт зупинялися на 16-му чанку</td>
+<td style="text-align: left;">Lambda розпізнала рекурсію</td>
+<td style="text-align: left;">Рекурсію дозволено явно, ланцюг обмежений планом</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">15 вересня</td>
+<td style="text-align: left;">«Завантажити все» обривалося, а Moodle дві години відповідав повільно</td>
+<td style="text-align: left;">Відповідь Lambda — до 6 МБ, екзамен — 1.9 ГБ; платформа засипала Moodle повторними запитами</td>
+<td style="text-align: left;">Архів готує воркер у S3, відповіді Moodle кешуються на хвилину</td>
+</tr>
+</tbody>
+</table>
+<p>Помітьте: <strong>жодне з цих обмежень не стосується мережі чи дисків</strong>, про які найчастіше думають під час оцінки навантаження. Усі вони — ліміти платформ, на яких побудовано систему: квоти моделі, час і розмір відповіді Lambda, тайм-аут API Gateway, захист від рекурсії, швидкість зовнішньої системи.</p>
+</section>
+<section id="що-варто-виправити" class="level1">
+<h1>7. Що варто виправити 🕵️</h1>
+<ol type="1">
+<li>❌ <strong>Прогноз вартості перед запуском занижено приблизно вшестеро.</strong> Код закладає 20 тис. вхідних і 3 500 вихідних токенів на роботу та ще й множить на знижку пакетного режиму, хоча оцінювання йде звичайними запитами: (20 тис. × $3 + 3.5 тис. × $15) / 10<sup>6</sup> × 0.5 ≈ $0.056. Виміряно ж $0.33–0.65. Запас ×1.3 цього не покриває. Бюджет запуску — $200, тож перевірку пройде запуск на ≈ 2 700 робіт, який насправді коштуватиме ≈ $900–1 800. Поки денна квота тримає платформу на 71 роботі, це непомітно, але після її підвищення запобіжник перестане працювати.</li>
+<li>⚠️ <strong>Темп запитів контролює кожен контейнер окремо.</strong> Два викладачі, що запустили оцінювання одночасно, — це два воркери по 8 запитів на хвилину, разом 16 при квоті 10. Зараз це рятують повтори після відмови, але спільний лічильник (наприклад, у DynamoDB) не допускав би відмов узагалі.</li>
+<li>⚠️ <strong>Запуск не перевіряє денну квоту.</strong> Запуск на 89 робіт стартує, хоча за квоти в 71 роботу на добу гарантовано не завершиться за день. Попередження до старту чесніше, ніж зупинка посередині.</li>
+<li>⚠️ <strong>Пакетний режим реалізовано, але не підключено.</strong> Він удвічі дешевший і не обмежений денною квотою токенів, а саме вона зараз стримує платформу.</li>
+</ol>
+</section>
+<section id="питання-для-обговорення" class="level1">
+<h1>Питання для обговорення</h1>
+<ul>
+<li>Квоту не підняли. Як оцінити екзамен на 300 робіт за один день?</li>
+<li>Оцінювання розбито на два запити: індексацію та оцінювання. Це подвоює витрату квоти запитів. Чому таке рішення все одно може бути виправданим?</li>
+<li>Які дані платформа свідомо не зберігає? Що змінилося б в архітектурі та в розрахунках, якби вона зберігала роботи студентів?</li>
+<li>Кеш Moodle на хвилину означає, що викладач, якого щойно видалили з курсу, ще хвилину бачить роботи. Чому це прийнятно? За яких умов це стало б неприйнятним?</li>
+<li>Порівняйте з онлайн-магазином: там головна стаття витрат — трафік, тут — модель. Що спільного в тому, як ми шукали вузьке місце?</li>
+</ul>
+</section>
+<section id="матеріали" class="level1">
+<h1>Матеріали</h1>
+<ul>
+<li><a href="https://01a0ac5a-1a0b-3722-03fc-9faa0e03a0a8.share.connect.posit.cloud">Розбір практики: онлайн-магазин</a></li>
+<li><a href="https://docs.aws.amazon.com/bedrock/latest/userguide/quotas-token-burndown.html">How tokens are counted in Amazon Bedrock</a></li>
+<li><a href="https://docs.aws.amazon.com/lambda/latest/dg/invocation-recursion.html">Lambda recursive loop detection</a></li>
+<li><a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-quotas.html">Amazon API Gateway HTTP API quotas</a></li>
+<li><a href="https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html">Prompt caching</a> і <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/batch-inference.html">batch inference</a> в Amazon Bedrock</li>
+</ul>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
