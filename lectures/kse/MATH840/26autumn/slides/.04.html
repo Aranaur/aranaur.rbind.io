@@ -1,0 +1,2583 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src=".04_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".04_files/libs/quarto-html/tabby.min.js"></script>
+<script src=".04_files/libs/quarto-html/popper.min.js"></script>
+<script src=".04_files/libs/quarto-html/tippy.umd.min.js"></script>
+<link href=".04_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".04_files/libs/quarto-html/light-border.css" rel="stylesheet">
+<link href=".04_files/libs/quarto-html/quarto-syntax-highlighting-acf12a64177840b8d86f2d4f01b2e9fb.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".04_files/libs/quarto-contrib/iconify-1.0.7/iconify-icon.min.js"></script><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.9.37">
+
+  <meta name="author" content="Ihor Miroshnychenko">
+  <title>Exponential Smoothing</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href=".04_files/libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href=".04_files/libs/revealjs/dist/reveal.css">
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+      vertical-align: middle;
+    }
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+      }
+    pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+    div.sourceCode
+      { color: #24292e;  }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #24292e; } /* Normal */
+    code span.al { color: #ff5555; font-weight: bold; } /* Alert */
+    code span.an { color: #6a737d; } /* Annotation */
+    code span.at { color: #d73a49; } /* Attribute */
+    code span.bn { color: #005cc5; } /* BaseN */
+    code span.bu { color: #d73a49; } /* BuiltIn */
+    code span.cf { color: #d73a49; } /* ControlFlow */
+    code span.ch { color: #032f62; } /* Char */
+    code span.cn { color: #005cc5; } /* Constant */
+    code span.co { color: #6a737d; } /* Comment */
+    code span.cv { color: #6a737d; } /* CommentVar */
+    code span.do { color: #6a737d; } /* Documentation */
+    code span.dt { color: #d73a49; } /* DataType */
+    code span.dv { color: #005cc5; } /* DecVal */
+    code span.er { color: #ff5555; text-decoration: underline; } /* Error */
+    code span.ex { color: #d73a49; font-weight: bold; } /* Extension */
+    code span.fl { color: #005cc5; } /* Float */
+    code span.fu { color: #6f42c1; } /* Function */
+    code span.im { color: #032f62; } /* Import */
+    code span.in { color: #6a737d; } /* Information */
+    code span.kw { color: #d73a49; } /* Keyword */
+    code span.op { color: #24292e; } /* Operator */
+    code span.ot { color: #6f42c1; } /* Other */
+    code span.pp { color: #d73a49; } /* Preprocessor */
+    code span.re { color: #6a737d; } /* RegionMarker */
+    code span.sc { color: #005cc5; } /* SpecialChar */
+    code span.ss { color: #032f62; } /* SpecialString */
+    code span.st { color: #032f62; } /* String */
+    code span.va { color: #e36209; } /* Variable */
+    code span.vs { color: #032f62; } /* VerbatimString */
+    code span.wa { color: #ff5555; } /* Warning */
+  </style>
+  <link rel="stylesheet" href=".04_files/libs/revealjs/dist/theme/quarto-8a52321a21477e1bb40c2cb18c896737.css">
+  <link href=".04_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href=".04_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href=".04_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href=".04_files/libs/revealjs/plugin/reveal-chalkboard/font-awesome/css/all.css" rel="stylesheet">
+  <link href=".04_files/libs/revealjs/plugin/reveal-chalkboard/style.css" rel="stylesheet">
+  <link href=".04_files/libs/revealjs/plugin/verticator/verticator.css" rel="stylesheet">
+  <link href=".04_files/libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+  
+  <script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+</head>
+<body class="quarto-light">
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide" data-background-iframe="colored-particles/index.html" class="quarto-title-block center">
+  <h1 class="title">Exponential Smoothing</h1>
+  <p class="subtitle">MATH840 | Time Series | Week 4</p>
+
+<div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+Ihor Miroshnychenko 
+</div>
+        <p class="quarto-title-affiliation">
+            Kyiv School of Economics
+          </p>
+    </div>
+</div>
+
+</section><section id="TOC">
+<nav role="doc-toc"> 
+<h2 id="toc-title">Table of contents</h2>
+<ul>
+<li><a href="#/where-this-fits" id="/toc-where-this-fits">Where this fits</a></li>
+<li><a href="#/simple-exponential-smoothing" id="/toc-simple-exponential-smoothing">Simple exponential smoothing</a></li>
+<li><a href="#/methods-with-trend" id="/toc-methods-with-trend">Methods with trend</a></li>
+<li><a href="#/methods-with-seasonality" id="/toc-methods-with-seasonality">Methods with seasonality</a></li>
+<li><a href="#/a-taxonomy-of-methods" id="/toc-a-taxonomy-of-methods">A taxonomy of methods</a></li>
+<li><a href="#/innovations-state-space-models" id="/toc-innovations-state-space-models">Innovations state space models</a></li>
+<li><a href="#/estimation-and-model-selection" id="/toc-estimation-and-model-selection">Estimation and model selection</a></li>
+<li><a href="#/forecasting-with-ets" id="/toc-forecasting-with-ets">Forecasting with ETS</a></li>
+<li><a href="#/ets-in-practice" id="/toc-ets-in-practice">ETS in practice</a></li>
+</ul>
+</nav>
+</section>
+<section>
+<section id="where-this-fits" class="title-slide slide level1 center">
+<h1>Where this fits</h1>
+
+</section>
+<section id="three-weeks-and-the-gap-they-leave" class="slide level2 smaller">
+<h2>Three weeks, and the gap they leave</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Week</th>
+<th>What you got</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Four benchmarks that need no fitting: <code>mean</code>, <code>naive</code>, <code>snaive</code>, <code>drift</code></td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Decomposition: a series is a <strong>level</strong>, a <strong>trend</strong>, a <strong>season</strong> and a <strong>remainder</strong></td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>How to tell a good forecast from a lucky one: residuals, intervals, accuracy, cross-validation</td>
+</tr>
+</tbody>
+</table>
+<div class="fragment">
+<p><strong>What is still missing.</strong> Decomposition describes the past — it has no mechanism for carrying the components forward. The benchmarks forecast, but they each use exactly one component and throw the rest away.</p>
+<p><span class="hi">Exponential smoothing keeps the components <strong>and</strong> updates them as data arrives.</span></p>
+</div>
+</section>
+<section id="the-one-idea" class="slide level2 smaller">
+<h2>The one idea</h2>
+<p>Week 1 gave you two extremes:</p>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Average method — every observation matters equally</strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math display">\[
+\hat{y}_{T+h|T} = \frac{1}{T} \sum_{t=1}^{T} y_t
+\]</span></p>
+</div>
+</div>
+</div>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Naïve method — only the last observation matters</strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math display">\[
+\hat{y}_{T+h|T} = y_T
+\]</span></p>
+</div>
+</div>
+</div>
+<p>Neither is usually right. <strong>Recent observations should matter more — but not exclusively.</strong> <em>How much more</em> is not a matter of taste: it is a parameter you estimate from the data.</p>
+</section>
+<section id="what-we-build-this-week" class="slide level2 smaller">
+<h2>What we build this week</h2>
+<ol type="1">
+<li><strong>Simple exponential smoothing</strong> — a level that updates. No trend, no season.</li>
+<li><strong>Holt’s method</strong> — add a slope. <strong>Damped trend</strong> — and don’t let the slope run forever.</li>
+<li><strong>Holt-Winters</strong> — add a season, additive or multiplicative.</li>
+<li><strong>A taxonomy</strong> — nine methods in one table, named by (Trend, Season).</li>
+<li><strong>ETS models</strong> — the same nine, wrapped in a probability model: 18 models, with intervals and a likelihood you can compare.</li>
+<li><strong>Automatic selection</strong> — <code>AutoETS</code>, AICc, and why that is not the same as forecast accuracy.</li>
+</ol>
+<div class="callout callout-tip callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Reading</strong></p>
+</div>
+<div class="callout-content">
+<p><a href="https://otexts.com/fpp3/expsmooth.html">FPP3 ch.&nbsp;8 — Exponential smoothing</a> · <a href="https://otexts.com/fpppy/nbs/08-exponential-smoothing.html">FPP the Pythonic Way, ch.&nbsp;8</a></p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="simple-exponential-smoothing" class="title-slide slide level1 center">
+<h1>Simple exponential smoothing</h1>
+
+</section>
+<section id="simple-exponential-smoothing-1" class="slide level2 smaller">
+<h2>Simple exponential smoothing</h2>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Forecast equation</strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math display">\[
+\hat{y}_{T+1|T} = \alpha y_T + \alpha(1-\alpha) y_{T-1} + \alpha(1-\alpha)^2 y_{T-2} + \cdots,
+\qquad 0 \le \alpha \le 1
+\]</span></p>
+</div>
+</div>
+</div>
+<ul>
+<li>The weights <span class="math inline">\(\alpha(1-\alpha)^j\)</span> <strong>decay geometrically</strong> with the age of the observation.</li>
+<li>They sum to 1 (in the limit), so the forecast is a genuine weighted average.</li>
+<li><span class="math inline">\(\alpha \to 1\)</span>: only the last observation counts — the naïve method.</li>
+<li><span class="math inline">\(\alpha \to 0\)</span>: every observation counts almost equally — the average method.</li>
+</ul>
+<p><span class="hi">The two Week 1 extremes are the two ends of one dial.</span></p>
+</section>
+<section id="the-weights-drawn" class="slide level2">
+<h2>The weights, drawn</h2>
+<div id="cell-ses-weights" class="cell" data-execution_count="2">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="" aria-hidden="true" tabindex="-1"></a>alpha <span class="op">=</span> <span class="fl">0.7</span></span>
+<span id="cb1-2"><a href="" aria-hidden="true" tabindex="-1"></a>n_points <span class="op">=</span> <span class="dv">5</span></span>
+<span id="cb1-3"><a href="" aria-hidden="true" tabindex="-1"></a>time_steps <span class="op">=</span> np.arange(n_points)</span>
+<span id="cb1-4"><a href="" aria-hidden="true" tabindex="-1"></a>lags_desc <span class="op">=</span> <span class="bu">range</span>(n_points <span class="op">-</span> <span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>)          <span class="co"># 4, 3, 2, 1, 0</span></span>
+<span id="cb1-5"><a href="" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> [<span class="ss">f"T-</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span> <span class="cf">if</span> i <span class="op">&gt;</span> <span class="dv">0</span> <span class="cf">else</span> <span class="st">"T"</span> <span class="cf">for</span> i <span class="kw">in</span> lags_desc]</span>
+<span id="cb1-6"><a href="" aria-hidden="true" tabindex="-1"></a>weights <span class="op">=</span> [alpha <span class="op">*</span> (<span class="dv">1</span> <span class="op">-</span> alpha) <span class="op">**</span> i <span class="cf">for</span> i <span class="kw">in</span> lags_desc]</span>
+<span id="cb1-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="" aria-hidden="true" tabindex="-1"></a>weight_labels <span class="op">=</span> []</span>
+<span id="cb1-9"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> lags_desc:</span>
+<span id="cb1-10"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> i <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb1-11"><a href="" aria-hidden="true" tabindex="-1"></a>        weight_labels.append(<span class="vs">r"</span><span class="dv">$</span><span class="ch">\a</span><span class="vs">lpha</span><span class="dv">$</span><span class="vs">"</span>)</span>
+<span id="cb1-12"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> i <span class="op">==</span> <span class="dv">1</span>:</span>
+<span id="cb1-13"><a href="" aria-hidden="true" tabindex="-1"></a>        weight_labels.append(<span class="vs">r"</span><span class="dv">$</span><span class="ch">\a</span><span class="vs">lpha</span><span class="kw">(</span><span class="vs">1-</span><span class="ch">\a</span><span class="vs">lpha</span><span class="kw">)</span><span class="dv">$</span><span class="vs">"</span>)</span>
+<span id="cb1-14"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb1-15"><a href="" aria-hidden="true" tabindex="-1"></a>        weight_labels.append(<span class="vs">fr"</span><span class="dv">$</span><span class="ch">\a</span><span class="vs">lpha</span><span class="kw">(</span><span class="vs">1-</span><span class="ch">\a</span><span class="vs">lpha</span><span class="kw">)</span><span class="dv">^</span><span class="ch">{{</span><span class="sc">{</span>i<span class="sc">}</span><span class="ch">}}</span><span class="dv">$</span><span class="vs">"</span>)</span>
+<span id="cb1-16"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">5</span>))</span>
+<span id="cb1-18"><a href="" aria-hidden="true" tabindex="-1"></a>markerline, stemlines, baseline <span class="op">=</span> ax.stem(time_steps, weights, linefmt<span class="op">=</span><span class="st">"C1-"</span>,</span>
+<span id="cb1-19"><a href="" aria-hidden="true" tabindex="-1"></a>                                          markerfmt<span class="op">=</span><span class="st">"C1x"</span>, basefmt<span class="op">=</span><span class="st">"black"</span>)</span>
+<span id="cb1-20"><a href="" aria-hidden="true" tabindex="-1"></a>plt.setp(stemlines, <span class="st">"linewidth"</span>, <span class="dv">2</span>)</span>
+<span id="cb1-21"><a href="" aria-hidden="true" tabindex="-1"></a>plt.setp(markerline, <span class="st">"markersize"</span>, <span class="dv">8</span>)</span>
+<span id="cb1-22"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(time_steps, weights, <span class="st">"C1--"</span>, alpha<span class="op">=</span><span class="fl">0.7</span>)</span>
+<span id="cb1-23"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="ss">f"Weight of each observation, α = </span><span class="sc">{</span>alpha<span class="sc">}</span><span class="ss">"</span>, fontsize<span class="op">=</span><span class="dv">14</span>)</span>
+<span id="cb1-24"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"Observation"</span>)</span>
+<span id="cb1-25"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"Weight"</span>)</span>
+<span id="cb1-26"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xticks(time_steps)</span>
+<span id="cb1-27"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xticklabels(labels)</span>
+<span id="cb1-28"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylim(bottom<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb1-29"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlim(left<span class="op">=-</span><span class="fl">0.5</span>, right<span class="op">=</span>n_points <span class="op">-</span> <span class="fl">0.5</span>)</span>
+<span id="cb1-30"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ts, w, label <span class="kw">in</span> <span class="bu">zip</span>(time_steps, weights, weight_labels):</span>
+<span id="cb1-31"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.text(ts <span class="op">+</span> <span class="fl">0.1</span>, w <span class="op">+</span> <span class="fl">0.02</span>, label, fontsize<span class="op">=</span><span class="dv">12</span>, color<span class="op">=</span><span class="st">"C1"</span>)</span>
+<span id="cb1-32"><a href="" aria-hidden="true" tabindex="-1"></a>plt.grid(axis<span class="op">=</span><span class="st">"y"</span>, linestyle<span class="op">=</span><span class="st">"--"</span>, alpha<span class="op">=</span><span class="fl">0.6</span>)</span>
+<span id="cb1-33"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04_files/figure-revealjs/ses-weights-output-1.svg" id="ses-weights" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="how-fast-do-the-weights-die" class="slide level2 smaller">
+<h2>How fast do the weights die?</h2>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Observation</th>
+<th style="text-align: right;">α = 0.2</th>
+<th style="text-align: right;">α = 0.4</th>
+<th style="text-align: right;">α = 0.6</th>
+<th style="text-align: right;">α = 0.8</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(y_T\)</span></td>
+<td style="text-align: right;">0.2000</td>
+<td style="text-align: right;">0.4000</td>
+<td style="text-align: right;">0.6000</td>
+<td style="text-align: right;">0.8000</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(y_{T-1}\)</span></td>
+<td style="text-align: right;">0.1600</td>
+<td style="text-align: right;">0.2400</td>
+<td style="text-align: right;">0.2400</td>
+<td style="text-align: right;">0.1600</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(y_{T-2}\)</span></td>
+<td style="text-align: right;">0.1280</td>
+<td style="text-align: right;">0.1440</td>
+<td style="text-align: right;">0.0960</td>
+<td style="text-align: right;">0.0320</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><span class="math inline">\(y_{T-3}\)</span></td>
+<td style="text-align: right;">0.1024</td>
+<td style="text-align: right;">0.0864</td>
+<td style="text-align: right;">0.0384</td>
+<td style="text-align: right;">0.0064</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">\(y_{T-4}\)</span></td>
+<td style="text-align: right;">0.0819</td>
+<td style="text-align: right;">0.0518</td>
+<td style="text-align: right;">0.0154</td>
+<td style="text-align: right;">0.0013</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sum of the five</td>
+<td style="text-align: right;">0.672</td>
+<td style="text-align: right;">0.922</td>
+<td style="text-align: right;">0.990</td>
+<td style="text-align: right;">1.000</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><span class="math inline">\(\alpha = 0.8\)</span>: the last five observations <strong>are</strong> the forecast.</li>
+<li><span class="math inline">\(\alpha = 0.2\)</span>: five observations carry only two thirds of the weight — the series has a long memory.</li>
+</ul>
+</section>
+<section id="component-form" class="slide level2 smaller">
+<h2>Component form</h2>
+<p>The weighted average is awkward to compute and impossible to extend. Rewrite it with a <strong>state</strong>:</p>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Component form</strong></p>
+</div>
+<div class="callout-content">
+<ul>
+<li>Forecast equation: <span class="math inline">\(\hat{y}_{t+h|t} = \ell_t\)</span></li>
+<li>Smoothing equation: <span class="math inline">\(\ell_t = \alpha y_t + (1-\alpha)\ell_{t-1}\)</span></li>
+</ul>
+</div>
+</div>
+</div>
+<ul>
+<li><span class="math inline">\(\ell_t\)</span> is the <strong>level</strong>: our current estimate of where the series is.</li>
+<li>One number carries the whole history. Each new observation nudges it.</li>
+<li>Forecasts are <strong>flat</strong>: <span class="math inline">\(\hat{y}_{T+h|T} = \ell_T\)</span> for every <span class="math inline">\(h\)</span>. No trend, no season — by construction.</li>
+</ul>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Weighted form — iterate the smoothing equation</strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math display">\[
+\hat{y}_{T+h|T} = \sum_{j=0}^{T-1} \alpha(1-\alpha)^j y_{T-j} + (1-\alpha)^T \ell_0
+\]</span></p>
+</div>
+</div>
+</div>
+<p>The initial level <span class="math inline">\(\ell_0\)</span> never disappears entirely — its weight is <span class="math inline">\((1-\alpha)^T\)</span>.</p>
+</section>
+<section id="choosing-α-and-ℓ₀" class="slide level2 smaller">
+<h2>Choosing α and ℓ₀</h2>
+<p>Both are <strong>estimated</strong>, exactly the way regression coefficients are: by minimising the sum of squared one-step errors.</p>
+<p><span class="math display">\[
+\text{SSE} = \sum_{t=1}^{T} \left(y_t - \hat{y}_{t|t-1}\right)^2
+= \sum_{t=1}^{T} e_t^2
+\]</span></p>
+<ul>
+<li>Unlike regression, there is <strong>no closed-form solution</strong> — <span class="math inline">\(\ell_t\)</span> depends on <span class="math inline">\(\alpha\)</span> recursively.</li>
+<li>So it is numerical optimisation: pick <span class="math inline">\((\alpha, \ell_0)\)</span>, run the recursion, measure SSE, repeat.</li>
+<li>This is why “which <span class="math inline">\(\alpha\)</span> should I use?” is the wrong question. The data answers it.</li>
+</ul>
+</section>
+<section id="example-algerian-exports" class="slide level2 smaller">
+<h2>Example: Algerian exports</h2>
+<div id="cell-algeria-data" class="cell" data-execution_count="3">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="" aria-hidden="true" tabindex="-1"></a>url <span class="op">=</span> <span class="st">'../data/global_economy.csv'</span></span>
+<span id="cb2-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="" aria-hidden="true" tabindex="-1"></a>economy_df <span class="op">=</span> pd.read_csv(url, parse_dates<span class="op">=</span>[<span class="st">"ds"</span>])</span>
+<span id="cb2-4"><a href="" aria-hidden="true" tabindex="-1"></a>algeria_df <span class="op">=</span> (economy_df</span>
+<span id="cb2-5"><a href="" aria-hidden="true" tabindex="-1"></a>              .query(<span class="st">"unique_id == 'Algeria'"</span>)[[<span class="st">"unique_id"</span>, <span class="st">"ds"</span>, <span class="st">"Exports"</span>]]</span>
+<span id="cb2-6"><a href="" aria-hidden="true" tabindex="-1"></a>              .rename(columns<span class="op">=</span>{<span class="st">"Exports"</span>: <span class="st">"y"</span>})</span>
+<span id="cb2-7"><a href="" aria-hidden="true" tabindex="-1"></a>              .dropna()</span>
+<span id="cb2-8"><a href="" aria-hidden="true" tabindex="-1"></a>              .reset_index(drop<span class="op">=</span><span class="va">True</span>))</span>
+<span id="cb2-9"><a href="" aria-hidden="true" tabindex="-1"></a>algeria_df.tail(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="algeria-data" class="cell-output cell-output-display" data-execution_count="3">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">y</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">55</th>
+<td>Algeria</td>
+<td>2015-01-01</td>
+<td>23.172</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">56</th>
+<td>Algeria</td>
+<td>2016-01-01</td>
+<td>20.860</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">57</th>
+<td>Algeria</td>
+<td>2017-01-01</td>
+<td>22.639</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="563561cb" class="cell" data-execution_count="4">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="" aria-hidden="true" tabindex="-1"></a>ses <span class="op">=</span> AutoETS(season_length<span class="op">=</span><span class="dv">1</span>, model<span class="op">=</span><span class="st">"ANN"</span>).fit(y<span class="op">=</span>algeria_df[<span class="st">"y"</span>].to_numpy(<span class="bu">float</span>))</span>
+<span id="cb3-2"><a href="" aria-hidden="true" tabindex="-1"></a>alpha_hat, level_0 <span class="op">=</span> ses.model_[<span class="st">"fit"</span>][<span class="dv">0</span>]</span>
+<span id="cb3-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"alpha = </span><span class="sc">{</span>alpha_hat<span class="sc">:.4f}</span><span class="ss">   l_0 = </span><span class="sc">{</span>level_0<span class="sc">:.2f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>alpha = 0.8366   l_0 = 39.55</code></pre>
+</div>
+</div>
+<p>The optimiser chose <span class="math inline">\(\hat{\alpha} \approx 0.84\)</span> — a short memory: exports react to the present, not to the 1960s.</p>
+</section>
+<section id="what-α-does-to-the-fitted-level" class="slide level2">
+<h2>What α does to the fitted level</h2>
+<div id="cell-algeria-alpha" class="cell" data-execution_count="5">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="" aria-hidden="true" tabindex="-1"></a>y <span class="op">=</span> algeria_df[<span class="st">"y"</span>].to_numpy(<span class="bu">float</span>)</span>
+<span id="cb5-2"><a href="" aria-hidden="true" tabindex="-1"></a>years <span class="op">=</span> algeria_df[<span class="st">"ds"</span>]</span>
+<span id="cb5-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="dv">5</span>))</span>
+<span id="cb5-5"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(years, y, color<span class="op">=</span><span class="st">"black"</span>, linewidth<span class="op">=</span><span class="fl">1.2</span>, label<span class="op">=</span><span class="st">"Exports"</span>)</span>
+<span id="cb5-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> a, colour <span class="kw">in</span> <span class="bu">zip</span>([<span class="fl">0.1</span>, <span class="bu">round</span>(<span class="bu">float</span>(alpha_hat), <span class="dv">2</span>), <span class="fl">0.9</span>], [red_pink, turquoise, orange]):</span>
+<span id="cb5-7"><a href="" aria-hidden="true" tabindex="-1"></a>    fit <span class="op">=</span> SimpleExpSmoothing(y, initialization_method<span class="op">=</span><span class="st">"estimated"</span>).fit(</span>
+<span id="cb5-8"><a href="" aria-hidden="true" tabindex="-1"></a>        smoothing_level<span class="op">=</span>a, optimized<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb5-9"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(years, fit.fittedvalues, color<span class="op">=</span>colour, linewidth<span class="op">=</span><span class="fl">1.4</span>,</span>
+<span id="cb5-10"><a href="" aria-hidden="true" tabindex="-1"></a>            label<span class="op">=</span><span class="ss">f"α = </span><span class="sc">{</span>a<span class="sc">}</span><span class="ss">  (SSE = </span><span class="sc">{</span>fit<span class="sc">.</span>sse<span class="sc">:,.0f}</span><span class="ss">)"</span>)</span>
+<span id="cb5-11"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Algerian exports of goods and services: the level under three values of α"</span>)</span>
+<span id="cb5-12"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"Year"</span>)</span>
+<span id="cb5-13"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"</span><span class="sc">% o</span><span class="st">f GDP"</span>)</span>
+<span id="cb5-14"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb5-15"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04_files/figure-revealjs/algeria-alpha-output-1.svg" id="algeria-alpha" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="what-α-does-read-it" class="slide level2 smaller">
+<h2>What α does: read it</h2>
+<ul>
+<li><span class="math inline">\(\alpha = 0.1\)</span> — a smooth line that lags the series by years. It smooths away real movements.</li>
+<li><span class="math inline">\(\alpha = 0.9\)</span> — the level chases every wiggle; the fitted value is almost the previous observation.</li>
+<li><span class="math inline">\(\hat{\alpha}\)</span> — the compromise the SSE prefers.</li>
+</ul>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>A smooth line is not a good forecast</strong></p>
+</div>
+<div class="callout-content">
+<p>A low <span class="math inline">\(\alpha\)</span> looks nicer on the plot and fits <strong>worse</strong>. Judge the level by its one-step errors, not by how calm it looks.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="ses-forecasts" class="slide level2 smaller">
+<h2>SES forecasts</h2>
+<div id="cell-algeria-forecast" class="cell" data-execution_count="6">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[AutoETS(season_length<span class="op">=</span><span class="dv">1</span>, model<span class="op">=</span><span class="st">"ANN"</span>, alias<span class="op">=</span><span class="st">"SES"</span>)], freq<span class="op">=</span><span class="st">"YS"</span>)</span>
+<span id="cb6-2"><a href="" aria-hidden="true" tabindex="-1"></a>fc_algeria <span class="op">=</span> sf.forecast(df<span class="op">=</span>algeria_df, h<span class="op">=</span><span class="dv">8</span>, level<span class="op">=</span>[<span class="dv">80</span>, <span class="dv">95</span>])</span>
+<span id="cb6-3"><a href="" aria-hidden="true" tabindex="-1"></a>fc_algeria.head(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="algeria-forecast" class="cell-output cell-output-display" data-execution_count="6">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">SES</th>
+<th data-quarto-table-cell-role="th">SES-lo-95</th>
+<th data-quarto-table-cell-role="th">SES-lo-80</th>
+<th data-quarto-table-cell-role="th">SES-hi-80</th>
+<th data-quarto-table-cell-role="th">SES-hi-95</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>Algeria</td>
+<td>2018-01-01</td>
+<td>22.443</td>
+<td>10.529</td>
+<td>14.653</td>
+<td>30.233</td>
+<td>34.357</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>Algeria</td>
+<td>2019-01-01</td>
+<td>22.443</td>
+<td>6.910</td>
+<td>12.287</td>
+<td>32.600</td>
+<td>37.976</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>Algeria</td>
+<td>2020-01-01</td>
+<td>22.443</td>
+<td>3.987</td>
+<td>10.376</td>
+<td>34.511</td>
+<td>40.899</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="dd0348a3" class="cell" data-execution_count="7">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(algeria_df, fc_algeria, level<span class="op">=</span>[<span class="dv">80</span>, <span class="dv">95</span>],</span>
+<span id="cb7-2"><a href="" aria-hidden="true" tabindex="-1"></a>            xlabel<span class="op">=</span><span class="st">"Year"</span>, ylabel<span class="op">=</span><span class="st">"</span><span class="sc">% o</span><span class="st">f GDP"</span>,</span>
+<span id="cb7-3"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"Algerian exports: ETS(A,N,N) forecasts"</span>, rm_legend<span class="op">=</span><span class="va">False</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04_files/figure-revealjs/cell-8-output-1.svg" class="r-stretch"></section>
+<section id="ses-forecasts-read-them" class="slide level2">
+<h2>SES forecasts: read them</h2>
+<ul>
+<li>The point forecast is a <strong>horizontal line</strong> — the current level, carried forward. That is all the model claims to know.</li>
+<li>The intervals <strong>widen</strong> with <span class="math inline">\(h\)</span>: uncertainty accumulates, because each future step adds one more unknown error.</li>
+<li>Compare with <code>naive</code> from Week 1: also a flat line, but anchored on a single observation. SES is anchored on all of them.</li>
+</ul>
+</section></section>
+<section>
+<section id="methods-with-trend" class="title-slide slide level1 center">
+<h1>Methods with trend</h1>
+
+</section>
+<section id="holts-linear-trend-method" class="slide level2 smaller">
+<h2>Holt’s linear trend method</h2>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Component form</strong></p>
+</div>
+<div class="callout-content">
+<ul>
+<li>Forecast: <span class="math inline">\(\hat{y}_{t+h|t} = \ell_t + h b_t\)</span></li>
+<li>Level: <span class="math inline">\(\ell_t = \alpha y_t + (1-\alpha)(\ell_{t-1} + b_{t-1})\)</span></li>
+<li>Trend: <span class="math inline">\(b_t = \beta^*(\ell_t - \ell_{t-1}) + (1-\beta^*) b_{t-1}\)</span></li>
+</ul>
+</div>
+</div>
+</div>
+<ul>
+<li>Two smoothing parameters, <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\beta^*\)</span>, both in <span class="math inline">\([0, 1]\)</span>; four things to estimate with <span class="math inline">\(\ell_0\)</span> and <span class="math inline">\(b_0\)</span>.</li>
+<li>The <strong>level</strong> is a weighted average of <span class="math inline">\(y_t\)</span> and the one-step forecast <span class="math inline">\(\ell_{t-1} + b_{t-1}\)</span>.</li>
+<li>The <strong>slope</strong> is a weighted average of the latest change in level and the previous slope.</li>
+<li><span class="math inline">\(\beta^*\)</span> small: a stable, slowly turning slope. <span class="math inline">\(\beta^*\)</span> large: a slope that reacts to the last two observations.</li>
+</ul>
+</section>
+<section id="what-β-does" class="slide level2">
+<h2>What β* does</h2>
+<div id="cell-holt-beta" class="cell" data-execution_count="8">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="" aria-hidden="true" tabindex="-1"></a>url <span class="op">=</span> <span class="st">'../data/global_economy.csv'</span></span>
+<span id="cb8-2"><a href="" aria-hidden="true" tabindex="-1"></a>aus_pop_df <span class="op">=</span> (economy_df</span>
+<span id="cb8-3"><a href="" aria-hidden="true" tabindex="-1"></a>              .query(<span class="st">"unique_id == 'Australia'"</span>)[[<span class="st">"unique_id"</span>, <span class="st">"ds"</span>, <span class="st">"Population"</span>]]</span>
+<span id="cb8-4"><a href="" aria-hidden="true" tabindex="-1"></a>              .rename(columns<span class="op">=</span>{<span class="st">"Population"</span>: <span class="st">"y"</span>})</span>
+<span id="cb8-5"><a href="" aria-hidden="true" tabindex="-1"></a>              .dropna()</span>
+<span id="cb8-6"><a href="" aria-hidden="true" tabindex="-1"></a>              .reset_index(drop<span class="op">=</span><span class="va">True</span>))</span>
+<span id="cb8-7"><a href="" aria-hidden="true" tabindex="-1"></a>aus_pop_df[<span class="st">"y"</span>] <span class="op">=</span> aus_pop_df[<span class="st">"y"</span>] <span class="op">/</span> <span class="fl">1e6</span></span>
+<span id="cb8-8"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="" aria-hidden="true" tabindex="-1"></a>y_pop <span class="op">=</span> aus_pop_df[<span class="st">"y"</span>].to_numpy(<span class="bu">float</span>)</span>
+<span id="cb8-10"><a href="" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">4</span>), sharey<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb8-11"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ax, beta <span class="kw">in</span> <span class="bu">zip</span>(axes, [<span class="fl">0.01</span>, <span class="fl">0.2</span>, <span class="fl">0.9</span>]):</span>
+<span id="cb8-12"><a href="" aria-hidden="true" tabindex="-1"></a>    fit <span class="op">=</span> Holt(y_pop, initialization_method<span class="op">=</span><span class="st">"estimated"</span>).fit(</span>
+<span id="cb8-13"><a href="" aria-hidden="true" tabindex="-1"></a>        smoothing_level<span class="op">=</span><span class="fl">0.8</span>, smoothing_trend<span class="op">=</span>beta, optimized<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb8-14"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(aus_pop_df[<span class="st">"ds"</span>], y_pop, color<span class="op">=</span><span class="st">"black"</span>, linewidth<span class="op">=</span><span class="fl">1.2</span>, label<span class="op">=</span><span class="st">"Population"</span>)</span>
+<span id="cb8-15"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(aus_pop_df[<span class="st">"ds"</span>], fit.fittedvalues, color<span class="op">=</span>turquoise, linewidth<span class="op">=</span><span class="fl">1.4</span>, label<span class="op">=</span><span class="st">"Fitted"</span>)</span>
+<span id="cb8-16"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_title(<span class="ss">f"β* = </span><span class="sc">{</span>beta<span class="sc">}</span><span class="ss">   (SSE = </span><span class="sc">{</span>fit<span class="sc">.</span>sse<span class="sc">:.2f}</span><span class="ss">)"</span>)</span>
+<span id="cb8-17"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_xlabel(<span class="st">"Year"</span>)</span>
+<span id="cb8-18"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_ylabel(<span class="st">"Millions"</span>)</span>
+<span id="cb8-19"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].legend()</span>
+<span id="cb8-20"><a href="" aria-hidden="true" tabindex="-1"></a>fig.suptitle(<span class="st">"Australian population: Holt's method with α = 0.8 fixed"</span>)</span>
+<span id="cb8-21"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04_files/figure-revealjs/holt-beta-output-1.svg" id="holt-beta" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="the-problem-with-a-straight-line" class="slide level2 smaller">
+<h2>The problem with a straight line</h2>
+<p>Holt’s forecast is <span class="math inline">\(\ell_T + h b_T\)</span>: the current slope, extended <strong>forever</strong>.</p>
+<ul>
+<li>Over <span class="math inline">\(h = 4\)</span> quarters that is often reasonable.</li>
+<li>Over <span class="math inline">\(h = 40\)</span> it says a company growing 5% a quarter today will grow 5% a quarter in ten years.</li>
+<li>Empirically, trends <strong>flatten</strong>. Unconstrained linear trends are one of the classic ways to produce a confidently absurd forecast.</li>
+</ul>
+<p><span class="hi">Fix: let the slope decay.</span></p>
+</section>
+<section id="damped-trend-method" class="slide level2 smaller">
+<h2>Damped trend method</h2>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Component form</strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math display">\[
+\begin{aligned}
+\hat{y}_{t+h|t} &amp;= \ell_t + (\phi + \phi^2 + \cdots + \phi^h) b_t \\
+\ell_t &amp;= \alpha y_t + (1-\alpha)(\ell_{t-1} + \phi b_{t-1}) \\
+b_t &amp;= \beta^*(\ell_t - \ell_{t-1}) + (1-\beta^*)\phi b_{t-1}
+\end{aligned}
+\]</span></p>
+</div>
+</div>
+</div>
+<ul>
+<li>Damping parameter <span class="math inline">\(0 &lt; \phi &lt; 1\)</span>. With <span class="math inline">\(\phi = 1\)</span> this <strong>is</strong> Holt’s method.</li>
+<li>Short horizons stay trended; long horizons flatten out to <span class="math inline">\(\ell_T + \dfrac{\phi b_T}{1-\phi}\)</span>.</li>
+<li>In practice <span class="math inline">\(\phi\)</span> is restricted to <span class="math inline">\((0.8, 0.98)\)</span>: below 0.8 the damping is so aggressive the trend barely survives one step, and at 1 the numerics get unstable.</li>
+</ul>
+</section>
+<section id="what-φ-does" class="slide level2 smaller">
+<h2>What φ does</h2>
+<div id="cell-damped-phi" class="cell" data-execution_count="9">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="" aria-hidden="true" tabindex="-1"></a>h <span class="op">=</span> <span class="dv">40</span></span>
+<span id="cb9-2"><a href="" aria-hidden="true" tabindex="-1"></a>future <span class="op">=</span> pd.date_range(aus_pop_df[<span class="st">"ds"</span>].iloc[<span class="op">-</span><span class="dv">1</span>], periods<span class="op">=</span>h <span class="op">+</span> <span class="dv">1</span>, freq<span class="op">=</span><span class="st">"YS"</span>)[<span class="dv">1</span>:]</span>
+<span id="cb9-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">4.6</span>))</span>
+<span id="cb9-5"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(aus_pop_df[<span class="st">"ds"</span>], y_pop, color<span class="op">=</span><span class="st">"black"</span>, linewidth<span class="op">=</span><span class="fl">1.2</span>, label<span class="op">=</span><span class="st">"Population"</span>)</span>
+<span id="cb9-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> phi, colour <span class="kw">in</span> <span class="bu">zip</span>([<span class="fl">0.8</span>, <span class="fl">0.9</span>, <span class="fl">0.98</span>, <span class="fl">1.0</span>], [red_pink, orange, turquoise, blue]):</span>
+<span id="cb9-7"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> phi <span class="op">==</span> <span class="fl">1.0</span>:</span>
+<span id="cb9-8"><a href="" aria-hidden="true" tabindex="-1"></a>        fit <span class="op">=</span> Holt(y_pop, initialization_method<span class="op">=</span><span class="st">"estimated"</span>).fit(</span>
+<span id="cb9-9"><a href="" aria-hidden="true" tabindex="-1"></a>            smoothing_level<span class="op">=</span><span class="fl">0.99</span>, smoothing_trend<span class="op">=</span><span class="fl">0.2</span>, optimized<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb9-10"><a href="" aria-hidden="true" tabindex="-1"></a>        label <span class="op">=</span> <span class="st">"φ = 1 (Holt)"</span></span>
+<span id="cb9-11"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb9-12"><a href="" aria-hidden="true" tabindex="-1"></a>        fit <span class="op">=</span> Holt(y_pop, damped_trend<span class="op">=</span><span class="va">True</span>, initialization_method<span class="op">=</span><span class="st">"estimated"</span>).fit(</span>
+<span id="cb9-13"><a href="" aria-hidden="true" tabindex="-1"></a>            smoothing_level<span class="op">=</span><span class="fl">0.99</span>, smoothing_trend<span class="op">=</span><span class="fl">0.2</span>, damping_trend<span class="op">=</span>phi, optimized<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb9-14"><a href="" aria-hidden="true" tabindex="-1"></a>        label <span class="op">=</span> <span class="ss">f"φ = </span><span class="sc">{</span>phi<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb9-15"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(future, fit.forecast(h), color<span class="op">=</span>colour, linewidth<span class="op">=</span><span class="fl">1.6</span>, label<span class="op">=</span>label)</span>
+<span id="cb9-16"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Australian population: the same level and slope, four damping parameters"</span>)</span>
+<span id="cb9-17"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"Year"</span>)</span>
+<span id="cb9-18"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"Millions"</span>)</span>
+<span id="cb9-19"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend()</span>
+<span id="cb9-20"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04_files/figure-revealjs/damped-phi-output-1.svg" id="damped-phi" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="holt-versus-damped-estimated" class="slide level2 smaller">
+<h2>Holt versus damped, estimated</h2>
+<div id="680102a9" class="cell" data-execution_count="10">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(</span>
+<span id="cb10-2"><a href="" aria-hidden="true" tabindex="-1"></a>    models<span class="op">=</span>[</span>
+<span id="cb10-3"><a href="" aria-hidden="true" tabindex="-1"></a>        AutoETS(season_length<span class="op">=</span><span class="dv">1</span>, model<span class="op">=</span><span class="st">"AAN"</span>, damped<span class="op">=</span><span class="va">False</span>, alias<span class="op">=</span><span class="st">"Holt"</span>),</span>
+<span id="cb10-4"><a href="" aria-hidden="true" tabindex="-1"></a>        AutoETS(season_length<span class="op">=</span><span class="dv">1</span>, model<span class="op">=</span><span class="st">"AAN"</span>, damped<span class="op">=</span><span class="va">True</span>,  alias<span class="op">=</span><span class="st">"Damped"</span>),</span>
+<span id="cb10-5"><a href="" aria-hidden="true" tabindex="-1"></a>    ],</span>
+<span id="cb10-6"><a href="" aria-hidden="true" tabindex="-1"></a>    freq<span class="op">=</span><span class="st">"YS"</span>,</span>
+<span id="cb10-7"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-8"><a href="" aria-hidden="true" tabindex="-1"></a>fc_pop <span class="op">=</span> sf.forecast(df<span class="op">=</span>aus_pop_df, h<span class="op">=</span><span class="dv">30</span>)</span>
+<span id="cb10-9"><a href="" aria-hidden="true" tabindex="-1"></a>fc_pop.iloc[[<span class="dv">0</span>, <span class="dv">9</span>, <span class="dv">29</span>]]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="10">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">Holt</th>
+<th data-quarto-table-cell-role="th">Damped</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>Australia</td>
+<td>2018-01-01</td>
+<td>24.850</td>
+<td>24.925</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">9</th>
+<td>Australia</td>
+<td>2027-01-01</td>
+<td>27.110</td>
+<td>27.635</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">29</th>
+<td>Australia</td>
+<td>2047-01-01</td>
+<td>32.133</td>
+<td>32.154</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="e01ece89" class="cell" data-execution_count="11">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> damped <span class="kw">in</span> (<span class="va">False</span>, <span class="va">True</span>):</span>
+<span id="cb11-2"><a href="" aria-hidden="true" tabindex="-1"></a>    fit <span class="op">=</span> AutoETS(season_length<span class="op">=</span><span class="dv">1</span>, model<span class="op">=</span><span class="st">"AAN"</span>, damped<span class="op">=</span>damped).fit(y<span class="op">=</span>y_pop)</span>
+<span id="cb11-3"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"damped=</span><span class="sc">{</span>damped<span class="sc">!s:5s}</span><span class="ss"> </span><span class="sc">{</span>fit<span class="sc">.</span>model_[<span class="st">'method'</span>]<span class="sc">:12s}</span><span class="ss"> "</span></span>
+<span id="cb11-4"><a href="" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"AICc = </span><span class="sc">{</span>fit<span class="sc">.</span>model_[<span class="st">'aicc'</span>]<span class="sc">:7.2f}</span><span class="ss">   parameters = </span><span class="sc">{</span>np<span class="sc">.</span><span class="bu">round</span>(fit.model_[<span class="st">'fit'</span>][<span class="dv">0</span>], <span class="dv">3</span>)<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>damped=False ETS(A,A,N)   AICc =  -51.95   parameters = [ 1.     0.    10.025  0.251]
+damped=True  ETS(A,Ad,N)  AICc =  -59.51   parameters = [ 1.     0.2    0.98  10.03   0.253]</code></pre>
+</div>
+</div>
+</section>
+<section id="holt-versus-damped-read-it" class="slide level2 smaller">
+<h2>Holt versus damped: read it</h2>
+<ul>
+<li>AICc prefers the <strong>damped</strong> model here — and the damped forecasts are <em>higher</em>, not lower, than Holt’s. Damping constrains the slope’s decay, it does not force pessimism: with <span class="math inline">\(\phi\)</span> fixed the optimiser is free to re-fit <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\beta^*\)</span>, and it does.</li>
+<li><span class="math inline">\(\hat{\phi} = 0.98\)</span>, the top of the allowed range: this series shows no evidence of a flattening trend over 58 years, so the model damps as little as it is allowed to.</li>
+<li>The implied long-run level is worth computing — it is what the model believes about 2200.</li>
+</ul>
+<div id="8ffbddd2" class="cell" data-execution_count="12">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="" aria-hidden="true" tabindex="-1"></a>fit <span class="op">=</span> AutoETS(season_length<span class="op">=</span><span class="dv">1</span>, model<span class="op">=</span><span class="st">"AAN"</span>, damped<span class="op">=</span><span class="va">True</span>).fit(y<span class="op">=</span>y_pop)</span>
+<span id="cb13-2"><a href="" aria-hidden="true" tabindex="-1"></a>alpha, beta, phi, l0, b0 <span class="op">=</span> fit.model_[<span class="st">"fit"</span>][<span class="dv">0</span>]</span>
+<span id="cb13-3"><a href="" aria-hidden="true" tabindex="-1"></a>level_T, slope_T <span class="op">=</span> fit.model_[<span class="st">"states"</span>][<span class="op">-</span><span class="dv">1</span>, :<span class="dv">2</span>]</span>
+<span id="cb13-4"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"phi = </span><span class="sc">{</span>phi<span class="sc">:.3f}</span><span class="ss">   level_T = </span><span class="sc">{</span>level_T<span class="sc">:.2f}</span><span class="ss">   slope_T = </span><span class="sc">{</span>slope_T<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb13-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"long-run forecast = level_T + phi*slope_T/(1-phi) = </span><span class="sc">{</span>level_T <span class="op">+</span> phi<span class="op">*</span>slope_T<span class="op">/</span>(<span class="dv">1</span><span class="op">-</span>phi)<span class="sc">:.1f}</span><span class="ss"> million"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>phi = 0.980   level_T = 24.60   slope_T = 0.333
+long-run forecast = level_T + phi*slope_T/(1-phi) = 40.9 million</code></pre>
+</div>
+</div>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Two traps in <code>statsforecast</code></strong></p>
+</div>
+<div class="callout-content">
+<p><code>damped=None</code> (the default) lets <code>AutoETS</code> <strong>choose</strong> damping by AICc — so <code>AAN</code> with no <code>damped</code> argument may silently return <code>ETS(A,Ad,N)</code>. And the <code>phi=</code> argument is a starting value, not a constraint: pass <code>phi=0.9</code> and the fit still comes back with <span class="math inline">\(\hat\phi = 0.97\)</span>. Fix <span class="math inline">\(\phi\)</span> in <code>statsmodels</code>, compare specifications in <code>statsforecast</code>.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="methods-with-seasonality" class="title-slide slide level1 center">
+<h1>Methods with seasonality</h1>
+
+</section>
+<section id="holt-winters-additive-method" class="slide level2 smaller">
+<h2>Holt-Winters’ additive method</h2>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Component form</strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math display">\[
+\begin{aligned}
+\hat{y}_{t+h|t} &amp;= \ell_t + h b_t + s_{t+h-m(k+1)} \\
+\ell_t &amp;= \alpha(y_t - s_{t-m}) + (1-\alpha)(\ell_{t-1} + b_{t-1}) \\
+b_t &amp;= \beta^*(\ell_t - \ell_{t-1}) + (1-\beta^*) b_{t-1} \\
+s_t &amp;= \gamma(y_t - \ell_{t-1} - b_{t-1}) + (1-\gamma) s_{t-m}
+\end{aligned}
+\]</span></p>
+</div>
+</div>
+</div>
+<ul>
+<li><span class="math inline">\(m\)</span> is the seasonal period; <span class="math inline">\(k\)</span> is the integer part of <span class="math inline">\((h-1)/m\)</span>, which just means <em>use the estimate for this season from the most recent complete cycle</em>.</li>
+<li>Each observation now updates <strong>three</strong> states: level, slope and the season it belongs to.</li>
+<li>A season is refreshed once per cycle, so <span class="math inline">\(\gamma\)</span> acts on <span class="math inline">\(m\)</span>-step-old information.</li>
+<li>Restrictions: <span class="math inline">\(0 &lt; \alpha, \beta^* &lt; 1\)</span> and <span class="math inline">\(0 &lt; \gamma &lt; 1 - \alpha\)</span>.</li>
+</ul>
+</section>
+<section id="where-the-γ-restriction-comes-from" class="slide level2 smaller">
+<h2>Where the γ restriction comes from</h2>
+<p>The seasonal component is often written against the level rather than the pre-level:</p>
+<p><span class="math display">\[
+s_t = \gamma^*(y_t - \ell_t) + (1-\gamma^*)s_{t-m}
+\]</span></p>
+<p>Substituting <span class="math inline">\(\ell_t = \alpha(y_t - s_{t-m}) + (1-\alpha)(\ell_{t-1}+b_{t-1})\)</span>:</p>
+<p><span class="math display">\[
+s_t = \gamma^*(1-\alpha)(y_t - \ell_{t-1} - b_{t-1}) + \left[1 - \gamma^*(1-\alpha)\right]s_{t-m}
+\]</span></p>
+<p>So the two forms agree with <span class="math inline">\(\gamma = \gamma^*(1-\alpha)\)</span>, and the natural restriction <span class="math inline">\(0 \le \gamma^* \le 1\)</span> becomes <span class="math inline">\(0 \le \gamma \le 1-\alpha\)</span>.</p>
+<p><span class="hi">The level and the season compete for the same information. That is why their weights are linked.</span></p>
+</section>
+<section id="what-γ-does" class="slide level2">
+<h2>What γ does</h2>
+<div id="cell-hw-gamma" class="cell" data-execution_count="13">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="" aria-hidden="true" tabindex="-1"></a>url <span class="op">=</span> <span class="st">'../data/tourism.csv'</span></span>
+<span id="cb15-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="" aria-hidden="true" tabindex="-1"></a>tourism_df <span class="op">=</span> pd.read_csv(url, parse_dates<span class="op">=</span>[<span class="st">"ds"</span>])</span>
+<span id="cb15-4"><a href="" aria-hidden="true" tabindex="-1"></a>holidays_df <span class="op">=</span> (tourism_df</span>
+<span id="cb15-5"><a href="" aria-hidden="true" tabindex="-1"></a>               .query(<span class="st">"Purpose == 'Holiday'"</span>)</span>
+<span id="cb15-6"><a href="" aria-hidden="true" tabindex="-1"></a>               .groupby(<span class="st">"ds"</span>, as_index<span class="op">=</span><span class="va">False</span>)[<span class="st">"y"</span>]</span>
+<span id="cb15-7"><a href="" aria-hidden="true" tabindex="-1"></a>               .<span class="bu">sum</span>())</span>
+<span id="cb15-8"><a href="" aria-hidden="true" tabindex="-1"></a>holidays_df[<span class="st">"y"</span>] <span class="op">=</span> holidays_df[<span class="st">"y"</span>] <span class="op">/</span> <span class="fl">1e3</span></span>
+<span id="cb15-9"><a href="" aria-hidden="true" tabindex="-1"></a>holidays_df.insert(<span class="dv">0</span>, <span class="st">"unique_id"</span>, <span class="st">"Holiday"</span>)</span>
+<span id="cb15-10"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-11"><a href="" aria-hidden="true" tabindex="-1"></a>y_hol <span class="op">=</span> holidays_df[<span class="st">"y"</span>].to_numpy(<span class="bu">float</span>)</span>
+<span id="cb15-12"><a href="" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">4</span>), sharey<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb15-13"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ax, gamma <span class="kw">in</span> <span class="bu">zip</span>(axes, [<span class="fl">0.01</span>, <span class="fl">0.3</span>, <span class="fl">0.9</span>]):</span>
+<span id="cb15-14"><a href="" aria-hidden="true" tabindex="-1"></a>    fit <span class="op">=</span> ExponentialSmoothing(y_hol, trend<span class="op">=</span><span class="st">"add"</span>, seasonal<span class="op">=</span><span class="st">"add"</span>, seasonal_periods<span class="op">=</span><span class="dv">4</span>,</span>
+<span id="cb15-15"><a href="" aria-hidden="true" tabindex="-1"></a>                               initialization_method<span class="op">=</span><span class="st">"estimated"</span>).fit(</span>
+<span id="cb15-16"><a href="" aria-hidden="true" tabindex="-1"></a>        smoothing_level<span class="op">=</span><span class="fl">0.4</span>, smoothing_trend<span class="op">=</span><span class="fl">0.02</span>, smoothing_seasonal<span class="op">=</span>gamma, optimized<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb15-17"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(holidays_df[<span class="st">"ds"</span>], y_hol, color<span class="op">=</span><span class="st">"black"</span>, linewidth<span class="op">=</span><span class="fl">1.0</span>, label<span class="op">=</span><span class="st">"Trips"</span>)</span>
+<span id="cb15-18"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(holidays_df[<span class="st">"ds"</span>], fit.fittedvalues, color<span class="op">=</span>turquoise, linewidth<span class="op">=</span><span class="fl">1.2</span>, label<span class="op">=</span><span class="st">"Fitted"</span>)</span>
+<span id="cb15-19"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_title(<span class="ss">f"γ = </span><span class="sc">{</span>gamma<span class="sc">}</span><span class="ss">   (SSE = </span><span class="sc">{</span>fit<span class="sc">.</span>sse<span class="sc">:.1f}</span><span class="ss">)"</span>)</span>
+<span id="cb15-20"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_xlabel(<span class="st">"Quarter"</span>)</span>
+<span id="cb15-21"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_ylabel(<span class="st">"Trips (millions)"</span>)</span>
+<span id="cb15-22"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].legend()</span>
+<span id="cb15-23"><a href="" aria-hidden="true" tabindex="-1"></a>fig.suptitle(<span class="st">"Australian domestic holidays: Holt-Winters additive, α and β* fixed"</span>)</span>
+<span id="cb15-24"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04_files/figure-revealjs/hw-gamma-output-1.svg" id="hw-gamma" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="holt-winters-multiplicative-method" class="slide level2 smaller">
+<h2>Holt-Winters’ multiplicative method</h2>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Component form</strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math display">\[
+\begin{aligned}
+\hat{y}_{t+h|t} &amp;= (\ell_t + h b_t)\, s_{t+h-m(k+1)} \\
+\ell_t &amp;= \alpha \frac{y_t}{s_{t-m}} + (1-\alpha)(\ell_{t-1} + b_{t-1}) \\
+b_t &amp;= \beta^*(\ell_t - \ell_{t-1}) + (1-\beta^*) b_{t-1} \\
+s_t &amp;= \gamma \frac{y_t}{\ell_{t-1} + b_{t-1}} + (1-\gamma) s_{t-m}
+\end{aligned}
+\]</span></p>
+</div>
+</div>
+</div>
+<ul>
+<li><strong>Additive</strong>: the season is an amount. Within a cycle <span class="math inline">\(\sum s_i \approx 0\)</span>.</li>
+<li><strong>Multiplicative</strong>: the season is a percentage. Within a cycle <span class="math inline">\(\sum s_i \approx m\)</span>.</li>
+<li>This is the same question you answered in Lab 3 with Box-Cox: does the seasonal swing grow with the level? If it does, multiply.</li>
+</ul>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p>Multiplicative seasonality is an alternative to transforming the data, not an addition to it. Box-Cox <strong>then</strong> additive seasonality does the same job — and if you do both, you are modelling the swing twice.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="additive-versus-multiplicative" class="slide level2 smaller">
+<h2>Additive versus multiplicative</h2>
+<div id="742e96d2" class="cell" data-execution_count="14">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(</span>
+<span id="cb16-2"><a href="" aria-hidden="true" tabindex="-1"></a>    models<span class="op">=</span>[</span>
+<span id="cb16-3"><a href="" aria-hidden="true" tabindex="-1"></a>        AutoETS(season_length<span class="op">=</span><span class="dv">4</span>, model<span class="op">=</span><span class="st">"AAA"</span>, alias<span class="op">=</span><span class="st">"additive"</span>),</span>
+<span id="cb16-4"><a href="" aria-hidden="true" tabindex="-1"></a>        AutoETS(season_length<span class="op">=</span><span class="dv">4</span>, model<span class="op">=</span><span class="st">"MAM"</span>, alias<span class="op">=</span><span class="st">"multiplicative"</span>),</span>
+<span id="cb16-5"><a href="" aria-hidden="true" tabindex="-1"></a>    ],</span>
+<span id="cb16-6"><a href="" aria-hidden="true" tabindex="-1"></a>    freq<span class="op">=</span><span class="st">"QS"</span>,</span>
+<span id="cb16-7"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-8"><a href="" aria-hidden="true" tabindex="-1"></a>fc_hol <span class="op">=</span> sf.forecast(df<span class="op">=</span>holidays_df, h<span class="op">=</span><span class="dv">12</span>)</span>
+<span id="cb16-9"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> sf.fit(df<span class="op">=</span>holidays_df)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="ef904c13" class="cell" data-execution_count="15">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(holidays_df, fc_hol, xlabel<span class="op">=</span><span class="st">"Quarter"</span>, ylabel<span class="op">=</span><span class="st">"Trips (millions)"</span>,</span>
+<span id="cb17-2"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"Australian domestic holidays: two seasonal specifications"</span>, rm_legend<span class="op">=</span><span class="va">False</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04_files/figure-revealjs/cell-16-output-1.svg" class="r-stretch"></section>
+<section id="the-states-behind-the-two-fits" class="slide level2 tiny">
+<h2>The states behind the two fits</h2>
+<div id="cell-hw-states" class="cell" data-execution_count="16">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="" aria-hidden="true" tabindex="-1"></a>add_model <span class="op">=</span> sf.fitted_[<span class="dv">0</span>, <span class="dv">0</span>].model_</span>
+<span id="cb18-2"><a href="" aria-hidden="true" tabindex="-1"></a>mult_model <span class="op">=</span> sf.fitted_[<span class="dv">0</span>, <span class="dv">1</span>].model_</span>
+<span id="cb18-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-4"><a href="" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">5</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="dv">7</span>), sharex<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb18-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> col, (model, name) <span class="kw">in</span> <span class="bu">enumerate</span>([(add_model, <span class="st">"ETS(A,A,A) — additive season"</span>),</span>
+<span id="cb18-6"><a href="" aria-hidden="true" tabindex="-1"></a>                                     (mult_model, <span class="st">"ETS(M,A,M) — multiplicative season"</span>)]):</span>
+<span id="cb18-7"><a href="" aria-hidden="true" tabindex="-1"></a>    axes[<span class="dv">0</span>, col].plot(y_hol, color<span class="op">=</span><span class="st">"black"</span>)</span>
+<span id="cb18-8"><a href="" aria-hidden="true" tabindex="-1"></a>    axes[<span class="dv">0</span>, col].set_title(name)</span>
+<span id="cb18-9"><a href="" aria-hidden="true" tabindex="-1"></a>    axes[<span class="dv">1</span>, col].plot(model[<span class="st">"states"</span>][:, <span class="dv">0</span>], color<span class="op">=</span>slate)</span>
+<span id="cb18-10"><a href="" aria-hidden="true" tabindex="-1"></a>    axes[<span class="dv">2</span>, col].plot(model[<span class="st">"states"</span>][:, <span class="dv">1</span>], color<span class="op">=</span>blue)</span>
+<span id="cb18-11"><a href="" aria-hidden="true" tabindex="-1"></a>    axes[<span class="dv">3</span>, col].plot(model[<span class="st">"states"</span>][:, <span class="dv">2</span>], color<span class="op">=</span>turquoise)</span>
+<span id="cb18-12"><a href="" aria-hidden="true" tabindex="-1"></a>    axes[<span class="dv">4</span>, col].plot(model[<span class="st">"residuals"</span>], color<span class="op">=</span>orange)</span>
+<span id="cb18-13"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> row, label <span class="kw">in</span> <span class="bu">enumerate</span>([<span class="st">"Trips"</span>, <span class="st">"Level"</span>, <span class="st">"Slope"</span>, <span class="st">"Season"</span>, <span class="st">"Residual"</span>]):</span>
+<span id="cb18-14"><a href="" aria-hidden="true" tabindex="-1"></a>    axes[row, <span class="dv">0</span>].set_ylabel(label)</span>
+<span id="cb18-15"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ax <span class="kw">in</span> axes.flat:</span>
+<span id="cb18-16"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.grid(<span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.3</span>)</span>
+<span id="cb18-17"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04_files/figure-revealjs/hw-states-output-1.svg" id="hw-states" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="the-states-read-them" class="slide level2 smaller">
+<h2>The states: read them</h2>
+<ul>
+<li>The <strong>level</strong> is the trend of the series with the season removed — the seasonally adjusted series from Lab 3, computed recursively instead of by STL.</li>
+<li>The <strong>slope</strong> is tiny and slow: Australian holiday travel shifts over decades, not quarters.</li>
+<li>The <strong>season</strong> is the interesting one. It is flat until the mid-2000s and then changes shape: the additive fit changes amplitude, the multiplicative fit changes it proportionally.</li>
+<li>The <strong>residual</strong> is what neither could explain. Additive residuals are in trips, multiplicative ones are relative — that is why the two columns are not on the same scale.</li>
+</ul>
+</section>
+<section id="holt-winters-damped" class="slide level2 smaller">
+<h2>Holt-Winters damped</h2>
+<p><span class="math display">\[
+\begin{aligned}
+\hat{y}_{t+h|t} &amp;= \left[\ell_t + (\phi + \phi^2 + \cdots + \phi^h) b_t\right] s_{t+h-m(k+1)} \\
+\ell_t &amp;= \alpha (y_t / s_{t-m}) + (1-\alpha)(\ell_{t-1} + \phi b_{t-1}) \\
+b_t &amp;= \beta^*(\ell_t - \ell_{t-1}) + (1-\beta^*)\phi b_{t-1} \\
+s_t &amp;= \gamma \frac{y_t}{\ell_{t-1} + \phi b_{t-1}} + (1-\gamma)s_{t-m}
+\end{aligned}
+\]</span></p>
+<p>This combination — multiplicative season, damped additive trend — is the workhorse specification for business data with a strong weekly or monthly rhythm.</p>
+</section>
+<section id="daily-data-m-7" class="slide level2 smaller">
+<h2>Daily data: m = 7</h2>
+<div id="c7cf7bac" class="cell" data-execution_count="17">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="" aria-hidden="true" tabindex="-1"></a>url <span class="op">=</span> <span class="st">'../data/vic_elec.csv'</span></span>
+<span id="cb19-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-3"><a href="" aria-hidden="true" tabindex="-1"></a>vic_df <span class="op">=</span> pd.read_csv(url, parse_dates<span class="op">=</span>[<span class="st">"ds"</span>])</span>
+<span id="cb19-4"><a href="" aria-hidden="true" tabindex="-1"></a>daily_df <span class="op">=</span> (vic_df.set_index(<span class="st">"ds"</span>)[<span class="st">"y"</span>].resample(<span class="st">"D"</span>).<span class="bu">sum</span>() <span class="op">/</span> <span class="fl">1e3</span>).reset_index()</span>
+<span id="cb19-5"><a href="" aria-hidden="true" tabindex="-1"></a>daily_df.insert(<span class="dv">0</span>, <span class="st">"unique_id"</span>, <span class="st">"Demand"</span>)</span>
+<span id="cb19-6"><a href="" aria-hidden="true" tabindex="-1"></a>winter_df <span class="op">=</span> daily_df.query(<span class="st">"'2014-06-01' &lt;= ds &lt;= '2014-07-31'"</span>).reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb19-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-8"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(</span>
+<span id="cb19-9"><a href="" aria-hidden="true" tabindex="-1"></a>    models<span class="op">=</span>[AutoETS(season_length<span class="op">=</span><span class="dv">7</span>, model<span class="op">=</span><span class="st">"MAM"</span>, damped<span class="op">=</span><span class="va">True</span>, alias<span class="op">=</span><span class="st">"HW damped"</span>)],</span>
+<span id="cb19-10"><a href="" aria-hidden="true" tabindex="-1"></a>    freq<span class="op">=</span><span class="st">"D"</span>,</span>
+<span id="cb19-11"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb19-12"><a href="" aria-hidden="true" tabindex="-1"></a>fc_daily <span class="op">=</span> sf.forecast(df<span class="op">=</span>winter_df, h<span class="op">=</span><span class="dv">14</span>, level<span class="op">=</span>[<span class="dv">80</span>, <span class="dv">95</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="c3940777" class="cell" data-execution_count="18">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(winter_df, fc_daily, level<span class="op">=</span>[<span class="dv">80</span>, <span class="dv">95</span>], xlabel<span class="op">=</span><span class="st">"Date"</span>, ylabel<span class="op">=</span><span class="st">"Demand (GWh)"</span>,</span>
+<span id="cb20-2"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"Victorian electricity demand: two weeks ahead"</span>, rm_legend<span class="op">=</span><span class="va">False</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04_files/figure-revealjs/cell-19-output-1.svg" class="r-stretch"></section>
+<section id="daily-data-what-to-notice" class="slide level2 smaller">
+<h2>Daily data: what to notice</h2>
+<ul>
+<li><span class="math inline">\(m = 7\)</span>, not 365: the cycle we are modelling is the <strong>week</strong>. Weekdays are high, weekends low.</li>
+<li>Two weeks of forecasts reproduce the weekly shape; the level drifts slightly and then damps.</li>
+<li>The intervals are wide on weekdays and narrow on weekends — with multiplicative errors, uncertainty scales with the level.</li>
+</ul>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Electricity has more than one season</strong></p>
+</div>
+<div class="callout-content">
+<p>Daily demand also has an annual cycle, and half-hourly demand has a daily one on top of the weekly. ETS carries <strong>one</strong> seasonal component. Multiple seasonality needs the methods in Week 8.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="a-taxonomy-of-methods" class="title-slide slide level1 center">
+<h1>A taxonomy of methods</h1>
+
+</section>
+<section id="nine-methods-two-questions" class="slide level2 smaller">
+<h2>Nine methods, two questions</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Trend component</th>
+<th style="text-align: left;">Seasonal: N (none)</th>
+<th style="text-align: left;">Seasonal: A (additive)</th>
+<th style="text-align: left;">Seasonal: M (multiplicative)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">N (none)</td>
+<td style="text-align: left;">(N,N)</td>
+<td style="text-align: left;">(N,A)</td>
+<td style="text-align: left;">(N,M)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">A (additive)</td>
+<td style="text-align: left;">(A,N)</td>
+<td style="text-align: left;">(A,A)</td>
+<td style="text-align: left;">(A,M)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">A<span class="math inline">\(_d\)</span> (additive damped)</td>
+<td style="text-align: left;">(A<span class="math inline">\(_d\)</span>,N)</td>
+<td style="text-align: left;">(A<span class="math inline">\(_d\)</span>,A)</td>
+<td style="text-align: left;">(A<span class="math inline">\(_d\)</span>,M)</td>
+</tr>
+</tbody>
+</table>
+<p>Two questions, asked twice: <strong>is there a trend, and does it flatten?</strong> and <strong>is there a season, and does it scale with the level?</strong></p>
+<p><span class="hi">Everything so far is one cell of this table. Nothing new is coming — only combinations.</span></p>
+</section>
+<section id="the-nine-by-name" class="slide level2 smaller">
+<h2>The nine, by name</h2>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Short hand</th>
+<th style="text-align: left;">Method</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">(N,N)</td>
+<td style="text-align: left;">Simple exponential smoothing</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">(A,N)</td>
+<td style="text-align: left;">Holt’s linear method</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">(A<span class="math inline">\(_d\)</span>,N)</td>
+<td style="text-align: left;">Additive damped trend method</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">(A,A)</td>
+<td style="text-align: left;">Additive Holt-Winters’ method</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">(A,M)</td>
+<td style="text-align: left;">Multiplicative Holt-Winters’ method</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">(A<span class="math inline">\(_d\)</span>,M)</td>
+<td style="text-align: left;">Holt-Winters’ damped method</td>
+</tr>
+</tbody>
+</table>
+<p>The three cells nobody names — (N,A), (N,M), (A,M) with an undamped trend — are perfectly usable; they are just rarer in practice than the six above.</p>
+</section>
+<section id="all-nine-written-out" class="slide level2 tiny40">
+<h2>All nine, written out</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Trend</th>
+<th style="text-align: left;">Seasonal N</th>
+<th style="text-align: left;">Seasonal A</th>
+<th style="text-align: left;">Seasonal M</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>N</strong></td>
+<td style="text-align: left;"><span class="math inline">\(\hat{y}_{t+h\|t} = \ell_t\)</span> <br> <span class="math inline">\(\ell_t = \alpha y_t + (1-\alpha)\ell_{t-1}\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(\hat{y}_{t+h\|t} = \ell_t + s_{t+h-m(k+1)}\)</span> <br> <span class="math inline">\(\ell_t = \alpha(y_t - s_{t-m}) + (1-\alpha)\ell_{t-1}\)</span> <br> <span class="math inline">\(s_t = \gamma(y_t - \ell_{t-1}) + (1-\gamma)s_{t-m}\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(\hat{y}_{t+h\|t} = \ell_t s_{t+h-m(k+1)}\)</span> <br> <span class="math inline">\(\ell_t = \alpha(y_t/s_{t-m}) + (1-\alpha)\ell_{t-1}\)</span> <br> <span class="math inline">\(s_t = \gamma(y_t/\ell_{t-1}) + (1-\gamma)s_{t-m}\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>A</strong></td>
+<td style="text-align: left;"><span class="math inline">\(\hat{y}_{t+h\|t} = \ell_t + hb_t\)</span> <br> <span class="math inline">\(\ell_t = \alpha y_t + (1-\alpha)(\ell_{t-1}+b_{t-1})\)</span> <br> <span class="math inline">\(b_t = \beta^*(\ell_t - \ell_{t-1}) + (1-\beta^*)b_{t-1}\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(\hat{y}_{t+h\|t} = \ell_t + hb_t + s_{t+h-m(k+1)}\)</span> <br> <span class="math inline">\(\ell_t = \alpha(y_t - s_{t-m}) + (1-\alpha)(\ell_{t-1}+b_{t-1})\)</span> <br> <span class="math inline">\(b_t = \beta^*(\ell_t-\ell_{t-1}) + (1-\beta^*)b_{t-1}\)</span> <br> <span class="math inline">\(s_t = \gamma(y_t - \ell_{t-1} - b_{t-1}) + (1-\gamma)s_{t-m}\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(\hat{y}_{t+h\|t} = (\ell_t + hb_t)s_{t+h-m(k+1)}\)</span> <br> <span class="math inline">\(\ell_t = \alpha(y_t/s_{t-m}) + (1-\alpha)(\ell_{t-1}+b_{t-1})\)</span> <br> <span class="math inline">\(b_t = \beta^*(\ell_t-\ell_{t-1}) + (1-\beta^*)b_{t-1}\)</span> <br> <span class="math inline">\(s_t = \gamma\dfrac{y_t}{\ell_{t-1}+b_{t-1}} + (1-\gamma)s_{t-m}\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>A<span class="math inline">\(_d\)</span></strong></td>
+<td style="text-align: left;"><span class="math inline">\(\hat{y}_{t+h\|t} = \ell_t + \phi_h b_t\)</span> <br> <span class="math inline">\(\ell_t = \alpha y_t + (1-\alpha)(\ell_{t-1}+\phi b_{t-1})\)</span> <br> <span class="math inline">\(b_t = \beta^*(\ell_t-\ell_{t-1}) + (1-\beta^*)\phi b_{t-1}\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(\hat{y}_{t+h\|t} = \ell_t + \phi_h b_t + s_{t+h-m(k+1)}\)</span> <br> <span class="math inline">\(\ell_t = \alpha(y_t - s_{t-m}) + (1-\alpha)(\ell_{t-1}+\phi b_{t-1})\)</span> <br> <span class="math inline">\(b_t = \beta^*(\ell_t-\ell_{t-1}) + (1-\beta^*)\phi b_{t-1}\)</span> <br> <span class="math inline">\(s_t = \gamma(y_t-\ell_{t-1}-\phi b_{t-1}) + (1-\gamma)s_{t-m}\)</span></td>
+<td style="text-align: left;"><span class="math inline">\(\hat{y}_{t+h\|t} = (\ell_t + \phi_h b_t)s_{t+h-m(k+1)}\)</span> <br> <span class="math inline">\(\ell_t = \alpha(y_t/s_{t-m}) + (1-\alpha)(\ell_{t-1}+\phi b_{t-1})\)</span> <br> <span class="math inline">\(b_t = \beta^*(\ell_t-\ell_{t-1}) + (1-\beta^*)\phi b_{t-1}\)</span> <br> <span class="math inline">\(s_t = \gamma\dfrac{y_t}{\ell_{t-1}+\phi b_{t-1}} + (1-\gamma)s_{t-m}\)</span></td>
+</tr>
+</tbody>
+</table>
+<p><span class="math inline">\(\phi_h = \phi + \phi^2 + \cdots + \phi^h\)</span></p>
+</section></section>
+<section>
+<section id="innovations-state-space-models" class="title-slide slide level1 center">
+<h1>Innovations state space models</h1>
+
+</section>
+<section id="methods-and-models" class="slide level2 smaller">
+<h2>Methods and models</h2>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>A method</strong></p>
+</div>
+<div class="callout-content">
+<p>An algorithm that returns <strong>point forecasts</strong>. Everything so far is a method.</p>
+</div>
+</div>
+</div>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>A model</strong></p>
+</div>
+<div class="callout-content">
+<p>A method <strong>plus</strong> a statement about the errors. It gives the same point forecasts, and in addition:</p>
+<ul>
+<li>prediction intervals that follow from something, rather than from a rule of thumb;</li>
+<li>a likelihood, so models can be compared with AICc;</li>
+<li>a way to simulate futures, not just draw a line.</li>
+</ul>
+</div>
+</div>
+</div>
+<p>Week 3 gave you residual diagnostics and told you the intervals assume something about the errors. Here is where that assumption is written down.</p>
+</section>
+<section id="etsann-ses-with-additive-errors" class="slide level2 smaller">
+<h2>ETS(A,N,N): SES with additive errors</h2>
+<p>Start from the component form and look at the one-step error <span class="math inline">\(e_t = y_t - \hat{y}_{t|t-1} = y_t - \ell_{t-1}\)</span>:</p>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Error-correction form</strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math display">\[
+\begin{aligned}
+y_t &amp;= \ell_{t-1} + e_t \\
+\ell_t &amp;= \ell_{t-1} + \alpha(y_t - \ell_{t-1}) = \ell_{t-1} + \alpha e_t
+\end{aligned}
+\]</span></p>
+</div>
+</div>
+</div>
+<p>Now <strong>assume</strong> <span class="math inline">\(e_t = \varepsilon_t \sim \text{NID}(0, \sigma^2)\)</span> and the method becomes a model:</p>
+<ul>
+<li>Measurement equation: <span class="math inline">\(y_t = \ell_{t-1} + \varepsilon_t\)</span></li>
+<li>State equation: <span class="math inline">\(\ell_t = \ell_{t-1} + \alpha \varepsilon_t\)</span></li>
+</ul>
+<p>The level is not smoothed data any more — it is a <strong>state</strong> that the noise moves.</p>
+</section>
+<section id="etsmnn-the-same-method-relative-errors" class="slide level2 smaller">
+<h2>ETS(M,N,N): the same method, relative errors</h2>
+<p>Suppose instead the error is proportional to the level — <span class="math inline">\(\varepsilon_t = \dfrac{y_t - \hat{y}_{t|t-1}}{\hat{y}_{t|t-1}} \sim \text{NID}(0, \sigma^2)\)</span>:</p>
+<ul>
+<li>Measurement equation: <span class="math inline">\(y_t = \ell_{t-1}(1 + \varepsilon_t)\)</span></li>
+<li>State equation: <span class="math inline">\(\ell_t = \ell_{t-1}(1 + \alpha\varepsilon_t)\)</span></li>
+</ul>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Important</strong></p>
+</div>
+<div class="callout-content">
+<p>With the <strong>same parameters</strong>, additive and multiplicative errors give <strong>identical point forecasts</strong> and <span class="hi">different prediction intervals</span>. The choice of error type is a choice about uncertainty, not about the forecast.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="the-same-forecast-different-uncertainty" class="slide level2 smaller">
+<h2>The same forecast, different uncertainty</h2>
+<div id="8df4e788" class="cell" data-execution_count="19">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(</span>
+<span id="cb21-2"><a href="" aria-hidden="true" tabindex="-1"></a>    models<span class="op">=</span>[AutoETS(season_length<span class="op">=</span><span class="dv">1</span>, model<span class="op">=</span><span class="st">"ANN"</span>, alias<span class="op">=</span><span class="st">"ANN"</span>),</span>
+<span id="cb21-3"><a href="" aria-hidden="true" tabindex="-1"></a>            AutoETS(season_length<span class="op">=</span><span class="dv">1</span>, model<span class="op">=</span><span class="st">"MNN"</span>, alias<span class="op">=</span><span class="st">"MNN"</span>)],</span>
+<span id="cb21-4"><a href="" aria-hidden="true" tabindex="-1"></a>    freq<span class="op">=</span><span class="st">"YS"</span>,</span>
+<span id="cb21-5"><a href="" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb21-6"><a href="" aria-hidden="true" tabindex="-1"></a>fc_err <span class="op">=</span> sf.forecast(df<span class="op">=</span>algeria_df, h<span class="op">=</span><span class="dv">5</span>, level<span class="op">=</span>[<span class="dv">80</span>])</span>
+<span id="cb21-7"><a href="" aria-hidden="true" tabindex="-1"></a>fc_err[<span class="st">"width ANN"</span>] <span class="op">=</span> fc_err[<span class="st">"ANN-hi-80"</span>] <span class="op">-</span> fc_err[<span class="st">"ANN-lo-80"</span>]</span>
+<span id="cb21-8"><a href="" aria-hidden="true" tabindex="-1"></a>fc_err[<span class="st">"width MNN"</span>] <span class="op">=</span> fc_err[<span class="st">"MNN-hi-80"</span>] <span class="op">-</span> fc_err[<span class="st">"MNN-lo-80"</span>]</span>
+<span id="cb21-9"><a href="" aria-hidden="true" tabindex="-1"></a>fc_err[[<span class="st">"ds"</span>, <span class="st">"ANN"</span>, <span class="st">"MNN"</span>, <span class="st">"width ANN"</span>, <span class="st">"width MNN"</span>]].<span class="bu">round</span>(<span class="dv">2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="19">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">ANN</th>
+<th data-quarto-table-cell-role="th">MNN</th>
+<th data-quarto-table-cell-role="th">width ANN</th>
+<th data-quarto-table-cell-role="th">width MNN</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>2018-01-01</td>
+<td>22.44</td>
+<td>22.59</td>
+<td>15.58</td>
+<td>11.31</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>2019-01-01</td>
+<td>22.44</td>
+<td>22.59</td>
+<td>20.31</td>
+<td>15.92</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>2020-01-01</td>
+<td>22.44</td>
+<td>22.59</td>
+<td>24.14</td>
+<td>19.58</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>2021-01-01</td>
+<td>22.44</td>
+<td>22.59</td>
+<td>27.43</td>
+<td>22.76</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>2022-01-01</td>
+<td>22.44</td>
+<td>22.59</td>
+<td>30.37</td>
+<td>25.65</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<ul>
+<li>Point forecasts agree to within a rounding error — the small gap is estimation, not structure: each model optimises its own likelihood, so <span class="math inline">\(\hat\alpha\)</span> differs slightly.</li>
+<li>The 80% interval is about a quarter narrower under multiplicative errors, because Algerian exports are a percentage that cannot go far below the current level.</li>
+</ul>
+</section>
+<section id="holts-method-as-a-model" class="slide level2 smaller">
+<h2>Holt’s method as a model</h2>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>ETS(A,A,N) — additive errors, <span class="math inline">\(\varepsilon_t = y_t - \ell_{t-1} - b_{t-1}\)</span></strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math display">\[
+\begin{aligned}
+y_t &amp;= \ell_{t-1} + b_{t-1} + \varepsilon_t \\
+\ell_t &amp;= \ell_{t-1} + b_{t-1} + \alpha\varepsilon_t \\
+b_t &amp;= b_{t-1} + \beta\varepsilon_t
+\end{aligned}
+\]</span></p>
+</div>
+</div>
+</div>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>ETS(M,A,N) — multiplicative errors, <span class="math inline">\(\varepsilon_t = \dfrac{y_t - (\ell_{t-1}+b_{t-1})}{\ell_{t-1}+b_{t-1}}\)</span></strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math display">\[
+\begin{aligned}
+y_t &amp;= (\ell_{t-1} + b_{t-1})(1 + \varepsilon_t) \\
+\ell_t &amp;= (\ell_{t-1} + b_{t-1})(1 + \alpha\varepsilon_t) \\
+b_t &amp;= b_{t-1} + \beta(\ell_{t-1} + b_{t-1})\varepsilon_t
+\end{aligned}
+\]</span></p>
+</div>
+</div>
+</div>
+<p>In the models we write <span class="math inline">\(\beta = \alpha\beta^*\)</span> — the two parametrisations describe the same method.</p>
+</section>
+<section id="eighteen-models" class="slide level2 smaller">
+<h2>Eighteen models</h2>
+<p><span class="hi">ADDITIVE ERROR MODELS</span></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Trend</th>
+<th style="text-align: left;">Seasonal N</th>
+<th style="text-align: left;">Seasonal A</th>
+<th style="text-align: left;">Seasonal M</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>N</strong></td>
+<td style="text-align: left;">A,N,N</td>
+<td style="text-align: left;">A,N,A</td>
+<td style="text-align: left;">A,N,M</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>A</strong></td>
+<td style="text-align: left;">A,A,N</td>
+<td style="text-align: left;">A,A,A</td>
+<td style="text-align: left;">A,A,M</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>A<span class="math inline">\(_d\)</span></strong></td>
+<td style="text-align: left;">A,A<span class="math inline">\(_d\)</span>,N</td>
+<td style="text-align: left;">A,A<span class="math inline">\(_d\)</span>,A</td>
+<td style="text-align: left;">A,A<span class="math inline">\(_d\)</span>,M</td>
+</tr>
+</tbody>
+</table>
+<p><span class="hi">MULTIPLICATIVE ERROR MODELS</span></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Trend</th>
+<th style="text-align: left;">Seasonal N</th>
+<th style="text-align: left;">Seasonal A</th>
+<th style="text-align: left;">Seasonal M</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>N</strong></td>
+<td style="text-align: left;">M,N,N</td>
+<td style="text-align: left;">M,N,A</td>
+<td style="text-align: left;">M,N,M</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>A</strong></td>
+<td style="text-align: left;">M,A,N</td>
+<td style="text-align: left;">M,A,A</td>
+<td style="text-align: left;">M,A,M</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>A<span class="math inline">\(_d\)</span></strong></td>
+<td style="text-align: left;">M,A<span class="math inline">\(_d\)</span>,N</td>
+<td style="text-align: left;">M,A<span class="math inline">\(_d\)</span>,A</td>
+<td style="text-align: left;">M,A<span class="math inline">\(_d\)</span>,M</td>
+</tr>
+</tbody>
+</table>
+<p>Nine methods × two error types = 18 models. <code>AutoETS</code> searches this table for you; the notation <code>ETS(M,A,M)</code> is how it reports the answer.</p>
+</section>
+<section id="the-general-form" class="slide level2 smaller">
+<h2>The general form</h2>
+<p>Let <span class="math inline">\(\mathbf{x}_t = (\ell_t, b_t, s_t, s_{t-1}, \ldots, s_{t-m+1})\)</span> be the state vector and <span class="math inline">\(\varepsilon_t \stackrel{\text{iid}}{\sim} N(0, \sigma^2)\)</span>:</p>
+<p><span class="math display">\[
+y_t = \underbrace{h(\mathbf{x}_{t-1})}_{\mu_t} + \underbrace{k(\mathbf{x}_{t-1})\varepsilon_t}_{e_t}
+\qquad\qquad
+\mathbf{x}_t = f(\mathbf{x}_{t-1}) + g(\mathbf{x}_{t-1})\varepsilon_t
+\]</span></p>
+<ul>
+<li>Additive errors: <span class="math inline">\(k(\mathbf{x}_{t-1}) = 1\)</span>, so <span class="math inline">\(y_t = \mu_t + \varepsilon_t\)</span>.</li>
+<li>Multiplicative errors: <span class="math inline">\(k(\mathbf{x}_{t-1}) = \mu_t\)</span>, so <span class="math inline">\(y_t = \mu_t(1 + \varepsilon_t)\)</span>.</li>
+</ul>
+<p>All 18 models are this pair of equations with different <span class="math inline">\(h\)</span>, <span class="math inline">\(k\)</span>, <span class="math inline">\(f\)</span>, <span class="math inline">\(g\)</span>. One estimation routine covers every one of them — which is exactly why <code>AutoETS</code> can exist.</p>
+</section>
+<section id="models-that-misbehave" class="slide level2 smaller">
+<h2>Models that misbehave</h2>
+<ul>
+<li>Some combinations divide by a state: <strong>ETS(A,N,M)</strong>, <strong>ETS(A,A,M)</strong>, <strong>ETS(A,A<span class="math inline">\(_d\)</span>,M)</strong>. They are numerically unstable and normally excluded.</li>
+<li><strong>Multiplicative errors need strictly positive data.</strong> With a zero in the series, the relative error is undefined and the fit fails outright:</li>
+</ul>
+<div id="ec97dbfc" class="cell" data-execution_count="20">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="" aria-hidden="true" tabindex="-1"></a>ansett_df <span class="op">=</span> pd.read_csv(<span class="st">'../data/ansett.csv'</span>, parse_dates<span class="op">=</span>[<span class="st">"ds"</span>])</span>
+<span id="cb22-2"><a href="" aria-hidden="true" tabindex="-1"></a>economy_class <span class="op">=</span> (ansett_df</span>
+<span id="cb22-3"><a href="" aria-hidden="true" tabindex="-1"></a>                 .query(<span class="st">"Airports == 'MEL-SYD' and Class == 'Economy'"</span>)</span>
+<span id="cb22-4"><a href="" aria-hidden="true" tabindex="-1"></a>                 .groupby(<span class="st">"ds"</span>, as_index<span class="op">=</span><span class="va">False</span>)[<span class="st">"y"</span>]</span>
+<span id="cb22-5"><a href="" aria-hidden="true" tabindex="-1"></a>                 .mean())</span>
+<span id="cb22-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"zeros in the series:"</span>, <span class="bu">int</span>((economy_class[<span class="st">"y"</span>] <span class="op">==</span> <span class="dv">0</span>).<span class="bu">sum</span>()))</span>
+<span id="cb22-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
+<span id="cb22-8"><a href="" aria-hidden="true" tabindex="-1"></a>    AutoETS(season_length<span class="op">=</span><span class="dv">4</span>, model<span class="op">=</span><span class="st">"MAM"</span>).fit(y<span class="op">=</span>economy_class[<span class="st">"y"</span>].to_numpy(<span class="bu">float</span>))</span>
+<span id="cb22-9"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span> <span class="pp">ValueError</span> <span class="im">as</span> err:</span>
+<span id="cb22-10"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"ValueError:"</span>, err)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>zeros in the series: 7
+ValueError: Inappropriate model for data with negative or zero values</code></pre>
+</div>
+</div>
+<p>For data with zeros or negative values, only the <strong>six fully additive</strong> models apply.</p>
+</section></section>
+<section>
+<section id="estimation-and-model-selection" class="title-slide slide level1 center">
+<h1>Estimation and model selection</h1>
+
+</section>
+<section id="estimating-an-ets-model" class="slide level2 smaller">
+<h2>Estimating an ETS model</h2>
+<p>Estimate the smoothing parameters <span class="math inline">\(\alpha, \beta, \gamma, \phi\)</span> <strong>and</strong> the initial states <span class="math inline">\(\ell_0, b_0, s_0, s_{-1}, \ldots, s_{-m+1}\)</span> by maximising the likelihood:</p>
+<p><span class="math display">\[
+L^*(\theta, \mathbf{x}_0) = T \log\left(\sum_{t=1}^{T}\varepsilon_t^2\right)
++ 2\sum_{t=1}^{T}\log\left|k(\mathbf{x}_{t-1})\right|
+= -2\log(\text{Likelihood}) + \text{constant}
+\]</span></p>
+<ul>
+<li>For <strong>additive</strong> errors, minimising <span class="math inline">\(L^*\)</span> is equivalent to minimising SSE — the same objective as the methods.</li>
+<li>For <strong>multiplicative</strong> errors it is <strong>not</strong>: the second term penalises states that make the error scale large.</li>
+<li>A monthly seasonal model estimates 3 parameters and 14 initial states. On five years of data that is a lot of freedom — which is what AICc is about to charge us for.</li>
+</ul>
+</section>
+<section id="parameter-restrictions" class="slide level2 smaller">
+<h2>Parameter restrictions</h2>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Usual (traditional) region</strong></p>
+</div>
+<div class="callout-content">
+<ul>
+<li>In the methods: <span class="math inline">\(0 &lt; \alpha, \beta^*, \gamma^*, \phi &lt; 1\)</span>, so every equation is a weighted average.</li>
+<li>In the models <span class="math inline">\(\beta = \alpha\beta^*\)</span> and <span class="math inline">\(\gamma = (1-\alpha)\gamma^*\)</span>, giving <span class="math inline">\(0 &lt; \alpha &lt; 1\)</span>, <span class="math inline">\(0 &lt; \beta &lt; \alpha\)</span>, <span class="math inline">\(0 &lt; \gamma &lt; 1-\alpha\)</span>.</li>
+<li><span class="math inline">\(0.8 &lt; \phi &lt; 0.98\)</span> to keep the optimiser away from the boundary.</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>Admissible region</strong></p>
+</div>
+<div class="callout-content">
+<p>Wider: any parameters for which the distant past stops influencing current forecasts. For ETS(A,N,N) the traditional region is <span class="math inline">\(0 &lt; \alpha &lt; 1\)</span>, the admissible one <span class="math inline">\(0 &lt; \alpha &lt; 2\)</span>.</p>
+</div>
+</div>
+</div>
+<p>An <span class="math inline">\(\hat{\alpha}\)</span> pinned at 0.9999, as in the Australian population fit, is a signal: the series wants a random walk, and the level is doing nothing but copying the last observation.</p>
+</section>
+<section id="model-selection" class="slide level2 smaller">
+<h2>Model selection</h2>
+<p><span class="math display">\[
+\text{AIC} = -2\log(L) + 2k
+\qquad
+\text{AIC}_c = \text{AIC} + \frac{2k(k+1)}{T-k-1}
+\qquad
+\text{BIC} = \text{AIC} + k\left[\log(T) - 2\right]
+\]</span></p>
+<p>where <span class="math inline">\(k\)</span> counts the parameters <strong>and</strong> the initial states.</p>
+<ul>
+<li>AICc is the default for ETS: with <span class="math inline">\(m + 3\)</span> things to estimate and short series, the small-sample correction matters.</li>
+<li>Likelihoods are comparable only on the <strong>same data</strong>: never compare an AICc from a transformed series with one from the raw series, or across different <span class="math inline">\(m\)</span>.</li>
+<li>Lower is better, and a difference of less than about 2 is not a difference.</li>
+</ul>
+</section>
+<section id="autoets-picks-a-model" class="slide level2 smaller">
+<h2>AutoETS picks a model</h2>
+<div id="1e071cbe" class="cell" data-execution_count="21">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="" aria-hidden="true" tabindex="-1"></a>auto <span class="op">=</span> AutoETS(season_length<span class="op">=</span><span class="dv">4</span>).fit(y<span class="op">=</span>y_hol)</span>
+<span id="cb24-2"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"chosen model:"</span>, auto.model_[<span class="st">"method"</span>])</span>
+<span id="cb24-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"AICc:"</span>, <span class="bu">round</span>(auto.model_[<span class="st">"aicc"</span>], <span class="dv">2</span>), <span class="st">" sigma^2:"</span>, <span class="bu">round</span>(auto.model_[<span class="st">"sigma2"</span>], <span class="dv">5</span>))</span>
+<span id="cb24-4"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"parameters:"</span>, np.<span class="bu">round</span>(auto.model_[<span class="st">"fit"</span>][<span class="dv">0</span>], <span class="dv">4</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>chosen model: ETS(M,N,M)
+AICc: 227.49  sigma^2: 0.0022
+parameters: [0.3612 0.0001 9.7878 0.9432 0.9268 0.9683]</code></pre>
+</div>
+</div>
+<p>For Australian holidays the search lands on <strong>ETS(M,N,M)</strong> — multiplicative errors, <em>no trend</em>, a multiplicative season:</p>
+<p><span class="math display">\[
+\begin{aligned}
+y_t &amp;= \ell_{t-1}s_{t-m}(1+\varepsilon_t) \\
+\ell_t &amp;= \ell_{t-1}(1+\alpha\varepsilon_t) \\
+s_t &amp;= s_{t-m}(1+\gamma\varepsilon_t)
+\end{aligned}
+\]</span></p>
+<p>The estimated <span class="math inline">\(\hat\gamma\)</span> is at its lower bound: the seasonal shape is treated as fixed, and the level absorbs the rest.</p>
+</section>
+<section id="what-it-rejected" class="slide level2 smaller">
+<h2>What it rejected</h2>
+<div id="f5b4de62" class="cell" data-execution_count="22">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="" aria-hidden="true" tabindex="-1"></a>rows <span class="op">=</span> []</span>
+<span id="cb26-2"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> spec, damped <span class="kw">in</span> [(<span class="st">"ANN"</span>, <span class="va">None</span>), (<span class="st">"AAN"</span>, <span class="va">False</span>), (<span class="st">"AAN"</span>, <span class="va">True</span>),</span>
+<span id="cb26-3"><a href="" aria-hidden="true" tabindex="-1"></a>                     (<span class="st">"AAA"</span>, <span class="va">None</span>), (<span class="st">"MAM"</span>, <span class="va">None</span>), (<span class="st">"MNM"</span>, <span class="va">None</span>)]:</span>
+<span id="cb26-4"><a href="" aria-hidden="true" tabindex="-1"></a>    fit <span class="op">=</span> AutoETS(season_length<span class="op">=</span><span class="dv">4</span>, model<span class="op">=</span>spec, damped<span class="op">=</span>damped).fit(y<span class="op">=</span>y_hol)</span>
+<span id="cb26-5"><a href="" aria-hidden="true" tabindex="-1"></a>    rows.append({<span class="st">"specification"</span>: spec <span class="op">+</span> (<span class="st">" damped"</span> <span class="cf">if</span> damped <span class="cf">else</span> <span class="st">""</span>),</span>
+<span id="cb26-6"><a href="" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"model"</span>: fit.model_[<span class="st">"method"</span>],</span>
+<span id="cb26-7"><a href="" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"parameters"</span>: fit.model_[<span class="st">"n_params"</span>],</span>
+<span id="cb26-8"><a href="" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"AICc"</span>: <span class="bu">round</span>(fit.model_[<span class="st">"aicc"</span>], <span class="dv">2</span>)})</span>
+<span id="cb26-9"><a href="" aria-hidden="true" tabindex="-1"></a>pd.DataFrame(rows).sort_values(<span class="st">"AICc"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="22">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">specification</th>
+<th data-quarto-table-cell-role="th">model</th>
+<th data-quarto-table-cell-role="th">parameters</th>
+<th data-quarto-table-cell-role="th">AICc</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">5</th>
+<td>MNM</td>
+<td>ETS(M,N,M)</td>
+<td>7</td>
+<td>227.49</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">4</th>
+<td>MAM</td>
+<td>ETS(M,A,M)</td>
+<td>9</td>
+<td>228.54</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">3</th>
+<td>AAA</td>
+<td>ETS(A,A,A)</td>
+<td>9</td>
+<td>229.36</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>AAN</td>
+<td>ETS(A,A,N)</td>
+<td>5</td>
+<td>363.47</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>AAN damped</td>
+<td>ETS(A,Ad,N)</td>
+<td>6</td>
+<td>366.39</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">0</th>
+<td>ANN</td>
+<td>ETS(A,N,N)</td>
+<td>3</td>
+<td>367.64</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<ul>
+<li>The three seasonal models are 130 AICc units better than the non-seasonal ones. On this series seasonality is not a modelling choice, it is the data.</li>
+<li>Among them the spread is under 2 units: <strong>AICc cannot tell them apart.</strong></li>
+</ul>
+</section>
+<section id="the-states-of-the-chosen-model" class="slide level2 tiny">
+<h2>The states of the chosen model</h2>
+<div id="cell-auto-states" class="cell" data-execution_count="23">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">4</span>, <span class="dv">1</span>, figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">6.5</span>), sharex<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb27-2"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].plot(y_hol, color<span class="op">=</span><span class="st">"black"</span>)</span>
+<span id="cb27-3"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="st">"ETS(M,N,M):  Trips = level × season × (1 + residual)"</span>)</span>
+<span id="cb27-4"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_ylabel(<span class="st">"Trips"</span>)</span>
+<span id="cb27-5"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].plot(auto.model_[<span class="st">"states"</span>][:, <span class="dv">0</span>], color<span class="op">=</span>slate)</span>
+<span id="cb27-6"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_ylabel(<span class="st">"Level"</span>)</span>
+<span id="cb27-7"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].plot(auto.model_[<span class="st">"states"</span>][:, <span class="dv">1</span>], color<span class="op">=</span>turquoise)</span>
+<span id="cb27-8"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].set_ylabel(<span class="st">"Season"</span>)</span>
+<span id="cb27-9"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">3</span>].plot(auto.model_[<span class="st">"residuals"</span>], color<span class="op">=</span>orange)</span>
+<span id="cb27-10"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">3</span>].set_ylabel(<span class="st">"Residual"</span>)</span>
+<span id="cb27-11"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">3</span>].set_xlabel(<span class="st">"Quarter"</span>)</span>
+<span id="cb27-12"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ax <span class="kw">in</span> axes:</span>
+<span id="cb27-13"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.grid(<span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.3</span>)</span>
+<span id="cb27-14"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04_files/figure-revealjs/auto-states-output-1.svg" id="auto-states" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="innovation-residuals-versus-regular-residuals" class="slide level2 smaller">
+<h2>Innovation residuals versus regular residuals</h2>
+<div id="cell-residual-kinds" class="cell" data-execution_count="24">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">2</span>, <span class="dv">1</span>, figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">4.6</span>), sharex<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb28-2"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].plot(auto.model_[<span class="st">"residuals"</span>], color<span class="op">=</span>orange)</span>
+<span id="cb28-3"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_ylabel(<span class="st">"Innovation</span><span class="ch">\n</span><span class="st">residuals"</span>)</span>
+<span id="cb28-4"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].plot(auto.model_[<span class="st">"actual_residuals"</span>], color<span class="op">=</span>slate)</span>
+<span id="cb28-5"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_ylabel(<span class="st">"Regular</span><span class="ch">\n</span><span class="st">residuals"</span>)</span>
+<span id="cb28-6"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_xlabel(<span class="st">"Quarter"</span>)</span>
+<span id="cb28-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ax <span class="kw">in</span> axes:</span>
+<span id="cb28-8"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.grid(<span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.3</span>)</span>
+<span id="cb28-9"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04_files/figure-revealjs/residual-kinds-output-1.svg" id="residual-kinds" class="quarto-figure quarto-figure-center r-stretch"><ul>
+<li><strong>Regular residuals</strong> <span class="math inline">\(y_t - \hat{y}_{t|t-1}\)</span> are in trips.</li>
+<li><strong>Innovation residuals</strong> are the <span class="math inline">\(\varepsilon_t\)</span> of the model — here <em>relative</em>, because the errors are multiplicative.</li>
+<li>Week 3’s diagnostics (ACF, Ljung-Box, histogram) belong on the <strong>innovation</strong> residuals: those are the ones the model claims are white noise.</li>
+</ul>
+</section></section>
+<section>
+<section id="forecasting-with-ets" class="title-slide slide level1 center">
+<h1>Forecasting with ETS</h1>
+
+</section>
+<section id="point-forecasts" class="slide level2 smaller">
+<h2>Point forecasts</h2>
+<p>Iterate the state equations for <span class="math inline">\(t = T+1, \ldots, T+h\)</span> and set every future <span class="math inline">\(\varepsilon_t = 0\)</span>.</p>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>ETS(A,A,N)</strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math display">\[
+\begin{aligned}
+y_{T+1} &amp;= \ell_T + b_T + \varepsilon_{T+1} &amp;\Rightarrow&amp;&amp; \hat{y}_{T+1|T} &amp;= \ell_T + b_T \\
+y_{T+2} &amp;= (\ell_T + b_T + \alpha\varepsilon_{T+1}) + (b_T + \beta\varepsilon_{T+1}) + \varepsilon_{T+2}
+&amp;\Rightarrow&amp;&amp; \hat{y}_{T+2|T} &amp;= \ell_T + 2b_T
+\end{aligned}
+\]</span></p>
+</div>
+</div>
+</div>
+<div class="callout callout-note no-icon callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<p><strong>ETS(M,A,N)</strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math display">\[
+y_{T+1} = (\ell_T + b_T)(1+\varepsilon_{T+1}) \Rightarrow \hat{y}_{T+1|T} = \ell_T + b_T,
+\qquad \hat{y}_{T+2|T} = \ell_T + 2b_T
+\]</span></p>
+</div>
+</div>
+</div>
+<p>Same point forecasts, as promised. The error type never touches the mean.</p>
+</section>
+<section id="prediction-intervals" class="slide level2 tiny">
+<h2>Prediction intervals</h2>
+<p><span class="math display">\[
+\hat{y}_{T+h|T} \pm c\,\sigma_h
+\]</span></p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Model</th>
+<th style="text-align: left;">Forecast variance <span class="math inline">\(\sigma_h^2\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">(A,N,N)</td>
+<td style="text-align: left;"><span class="math inline">\(\sigma^2\left[1 + \alpha^2(h-1)\right]\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">(A,A,N)</td>
+<td style="text-align: left;"><span class="math inline">\(\sigma^2\left[1 + (h-1)\left\{\alpha^2 + \alpha\beta h + \tfrac{1}{6}\beta^2 h(2h-1)\right\}\right]\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">(A,N,A)</td>
+<td style="text-align: left;"><span class="math inline">\(\sigma^2\left[1 + \alpha^2(h-1) + \gamma k(2\alpha+\gamma)\right]\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">(A,A,A)</td>
+<td style="text-align: left;"><span class="math inline">\(\sigma^2\left[1 + (h-1)\left\{\alpha^2 + \alpha\beta h + \tfrac{1}{6}\beta^2h(2h-1)\right\} + \gamma k\left\{2\alpha + \gamma + \beta m(k+1)\right\}\right]\)</span></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Exact formulae exist for the additive models; <span class="math inline">\(k\)</span> is again <span class="math inline">\(\lfloor (h-1)/m \rfloor\)</span>.</li>
+<li>For the rest, the intervals come from <strong>simulating</strong> thousands of future paths from the fitted states and taking percentiles.</li>
+<li>Either way, they assume the innovation residuals really are white noise with constant variance. That is what you check first — the intervals are only as good as that assumption.</li>
+</ul>
+</section>
+<section id="forecasts-with-intervals" class="slide level2 smaller">
+<h2>Forecasts with intervals</h2>
+<div id="c1c1b81a" class="cell" data-execution_count="25">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="" aria-hidden="true" tabindex="-1"></a>sf <span class="op">=</span> StatsForecast(models<span class="op">=</span>[AutoETS(season_length<span class="op">=</span><span class="dv">4</span>, alias<span class="op">=</span><span class="st">"AutoETS"</span>)], freq<span class="op">=</span><span class="st">"QS"</span>)</span>
+<span id="cb29-2"><a href="" aria-hidden="true" tabindex="-1"></a>fc_auto <span class="op">=</span> sf.forecast(df<span class="op">=</span>holidays_df, h<span class="op">=</span><span class="dv">8</span>, level<span class="op">=</span>[<span class="dv">80</span>, <span class="dv">95</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="ae52bdd0" class="cell" data-execution_count="26">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="" aria-hidden="true" tabindex="-1"></a>plot_series(holidays_df, fc_auto, level<span class="op">=</span>[<span class="dv">80</span>, <span class="dv">95</span>], xlabel<span class="op">=</span><span class="st">"Quarter"</span>,</span>
+<span id="cb30-2"><a href="" aria-hidden="true" tabindex="-1"></a>            ylabel<span class="op">=</span><span class="st">"Trips (millions)"</span>,</span>
+<span id="cb30-3"><a href="" aria-hidden="true" tabindex="-1"></a>            title<span class="op">=</span><span class="st">"Australian domestic holidays: ETS(M,N,M), two years ahead"</span>, rm_legend<span class="op">=</span><span class="va">False</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".04_files/figure-revealjs/cell-27-output-1.svg" class="r-stretch"></section>
+<section id="aicc-chose.-was-it-right" class="slide level2 smaller">
+<h2>AICc chose. Was it right?</h2>
+<p>AICc ranks models on how well they explain the <strong>data they were fitted to</strong>. The challenge scores you on data the model has not seen. Week 3 gave us the tool to check whether those two agree.</p>
+<div id="63c76a97" class="cell" data-execution_count="27">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="" aria-hidden="true" tabindex="-1"></a>models <span class="op">=</span> [</span>
+<span id="cb31-2"><a href="" aria-hidden="true" tabindex="-1"></a>    AutoETS(season_length<span class="op">=</span><span class="dv">4</span>, alias<span class="op">=</span><span class="st">"AutoETS"</span>),          <span class="co"># ETS(M,N,M) — best AICc</span></span>
+<span id="cb31-3"><a href="" aria-hidden="true" tabindex="-1"></a>    AutoETS(season_length<span class="op">=</span><span class="dv">4</span>, model<span class="op">=</span><span class="st">"MAM"</span>, alias<span class="op">=</span><span class="st">"MAM"</span>),</span>
+<span id="cb31-4"><a href="" aria-hidden="true" tabindex="-1"></a>    AutoETS(season_length<span class="op">=</span><span class="dv">4</span>, model<span class="op">=</span><span class="st">"AAA"</span>, alias<span class="op">=</span><span class="st">"AAA"</span>),</span>
+<span id="cb31-5"><a href="" aria-hidden="true" tabindex="-1"></a>    SeasonalNaive(season_length<span class="op">=</span><span class="dv">4</span>, alias<span class="op">=</span><span class="st">"snaive"</span>),</span>
+<span id="cb31-6"><a href="" aria-hidden="true" tabindex="-1"></a>    Naive(alias<span class="op">=</span><span class="st">"naive"</span>),</span>
+<span id="cb31-7"><a href="" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb31-8"><a href="" aria-hidden="true" tabindex="-1"></a>cv_df <span class="op">=</span> StatsForecast(models<span class="op">=</span>models, freq<span class="op">=</span><span class="st">"QS"</span>).cross_validation(</span>
+<span id="cb31-9"><a href="" aria-hidden="true" tabindex="-1"></a>    df<span class="op">=</span>holidays_df, h<span class="op">=</span><span class="dv">4</span>, n_windows<span class="op">=</span><span class="dv">12</span>, step_size<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb31-10"><a href="" aria-hidden="true" tabindex="-1"></a>evaluate(cv_df.drop(columns<span class="op">=</span><span class="st">"cutoff"</span>),</span>
+<span id="cb31-11"><a href="" aria-hidden="true" tabindex="-1"></a>         metrics<span class="op">=</span>[rmse, partial(mase, seasonality<span class="op">=</span><span class="dv">4</span>)],</span>
+<span id="cb31-12"><a href="" aria-hidden="true" tabindex="-1"></a>         train_df<span class="op">=</span>holidays_df).<span class="bu">round</span>(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="27">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">metric</th>
+<th data-quarto-table-cell-role="th">AutoETS</th>
+<th data-quarto-table-cell-role="th">MAM</th>
+<th data-quarto-table-cell-role="th">AAA</th>
+<th data-quarto-table-cell-role="th">snaive</th>
+<th data-quarto-table-cell-role="th">naive</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>Holiday</td>
+<td>rmse</td>
+<td>0.570</td>
+<td>0.558</td>
+<td>0.536</td>
+<td>0.601</td>
+<td>1.239</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>Holiday</td>
+<td>mase</td>
+<td>1.139</td>
+<td>1.060</td>
+<td>1.046</td>
+<td>1.124</td>
+<td>2.026</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+</section>
+<section id="aicc-chose.-was-it-right-1" class="slide level2 smaller">
+<h2>AICc chose. Was it right?</h2>
+<ul>
+<li>Every ETS specification beats both benchmarks — the models are earning their keep.</li>
+<li>But the <strong>AICc winner is the worst of the three ETS models out of sample</strong>, and the specification AICc ranked third (A,A,A) forecasts best.</li>
+<li>The differences are small (RMSE 0.54 vs 0.57 million trips), which is the point: AICc narrowed 18 models down to three, and cross-validation picked among them.</li>
+</ul>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>The working rule</strong></p>
+</div>
+<div class="callout-content">
+<p>Use AICc to <strong>shortlist</strong> specifications on one series; use cross-validation on the horizon you will actually be scored on to <strong>choose</strong>. Reporting only one of the two is how people talk themselves into the wrong model.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="the-same-comparison-on-daily-data" class="slide level2 smaller">
+<h2>The same comparison on daily data</h2>
+<div id="c4113c8a" class="cell" data-execution_count="28">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="" aria-hidden="true" tabindex="-1"></a>cv_daily <span class="op">=</span> StatsForecast(</span>
+<span id="cb32-2"><a href="" aria-hidden="true" tabindex="-1"></a>    models<span class="op">=</span>[AutoETS(season_length<span class="op">=</span><span class="dv">7</span>, alias<span class="op">=</span><span class="st">"AutoETS"</span>),</span>
+<span id="cb32-3"><a href="" aria-hidden="true" tabindex="-1"></a>            SeasonalNaive(season_length<span class="op">=</span><span class="dv">7</span>, alias<span class="op">=</span><span class="st">"snaive"</span>)],</span>
+<span id="cb32-4"><a href="" aria-hidden="true" tabindex="-1"></a>    freq<span class="op">=</span><span class="st">"D"</span>,</span>
+<span id="cb32-5"><a href="" aria-hidden="true" tabindex="-1"></a>).cross_validation(df<span class="op">=</span>winter_df, h<span class="op">=</span><span class="dv">7</span>, n_windows<span class="op">=</span><span class="dv">4</span>, step_size<span class="op">=</span><span class="dv">7</span>)</span>
+<span id="cb32-6"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-7"><a href="" aria-hidden="true" tabindex="-1"></a>evaluate(cv_daily.drop(columns<span class="op">=</span><span class="st">"cutoff"</span>),</span>
+<span id="cb32-8"><a href="" aria-hidden="true" tabindex="-1"></a>         metrics<span class="op">=</span>[rmse, partial(mase, seasonality<span class="op">=</span><span class="dv">7</span>)],</span>
+<span id="cb32-9"><a href="" aria-hidden="true" tabindex="-1"></a>         train_df<span class="op">=</span>winter_df).<span class="bu">round</span>(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="28">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">metric</th>
+<th data-quarto-table-cell-role="th">AutoETS</th>
+<th data-quarto-table-cell-role="th">snaive</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>Demand</td>
+<td>rmse</td>
+<td>11.835</td>
+<td>12.714</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>Demand</td>
+<td>mase</td>
+<td>0.946</td>
+<td>1.084</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>Here ETS wins clearly: MASE below 1 means it beats the seasonal naïve benchmark on its own terms — a weekly rhythm plus a moving level is exactly the structure ETS is built for.</p>
+</section></section>
+<section>
+<section id="ets-in-practice" class="title-slide slide level1 center">
+<h1>ETS in practice</h1>
+
+</section>
+<section id="five-ways-to-get-this-wrong" class="slide level2 smaller">
+<h2>Five ways to get this wrong</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Trap</th>
+<th>What you see</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>season_length</code> ≠ the real period</td>
+<td>A plausible model with a worse AICc, silently</td>
+<td>Quarterly 4, monthly 12, daily-with-weekly 7 — check against Lab 3</td>
+</tr>
+<tr class="even">
+<td>Seasonal period too long</td>
+<td><code>season_length=52</code> returns <code>ETS(A,N,N)</code>: the season is dropped</td>
+<td>ETS needs <span class="math inline">\(m \le 24\)</span>; long or multiple seasonality → Week 8</td>
+</tr>
+<tr class="odd">
+<td>Multiplicative model, non-positive data</td>
+<td><code>ValueError: Inappropriate model for data with negative or zero values</code></td>
+<td>Use the additive models, or treat the zeros first</td>
+</tr>
+<tr class="even">
+<td><code>damped=None</code></td>
+<td><code>AAN</code> comes back as <code>ETS(A,Ad,N)</code></td>
+<td>Pass <code>damped=False</code> to mean it</td>
+</tr>
+<tr class="odd">
+<td>Transform <strong>and</strong> multiply</td>
+<td>The seasonal swing is modelled twice</td>
+<td>Box-Cox + additive, <strong>or</strong> raw + multiplicative</td>
+</tr>
+</tbody>
+</table>
+<p>The first two are the dangerous ones: nothing fails, and the model you get is quietly worse.</p>
+</section>
+<section id="two-of-them-silently" class="slide level2 smaller">
+<h2>Two of them, silently</h2>
+<div id="73f29d03" class="cell" data-execution_count="29">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="" aria-hidden="true" tabindex="-1"></a>weekly <span class="op">=</span> economy_class.assign(unique_id<span class="op">=</span><span class="st">"MEL-SYD Economy"</span>)</span>
+<span id="cb33-2"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"m = 52 :"</span>, AutoETS(season_length<span class="op">=</span><span class="dv">52</span>).fit(y<span class="op">=</span>weekly[<span class="st">"y"</span>].to_numpy(<span class="bu">float</span>)).model_[<span class="st">"method"</span>])</span>
+<span id="cb33-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"m = 12 on quarterly data:"</span>,</span>
+<span id="cb33-4"><a href="" aria-hidden="true" tabindex="-1"></a>      AutoETS(season_length<span class="op">=</span><span class="dv">12</span>).fit(y<span class="op">=</span>y_hol).model_[<span class="st">"method"</span>],</span>
+<span id="cb33-5"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="st">"AICc"</span>, <span class="bu">round</span>(AutoETS(season_length<span class="op">=</span><span class="dv">12</span>).fit(y<span class="op">=</span>y_hol).model_[<span class="st">"aicc"</span>], <span class="dv">1</span>),</span>
+<span id="cb33-6"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="st">"vs"</span>, <span class="bu">round</span>(auto.model_[<span class="st">"aicc"</span>], <span class="dv">1</span>), <span class="st">"for m = 4"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>m = 52 : ETS(A,N,N)
+m = 12 on quarterly data: ETS(M,N,A) AICc 247.1 vs 227.5 for m = 4</code></pre>
+</div>
+</div>
+</section>
+<section id="what-ets-is-in-one-slide" class="slide level2 smaller">
+<h2>What ETS is, in one slide</h2>
+<ul>
+<li>A <strong>level, a slope and a season that update</strong> as each observation arrives, with the update speeds <span class="math inline">\(\alpha, \beta, \gamma\)</span> estimated from the data.</li>
+<li>A <strong>taxonomy</strong>: (Error, Trend, Season), each additive or multiplicative, trend optionally damped — 18 models, one estimation routine, one search (<code>AutoETS</code>).</li>
+<li><strong>Fast, robust and hard to beat</strong> on short seasonal business series. It is the benchmark ARIMA has to justify itself against next.</li>
+<li>What it does <strong>not</strong> do: covariates, multiple seasonality, long seasonal periods, structural breaks. Those are the next four lectures.</li>
+</ul>
+</section>
+<section id="in-the-practice-session" class="slide level2 smaller">
+<h2>In the practice session</h2>
+<p>Week 5 is the <strong>mid-term quiz</strong> — no lab. This lecture is the material for the <strong>Week 6 challenge</strong>, on the series that becomes yours in Week 4:</p>
+<ol type="1">
+<li>fit <code>AutoETS</code>, and report what it chose and why the components make sense for your series;</li>
+<li>shortlist two or three specifications by AICc, and <strong>choose between them by cross-validation</strong> on the challenge horizon;</li>
+<li>check the innovation residuals with the Week 3 diagnostics before you trust the intervals;</li>
+<li>beat the benchmark on your series — and if you do not, explain what the states show.</li>
+</ol>
+<div class="callout callout-tip callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Before Week 6</strong></p>
+</div>
+<div class="callout-content">
+<p>Read <a href="https://otexts.com/fpp3/expsmooth.html">FPP3 ch.&nbsp;8</a> and <a href="https://otexts.com/fpppy/nbs/08-exponential-smoothing.html">FPP the Pythonic Way, ch.&nbsp;8</a>. The quiz in Week 5 covers Weeks 1–4, this lecture included.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section id="questions" class="title-slide slide level1 unnumbered unlisted center" data-background-iframe="colored-particles/index.html">
+<h1>Questions?</h1>
+<p><br> <br></p>
+<p><iconify-icon inline="" icon="solar:book-bold"></iconify-icon> <a href="https://teaching.kse.org.ua/course/view.php?id=4432">Course materials</a></p>
+<p><iconify-icon inline="" icon="mdi:envelope"></iconify-icon> imiroshnychenko@kse.org.ua</p>
+<p><iconify-icon inline="" icon="ic:baseline-telegram"></iconify-icon> <a href="https://t.me/araprof"><span class="citation" data-cites="araprof">@araprof</span></a></p>
+<p><iconify-icon inline="" icon="mdi:youtube"></iconify-icon> <a href="https://www.youtube.com/@datamirosh"><span class="citation" data-cites="datamirosh">@datamirosh</span></a></p>
+<p><iconify-icon inline="" icon="mdi:linkedin"></iconify-icon> <a href="https://www.linkedin.com/in/ihormiroshnychenko/">@ihormiroshnychenko</a></p>
+<p><iconify-icon inline="" icon="mdi:github"></iconify-icon> <a href="https://github.com/Aranaur">@aranaur</a></p>
+<p><iconify-icon inline="" icon="ion:home"></iconify-icon> <a href="https://aranaur.rbind.io">aranaur.rbind.io</a></p>
+
+</section>
+    </div>
+  <div class="quarto-auto-generated-content" style="display: none;">
+<p><img src="img/kse.png" class="slide-logo"></p>
+<div class="footer footer-default">
+<p><a href="https://teaching.kse.org.ua/course/view.php?id=4432">🔗MATH840 | Time Series</a></p>
+</div>
+</div></div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src=".04_files/libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src=".04_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src=".04_files/libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src=".04_files/libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src=".04_files/libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src=".04_files/libs/revealjs/plugin/reveal-chalkboard/plugin.js"></script>
+  <script src=".04_files/libs/revealjs/plugin/verticator/verticator.js"></script>
+  <script src=".04_files/libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src=".04_files/libs/revealjs/plugin/notes/notes.js"></script>
+  <script src=".04_files/libs/revealjs/plugin/search/search.js"></script>
+  <script src=".04_files/libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script src=".04_files/libs/revealjs/plugin/math/math.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': true,
+'previewLinksAuto': false,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'jumpToSlide': true,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.togglePdfExport(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleScrollView(event)\"><kbd>r</kbd> Scroll View Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleChalkboard(event)\"><kbd>b</kbd> Toggle Chalkboard</a></li>\n<li class=\"slide-tool-item\" data-item=\"6\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleNotesCanvas(event)\"><kbd>c</kbd> Toggle Notes Canvas</a></li>\n<li class=\"slide-tool-item\" data-item=\"7\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.downloadDrawings(event)\"><kbd>d</kbd> Download Drawings</a></li>\n<li class=\"slide-tool-item\" data-item=\"8\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'chalkboard': {"buttons":true},
+'verticator': {"themetag":"h1","color":"","inversecolor":"","skipuncounted":false,"clickable":true,"position":"auto","offset":"3vmin","autogenerate":true,"tooltip":false,"scale":1},
+'smaller': false,
+ 
+        // Display controls in the bottom right corner
+        controls: false,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: 'h.v',
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'default',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: false,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: true,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: true,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'fade',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'fade',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1350,
+
+        height: 759.375,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 0.1,
+
+        math: {
+          mathjax: 'https://cdn.jsdelivr.net/npm/mathjax@2.7.9/MathJax.js',
+          config: 'TeX-AMS_HTML-full',
+          tex2jax: {
+            inlineMath: [['\\(','\\)']],
+            displayMath: [['\\[','\\]']],
+            balanceBraces: true,
+            processEscapes: false,
+            processRefs: true,
+            processEnvironments: true,
+            preview: 'TeX',
+            skipTags: ['script','noscript','style','textarea','pre','code'],
+            ignoreClass: 'tex2jax_ignore',
+            processClass: 'tex2jax_process'
+          },
+        },
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, RevealChalkboard, Verticator, QuartoSupport,
+
+          RevealMath,
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    <script id="quarto-html-after-body" type="application/javascript">
+      window.document.addEventListener("DOMContentLoaded", function (event) {
+        const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+        tabsets.forEach(function(tabset) {
+          const tabby = new Tabby('#' + tabset.id);
+        });
+        const isCodeAnnotation = (el) => {
+          for (const clz of el.classList) {
+            if (clz.startsWith('code-annotation-')) {                     
+              return true;
+            }
+          }
+          return false;
+        }
+        const onCopySuccess = function(e) {
+          // button target
+          const button = e.trigger;
+          // don't keep focus
+          button.blur();
+          // flash "checked"
+          button.classList.add('code-copy-button-checked');
+          var currentTitle = button.getAttribute("title");
+          button.setAttribute("title", "Copied!");
+          let tooltip;
+          if (window.bootstrap) {
+            button.setAttribute("data-bs-toggle", "tooltip");
+            button.setAttribute("data-bs-placement", "left");
+            button.setAttribute("data-bs-title", "Copied!");
+            tooltip = new bootstrap.Tooltip(button, 
+              { trigger: "manual", 
+                customClass: "code-copy-button-tooltip",
+                offset: [0, -8]});
+            tooltip.show();    
+          }
+          setTimeout(function() {
+            if (tooltip) {
+              tooltip.hide();
+              button.removeAttribute("data-bs-title");
+              button.removeAttribute("data-bs-toggle");
+              button.removeAttribute("data-bs-placement");
+            }
+            button.setAttribute("title", currentTitle);
+            button.classList.remove('code-copy-button-checked');
+          }, 1000);
+          // clear code selection
+          e.clearSelection();
+        }
+        const getTextToCopy = function(trigger) {
+          const outerScaffold = trigger.parentElement.cloneNode(true);
+          const codeEl = outerScaffold.querySelector('code');
+          for (const childEl of codeEl.children) {
+            if (isCodeAnnotation(childEl)) {
+              childEl.remove();
+            }
+          }
+          return codeEl.innerText;
+        }
+        const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+          text: getTextToCopy
+        });
+        clipboard.on('success', onCopySuccess);
+        if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+          const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+            text: getTextToCopy,
+            container: window.document.getElementById('quarto-embedded-source-code-modal')
+          });
+          clipboardModal.on('success', onCopySuccess);
+        }
+          var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+          var mailtoRegex = new RegExp(/^mailto:/);
+            var filterRegex = new RegExp('/' + window.location.host + '/');
+          var isInternal = (href) => {
+              return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+          }
+          // Inspect non-navigation links and adorn them if external
+         var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+          for (var i=0; i<links.length; i++) {
+            const link = links[i];
+            if (!isInternal(link.href)) {
+              // undo the damage that might have been done by quarto-nav.js in the case of
+              // links that we want to consider external
+              if (link.dataset.originalHref !== undefined) {
+                link.href = link.dataset.originalHref;
+              }
+            }
+          }
+        function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+          const config = {
+            allowHTML: true,
+            maxWidth: 500,
+            delay: 100,
+            arrow: false,
+            appendTo: function(el) {
+                return el.closest('section.slide') || el.parentElement;
+            },
+            interactive: true,
+            interactiveBorder: 10,
+            theme: 'light-border',
+            placement: 'bottom-start',
+          };
+          if (contentFn) {
+            config.content = contentFn;
+          }
+          if (onTriggerFn) {
+            config.onTrigger = onTriggerFn;
+          }
+          if (onUntriggerFn) {
+            config.onUntrigger = onUntriggerFn;
+          }
+            config['offset'] = [0,0];
+            config['maxWidth'] = 700;
+          window.tippy(el, config); 
+        }
+        const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+        for (var i=0; i<noterefs.length; i++) {
+          const ref = noterefs[i];
+          tippyHover(ref, function() {
+            // use id or data attribute instead here
+            let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+            try { href = new URL(href).hash; } catch {}
+            const id = href.replace(/^#\/?/, "");
+            const note = window.document.getElementById(id);
+            if (note) {
+              return note.innerHTML;
+            } else {
+              return "";
+            }
+          });
+        }
+        const findCites = (el) => {
+          const parentEl = el.parentElement;
+          if (parentEl) {
+            const cites = parentEl.dataset.cites;
+            if (cites) {
+              return {
+                el,
+                cites: cites.split(' ')
+              };
+            } else {
+              return findCites(el.parentElement)
+            }
+          } else {
+            return undefined;
+          }
+        };
+        var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+        for (var i=0; i<bibliorefs.length; i++) {
+          const ref = bibliorefs[i];
+          const citeInfo = findCites(ref);
+          if (citeInfo) {
+            tippyHover(citeInfo.el, function() {
+              var popup = window.document.createElement('div');
+              citeInfo.cites.forEach(function(cite) {
+                var citeDiv = window.document.createElement('div');
+                citeDiv.classList.add('hanging-indent');
+                citeDiv.classList.add('csl-entry');
+                var biblioDiv = window.document.getElementById('ref-' + cite);
+                if (biblioDiv) {
+                  citeDiv.innerHTML = biblioDiv.innerHTML;
+                }
+                popup.appendChild(citeDiv);
+              });
+              return popup.innerHTML;
+            });
+          }
+        }
+      });
+      </script>
+    
+
+</body></html>

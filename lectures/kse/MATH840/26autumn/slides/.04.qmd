@@ -1,0 +1,1286 @@
+---
+title: "Exponential Smoothing"
+subtitle: "MATH840 | Time Series | Week 4"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=4432">🔗MATH840 | Time Series</a>
+format:
+  revealjs:
+    fragments: false   # show every slide in full; no click-through reveals
+    code-line-numbers: false
+    code-fold: true
+    code-summary: "Code"
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+editor_options:
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    category=UserWarning,
+    message=".*FigureCanvasAgg is non-interactive.*"
+)
+import os
+os.environ["NIXTLA_ID_AS_COL"] = "true"
+import numpy as np
+np.set_printoptions(suppress=True)
+np.random.seed(1)
+import random
+random.seed(1)
+import pandas as pd
+pd.set_option("max_colwidth", 100)
+pd.set_option("display.precision", 3)
+import seaborn as sns
+sns.set_style("whitegrid")
+import matplotlib.pyplot as plt
+plt.style.use("ggplot")
+plt.rcParams.update({
+    "figure.figsize": (8, 5),
+    "figure.dpi": 100,
+    "savefig.dpi": 300,
+    "figure.constrained_layout.use": True,
+    "axes.titlesize": 12,
+    "axes.labelsize": 10,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+    "legend.fontsize": 9,
+    "legend.title_fontsize": 10,
+})
+import matplotlib as mpl
+from cycler import cycler
+mpl.rcParams['axes.prop_cycle'] = cycler(color=[slate, blue, turquoise, orange, red, green, purple, yellow, red_pink])
+from fpppy.utils import plot_series
+
+from functools import partial
+from statsmodels.tsa.api import SimpleExpSmoothing, Holt, ExponentialSmoothing
+from statsforecast import StatsForecast
+from statsforecast.models import AutoETS, Naive, SeasonalNaive
+from utilsforecast.evaluation import evaluate
+from utilsforecast.losses import rmse, mae, mase
+from great_tables import GT
+```
+
+# Where this fits
+
+## Three weeks, and the gap they leave {.smaller}
+
+| Week | What you got |
+|---|---|
+| 1 | Four benchmarks that need no fitting: `mean`, `naive`, `snaive`, `drift` |
+| 2 | Decomposition: a series is a **level**, a **trend**, a **season** and a **remainder** |
+| 3 | How to tell a good forecast from a lucky one: residuals, intervals, accuracy, cross-validation |
+
+. . .
+
+**What is still missing.** Decomposition describes the past — it has no mechanism for carrying
+the components forward. The benchmarks forecast, but they each use exactly one component and
+throw the rest away.
+
+[Exponential smoothing keeps the components **and** updates them as data arrives.]{.hi}
+
+## The one idea {.smaller}
+
+Week 1 gave you two extremes:
+
+::: {.callout-note icon="false"}
+## Average method — every observation matters equally
+
+$$
+\hat{y}_{T+h|T} = \frac{1}{T} \sum_{t=1}^{T} y_t
+$$
+:::
+
+::: {.callout-note icon="false"}
+## Naïve method — only the last observation matters
+
+$$
+\hat{y}_{T+h|T} = y_T
+$$
+:::
+
+Neither is usually right. **Recent observations should matter more — but not exclusively.**
+*How much more* is not a matter of taste: it is a parameter you estimate from the data.
+
+## What we build this week {.smaller}
+
+1. **Simple exponential smoothing** — a level that updates. No trend, no season.
+2. **Holt's method** — add a slope. **Damped trend** — and don't let the slope run forever.
+3. **Holt-Winters** — add a season, additive or multiplicative.
+4. **A taxonomy** — nine methods in one table, named by (Trend, Season).
+5. **ETS models** — the same nine, wrapped in a probability model: 18 models, with intervals
+   and a likelihood you can compare.
+6. **Automatic selection** — `AutoETS`, AICc, and why that is not the same as forecast accuracy.
+
+::: {.callout-tip}
+## Reading
+
+[FPP3 ch. 8 — Exponential smoothing](https://otexts.com/fpp3/expsmooth.html) ·
+[FPP the Pythonic Way, ch. 8](https://otexts.com/fpppy/nbs/08-exponential-smoothing.html)
+:::
+
+# Simple exponential smoothing
+
+## Simple exponential smoothing {.smaller}
+
+::: {.callout-note icon="false"}
+## Forecast equation
+
+$$
+\hat{y}_{T+1|T} = \alpha y_T + \alpha(1-\alpha) y_{T-1} + \alpha(1-\alpha)^2 y_{T-2} + \cdots,
+\qquad 0 \le \alpha \le 1
+$$
+:::
+
+- The weights $\alpha(1-\alpha)^j$ **decay geometrically** with the age of the observation.
+- They sum to 1 (in the limit), so the forecast is a genuine weighted average.
+- $\alpha \to 1$: only the last observation counts — the naïve method.
+- $\alpha \to 0$: every observation counts almost equally — the average method.
+
+[The two Week 1 extremes are the two ends of one dial.]{.hi}
+
+## The weights, drawn
+
+```{python}
+#| label: ses-weights
+#| fig-align: center
+
+alpha = 0.7
+n_points = 5
+time_steps = np.arange(n_points)
+lags_desc = range(n_points - 1, -1, -1)          # 4, 3, 2, 1, 0
+labels = [f"T-{i}" if i > 0 else "T" for i in lags_desc]
+weights = [alpha * (1 - alpha) ** i for i in lags_desc]
+
+weight_labels = []
+for i in lags_desc:
+    if i == 0:
+        weight_labels.append(r"$\alpha$")
+    elif i == 1:
+        weight_labels.append(r"$\alpha(1-\alpha)$")
+    else:
+        weight_labels.append(fr"$\alpha(1-\alpha)^{{{i}}}$")
+
+fig, ax = plt.subplots(figsize=(10, 5))
+markerline, stemlines, baseline = ax.stem(time_steps, weights, linefmt="C1-",
+                                          markerfmt="C1x", basefmt="black")
+plt.setp(stemlines, "linewidth", 2)
+plt.setp(markerline, "markersize", 8)
+ax.plot(time_steps, weights, "C1--", alpha=0.7)
+ax.set_title(f"Weight of each observation, α = {alpha}", fontsize=14)
+ax.set_xlabel("Observation")
+ax.set_ylabel("Weight")
+ax.set_xticks(time_steps)
+ax.set_xticklabels(labels)
+ax.set_ylim(bottom=0)
+ax.set_xlim(left=-0.5, right=n_points - 0.5)
+for ts, w, label in zip(time_steps, weights, weight_labels):
+    ax.text(ts + 0.1, w + 0.02, label, fontsize=12, color="C1")
+plt.grid(axis="y", linestyle="--", alpha=0.6)
+plt.show()
+```
+
+## How fast do the weights die? {.smaller}
+
+| Observation | α = 0.2 | α = 0.4 | α = 0.6 | α = 0.8 |
+| :--- | ---: | ---: | ---: | ---: |
+| $y_T$ | 0.2000 | 0.4000 | 0.6000 | 0.8000 |
+| $y_{T-1}$ | 0.1600 | 0.2400 | 0.2400 | 0.1600 |
+| $y_{T-2}$ | 0.1280 | 0.1440 | 0.0960 | 0.0320 |
+| $y_{T-3}$ | 0.1024 | 0.0864 | 0.0384 | 0.0064 |
+| $y_{T-4}$ | 0.0819 | 0.0518 | 0.0154 | 0.0013 |
+| Sum of the five | 0.672 | 0.922 | 0.990 | 1.000 |
+
+- $\alpha = 0.8$: the last five observations **are** the forecast.
+- $\alpha = 0.2$: five observations carry only two thirds of the weight — the series has a long memory.
+
+## Component form {.smaller}
+
+The weighted average is awkward to compute and impossible to extend. Rewrite it with a **state**:
+
+::: {.callout-note icon="false"}
+## Component form
+
+- Forecast equation: $\hat{y}_{t+h|t} = \ell_t$
+- Smoothing equation: $\ell_t = \alpha y_t + (1-\alpha)\ell_{t-1}$
+:::
+
+- $\ell_t$ is the **level**: our current estimate of where the series is.
+- One number carries the whole history. Each new observation nudges it.
+- Forecasts are **flat**: $\hat{y}_{T+h|T} = \ell_T$ for every $h$. No trend, no season — by construction.
+
+::: {.callout-note icon="false"}
+## Weighted form — iterate the smoothing equation
+
+$$
+\hat{y}_{T+h|T} = \sum_{j=0}^{T-1} \alpha(1-\alpha)^j y_{T-j} + (1-\alpha)^T \ell_0
+$$
+:::
+
+The initial level $\ell_0$ never disappears entirely — its weight is $(1-\alpha)^T$.
+
+## Choosing α and ℓ₀ {.smaller}
+
+Both are **estimated**, exactly the way regression coefficients are: by minimising the sum of
+squared one-step errors.
+
+$$
+\text{SSE} = \sum_{t=1}^{T} \left(y_t - \hat{y}_{t|t-1}\right)^2
+= \sum_{t=1}^{T} e_t^2
+$$
+
+- Unlike regression, there is **no closed-form solution** — $\ell_t$ depends on $\alpha$ recursively.
+- So it is numerical optimisation: pick $(\alpha, \ell_0)$, run the recursion, measure SSE, repeat.
+- This is why "which $\alpha$ should I use?" is the wrong question. The data answers it.
+
+## Example: Algerian exports {.smaller}
+
+```{python}
+#| label: algeria-data
+#| echo: true
+#| code-fold: false
+url = '../data/global_economy.csv'
+
+economy_df = pd.read_csv(url, parse_dates=["ds"])
+algeria_df = (economy_df
+              .query("unique_id == 'Algeria'")[["unique_id", "ds", "Exports"]]
+              .rename(columns={"Exports": "y"})
+              .dropna()
+              .reset_index(drop=True))
+algeria_df.tail(3)
+```
+
+```{python}
+#| echo: true
+#| code-fold: false
+ses = AutoETS(season_length=1, model="ANN").fit(y=algeria_df["y"].to_numpy(float))
+alpha_hat, level_0 = ses.model_["fit"][0]
+print(f"alpha = {alpha_hat:.4f}   l_0 = {level_0:.2f}")
+```
+
+The optimiser chose $\hat{\alpha} \approx 0.84$ — a short memory: exports react to the present,
+not to the 1960s.
+
+## What α does to the fitted level
+
+```{python}
+#| label: algeria-alpha
+#| fig-align: center
+#| echo: true
+y = algeria_df["y"].to_numpy(float)
+years = algeria_df["ds"]
+
+fig, ax = plt.subplots(figsize=(11, 5))
+ax.plot(years, y, color="black", linewidth=1.2, label="Exports")
+for a, colour in zip([0.1, round(float(alpha_hat), 2), 0.9], [red_pink, turquoise, orange]):
+    fit = SimpleExpSmoothing(y, initialization_method="estimated").fit(
+        smoothing_level=a, optimized=False)
+    ax.plot(years, fit.fittedvalues, color=colour, linewidth=1.4,
+            label=f"α = {a}  (SSE = {fit.sse:,.0f})")
+ax.set_title("Algerian exports of goods and services: the level under three values of α")
+ax.set_xlabel("Year")
+ax.set_ylabel("% of GDP")
+ax.legend()
+plt.show()
+```
+
+## What α does: read it {.smaller}
+
+- $\alpha = 0.1$ — a smooth line that lags the series by years. It smooths away real movements.
+- $\alpha = 0.9$ — the level chases every wiggle; the fitted value is almost the previous observation.
+- $\hat{\alpha}$ — the compromise the SSE prefers.
+
+::: {.callout-warning}
+## A smooth line is not a good forecast
+
+A low $\alpha$ looks nicer on the plot and fits **worse**. Judge the level by its one-step errors,
+not by how calm it looks.
+:::
+
+## SES forecasts {.smaller}
+
+```{python}
+#| label: algeria-forecast
+#| echo: true
+#| code-fold: false
+sf = StatsForecast(models=[AutoETS(season_length=1, model="ANN", alias="SES")], freq="YS")
+fc_algeria = sf.forecast(df=algeria_df, h=8, level=[80, 95])
+fc_algeria.head(3)
+```
+
+```{python}
+#| echo: true
+plot_series(algeria_df, fc_algeria, level=[80, 95],
+            xlabel="Year", ylabel="% of GDP",
+            title="Algerian exports: ETS(A,N,N) forecasts", rm_legend=False)
+```
+
+## SES forecasts: read them
+
+- The point forecast is a **horizontal line** — the current level, carried forward. That is all the
+  model claims to know.
+- The intervals **widen** with $h$: uncertainty accumulates, because each future step adds one more
+  unknown error.
+- Compare with `naive` from Week 1: also a flat line, but anchored on a single observation.
+  SES is anchored on all of them.
+
+# Methods with trend
+
+## Holt's linear trend method {.smaller}
+
+::: {.callout-note icon="false"}
+## Component form
+
+- Forecast: $\hat{y}_{t+h|t} = \ell_t + h b_t$
+- Level: $\ell_t = \alpha y_t + (1-\alpha)(\ell_{t-1} + b_{t-1})$
+- Trend: $b_t = \beta^*(\ell_t - \ell_{t-1}) + (1-\beta^*) b_{t-1}$
+:::
+
+- Two smoothing parameters, $\alpha$ and $\beta^*$, both in $[0, 1]$; four things to estimate with
+  $\ell_0$ and $b_0$.
+- The **level** is a weighted average of $y_t$ and the one-step forecast $\ell_{t-1} + b_{t-1}$.
+- The **slope** is a weighted average of the latest change in level and the previous slope.
+- $\beta^*$ small: a stable, slowly turning slope. $\beta^*$ large: a slope that reacts to the last
+  two observations.
+
+## What β\* does
+
+```{python}
+#| label: holt-beta
+#| fig-align: center
+url = '../data/global_economy.csv'
+aus_pop_df = (economy_df
+              .query("unique_id == 'Australia'")[["unique_id", "ds", "Population"]]
+              .rename(columns={"Population": "y"})
+              .dropna()
+              .reset_index(drop=True))
+aus_pop_df["y"] = aus_pop_df["y"] / 1e6
+
+y_pop = aus_pop_df["y"].to_numpy(float)
+fig, axes = plt.subplots(1, 3, figsize=(12, 4), sharey=True)
+for ax, beta in zip(axes, [0.01, 0.2, 0.9]):
+    fit = Holt(y_pop, initialization_method="estimated").fit(
+        smoothing_level=0.8, smoothing_trend=beta, optimized=False)
+    ax.plot(aus_pop_df["ds"], y_pop, color="black", linewidth=1.2, label="Population")
+    ax.plot(aus_pop_df["ds"], fit.fittedvalues, color=turquoise, linewidth=1.4, label="Fitted")
+    ax.set_title(f"β* = {beta}   (SSE = {fit.sse:.2f})")
+    ax.set_xlabel("Year")
+axes[0].set_ylabel("Millions")
+axes[0].legend()
+fig.suptitle("Australian population: Holt's method with α = 0.8 fixed")
+plt.show()
+```
+
+## The problem with a straight line {.smaller}
+
+Holt's forecast is $\ell_T + h b_T$: the current slope, extended **forever**.
+
+- Over $h = 4$ quarters that is often reasonable.
+- Over $h = 40$ it says a company growing 5% a quarter today will grow 5% a quarter in ten years.
+- Empirically, trends **flatten**. Unconstrained linear trends are one of the classic ways to
+  produce a confidently absurd forecast.
+
+[Fix: let the slope decay.]{.hi}
+
+## Damped trend method {.smaller}
+
+::: {.callout-note icon="false"}
+## Component form
+
+$$
+\begin{aligned}
+\hat{y}_{t+h|t} &= \ell_t + (\phi + \phi^2 + \cdots + \phi^h) b_t \\
+\ell_t &= \alpha y_t + (1-\alpha)(\ell_{t-1} + \phi b_{t-1}) \\
+b_t &= \beta^*(\ell_t - \ell_{t-1}) + (1-\beta^*)\phi b_{t-1}
+\end{aligned}
+$$
+:::
+
+- Damping parameter $0 < \phi < 1$. With $\phi = 1$ this **is** Holt's method.
+- Short horizons stay trended; long horizons flatten out to
+  $\ell_T + \dfrac{\phi b_T}{1-\phi}$.
+- In practice $\phi$ is restricted to $(0.8, 0.98)$: below 0.8 the damping is so aggressive the
+  trend barely survives one step, and at 1 the numerics get unstable.
+
+## What φ does {.smaller}
+
+```{python}
+#| label: damped-phi
+#| fig-align: center
+h = 40
+future = pd.date_range(aus_pop_df["ds"].iloc[-1], periods=h + 1, freq="YS")[1:]
+
+fig, ax = plt.subplots(figsize=(11, 4.6))
+ax.plot(aus_pop_df["ds"], y_pop, color="black", linewidth=1.2, label="Population")
+for phi, colour in zip([0.8, 0.9, 0.98, 1.0], [red_pink, orange, turquoise, blue]):
+    if phi == 1.0:
+        fit = Holt(y_pop, initialization_method="estimated").fit(
+            smoothing_level=0.99, smoothing_trend=0.2, optimized=False)
+        label = "φ = 1 (Holt)"
+    else:
+        fit = Holt(y_pop, damped_trend=True, initialization_method="estimated").fit(
+            smoothing_level=0.99, smoothing_trend=0.2, damping_trend=phi, optimized=False)
+        label = f"φ = {phi}"
+    ax.plot(future, fit.forecast(h), color=colour, linewidth=1.6, label=label)
+ax.set_title("Australian population: the same level and slope, four damping parameters")
+ax.set_xlabel("Year")
+ax.set_ylabel("Millions")
+ax.legend()
+plt.show()
+```
+
+## Holt versus damped, estimated {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+sf = StatsForecast(
+    models=[
+        AutoETS(season_length=1, model="AAN", damped=False, alias="Holt"),
+        AutoETS(season_length=1, model="AAN", damped=True,  alias="Damped"),
+    ],
+    freq="YS",
+)
+fc_pop = sf.forecast(df=aus_pop_df, h=30)
+fc_pop.iloc[[0, 9, 29]]
+```
+
+```{python}
+#| echo: true
+#| code-fold: false
+for damped in (False, True):
+    fit = AutoETS(season_length=1, model="AAN", damped=damped).fit(y=y_pop)
+    print(f"damped={damped!s:5s} {fit.model_['method']:12s} "
+          f"AICc = {fit.model_['aicc']:7.2f}   parameters = {np.round(fit.model_['fit'][0], 3)}")
+```
+
+## Holt versus damped: read it {.smaller}
+
+- AICc prefers the **damped** model here — and the damped forecasts are *higher*, not lower, than
+  Holt's. Damping constrains the slope's decay, it does not force pessimism: with $\phi$ fixed the
+  optimiser is free to re-fit $\alpha$ and $\beta^*$, and it does.
+- $\hat{\phi} = 0.98$, the top of the allowed range: this series shows no evidence of a flattening
+  trend over 58 years, so the model damps as little as it is allowed to.
+- The implied long-run level is worth computing — it is what the model believes about 2200.
+
+```{python}
+#| echo: true
+#| code-fold: false
+fit = AutoETS(season_length=1, model="AAN", damped=True).fit(y=y_pop)
+alpha, beta, phi, l0, b0 = fit.model_["fit"][0]
+level_T, slope_T = fit.model_["states"][-1, :2]
+print(f"phi = {phi:.3f}   level_T = {level_T:.2f}   slope_T = {slope_T:.3f}")
+print(f"long-run forecast = level_T + phi*slope_T/(1-phi) = {level_T + phi*slope_T/(1-phi):.1f} million")
+```
+
+::: {.callout-warning}
+## Two traps in `statsforecast`
+
+`damped=None` (the default) lets `AutoETS` **choose** damping by AICc — so `AAN` with no `damped`
+argument may silently return `ETS(A,Ad,N)`. And the `phi=` argument is a starting value, not a
+constraint: pass `phi=0.9` and the fit still comes back with $\hat\phi = 0.97$. Fix $\phi$ in
+`statsmodels`, compare specifications in `statsforecast`.
+:::
+
+# Methods with seasonality
+
+## Holt-Winters' additive method {.smaller}
+
+::: {.callout-note icon="false"}
+## Component form
+
+$$
+\begin{aligned}
+\hat{y}_{t+h|t} &= \ell_t + h b_t + s_{t+h-m(k+1)} \\
+\ell_t &= \alpha(y_t - s_{t-m}) + (1-\alpha)(\ell_{t-1} + b_{t-1}) \\
+b_t &= \beta^*(\ell_t - \ell_{t-1}) + (1-\beta^*) b_{t-1} \\
+s_t &= \gamma(y_t - \ell_{t-1} - b_{t-1}) + (1-\gamma) s_{t-m}
+\end{aligned}
+$$
+:::
+
+- $m$ is the seasonal period; $k$ is the integer part of $(h-1)/m$, which just means *use the
+  estimate for this season from the most recent complete cycle*.
+- Each observation now updates **three** states: level, slope and the season it belongs to.
+- A season is refreshed once per cycle, so $\gamma$ acts on $m$-step-old information.
+- Restrictions: $0 < \alpha, \beta^* < 1$ and $0 < \gamma < 1 - \alpha$.
+
+## Where the γ restriction comes from {.smaller}
+
+The seasonal component is often written against the level rather than the pre-level:
+
+$$
+s_t = \gamma^*(y_t - \ell_t) + (1-\gamma^*)s_{t-m}
+$$
+
+Substituting $\ell_t = \alpha(y_t - s_{t-m}) + (1-\alpha)(\ell_{t-1}+b_{t-1})$:
+
+$$
+s_t = \gamma^*(1-\alpha)(y_t - \ell_{t-1} - b_{t-1}) + \left[1 - \gamma^*(1-\alpha)\right]s_{t-m}
+$$
+
+So the two forms agree with $\gamma = \gamma^*(1-\alpha)$, and the natural restriction
+$0 \le \gamma^* \le 1$ becomes $0 \le \gamma \le 1-\alpha$.
+
+[The level and the season compete for the same information. That is why their weights are linked.]{.hi}
+
+## What γ does
+
+```{python}
+#| label: hw-gamma
+#| fig-align: center
+url = '../data/tourism.csv'
+
+tourism_df = pd.read_csv(url, parse_dates=["ds"])
+holidays_df = (tourism_df
+               .query("Purpose == 'Holiday'")
+               .groupby("ds", as_index=False)["y"]
+               .sum())
+holidays_df["y"] = holidays_df["y"] / 1e3
+holidays_df.insert(0, "unique_id", "Holiday")
+
+y_hol = holidays_df["y"].to_numpy(float)
+fig, axes = plt.subplots(1, 3, figsize=(12, 4), sharey=True)
+for ax, gamma in zip(axes, [0.01, 0.3, 0.9]):
+    fit = ExponentialSmoothing(y_hol, trend="add", seasonal="add", seasonal_periods=4,
+                               initialization_method="estimated").fit(
+        smoothing_level=0.4, smoothing_trend=0.02, smoothing_seasonal=gamma, optimized=False)
+    ax.plot(holidays_df["ds"], y_hol, color="black", linewidth=1.0, label="Trips")
+    ax.plot(holidays_df["ds"], fit.fittedvalues, color=turquoise, linewidth=1.2, label="Fitted")
+    ax.set_title(f"γ = {gamma}   (SSE = {fit.sse:.1f})")
+    ax.set_xlabel("Quarter")
+axes[0].set_ylabel("Trips (millions)")
+axes[0].legend()
+fig.suptitle("Australian domestic holidays: Holt-Winters additive, α and β* fixed")
+plt.show()
+```
+
+## Holt-Winters' multiplicative method {.smaller}
+
+::: {.callout-note icon="false"}
+## Component form
+
+$$
+\begin{aligned}
+\hat{y}_{t+h|t} &= (\ell_t + h b_t)\, s_{t+h-m(k+1)} \\
+\ell_t &= \alpha \frac{y_t}{s_{t-m}} + (1-\alpha)(\ell_{t-1} + b_{t-1}) \\
+b_t &= \beta^*(\ell_t - \ell_{t-1}) + (1-\beta^*) b_{t-1} \\
+s_t &= \gamma \frac{y_t}{\ell_{t-1} + b_{t-1}} + (1-\gamma) s_{t-m}
+\end{aligned}
+$$
+:::
+
+- **Additive**: the season is an amount. Within a cycle $\sum s_i \approx 0$.
+- **Multiplicative**: the season is a percentage. Within a cycle $\sum s_i \approx m$.
+- This is the same question you answered in Lab 3 with Box-Cox: does the seasonal swing grow with
+  the level? If it does, multiply.
+
+::: {.callout-note}
+Multiplicative seasonality is an alternative to transforming the data, not an addition to it.
+Box-Cox **then** additive seasonality does the same job — and if you do both, you are modelling the
+swing twice.
+:::
+
+## Additive versus multiplicative {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+sf = StatsForecast(
+    models=[
+        AutoETS(season_length=4, model="AAA", alias="additive"),
+        AutoETS(season_length=4, model="MAM", alias="multiplicative"),
+    ],
+    freq="QS",
+)
+fc_hol = sf.forecast(df=holidays_df, h=12)
+sf = sf.fit(df=holidays_df)
+```
+
+```{python}
+#| echo: true
+plot_series(holidays_df, fc_hol, xlabel="Quarter", ylabel="Trips (millions)",
+            title="Australian domestic holidays: two seasonal specifications", rm_legend=False)
+```
+
+## The states behind the two fits {.tiny}
+
+```{python}
+#| label: hw-states
+#| fig-align: center
+add_model = sf.fitted_[0, 0].model_
+mult_model = sf.fitted_[0, 1].model_
+
+fig, axes = plt.subplots(5, 2, figsize=(11, 7), sharex=True)
+for col, (model, name) in enumerate([(add_model, "ETS(A,A,A) — additive season"),
+                                     (mult_model, "ETS(M,A,M) — multiplicative season")]):
+    axes[0, col].plot(y_hol, color="black")
+    axes[0, col].set_title(name)
+    axes[1, col].plot(model["states"][:, 0], color=slate)
+    axes[2, col].plot(model["states"][:, 1], color=blue)
+    axes[3, col].plot(model["states"][:, 2], color=turquoise)
+    axes[4, col].plot(model["residuals"], color=orange)
+for row, label in enumerate(["Trips", "Level", "Slope", "Season", "Residual"]):
+    axes[row, 0].set_ylabel(label)
+for ax in axes.flat:
+    ax.grid(True, alpha=0.3)
+plt.show()
+```
+
+## The states: read them {.smaller}
+
+- The **level** is the trend of the series with the season removed — the seasonally adjusted series
+  from Lab 3, computed recursively instead of by STL.
+- The **slope** is tiny and slow: Australian holiday travel shifts over decades, not quarters.
+- The **season** is the interesting one. It is flat until the mid-2000s and then changes shape: the
+  additive fit changes amplitude, the multiplicative fit changes it proportionally.
+- The **residual** is what neither could explain. Additive residuals are in trips, multiplicative
+  ones are relative — that is why the two columns are not on the same scale.
+
+## Holt-Winters damped {.smaller}
+
+$$
+\begin{aligned}
+\hat{y}_{t+h|t} &= \left[\ell_t + (\phi + \phi^2 + \cdots + \phi^h) b_t\right] s_{t+h-m(k+1)} \\
+\ell_t &= \alpha (y_t / s_{t-m}) + (1-\alpha)(\ell_{t-1} + \phi b_{t-1}) \\
+b_t &= \beta^*(\ell_t - \ell_{t-1}) + (1-\beta^*)\phi b_{t-1} \\
+s_t &= \gamma \frac{y_t}{\ell_{t-1} + \phi b_{t-1}} + (1-\gamma)s_{t-m}
+\end{aligned}
+$$
+
+This combination — multiplicative season, damped additive trend — is the workhorse specification for
+business data with a strong weekly or monthly rhythm.
+
+## Daily data: m = 7 {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+url = '../data/vic_elec.csv'
+
+vic_df = pd.read_csv(url, parse_dates=["ds"])
+daily_df = (vic_df.set_index("ds")["y"].resample("D").sum() / 1e3).reset_index()
+daily_df.insert(0, "unique_id", "Demand")
+winter_df = daily_df.query("'2014-06-01' <= ds <= '2014-07-31'").reset_index(drop=True)
+
+sf = StatsForecast(
+    models=[AutoETS(season_length=7, model="MAM", damped=True, alias="HW damped")],
+    freq="D",
+)
+fc_daily = sf.forecast(df=winter_df, h=14, level=[80, 95])
+```
+
+```{python}
+#| echo: true
+plot_series(winter_df, fc_daily, level=[80, 95], xlabel="Date", ylabel="Demand (GWh)",
+            title="Victorian electricity demand: two weeks ahead", rm_legend=False)
+```
+
+## Daily data: what to notice {.smaller}
+
+- $m = 7$, not 365: the cycle we are modelling is the **week**. Weekdays are high, weekends low.
+- Two weeks of forecasts reproduce the weekly shape; the level drifts slightly and then damps.
+- The intervals are wide on weekdays and narrow on weekends — with multiplicative errors,
+  uncertainty scales with the level.
+
+::: {.callout-warning}
+## Electricity has more than one season
+
+Daily demand also has an annual cycle, and half-hourly demand has a daily one on top of the weekly.
+ETS carries **one** seasonal component. Multiple seasonality needs the methods in Week 8.
+:::
+
+# A taxonomy of methods
+
+## Nine methods, two questions {.smaller}
+
+| Trend component | Seasonal: N (none) | Seasonal: A (additive) | Seasonal: M (multiplicative) |
+| :--- | :--- | :--- | :--- |
+| N (none) | (N,N) | (N,A) | (N,M) |
+| A (additive) | (A,N) | (A,A) | (A,M) |
+| A$_d$ (additive damped) | (A$_d$,N) | (A$_d$,A) | (A$_d$,M) |
+
+Two questions, asked twice: **is there a trend, and does it flatten?** and **is there a season, and
+does it scale with the level?**
+
+[Everything so far is one cell of this table. Nothing new is coming — only combinations.]{.hi}
+
+## The nine, by name {.smaller}
+
+| Short hand | Method |
+| :--- | :--- |
+| (N,N) | Simple exponential smoothing |
+| (A,N) | Holt's linear method |
+| (A$_d$,N) | Additive damped trend method |
+| (A,A) | Additive Holt-Winters' method |
+| (A,M) | Multiplicative Holt-Winters' method |
+| (A$_d$,M) | Holt-Winters' damped method |
+
+The three cells nobody names — (N,A), (N,M), (A,M) with an undamped trend — are perfectly usable;
+they are just rarer in practice than the six above.
+
+## All nine, written out {.tiny40}
+
+| Trend | Seasonal N | Seasonal A | Seasonal M |
+| :--- | :--- | :--- | :--- |
+| **N** | $\hat{y}_{t+h\|t} = \ell_t$ <br> $\ell_t = \alpha y_t + (1-\alpha)\ell_{t-1}$ | $\hat{y}_{t+h\|t} = \ell_t + s_{t+h-m(k+1)}$ <br> $\ell_t = \alpha(y_t - s_{t-m}) + (1-\alpha)\ell_{t-1}$ <br> $s_t = \gamma(y_t - \ell_{t-1}) + (1-\gamma)s_{t-m}$ | $\hat{y}_{t+h\|t} = \ell_t s_{t+h-m(k+1)}$ <br> $\ell_t = \alpha(y_t/s_{t-m}) + (1-\alpha)\ell_{t-1}$ <br> $s_t = \gamma(y_t/\ell_{t-1}) + (1-\gamma)s_{t-m}$ |
+| **A** | $\hat{y}_{t+h\|t} = \ell_t + hb_t$ <br> $\ell_t = \alpha y_t + (1-\alpha)(\ell_{t-1}+b_{t-1})$ <br> $b_t = \beta^*(\ell_t - \ell_{t-1}) + (1-\beta^*)b_{t-1}$ | $\hat{y}_{t+h\|t} = \ell_t + hb_t + s_{t+h-m(k+1)}$ <br> $\ell_t = \alpha(y_t - s_{t-m}) + (1-\alpha)(\ell_{t-1}+b_{t-1})$ <br> $b_t = \beta^*(\ell_t-\ell_{t-1}) + (1-\beta^*)b_{t-1}$ <br> $s_t = \gamma(y_t - \ell_{t-1} - b_{t-1}) + (1-\gamma)s_{t-m}$ | $\hat{y}_{t+h\|t} = (\ell_t + hb_t)s_{t+h-m(k+1)}$ <br> $\ell_t = \alpha(y_t/s_{t-m}) + (1-\alpha)(\ell_{t-1}+b_{t-1})$ <br> $b_t = \beta^*(\ell_t-\ell_{t-1}) + (1-\beta^*)b_{t-1}$ <br> $s_t = \gamma\dfrac{y_t}{\ell_{t-1}+b_{t-1}} + (1-\gamma)s_{t-m}$ |
+| **A$_d$** | $\hat{y}_{t+h\|t} = \ell_t + \phi_h b_t$ <br> $\ell_t = \alpha y_t + (1-\alpha)(\ell_{t-1}+\phi b_{t-1})$ <br> $b_t = \beta^*(\ell_t-\ell_{t-1}) + (1-\beta^*)\phi b_{t-1}$ | $\hat{y}_{t+h\|t} = \ell_t + \phi_h b_t + s_{t+h-m(k+1)}$ <br> $\ell_t = \alpha(y_t - s_{t-m}) + (1-\alpha)(\ell_{t-1}+\phi b_{t-1})$ <br> $b_t = \beta^*(\ell_t-\ell_{t-1}) + (1-\beta^*)\phi b_{t-1}$ <br> $s_t = \gamma(y_t-\ell_{t-1}-\phi b_{t-1}) + (1-\gamma)s_{t-m}$ | $\hat{y}_{t+h\|t} = (\ell_t + \phi_h b_t)s_{t+h-m(k+1)}$ <br> $\ell_t = \alpha(y_t/s_{t-m}) + (1-\alpha)(\ell_{t-1}+\phi b_{t-1})$ <br> $b_t = \beta^*(\ell_t-\ell_{t-1}) + (1-\beta^*)\phi b_{t-1}$ <br> $s_t = \gamma\dfrac{y_t}{\ell_{t-1}+\phi b_{t-1}} + (1-\gamma)s_{t-m}$ |
+
+$\phi_h = \phi + \phi^2 + \cdots + \phi^h$
+
+# Innovations state space models
+
+## Methods and models {.smaller}
+
+::: {.callout-note icon="false"}
+## A method
+
+An algorithm that returns **point forecasts**. Everything so far is a method.
+:::
+
+::: {.callout-note icon="false"}
+## A model
+
+A method **plus** a statement about the errors. It gives the same point forecasts, and in addition:
+
+- prediction intervals that follow from something, rather than from a rule of thumb;
+- a likelihood, so models can be compared with AICc;
+- a way to simulate futures, not just draw a line.
+:::
+
+Week 3 gave you residual diagnostics and told you the intervals assume something about the errors.
+Here is where that assumption is written down.
+
+## ETS(A,N,N): SES with additive errors {.smaller}
+
+Start from the component form and look at the one-step error
+$e_t = y_t - \hat{y}_{t|t-1} = y_t - \ell_{t-1}$:
+
+::: {.callout-note icon="false"}
+## Error-correction form
+
+$$
+\begin{aligned}
+y_t &= \ell_{t-1} + e_t \\
+\ell_t &= \ell_{t-1} + \alpha(y_t - \ell_{t-1}) = \ell_{t-1} + \alpha e_t
+\end{aligned}
+$$
+:::
+
+Now **assume** $e_t = \varepsilon_t \sim \text{NID}(0, \sigma^2)$ and the method becomes a model:
+
+- Measurement equation: $y_t = \ell_{t-1} + \varepsilon_t$
+- State equation: $\ell_t = \ell_{t-1} + \alpha \varepsilon_t$
+
+The level is not smoothed data any more — it is a **state** that the noise moves.
+
+## ETS(M,N,N): the same method, relative errors {.smaller}
+
+Suppose instead the error is proportional to the level —
+$\varepsilon_t = \dfrac{y_t - \hat{y}_{t|t-1}}{\hat{y}_{t|t-1}} \sim \text{NID}(0, \sigma^2)$:
+
+- Measurement equation: $y_t = \ell_{t-1}(1 + \varepsilon_t)$
+- State equation: $\ell_t = \ell_{t-1}(1 + \alpha\varepsilon_t)$
+
+::: {.callout-important}
+With the **same parameters**, additive and multiplicative errors give **identical point forecasts**
+and [different prediction intervals]{.hi}. The choice of error type is a choice about uncertainty,
+not about the forecast.
+:::
+
+## The same forecast, different uncertainty {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+sf = StatsForecast(
+    models=[AutoETS(season_length=1, model="ANN", alias="ANN"),
+            AutoETS(season_length=1, model="MNN", alias="MNN")],
+    freq="YS",
+)
+fc_err = sf.forecast(df=algeria_df, h=5, level=[80])
+fc_err["width ANN"] = fc_err["ANN-hi-80"] - fc_err["ANN-lo-80"]
+fc_err["width MNN"] = fc_err["MNN-hi-80"] - fc_err["MNN-lo-80"]
+fc_err[["ds", "ANN", "MNN", "width ANN", "width MNN"]].round(2)
+```
+
+- Point forecasts agree to within a rounding error — the small gap is estimation, not structure:
+  each model optimises its own likelihood, so $\hat\alpha$ differs slightly.
+- The 80% interval is about a quarter narrower under multiplicative errors, because Algerian exports
+  are a percentage that cannot go far below the current level.
+
+## Holt's method as a model {.smaller}
+
+::: {.callout-note icon="false"}
+## ETS(A,A,N) — additive errors, $\varepsilon_t = y_t - \ell_{t-1} - b_{t-1}$
+
+$$
+\begin{aligned}
+y_t &= \ell_{t-1} + b_{t-1} + \varepsilon_t \\
+\ell_t &= \ell_{t-1} + b_{t-1} + \alpha\varepsilon_t \\
+b_t &= b_{t-1} + \beta\varepsilon_t
+\end{aligned}
+$$
+:::
+
+::: {.callout-note icon="false"}
+## ETS(M,A,N) — multiplicative errors, $\varepsilon_t = \dfrac{y_t - (\ell_{t-1}+b_{t-1})}{\ell_{t-1}+b_{t-1}}$
+
+$$
+\begin{aligned}
+y_t &= (\ell_{t-1} + b_{t-1})(1 + \varepsilon_t) \\
+\ell_t &= (\ell_{t-1} + b_{t-1})(1 + \alpha\varepsilon_t) \\
+b_t &= b_{t-1} + \beta(\ell_{t-1} + b_{t-1})\varepsilon_t
+\end{aligned}
+$$
+:::
+
+In the models we write $\beta = \alpha\beta^*$ — the two parametrisations describe the same method.
+
+## Eighteen models {.smaller}
+
+[ADDITIVE ERROR MODELS]{.hi}
+
+| Trend | Seasonal N | Seasonal A | Seasonal M |
+| :--- | :--- | :--- | :--- |
+| **N** | A,N,N | A,N,A | A,N,M |
+| **A** | A,A,N | A,A,A | A,A,M |
+| **A$_d$** | A,A$_d$,N | A,A$_d$,A | A,A$_d$,M |
+
+[MULTIPLICATIVE ERROR MODELS]{.hi}
+
+| Trend | Seasonal N | Seasonal A | Seasonal M |
+| :--- | :--- | :--- | :--- |
+| **N** | M,N,N | M,N,A | M,N,M |
+| **A** | M,A,N | M,A,A | M,A,M |
+| **A$_d$** | M,A$_d$,N | M,A$_d$,A | M,A$_d$,M |
+
+Nine methods × two error types = 18 models. `AutoETS` searches this table for you; the notation
+`ETS(M,A,M)` is how it reports the answer.
+
+## The general form {.smaller}
+
+Let $\mathbf{x}_t = (\ell_t, b_t, s_t, s_{t-1}, \ldots, s_{t-m+1})$ be the state vector and
+$\varepsilon_t \stackrel{\text{iid}}{\sim} N(0, \sigma^2)$:
+
+$$
+y_t = \underbrace{h(\mathbf{x}_{t-1})}_{\mu_t} + \underbrace{k(\mathbf{x}_{t-1})\varepsilon_t}_{e_t}
+\qquad\qquad
+\mathbf{x}_t = f(\mathbf{x}_{t-1}) + g(\mathbf{x}_{t-1})\varepsilon_t
+$$
+
+- Additive errors: $k(\mathbf{x}_{t-1}) = 1$, so $y_t = \mu_t + \varepsilon_t$.
+- Multiplicative errors: $k(\mathbf{x}_{t-1}) = \mu_t$, so $y_t = \mu_t(1 + \varepsilon_t)$.
+
+All 18 models are this pair of equations with different $h$, $k$, $f$, $g$. One estimation routine
+covers every one of them — which is exactly why `AutoETS` can exist.
+
+## Models that misbehave {.smaller}
+
+- Some combinations divide by a state: **ETS(A,N,M)**, **ETS(A,A,M)**, **ETS(A,A$_d$,M)**. They are
+  numerically unstable and normally excluded.
+- **Multiplicative errors need strictly positive data.** With a zero in the series, the relative
+  error is undefined and the fit fails outright:
+
+```{python}
+#| echo: true
+#| code-fold: false
+ansett_df = pd.read_csv('../data/ansett.csv', parse_dates=["ds"])
+economy_class = (ansett_df
+                 .query("Airports == 'MEL-SYD' and Class == 'Economy'")
+                 .groupby("ds", as_index=False)["y"]
+                 .mean())
+print("zeros in the series:", int((economy_class["y"] == 0).sum()))
+try:
+    AutoETS(season_length=4, model="MAM").fit(y=economy_class["y"].to_numpy(float))
+except ValueError as err:
+    print("ValueError:", err)
+```
+
+For data with zeros or negative values, only the **six fully additive** models apply.
+
+# Estimation and model selection
+
+## Estimating an ETS model {.smaller}
+
+Estimate the smoothing parameters $\alpha, \beta, \gamma, \phi$ **and** the initial states
+$\ell_0, b_0, s_0, s_{-1}, \ldots, s_{-m+1}$ by maximising the likelihood:
+
+$$
+L^*(\theta, \mathbf{x}_0) = T \log\left(\sum_{t=1}^{T}\varepsilon_t^2\right)
++ 2\sum_{t=1}^{T}\log\left|k(\mathbf{x}_{t-1})\right|
+= -2\log(\text{Likelihood}) + \text{constant}
+$$
+
+- For **additive** errors, minimising $L^*$ is equivalent to minimising SSE — the same objective as
+  the methods.
+- For **multiplicative** errors it is **not**: the second term penalises states that make the error
+  scale large.
+- A monthly seasonal model estimates 3 parameters and 14 initial states. On five years of data that
+  is a lot of freedom — which is what AICc is about to charge us for.
+
+## Parameter restrictions {.smaller}
+
+::: {.callout-note icon="false"}
+## Usual (traditional) region
+
+- In the methods: $0 < \alpha, \beta^*, \gamma^*, \phi < 1$, so every equation is a weighted average.
+- In the models $\beta = \alpha\beta^*$ and $\gamma = (1-\alpha)\gamma^*$, giving
+  $0 < \alpha < 1$, $0 < \beta < \alpha$, $0 < \gamma < 1-\alpha$.
+- $0.8 < \phi < 0.98$ to keep the optimiser away from the boundary.
+:::
+
+::: {.callout-note icon="false"}
+## Admissible region
+
+Wider: any parameters for which the distant past stops influencing current forecasts. For
+ETS(A,N,N) the traditional region is $0 < \alpha < 1$, the admissible one $0 < \alpha < 2$.
+:::
+
+An $\hat{\alpha}$ pinned at 0.9999, as in the Australian population fit, is a signal: the series
+wants a random walk, and the level is doing nothing but copying the last observation.
+
+## Model selection {.smaller}
+
+$$
+\text{AIC} = -2\log(L) + 2k
+\qquad
+\text{AIC}_c = \text{AIC} + \frac{2k(k+1)}{T-k-1}
+\qquad
+\text{BIC} = \text{AIC} + k\left[\log(T) - 2\right]
+$$
+
+where $k$ counts the parameters **and** the initial states.
+
+- AICc is the default for ETS: with $m + 3$ things to estimate and short series, the small-sample
+  correction matters.
+- Likelihoods are comparable only on the **same data**: never compare an AICc from a transformed
+  series with one from the raw series, or across different $m$.
+- Lower is better, and a difference of less than about 2 is not a difference.
+
+## AutoETS picks a model {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+auto = AutoETS(season_length=4).fit(y=y_hol)
+print("chosen model:", auto.model_["method"])
+print("AICc:", round(auto.model_["aicc"], 2), " sigma^2:", round(auto.model_["sigma2"], 5))
+print("parameters:", np.round(auto.model_["fit"][0], 4))
+```
+
+For Australian holidays the search lands on **ETS(M,N,M)** — multiplicative errors, *no trend*, a
+multiplicative season:
+
+$$
+\begin{aligned}
+y_t &= \ell_{t-1}s_{t-m}(1+\varepsilon_t) \\
+\ell_t &= \ell_{t-1}(1+\alpha\varepsilon_t) \\
+s_t &= s_{t-m}(1+\gamma\varepsilon_t)
+\end{aligned}
+$$
+
+The estimated $\hat\gamma$ is at its lower bound: the seasonal shape is treated as fixed, and the
+level absorbs the rest.
+
+## What it rejected {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+rows = []
+for spec, damped in [("ANN", None), ("AAN", False), ("AAN", True),
+                     ("AAA", None), ("MAM", None), ("MNM", None)]:
+    fit = AutoETS(season_length=4, model=spec, damped=damped).fit(y=y_hol)
+    rows.append({"specification": spec + (" damped" if damped else ""),
+                 "model": fit.model_["method"],
+                 "parameters": fit.model_["n_params"],
+                 "AICc": round(fit.model_["aicc"], 2)})
+pd.DataFrame(rows).sort_values("AICc")
+```
+
+- The three seasonal models are 130 AICc units better than the non-seasonal ones. On this series
+  seasonality is not a modelling choice, it is the data.
+- Among them the spread is under 2 units: **AICc cannot tell them apart.**
+
+## The states of the chosen model {.tiny}
+
+```{python}
+#| label: auto-states
+#| fig-align: center
+fig, axes = plt.subplots(4, 1, figsize=(11, 6.5), sharex=True)
+axes[0].plot(y_hol, color="black")
+axes[0].set_title("ETS(M,N,M):  Trips = level × season × (1 + residual)")
+axes[0].set_ylabel("Trips")
+axes[1].plot(auto.model_["states"][:, 0], color=slate)
+axes[1].set_ylabel("Level")
+axes[2].plot(auto.model_["states"][:, 1], color=turquoise)
+axes[2].set_ylabel("Season")
+axes[3].plot(auto.model_["residuals"], color=orange)
+axes[3].set_ylabel("Residual")
+axes[3].set_xlabel("Quarter")
+for ax in axes:
+    ax.grid(True, alpha=0.3)
+plt.show()
+```
+
+## Innovation residuals versus regular residuals {.smaller}
+
+```{python}
+#| label: residual-kinds
+#| fig-align: center
+fig, axes = plt.subplots(2, 1, figsize=(11, 4.6), sharex=True)
+axes[0].plot(auto.model_["residuals"], color=orange)
+axes[0].set_ylabel("Innovation\nresiduals")
+axes[1].plot(auto.model_["actual_residuals"], color=slate)
+axes[1].set_ylabel("Regular\nresiduals")
+axes[1].set_xlabel("Quarter")
+for ax in axes:
+    ax.grid(True, alpha=0.3)
+plt.show()
+```
+
+- **Regular residuals** $y_t - \hat{y}_{t|t-1}$ are in trips.
+- **Innovation residuals** are the $\varepsilon_t$ of the model — here *relative*, because the errors
+  are multiplicative.
+- Week 3's diagnostics (ACF, Ljung-Box, histogram) belong on the **innovation** residuals: those are
+  the ones the model claims are white noise.
+
+# Forecasting with ETS
+
+## Point forecasts {.smaller}
+
+Iterate the state equations for $t = T+1, \ldots, T+h$ and set every future $\varepsilon_t = 0$.
+
+::: {.callout-note icon="false"}
+## ETS(A,A,N)
+
+$$
+\begin{aligned}
+y_{T+1} &= \ell_T + b_T + \varepsilon_{T+1} &\Rightarrow&& \hat{y}_{T+1|T} &= \ell_T + b_T \\
+y_{T+2} &= (\ell_T + b_T + \alpha\varepsilon_{T+1}) + (b_T + \beta\varepsilon_{T+1}) + \varepsilon_{T+2}
+&\Rightarrow&& \hat{y}_{T+2|T} &= \ell_T + 2b_T
+\end{aligned}
+$$
+:::
+
+::: {.callout-note icon="false"}
+## ETS(M,A,N)
+
+$$
+y_{T+1} = (\ell_T + b_T)(1+\varepsilon_{T+1}) \Rightarrow \hat{y}_{T+1|T} = \ell_T + b_T,
+\qquad \hat{y}_{T+2|T} = \ell_T + 2b_T
+$$
+:::
+
+Same point forecasts, as promised. The error type never touches the mean.
+
+## Prediction intervals {.tiny}
+
+$$
+\hat{y}_{T+h|T} \pm c\,\sigma_h
+$$
+
+| Model | Forecast variance $\sigma_h^2$ |
+| :--- | :--- |
+| (A,N,N) | $\sigma^2\left[1 + \alpha^2(h-1)\right]$ |
+| (A,A,N) | $\sigma^2\left[1 + (h-1)\left\{\alpha^2 + \alpha\beta h + \tfrac{1}{6}\beta^2 h(2h-1)\right\}\right]$ |
+| (A,N,A) | $\sigma^2\left[1 + \alpha^2(h-1) + \gamma k(2\alpha+\gamma)\right]$ |
+| (A,A,A) | $\sigma^2\left[1 + (h-1)\left\{\alpha^2 + \alpha\beta h + \tfrac{1}{6}\beta^2h(2h-1)\right\} + \gamma k\left\{2\alpha + \gamma + \beta m(k+1)\right\}\right]$ |
+
+- Exact formulae exist for the additive models; $k$ is again $\lfloor (h-1)/m \rfloor$.
+- For the rest, the intervals come from **simulating** thousands of future paths from the fitted
+  states and taking percentiles.
+- Either way, they assume the innovation residuals really are white noise with constant variance.
+  That is what you check first — the intervals are only as good as that assumption.
+
+## Forecasts with intervals {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+sf = StatsForecast(models=[AutoETS(season_length=4, alias="AutoETS")], freq="QS")
+fc_auto = sf.forecast(df=holidays_df, h=8, level=[80, 95])
+```
+
+```{python}
+#| echo: true
+plot_series(holidays_df, fc_auto, level=[80, 95], xlabel="Quarter",
+            ylabel="Trips (millions)",
+            title="Australian domestic holidays: ETS(M,N,M), two years ahead", rm_legend=False)
+```
+
+## AICc chose. Was it right? {.smaller}
+
+AICc ranks models on how well they explain the **data they were fitted to**. The challenge scores
+you on data the model has not seen. Week 3 gave us the tool to check whether those two agree.
+
+```{python}
+#| echo: true
+#| code-fold: false
+models = [
+    AutoETS(season_length=4, alias="AutoETS"),          # ETS(M,N,M) — best AICc
+    AutoETS(season_length=4, model="MAM", alias="MAM"),
+    AutoETS(season_length=4, model="AAA", alias="AAA"),
+    SeasonalNaive(season_length=4, alias="snaive"),
+    Naive(alias="naive"),
+]
+cv_df = StatsForecast(models=models, freq="QS").cross_validation(
+    df=holidays_df, h=4, n_windows=12, step_size=4)
+evaluate(cv_df.drop(columns="cutoff"),
+         metrics=[rmse, partial(mase, seasonality=4)],
+         train_df=holidays_df).round(3)
+```
+
+## AICc chose. Was it right? {.smaller}
+
+- Every ETS specification beats both benchmarks — the models are earning their keep.
+- But the **AICc winner is the worst of the three ETS models out of sample**, and the specification
+  AICc ranked third (A,A,A) forecasts best.
+- The differences are small (RMSE 0.54 vs 0.57 million trips), which is the point: AICc narrowed 18
+  models down to three, and cross-validation picked among them.
+
+::: {.callout-important}
+## The working rule
+
+Use AICc to **shortlist** specifications on one series; use cross-validation on the horizon you will
+actually be scored on to **choose**. Reporting only one of the two is how people talk themselves into
+the wrong model.
+:::
+
+## The same comparison on daily data {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+cv_daily = StatsForecast(
+    models=[AutoETS(season_length=7, alias="AutoETS"),
+            SeasonalNaive(season_length=7, alias="snaive")],
+    freq="D",
+).cross_validation(df=winter_df, h=7, n_windows=4, step_size=7)
+
+evaluate(cv_daily.drop(columns="cutoff"),
+         metrics=[rmse, partial(mase, seasonality=7)],
+         train_df=winter_df).round(3)
+```
+
+Here ETS wins clearly: MASE below 1 means it beats the seasonal naïve benchmark on its own terms —
+a weekly rhythm plus a moving level is exactly the structure ETS is built for.
+
+# ETS in practice
+
+## Five ways to get this wrong {.smaller}
+
+| Trap | What you see | Fix |
+|---|---|---|
+| `season_length` ≠ the real period | A plausible model with a worse AICc, silently | Quarterly 4, monthly 12, daily-with-weekly 7 — check against Lab 3 |
+| Seasonal period too long | `season_length=52` returns `ETS(A,N,N)`: the season is dropped | ETS needs $m \le 24$; long or multiple seasonality → Week 8 |
+| Multiplicative model, non-positive data | `ValueError: Inappropriate model for data with negative or zero values` | Use the additive models, or treat the zeros first |
+| `damped=None` | `AAN` comes back as `ETS(A,Ad,N)` | Pass `damped=False` to mean it |
+| Transform **and** multiply | The seasonal swing is modelled twice | Box-Cox + additive, **or** raw + multiplicative |
+
+The first two are the dangerous ones: nothing fails, and the model you get is quietly worse.
+
+## Two of them, silently {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+weekly = economy_class.assign(unique_id="MEL-SYD Economy")
+print("m = 52 :", AutoETS(season_length=52).fit(y=weekly["y"].to_numpy(float)).model_["method"])
+print("m = 12 on quarterly data:",
+      AutoETS(season_length=12).fit(y=y_hol).model_["method"],
+      "AICc", round(AutoETS(season_length=12).fit(y=y_hol).model_["aicc"], 1),
+      "vs", round(auto.model_["aicc"], 1), "for m = 4")
+```
+
+## What ETS is, in one slide {.smaller}
+
+- A **level, a slope and a season that update** as each observation arrives, with the update speeds
+  $\alpha, \beta, \gamma$ estimated from the data.
+- A **taxonomy**: (Error, Trend, Season), each additive or multiplicative, trend optionally damped —
+  18 models, one estimation routine, one search (`AutoETS`).
+- **Fast, robust and hard to beat** on short seasonal business series. It is the benchmark ARIMA has
+  to justify itself against next.
+- What it does **not** do: covariates, multiple seasonality, long seasonal periods, structural
+  breaks. Those are the next four lectures.
+
+## In the practice session {.smaller}
+
+Week 5 is the **mid-term quiz** — no lab. This lecture is the material for the **Week 6 challenge**,
+on the series that becomes yours in Week 4:
+
+1. fit `AutoETS`, and report what it chose and why the components make sense for your series;
+2. shortlist two or three specifications by AICc, and **choose between them by cross-validation**
+   on the challenge horizon;
+3. check the innovation residuals with the Week 3 diagnostics before you trust the intervals;
+4. beat the benchmark on your series — and if you do not, explain what the states show.
+
+::: {.callout-tip}
+## Before Week 6
+
+Read [FPP3 ch. 8](https://otexts.com/fpp3/expsmooth.html) and
+[FPP the Pythonic Way, ch. 8](https://otexts.com/fpppy/nbs/08-exponential-smoothing.html).
+The quiz in Week 5 covers Weeks 1–4, this lecture included.
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe="colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=4432)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
