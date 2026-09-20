@@ -1,0 +1,217 @@
+---
+title: "Challenge 1: Beat your benchmark"
+subtitle: "MATH840 | Time Series | Week 4 — graded assignment 3 of 7"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    highlight-style: github
+    theme: [default, custom.scss]
+execute:
+  echo: true
+  warning: false
+  eval: false
+editor_options:
+  chunk_output_type: console
+---
+
+::: {.callout-important appearance="simple"}
+## What changed this week
+
+You asked to do the graded work at home, and that is how it works from now on.
+
+- **The practice session is no longer the lab.** We spend it on worked examples and discussion —
+  the moves you are about to need, on a shared dataset, with everything asked out loud.
+- **The graded work is done at home, due 23:59 on the day of the practice session.** No in-class
+  submission, no baseline deadline.
+- **Attendance is not marked.** The session is worth coming to because the examples are the ones
+  you will reuse an hour later, not because a register is taken.
+:::
+
+::: {.callout-tip appearance="simple"}
+## Open the notebook
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab04.ipynb)
+
+Click **Copy to Drive** before you start working, otherwise nothing you write is saved.
+:::
+
+## 🎯 The task
+
+This is the first of five **challenges**. From today you have your own time series, and one number
+to beat on it.
+
+Forecast the next $h$ observations of your series and beat your benchmark — with the toolbox from
+Week 3 and nothing more. No ETS, no ARIMA: those are the next challenges, and this one is the
+measurement that makes their improvement visible.
+
+::: {.callout-important}
+## This one counts
+
+8 points. **Deadline: 23:59 today**, on Moodle. The accuracy score is published the next morning;
+rubric marks and comments come back before the next practice session.
+:::
+
+## 🗂 Your series
+
+Your series is issued by a hash of the **same identifier you have used since Week 1**. The template
+does it for you: it turns your identifier into a code such as `TS-4DD7A` and downloads that series.
+
+::: {.callout-note}
+## What "anonymised" means here
+
+The series is real. What has been removed is its identity: no name, no units, values rescaled,
+the calendar shifted by whole years, the history trimmed. Two students never get the same window of
+the same series, so a forecast is worth exactly what your model is worth.
+
+You are not expected to work out what it measures, and you will not be marked for trying. Read the
+data, not the domain.
+:::
+
+**This series is yours for the rest of the course.** Challenges 2–5 (ETS, ARIMA, seasonal ARIMA,
+advanced methods) run on the same series, so you will watch your own forecast improve — or fail to.
+
+## 📋 What you are marked on
+
+| Section | Criteria | Points |
+|---|---|---:|
+| 1 | EDA and visualisation | 1 |
+| 2 | Forecast and accuracy | 3 |
+| 3 | Justification block | 3 |
+| 4 | Code quality and reproducibility | 1 |
+| | **Total** | **8** |
+
+The notebook has one section per row. **Keep those headings.**
+
+## 📊 Section 1 — EDA and visualisation (1 point)
+
+One point, and it is not a repeat of Lab 2: this is a **new series**, and the plots are here to
+support the choice of method.
+
+- A time plot, and whichever of the seasonal / subseries / ACF plots your argument actually uses.
+- Every plot needs a sentence. A plot with no reading attached earns nothing.
+- Show the validation split on a plot: history, validation window, and your forecast over it.
+
+## 📐 Section 2 — Forecast and accuracy (3 points)
+
+### Your benchmark
+
+The benchmark is the **best of the four simple methods** from Week 1 — `mean`, `naive`, `snaive`,
+`drift` — chosen on a validation window: the last $h$ observations of the history you were given.
+
+Nothing about it is hidden. The template computes it, and the scorer computes it the same way, from
+the same public data:
+
+1. fit the four methods to everything except the last $h$ observations;
+2. score them on those $h$ observations by RMSE, and keep the winner;
+3. refit the winner on the **whole** history you were given — that is your benchmark.
+
+### How the points are awarded
+
+Your forecast and the benchmark's are both scored by **MASE** on the $h$ observations that come
+after your history, which you have not seen.
+
+$$
+\text{skill} = \frac{\text{MASE}_{\text{you}}}{\text{MASE}_{\text{benchmark}}}
+$$
+
+| Result | Points |
+|---|---:|
+| skill $\le 1.00$ — you beat the benchmark | 3 |
+| skill $\le 1.10$ — within 10% of it | 2 |
+| worse than that | 1, and Section 3 must say why |
+
+::: {.callout-note}
+## Your series is known to be beatable
+
+Every series in the pool was screened: it is only issued if a reference model lands between
+**0.70 and 0.90** of its benchmark. Below that the series is trivial, above it effectively
+unbeatable. If you do not beat your benchmark, that is a fact about your model, not your luck.
+
+The screening reference was an automatic ETS or ARIMA — models you meet in the next two challenges.
+With the toolbox alone, matching the benchmark is a solid result and beating it is a good one.
+:::
+
+### What the toolbox gives you {.smaller}
+
+Everything in this list is Week 3 material, and each of them can beat a simple method:
+
+- a **transformation** — Box-Cox, if the seasonal swing grows with the level;
+- **forecasting with decomposition**: STL the series, forecast the seasonally adjusted part with
+  `naive` or `drift`, carry the seasonal component forward with `snaive`, add them back;
+- a **combination**: the average of two or three forecasts is often better than any of them;
+- **residual diagnostics** to catch a model that is leaving structure behind.
+
+📖 [FPP 5.7 forecasting with decomposition](https://otexts.com/fpp3/forecasting-decomposition.html) ·
+[FPP 5.4 residual diagnostics](https://otexts.com/fpp3/diagnostics.html) ·
+[FPP 5.8 evaluating accuracy](https://otexts.com/fpp3/accuracy.html) ·
+[FPP the Pythonic Way, ch. 5](https://otexts.com/fpppy/nbs/05-toolbox.html)
+
+## ✍️ Section 3 — Justification block (3 points)
+
+Three points, and the only part of the work a human reads closely. Four things, roughly a paragraph
+each:
+
+| Item | Points | What earns them |
+|---|---:|---|
+| 3.1 What the data shows | 0.75 | Frequency, seasonal period, trend, level shifts, outliers — with the plot that shows each claim |
+| 3.2 Why this method | 0.75 | The method you submitted and **why it fits what you just described**, including what you tried and dropped |
+| 3.3 What the residuals say | 0.75 | ACF and a Ljung-Box test on your final model's residuals, read — what structure is left, and whether it matters at this horizon |
+| 3.4 What you expect | 0.75 | Your own MASE on the validation window against the benchmark's, and the number you expect on the hidden holdout |
+
+::: {.callout-important}
+Marked on the reasoning, not on the outcome. A well-argued forecast that loses to the benchmark
+scores full marks in Section 3 — and if it loses, say what you think the holdout contained that your
+validation window did not.
+:::
+
+## 🧹 Section 4 — Code quality and reproducibility (1 point)
+
+- The notebook runs top to bottom on a fresh kernel without errors.
+- Your submission file is written **by the notebook**, not edited by hand.
+- No leakage: nothing after the end of your history exists, so nothing can be fitted to it. If you
+  tune on the validation window, say so in 3.2 — that is legitimate, and it is also why your
+  validation MASE is optimistic.
+
+## 📤 Submission
+
+Upload three files to the Week 4 activity on Moodle **before 23:59 today**:
+
+- `SURNAME_ch1_forecast.csv` — written by the last cell of the template. Exactly $h$ rows and these
+  columns:
+
+  | Column | What |
+  |---|---|
+  | `student_id` | your identifier |
+  | `code` | your series code, e.g. `TS-4DD7A` |
+  | `ds` | the dates you are forecasting, in order |
+  | `yhat` | your point forecast |
+  | `yhat_lo_80`, `yhat_hi_80` | your 80% interval — not marked this week, but the scorer records its coverage |
+
+- `SURNAME_ch1.pdf` — the report, with the justification block;
+- `SURNAME_ch1.ipynb` — the source.
+
+::: {.callout-warning}
+## The scorer is strict about the format, and only about the format
+
+Wrong dates, wrong number of rows, a missing column or a `NaN` in `yhat` cannot be scored, and
+Section 1 is then 0. The template writes the file correctly; if you rebuild it by hand, run the
+check cell it provides.
+:::
+
+## ⏱ How long this should take
+
+Ninety minutes if you follow the practice session's example, half of that if you reuse its code.
+The work is deliberately not bigger than a session — it moved home so that nobody has to produce a
+forecast and an argument in a room with a clock, not so that it could grow.
+
+## 📚 For next week
+
+**Week 5 is the mid-term quiz** — no practice session and no challenge. It covers Weeks 1–4:
+forecasting basics and graphics, decomposition, the toolbox, exponential smoothing.
+
+Challenge 2 is in Week 6, on this same series, with ETS — which is the Week 4 lecture, already
+published. Read [FPP3 ch. 8](https://otexts.com/fpp3/expsmooth.html) before then and your second
+challenge is half done.

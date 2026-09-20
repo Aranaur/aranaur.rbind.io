@@ -17,19 +17,42 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 3 — lab handout | <https://01a0a118-ef43-4671-3ca8-af3592c18aeb.share.connect.posit.cloud> |
 | Week 3 — worked example (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab03_worked_example.ipynb) |
 | Week 3 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab03.ipynb) |
+| Week 4 — practice demo, the toolbox end to end (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo04.ipynb) |
+| Week 4 — Challenge 1 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab04.ipynb) |
 | Moodle | <https://teaching.kse.org.ua/course/view.php?id=4432> |
 
 ## Layout
 
 ```
-slides/   .00 syllabus, .01–.03 weeks 1–3 (dot-prefixed: not rendered into the site)
-labs/     .labNN.qmd handouts, _labNN.ipynb Colab notebooks
+slides/   .00 syllabus, .01–.04 weeks 1–4 (dot-prefixed: not rendered into the site)
+labs/     .labNN.qmd handouts, _labNN.ipynb templates, _demoNN.ipynb practice demos,
+          .demoNN-notes.md how to run the session
 data/     datasets served to students over raw.githubusercontent.com
-infra/    publishing, and later the Track B series pool and scorer
+data/trackb/  the issued Track B series, one CSV per code, plus index.csv
+infra/    publishing, deck PDFs, and the Track B pool and scorer
 project/  final project (Week 10)
 ```
 
-`SYLLABUS-CHANGES.md` lists the edits the live syllabus still needs — including the
+From Week 4 the practice session is a worked example on a shared series and the graded work goes
+home, due 23:59 the same day. `labs/.demoNN-notes.md` is the running order for the session: what to
+show, what to ask, and which answers to expect.
+
+## Track B
+
+```bash
+cd lectures/kse/MATH840/26autumn/infra
+python trackb_pool.py                       # screen the pool and issue data/trackb/
+python trackb_score.py ../grading/submissions/ch1 --out ../grading/ch1_scores.csv
+```
+
+`trackb_pool.py` cuts several variants of every source series, disguises each one (values rescaled,
+calendar shifted by whole years, history trimmed), and issues only those where a reference
+AutoETS/AutoARIMA lands between 0.70 and 0.90 of the series' own benchmark. The served history goes
+to `data/trackb/`; the hidden holdout, the identities and the reference scores go to
+`grading/trackb_pool.json`, which is gitignored and must stay that way — it is the answer key for
+five challenges.
+
+`.SYLLABUS-CHANGES.md` lists the edits the live syllabus still needs — including the
 practice-hours error (44 in the document, 22 in reality) and the move from eight
 7-point labs to seven 8-point ones.
 
@@ -94,3 +117,4 @@ Weeks are offset by one against the 2025/26 decks, because Week 1 merged last ye
 | 1 | `.01` | `.01` + `.02` |
 | 2 | `.02` | `.03` |
 | 3 | `.03` | `.04` |
+| 4 | `.04` | `.05` |

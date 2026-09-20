@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Ihor Miroshnychenko">
+
+<title>Challenge 1: Beat your benchmark</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src=".lab04_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".lab04_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src=".lab04_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src=".lab04_files/libs/quarto-html/popper.min.js"></script>
+<script src=".lab04_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src=".lab04_files/libs/quarto-html/anchor.min.js"></script>
+<link href=".lab04_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".lab04_files/libs/quarto-html/quarto-syntax-highlighting-a6f4957c43e529dfa47e771024b1e13d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".lab04_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href=".lab04_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href=".lab04_files/libs/bootstrap/bootstrap-f0363865eaeadd24fdd349ba0d39ddd7.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#the-task" id="toc-the-task" class="nav-link active" data-scroll-target="#the-task">🎯 The task</a></li>
+  <li><a href="#your-series" id="toc-your-series" class="nav-link" data-scroll-target="#your-series">🗂 Your series</a></li>
+  <li><a href="#what-you-are-marked-on" id="toc-what-you-are-marked-on" class="nav-link" data-scroll-target="#what-you-are-marked-on">📋 What you are marked on</a></li>
+  <li><a href="#section-1-eda-and-visualisation-1-point" id="toc-section-1-eda-and-visualisation-1-point" class="nav-link" data-scroll-target="#section-1-eda-and-visualisation-1-point">📊 Section 1 — EDA and visualisation (1 point)</a></li>
+  <li><a href="#section-2-forecast-and-accuracy-3-points" id="toc-section-2-forecast-and-accuracy-3-points" class="nav-link" data-scroll-target="#section-2-forecast-and-accuracy-3-points">📐 Section 2 — Forecast and accuracy (3 points)</a>
+  <ul class="collapse">
+  <li><a href="#your-benchmark" id="toc-your-benchmark" class="nav-link" data-scroll-target="#your-benchmark">Your benchmark</a></li>
+  <li><a href="#how-the-points-are-awarded" id="toc-how-the-points-are-awarded" class="nav-link" data-scroll-target="#how-the-points-are-awarded">How the points are awarded</a></li>
+  <li><a href="#what-the-toolbox-gives-you" id="toc-what-the-toolbox-gives-you" class="nav-link" data-scroll-target="#what-the-toolbox-gives-you">What the toolbox gives you</a></li>
+  </ul></li>
+  <li><a href="#section-3-justification-block-3-points" id="toc-section-3-justification-block-3-points" class="nav-link" data-scroll-target="#section-3-justification-block-3-points">✍️ Section 3 — Justification block (3 points)</a></li>
+  <li><a href="#section-4-code-quality-and-reproducibility-1-point" id="toc-section-4-code-quality-and-reproducibility-1-point" class="nav-link" data-scroll-target="#section-4-code-quality-and-reproducibility-1-point">🧹 Section 4 — Code quality and reproducibility (1 point)</a></li>
+  <li><a href="#submission" id="toc-submission" class="nav-link" data-scroll-target="#submission">📤 Submission</a></li>
+  <li><a href="#how-long-this-should-take" id="toc-how-long-this-should-take" class="nav-link" data-scroll-target="#how-long-this-should-take">⏱ How long this should take</a></li>
+  <li><a href="#for-next-week" id="toc-for-next-week" class="nav-link" data-scroll-target="#for-next-week">📚 For next week</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Challenge 1: Beat your benchmark</h1>
+<p class="subtitle lead">MATH840 | Time Series | Week 4 — graded assignment 3 of 7</p>
+</div>
+
+
+<div class="quarto-title-meta-author">
+  <div class="quarto-title-meta-heading">Author</div>
+  <div class="quarto-title-meta-heading">Affiliation</div>
+  
+    <div class="quarto-title-meta-contents">
+    <p class="author">Ihor Miroshnychenko </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            Kyiv School of Economics
+          </p>
+      </div>
+  </div>
+
+<div class="quarto-title-meta">
+
+      
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="callout callout-style-simple callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>What changed this week
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>You asked to do the graded work at home, and that is how it works from now on.</p>
+<ul>
+<li><strong>The practice session is no longer the lab.</strong> We spend it on worked examples and discussion — the moves you are about to need, on a shared dataset, with everything asked out loud.</li>
+<li><strong>The graded work is done at home, due 23:59 on the day of the practice session.</strong> No in-class submission, no baseline deadline.</li>
+<li><strong>Attendance is not marked.</strong> The session is worth coming to because the examples are the ones you will reuse an hour later, not because a register is taken.</li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-simple callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Open the notebook
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab04.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" class="img-fluid figure-img"></a></p>
+<figcaption>Open In Colab</figcaption>
+</figure>
+</div>
+<p>Click <strong>Copy to Drive</strong> before you start working, otherwise nothing you write is saved.</p>
+</div>
+</div>
+<section id="the-task" class="level2">
+<h2 class="anchored" data-anchor-id="the-task">🎯 The task</h2>
+<p>This is the first of five <strong>challenges</strong>. From today you have your own time series, and one number to beat on it.</p>
+<p>Forecast the next <span class="math inline">\(h\)</span> observations of your series and beat your benchmark — with the toolbox from Week 3 and nothing more. No ETS, no ARIMA: those are the next challenges, and this one is the measurement that makes their improvement visible.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>This one counts
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>8 points. <strong>Deadline: 23:59 today</strong>, on Moodle. The accuracy score is published the next morning; rubric marks and comments come back before the next practice session.</p>
+</div>
+</div>
+</section>
+<section id="your-series" class="level2">
+<h2 class="anchored" data-anchor-id="your-series">🗂 Your series</h2>
+<p>Your series is issued by a hash of the <strong>same identifier you have used since Week 1</strong>. The template does it for you: it turns your identifier into a code such as <code>TS-4DD7A</code> and downloads that series.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>What “anonymised” means here
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The series is real. What has been removed is its identity: no name, no units, values rescaled, the calendar shifted by whole years, the history trimmed. Two students never get the same window of the same series, so a forecast is worth exactly what your model is worth.</p>
+<p>You are not expected to work out what it measures, and you will not be marked for trying. Read the data, not the domain.</p>
+</div>
+</div>
+<p><strong>This series is yours for the rest of the course.</strong> Challenges 2–5 (ETS, ARIMA, seasonal ARIMA, advanced methods) run on the same series, so you will watch your own forecast improve — or fail to.</p>
+</section>
+<section id="what-you-are-marked-on" class="level2">
+<h2 class="anchored" data-anchor-id="what-you-are-marked-on">📋 What you are marked on</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Section</th>
+<th>Criteria</th>
+<th style="text-align: right;">Points</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>EDA and visualisation</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Forecast and accuracy</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Justification block</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>Code quality and reproducibility</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td><strong>Total</strong></td>
+<td style="text-align: right;"><strong>8</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The notebook has one section per row. <strong>Keep those headings.</strong></p>
+</section>
+<section id="section-1-eda-and-visualisation-1-point" class="level2">
+<h2 class="anchored" data-anchor-id="section-1-eda-and-visualisation-1-point">📊 Section 1 — EDA and visualisation (1 point)</h2>
+<p>One point, and it is not a repeat of Lab 2: this is a <strong>new series</strong>, and the plots are here to support the choice of method.</p>
+<ul>
+<li>A time plot, and whichever of the seasonal / subseries / ACF plots your argument actually uses.</li>
+<li>Every plot needs a sentence. A plot with no reading attached earns nothing.</li>
+<li>Show the validation split on a plot: history, validation window, and your forecast over it.</li>
+</ul>
+</section>
+<section id="section-2-forecast-and-accuracy-3-points" class="level2">
+<h2 class="anchored" data-anchor-id="section-2-forecast-and-accuracy-3-points">📐 Section 2 — Forecast and accuracy (3 points)</h2>
+<section id="your-benchmark" class="level3">
+<h3 class="anchored" data-anchor-id="your-benchmark">Your benchmark</h3>
+<p>The benchmark is the <strong>best of the four simple methods</strong> from Week 1 — <code>mean</code>, <code>naive</code>, <code>snaive</code>, <code>drift</code> — chosen on a validation window: the last <span class="math inline">\(h\)</span> observations of the history you were given.</p>
+<p>Nothing about it is hidden. The template computes it, and the scorer computes it the same way, from the same public data:</p>
+<ol type="1">
+<li>fit the four methods to everything except the last <span class="math inline">\(h\)</span> observations;</li>
+<li>score them on those <span class="math inline">\(h\)</span> observations by RMSE, and keep the winner;</li>
+<li>refit the winner on the <strong>whole</strong> history you were given — that is your benchmark.</li>
+</ol>
+</section>
+<section id="how-the-points-are-awarded" class="level3">
+<h3 class="anchored" data-anchor-id="how-the-points-are-awarded">How the points are awarded</h3>
+<p>Your forecast and the benchmark’s are both scored by <strong>MASE</strong> on the <span class="math inline">\(h\)</span> observations that come after your history, which you have not seen.</p>
+<p><span class="math display">\[
+\text{skill} = \frac{\text{MASE}_{\text{you}}}{\text{MASE}_{\text{benchmark}}}
+\]</span></p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Result</th>
+<th style="text-align: right;">Points</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>skill <span class="math inline">\(\le 1.00\)</span> — you beat the benchmark</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="even">
+<td>skill <span class="math inline">\(\le 1.10\)</span> — within 10% of it</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr class="odd">
+<td>worse than that</td>
+<td style="text-align: right;">1, and Section 3 must say why</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Your series is known to be beatable
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Every series in the pool was screened: it is only issued if a reference model lands between <strong>0.70 and 0.90</strong> of its benchmark. Below that the series is trivial, above it effectively unbeatable. If you do not beat your benchmark, that is a fact about your model, not your luck.</p>
+<p>The screening reference was an automatic ETS or ARIMA — models you meet in the next two challenges. With the toolbox alone, matching the benchmark is a solid result and beating it is a good one.</p>
+</div>
+</div>
+</section>
+<section id="what-the-toolbox-gives-you" class="level3 smaller">
+<h3 class="smaller anchored" data-anchor-id="what-the-toolbox-gives-you">What the toolbox gives you</h3>
+<p>Everything in this list is Week 3 material, and each of them can beat a simple method:</p>
+<ul>
+<li>a <strong>transformation</strong> — Box-Cox, if the seasonal swing grows with the level;</li>
+<li><strong>forecasting with decomposition</strong>: STL the series, forecast the seasonally adjusted part with <code>naive</code> or <code>drift</code>, carry the seasonal component forward with <code>snaive</code>, add them back;</li>
+<li>a <strong>combination</strong>: the average of two or three forecasts is often better than any of them;</li>
+<li><strong>residual diagnostics</strong> to catch a model that is leaving structure behind.</li>
+</ul>
+<p>📖 <a href="https://otexts.com/fpp3/forecasting-decomposition.html">FPP 5.7 forecasting with decomposition</a> · <a href="https://otexts.com/fpp3/diagnostics.html">FPP 5.4 residual diagnostics</a> · <a href="https://otexts.com/fpp3/accuracy.html">FPP 5.8 evaluating accuracy</a> · <a href="https://otexts.com/fpppy/nbs/05-toolbox.html">FPP the Pythonic Way, ch.&nbsp;5</a></p>
+</section>
+</section>
+<section id="section-3-justification-block-3-points" class="level2">
+<h2 class="anchored" data-anchor-id="section-3-justification-block-3-points">✍️ Section 3 — Justification block (3 points)</h2>
+<p>Three points, and the only part of the work a human reads closely. Four things, roughly a paragraph each:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 40%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Item</th>
+<th style="text-align: right;">Points</th>
+<th>What earns them</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>3.1 What the data shows</td>
+<td style="text-align: right;">0.75</td>
+<td>Frequency, seasonal period, trend, level shifts, outliers — with the plot that shows each claim</td>
+</tr>
+<tr class="even">
+<td>3.2 Why this method</td>
+<td style="text-align: right;">0.75</td>
+<td>The method you submitted and <strong>why it fits what you just described</strong>, including what you tried and dropped</td>
+</tr>
+<tr class="odd">
+<td>3.3 What the residuals say</td>
+<td style="text-align: right;">0.75</td>
+<td>ACF and a Ljung-Box test on your final model’s residuals, read — what structure is left, and whether it matters at this horizon</td>
+</tr>
+<tr class="even">
+<td>3.4 What you expect</td>
+<td style="text-align: right;">0.75</td>
+<td>Your own MASE on the validation window against the benchmark’s, and the number you expect on the hidden holdout</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Marked on the reasoning, not on the outcome. A well-argued forecast that loses to the benchmark scores full marks in Section 3 — and if it loses, say what you think the holdout contained that your validation window did not.</p>
+</div>
+</div>
+</section>
+<section id="section-4-code-quality-and-reproducibility-1-point" class="level2">
+<h2 class="anchored" data-anchor-id="section-4-code-quality-and-reproducibility-1-point">🧹 Section 4 — Code quality and reproducibility (1 point)</h2>
+<ul>
+<li>The notebook runs top to bottom on a fresh kernel without errors.</li>
+<li>Your submission file is written <strong>by the notebook</strong>, not edited by hand.</li>
+<li>No leakage: nothing after the end of your history exists, so nothing can be fitted to it. If you tune on the validation window, say so in 3.2 — that is legitimate, and it is also why your validation MASE is optimistic.</li>
+</ul>
+</section>
+<section id="submission" class="level2">
+<h2 class="anchored" data-anchor-id="submission">📤 Submission</h2>
+<p>Upload three files to the Week 4 activity on Moodle <strong>before 23:59 today</strong>:</p>
+<ul>
+<li><p><code>SURNAME_ch1_forecast.csv</code> — written by the last cell of the template. Exactly <span class="math inline">\(h\)</span> rows and these columns:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Column</th>
+<th>What</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>student_id</code></td>
+<td>your identifier</td>
+</tr>
+<tr class="even">
+<td><code>code</code></td>
+<td>your series code, e.g.&nbsp;<code>TS-4DD7A</code></td>
+</tr>
+<tr class="odd">
+<td><code>ds</code></td>
+<td>the dates you are forecasting, in order</td>
+</tr>
+<tr class="even">
+<td><code>yhat</code></td>
+<td>your point forecast</td>
+</tr>
+<tr class="odd">
+<td><code>yhat_lo_80</code>, <code>yhat_hi_80</code></td>
+<td>your 80% interval — not marked this week, but the scorer records its coverage</td>
+</tr>
+</tbody>
+</table></li>
+<li><p><code>SURNAME_ch1.pdf</code> — the report, with the justification block;</p></li>
+<li><p><code>SURNAME_ch1.ipynb</code> — the source.</p></li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>The scorer is strict about the format, and only about the format
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Wrong dates, wrong number of rows, a missing column or a <code>NaN</code> in <code>yhat</code> cannot be scored, and Section 1 is then 0. The template writes the file correctly; if you rebuild it by hand, run the check cell it provides.</p>
+</div>
+</div>
+</section>
+<section id="how-long-this-should-take" class="level2">
+<h2 class="anchored" data-anchor-id="how-long-this-should-take">⏱ How long this should take</h2>
+<p>Ninety minutes if you follow the practice session’s example, half of that if you reuse its code. The work is deliberately not bigger than a session — it moved home so that nobody has to produce a forecast and an argument in a room with a clock, not so that it could grow.</p>
+</section>
+<section id="for-next-week" class="level2">
+<h2 class="anchored" data-anchor-id="for-next-week">📚 For next week</h2>
+<p><strong>Week 5 is the mid-term quiz</strong> — no practice session and no challenge. It covers Weeks 1–4: forecasting basics and graphics, decomposition, the toolbox, exponential smoothing.</p>
+<p>Challenge 2 is in Week 6, on this same series, with ETS — which is the Week 4 lecture, already published. Read <a href="https://otexts.com/fpp3/expsmooth.html">FPP3 ch.&nbsp;8</a> before then and your second challenge is half done.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
