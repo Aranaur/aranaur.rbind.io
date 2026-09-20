@@ -10,6 +10,7 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 1 — Introduction to Forecasting & Time Series Graphics | <https://01a05924-a704-8747-1dda-9917ad1a3d63.share.connect.posit.cloud> |
 | Week 2 — Time Series Decomposition | <https://01a0784c-f128-848e-7cc4-a140ab0a2965.share.connect.posit.cloud> |
 | Week 3 — The Forecaster's Toolbox | <https://01a09fdb-5a7c-a2ec-2f40-2979b1d48c0d.share.connect.posit.cloud> |
+| Week 4 — Exponential Smoothing | <https://01a0beea-9ee5-a9ef-49a2-7329aa93e476.share.connect.posit.cloud> |
 | Week 1 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab01.ipynb) |
 | Week 2 — lab handout | <https://01a07874-b74d-873c-a106-e68a78304698.share.connect.posit.cloud> |
 | Week 2 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab02.ipynb) |
