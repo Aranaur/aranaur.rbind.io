@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -77,6 +78,32 @@ def pdf_text(pdf: Path) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
+def calls_in_visible_code(qmd: Path) -> list[str]:
+    """Function calls a reader sees in the deck: chunks that are not hidden and are evaluated."""
+    calls = []
+    for block in re.findall(r"(?ms)^```\{python\}\n(.*?)^```", qmd.read_text(encoding="utf-8")):
+        options = dict(re.findall(r"(?m)^#\|\s*([\w-]+):\s*(\S+)", block))
+        if "false" in (options.get("include"), options.get("echo"), options.get("eval")):
+            continue
+        calls += re.findall(r"\b([A-Za-z_][A-Za-z_0-9]{5,})\(", block)
+    # Most common first: those are the calls the deck is actually teaching.
+    return [name for name, _ in Counter(calls).most_common()]
+
+
+def code_not_printed(qmd: Path, pdf: Path) -> list[str]:
+    """The deck's three most-used visible calls that are missing from the printed text.
+
+    A deck whose code never reaches the PDF is useless as a notebook source - the reader sees
+    results with no way to reproduce them - and that is exactly what a collapsed <details> gives.
+    """
+    wanted = calls_in_visible_code(qmd)[:3]
+    if not wanted:
+        return []
+    text = pdf_text(pdf)
+    missing = [f"{name}()" for name in wanted if f"{name}(" not in text]
+    return missing if len(missing) == len(wanted) else []
+
+
 def build_decks(manifest: list, warnings: list) -> int:
     weeks = []
     for qmd in sorted(SLIDES.glob(".[0-9][0-9].qmd")):
@@ -104,8 +131,10 @@ def build_decks(manifest: list, warnings: list) -> int:
             printable.unlink(missing_ok=True)
 
         verify(qmd, pdf)
-        if "```{python}" in qmd.read_text(encoding="utf-8") and "import " not in pdf_text(pdf):
-            sys.exit(f"{pdf.name}: the deck has code but none reached the PDF")
+        missing = code_not_printed(qmd, pdf)
+        if missing:
+            sys.exit(f"{pdf.name}: the deck shows code the PDF does not contain, "
+                     f"e.g. {', '.join(missing)} - were the folded blocks opened?")
         manifest.append((pdf.name, "Лекція" if n else "Правила курсу",
                          f"тиждень {week}", title_of(qmd)))
     return max(weeks, default=1)

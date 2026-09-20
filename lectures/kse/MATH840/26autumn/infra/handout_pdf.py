@@ -21,6 +21,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -30,6 +31,12 @@ CHROME = os.environ.get(
     "CHROME",
     str(Path.home() / "AppData/Local/quarto/chromium/win64-869685/chrome-win/chrome.exe"),
 )
+
+# A profile that survives between prints. MathJax pulls its config, jax files and a font file per
+# glyph family from a CDN; on a cold cache those requests outlive the virtual-time budget and the
+# page prints with raw TeX on every attempt - deterministically, so retrying cannot save it. One
+# warm profile makes the whole thing reliable: the first print fills the cache, the rest reuse it.
+PROFILE = Path(os.environ.get("MATH840_CHROME_PROFILE", Path(tempfile.gettempdir()) / "math840-chrome"))
 
 # TeX that survives into the printed text means MathJax had not typeset the page yet.
 RAW_TEX = ("$$", "\\hat{", "\\frac{")
@@ -55,15 +62,18 @@ def raw_tex(pdf: Path) -> int:
 def print_pdf(url: str, pdf: Path, budget_ms: int = 30000, attempts: int = 10) -> int:
     """Print `url` to `pdf`, retrying until no formula is left untypeset.
 
-    MathJax loads from a CDN, and whether it has finished when Chrome decides to print is a
-    race: the same deck prints clean on one run and with raw TeX on the next, and a longer
-    virtual-time budget does not change the odds. So the check itself is the readiness
-    signal - print, look for surviving TeX, print again if there is any.
+    MathJax loads from a CDN, and whether it has finished when Chrome decides to print depends on
+    the cache, not on the budget: with a cold profile the 84-page week 3 deck kept its raw TeX on
+    ten attempts in a row and three virtual-time budgets from 30 to 180 seconds, and printed clean
+    on the next run once the fonts were cached. Hence the shared PROFILE above; the retry loop
+    stays as the safety net, because the check - print, look for surviving TeX, print again - is
+    the only readiness signal Chrome gives us.
     """
     for attempt in range(1, attempts + 1):
         pdf.unlink(missing_ok=True)
         subprocess.run([
             CHROME, "--headless", "--disable-gpu", "--no-first-run",
+            f"--user-data-dir={PROFILE}",
             "--run-all-compositor-stages-before-draw",
             f"--virtual-time-budget={budget_ms}",
             "--print-to-pdf-no-header",              # flag name in the Chromium Quarto bundles
