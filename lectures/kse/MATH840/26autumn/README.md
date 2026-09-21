@@ -18,7 +18,7 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 3 — worked example (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab03_worked_example.ipynb) |
 | Week 3 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab03.ipynb) |
 | Week 4 — practice demo, the toolbox end to end (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo04.ipynb) |
-| Week 4 — Challenge 1 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab04.ipynb) |
+| Week 4 — Lab 4 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab04.ipynb) |
 | Moodle | <https://teaching.kse.org.ua/course/view.php?id=4432> |
 
 ## Layout
@@ -41,14 +41,21 @@ show, what to ask, and which answers to expect.
 
 ```bash
 cd lectures/kse/MATH840/26autumn/infra
-python trackb_pool.py                       # screen the pool and issue data/trackb/
-python trackb_score.py ../grading/submissions/ch1 --out ../grading/ch1_scores.csv
+python trackb_pool.py --jobs 16             # screen the pool and issue data/trackb/
+python trackb_pool.py --refilter            # re-apply the issue rules to a pool already on disk
+python trackb_score.py ../grading/submissions/lab04 --ungraded   # week 4: measured, not marked
+python trackb_score.py ../grading/submissions/ch2 --out ../grading/ch2_scores.csv
 ```
 
 `trackb_pool.py` cuts several variants of every source series, disguises each one (values rescaled,
-calendar shifted by whole years, history trimmed), and issues only those where a reference
-AutoETS/AutoARIMA lands between 0.70 and 0.90 of the series' own benchmark. The served history goes
-to `data/trackb/`; the hidden holdout, the identities and the reference scores go to
+calendar shifted by whole years, history trimmed), and issues only those that pass every screen: the
+series is seasonal (F_S >= 0.6), an automatic ETS and an automatic ARIMA each beat its benchmark on
+their own, and the better of the two lands between 0.70 and 0.90 of it. 140 of 2466 variants survive,
+which is what makes the accuracy points from Week 6 measure the model rather than the draw - Week 4 is
+scored with `--ungraded`, because with decomposition alone the benchmark falls about a third of the
+time.
+
+The served history goes to `data/trackb/`; the hidden holdout, the identities and the reference scores go to
 `grading/trackb_pool.json`, which is gitignored and must stay that way — it is the answer key for
 five challenges.
 

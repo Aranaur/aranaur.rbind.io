@@ -56,6 +56,7 @@ MAX_SERVED = {12: 264, 4: 72}     # 22 years of months, 18 of quarters: enough t
 VARIANTS = {12: 6, 4: 4}
 BAND = (0.70, 0.90)               # the promise on the Week 1 slide
 HONEST_BENCHMARK = 0.85           # how much better than the benchmark another simple method may be
+SEASONAL_MIN = 0.60              # F_S floor: the whole five-challenge arc needs a season
 ETS_GATE = (0.70, 1.30)           # where it is still worth paying for AutoARIMA
 METHODS = ("mean", "naive", "snaive", "drift")
 
@@ -199,6 +200,16 @@ def reference(served: np.ndarray, holdout: np.ndarray, m: int, h: int, which: st
     return mase(holdout, forecast, served, m)
 
 
+def seasonal_strength(served: np.ndarray, m: int) -> float:
+    """F_S from an STL fit - the same measure the students computed in Lab 3."""
+    from statsmodels.tsa.seasonal import STL
+
+    fit = STL(served, period=m, seasonal=13, robust=True).fit()
+    R, S = fit.resid, fit.seasonal
+    denominator = (S + R).var()
+    return float(max(0.0, 1 - R.var() / denominator)) if denominator > 0 else 0.0
+
+
 def benchmark_quality(holdout, served, m, h, bench_mase) -> float:
     """How close the *best* of the four simple methods on the holdout comes to the chosen benchmark.
 
@@ -243,6 +254,9 @@ def screen(src: Source, variant: int) -> dict | None:
     best = min([v for v in (ets, arima) if np.isfinite(v)])
     skill = best / bench_mase
     quality = benchmark_quality(holdout, served, m, h, bench_mase)
+    f_s = seasonal_strength(served, m)
+    # Week 6 is ETS only and week 7 ARIMA only, so each has to clear the benchmark on its own.
+    both_beat = bool(np.isfinite(arima) and ets < bench_mase and arima < bench_mase)
 
     return {
         "code": code_for(src.key, variant),
@@ -263,7 +277,10 @@ def screen(src: Source, variant: int) -> dict | None:
         "ref_best": "AutoARIMA" if np.isfinite(arima) and arima < ets else "AutoETS",
         "skill": round(skill, 4),
         "benchmark_quality": round(quality, 4),
-        "issued": bool(BAND[0] <= skill <= BAND[1] and quality >= HONEST_BENCHMARK),
+        "F_S": round(f_s, 4),
+        "both_beat_benchmark": both_beat,
+        "issued": bool(BAND[0] <= skill <= BAND[1] and quality >= HONEST_BENCHMARK
+                       and f_s >= SEASONAL_MIN and both_beat),
         **info,
         "holdout": [round(float(v), 3) for v in holdout],
         "valid_rmse": {k: round(v, 4) for k, v in valid_errors.items()},
@@ -305,10 +322,24 @@ def refilter() -> None:
         holdout = np.asarray(row["holdout"], dtype=float)
         m, h = row["m"], row["h"]
         quality = benchmark_quality(holdout, served, m, h, row["benchmark_mase"])
-        row["benchmark_quality"] = round(quality, 4)
+        f_s = seasonal_strength(served, m)
+        ets, arima = row["ref_mase_ets"], row["ref_mase_arima"]
+        both_beat = bool(arima is not None and ets < row["benchmark_mase"]
+                         and arima < row["benchmark_mase"])
+        row.update({"benchmark_quality": round(quality, 4), "F_S": round(f_s, 4),
+                    "both_beat_benchmark": both_beat})
+
+        reasons = []
         if quality < HONEST_BENCHMARK:
+            reasons.append(f"benchmark beaten by another simple method ({quality:.2f})")
+        if f_s < SEASONAL_MIN:
+            reasons.append(f"no season to model (F_S {f_s:.2f})")
+        if not both_beat:
+            which = "ARIMA" if arima is None or arima >= row["benchmark_mase"] else "ETS"
+            reasons.append(f"{which} does not beat the benchmark on its own")
+        if reasons:
             row["issued"] = False
-            demoted.append((row["code"], quality))
+            demoted.append((row["code"], "; ".join(reasons)))
             csv.unlink()
 
     issued = [r for r in rows if r["issued"]]
@@ -318,11 +349,17 @@ def refilter() -> None:
                           for r in issued]).sort_values("code")
     index.to_csv(PUBLIC / "index.csv", index=False)
 
-    print(f"demoted {len(demoted)} series whose benchmark another simple method beats by more than "
-          f"{(1 - HONEST_BENCHMARK) * 100:.0f}%:")
-    for code, q in sorted(demoted, key=lambda x: x[1]):
-        print(f"  {code}: best simple method is {q:.2f} of the benchmark")
-    print(f"issued now: {len(issued)}")
+    print(f"demoted {len(demoted)} series:")
+    counts: dict[str, int] = {}
+    for _, reason in demoted:
+        for part in reason.split("; "):
+            key = part.split(" (")[0]
+            counts[key] = counts.get(key, 0) + 1
+    for key, n in sorted(counts.items(), key=lambda kv: -kv[1]):
+        print(f"  {n:4d}  {key}")
+    seasonal = [r["F_S"] for r in issued]
+    print(f"issued now: {len(issued)} | F_S median {np.median(seasonal):.2f} "
+          f"min {min(seasonal):.2f}")
     print(f"expected duplicate draws for 39 students: {39 * 38 / 2 / max(1, len(issued)):.1f} pairs")
 
 

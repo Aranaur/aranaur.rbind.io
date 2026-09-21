@@ -1,7 +1,12 @@
 """Score Track B submissions against the hidden holdout.
 
-    python trackb_score.py ../grading/submissions/ch1
-    python trackb_score.py ../grading/submissions/ch1 --out ../grading/ch1_scores.csv
+    python trackb_score.py ../grading/submissions/lab04 --ungraded
+    python trackb_score.py ../grading/submissions/ch2 --out ../grading/ch2_scores.csv
+
+Week 4 is scored but not marked: `--ungraded` drops the points column and reports the forecast
+against all four simple methods instead, which is what that week publishes as information. From
+week 6 the accuracy points apply, and the pool guarantees the week's own model class beats the
+benchmark, so the three points measure the model rather than the draw.
 
 One row per submission: the MASE of the forecast, the MASE of the student's own benchmark, the skill
 ratio between them, and the accuracy points that follow. Everything it reads and everything it writes
@@ -44,7 +49,7 @@ def points_for(skill: float) -> int:
     return 1
 
 
-def score_one(path: Path, pool: dict[str, dict]) -> dict:
+def score_one(path: Path, pool: dict[str, dict], ungraded: bool = False) -> dict:
     row: dict = {"file": path.name, "student_id": None, "code": None, "points": 0, "note": ""}
     try:
         sub = pd.read_csv(path)
@@ -103,20 +108,27 @@ def score_one(path: Path, pool: dict[str, dict]) -> dict:
         "mase": round(student_mase, 4),
         "benchmark_mase": round(bench_mase, 4),
         "skill": round(skill, 4),
-        "points": points_for(skill),
+        "points": None if ungraded else points_for(skill),
         "coverage_80": round(float(inside), 2),
         "reference_skill": entry["skill"],
         "note": "beat the benchmark" if skill < 1 else
                 ("equal to the benchmark" if skill == 1 else
                  ("within 10%" if skill <= 1.1 else "worse than the benchmark - explanation required")),
     })
+    if ungraded:
+        # What week 4 publishes: the forecast against every simple method, so a student can see
+        # which of them their decomposition beat and which it did not.
+        for other, fc in benchmark_forecasts(y, h, m).items():
+            row[f"vs_{other}"] = round(student_mase / mase(holdout, fc, y, m), 3)
     return row
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("submissions", help="directory of SURNAME_ch1_forecast.csv files")
+    ap.add_argument("submissions", help="directory of submitted forecast CSV files")
     ap.add_argument("--out", help="write the scores to this CSV as well")
+    ap.add_argument("--ungraded", action="store_true",
+                    help="report accuracy without awarding points (week 4)")
     args = ap.parse_args()
 
     if not POOL.exists():
@@ -128,17 +140,27 @@ def main() -> None:
     if not files:
         raise SystemExit(f"no CSV files in {args.submissions}")
 
-    scores = pd.DataFrame([score_one(f, pool) for f in files])
+    scores = pd.DataFrame([score_one(f, pool, args.ungraded) for f in files])
     ordered = [c for c in ["file", "student_id", "code", "benchmark", "mase", "benchmark_mase",
-                           "skill", "points", "coverage_80", "reference_skill", "note"]
+                           "skill", "points", "coverage_80", "vs_mean", "vs_naive", "vs_snaive",
+                           "vs_drift", "reference_skill", "note"]
                if c in scores.columns]
+    if args.ungraded:
+        ordered = [c for c in ordered if c != "points"]
     scores = scores[ordered]
     print(scores.to_string(index=False))
 
-    scored = scores[scores["points"] > 0]
-    print(f"\n{len(scored)} of {len(scores)} scored | "
-          f"points {dict(scores['points'].value_counts().sort_index())}")
-    if len(scored):
+    scored = scores[scores["skill"].notna()] if args.ungraded else scores[scores["points"] > 0]
+    if args.ungraded:
+        print(f"\n{len(scored)} of {len(scores)} readable | no points awarded this week")
+        if len(scored):
+            beat = {other: f"{(scored[f'vs_{other}'] < 1).mean():.0%}"
+                    for other in ("mean", "naive", "snaive", "drift")}
+            print(f"  decomposition forecasts that beat each simple method: {beat}")
+    else:
+        print(f"\n{len(scored)} of {len(scores)} scored | "
+              f"points {dict(scores['points'].value_counts().sort_index())}")
+    if len(scored) and not args.ungraded:
         print(f"median skill {scored['skill'].median():.2f} | "
               f"beat the benchmark: {(scored['skill'] <= 1).sum()} | "
               f"mean 80% coverage {scored['coverage_80'].mean():.2f}")

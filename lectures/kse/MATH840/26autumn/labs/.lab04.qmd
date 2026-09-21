@@ -1,5 +1,5 @@
 ---
-title: "Challenge 1: Beat your benchmark"
+title: "Lab 4: Forecasting with decomposition"
 subtitle: "MATH840 | Time Series | Week 4 — graded assignment 3 of 7"
 author: "Ihor Miroshnychenko"
 institute: Kyiv School of Economics
@@ -40,18 +40,18 @@ Click **Copy to Drive** before you start working, otherwise nothing you write is
 
 ## 🎯 The task
 
-This is the first of five **challenges**. From today you have your own time series, and one number
-to beat on it.
+Today you are issued **your own time series**, and it stays yours for the rest of the course.
 
-Forecast the next $h$ observations of your series and beat your benchmark — with the toolbox from
-Week 3 and nothing more. No ETS, no ARIMA: those are the next challenges, and this one is the
-measurement that makes their improvement visible.
+This lab asks you to take it apart and forecast it from its parts: decompose it, forecast the
+seasonally adjusted series, carry the seasonal component forward, put them back together — and then
+compare the result honestly against the four simple methods from Week 1. Toolbox only: no ETS, no
+ARIMA. Those are Weeks 6 and 7, on this same series.
 
 ::: {.callout-important}
 ## This one counts
 
-8 points. **Deadline: 23:59 today**, on Moodle. The accuracy score is published the next morning;
-rubric marks and comments come back before the next practice session.
+8 points. **Deadline: 23:59 today**, on Moodle. Marks and comments come back before the next
+practice session.
 :::
 
 ## 🗂 Your series
@@ -70,127 +70,117 @@ You are not expected to work out what it measures, and you will not be marked fo
 data, not the domain.
 :::
 
-**This series is yours for the rest of the course.** Challenges 2–5 (ETS, ARIMA, seasonal ARIMA,
-advanced methods) run on the same series, so you will watch your own forecast improve — or fail to.
+**This series is yours for Weeks 6, 7, 8 and 9 as well.** Every series in the pool is seasonal, has
+at least fifteen years of history, and has been checked so that both an automatic ETS and an
+automatic ARIMA beat its benchmark — which is what makes the challenges from Week 6 a fair fight.
 
 ## 📋 What you are marked on
 
 | Section | Criteria | Points |
 |---|---|---:|
 | 1 | EDA and visualisation | 1 |
-| 2 | Forecast and accuracy | 3 |
+| 2 | Decomposition and forecast | 3 |
 | 3 | Justification block | 3 |
 | 4 | Code quality and reproducibility | 1 |
 | | **Total** | **8** |
 
 The notebook has one section per row. **Keep those headings.**
 
-## 📊 Section 1 — EDA and visualisation (1 point)
-
-One point, and it is not a repeat of Lab 2: this is a **new series**, and the plots are here to
-support the choice of method.
-
-- A time plot, and whichever of the seasonal / subseries / ACF plots your argument actually uses.
-- Every plot needs a sentence. A plot with no reading attached earns nothing.
-- Show the validation split on a plot: history, validation window, and your forecast over it.
-
-## 📐 Section 2 — Forecast and accuracy (3 points)
-
-### Your benchmark
-
-The benchmark is the **best of the four simple methods** from Week 1 — `mean`, `naive`, `snaive`,
-`drift` — chosen on a validation window: the last $h$ observations of the history you were given.
-
-Nothing about it is hidden. The template computes it, and the scorer computes it the same way, from
-the same public data:
-
-1. fit the four methods to everything except the last $h$ observations;
-2. score them on those $h$ observations by RMSE, and keep the winner;
-3. refit the winner on the **whole** history you were given — that is your benchmark.
-
-### How the points are awarded
-
-Your forecast and the benchmark's are both scored by **MASE** on the $h$ observations that come
-after your history, which you have not seen.
-
-$$
-\text{skill} = \frac{\text{MASE}_{\text{you}}}{\text{MASE}_{\text{benchmark}}}
-$$
-
-| Result | Points |
-|---|---:|
-| skill $< 1.00$ — you beat the benchmark | 3 |
-| skill $\le 1.10$ — within 10% of it, or equal to it | 2 |
-| worse than that | 1, and Section 3 must say why |
-
 ::: {.callout-note}
-## Your series is known to be beatable
+## Why accuracy is not marked this week — and is from Week 6
 
-Every series in the pool was screened: it is only issued if a reference model lands between
-**0.70 and 0.90** of its benchmark. Below that the series is trivial, above it effectively
-unbeatable. If you do not beat your benchmark, that is a fact about your model, not your luck.
+The plan was to mark this week on whether you beat your benchmark. Before setting that, the odds
+were measured on the actual pool, and they do not support it:
 
-The benchmark is also checked for being a fair target: series where one of the other three simple
-methods would have beaten the chosen one by more than 15% on the hidden holdout were thrown out, so
-you are not competing against an unlucky pick.
+| Benchmark | Decomposition forecast beats it |
+|---|---:|
+| the best of the four simple methods, chosen on a validation window | **36%** |
+| a plain `naive` forecast | **96%** |
 
-The screening reference was an automatic ETS or ARIMA — models you meet in the next two challenges.
-With the toolbox alone the odds are tighter, and they have been measured on this pool: a careful
-attempt — several candidates, chosen on the validation window — **beat the benchmark on about a third
-of the series, came within 10% on nearly half, and lost on the rest**.
+A target you clear 36% of the time no matter how well you work is luck, and one you clear 96% of the
+time is a formality. Neither is worth three points. So this week the points go to the work itself —
+how the decomposition is done, and how well you argue from it — and **accuracy is measured but not
+marked**: your score against all four simple methods is published the next morning as information.
 
-So two accuracy points is the typical outcome this week, not a failure, and the way to three is a
-better argument rather than a luckier guess. In Challenge 2 the same series meets ETS, and the odds
-change: that is the improvement this week's number exists to measure.
+From Week 6 that changes. With ETS, and then with ARIMA, every series in the pool is one where the
+method of that week does beat the benchmark — so the accuracy points start when they measure your
+model rather than your draw. This week's number is the baseline they will be compared against.
 :::
 
-### What the toolbox gives you {.smaller}
+## 📊 Section 1 — EDA and visualisation (1 point)
 
-Everything in this list is Week 3 material, and each of them can beat a simple method:
+This is a series you have never seen. The plots are here to justify the decisions in Section 2, not
+to fill space.
 
-- a **transformation** — Box-Cox, if the seasonal swing grows with the level;
-- **forecasting with decomposition**: STL the series, forecast the seasonally adjusted part with
-  `naive` or `drift`, carry the seasonal component forward with `snaive`, add them back;
-- a **combination**: the average of two or three forecasts is often better than any of them;
-- **residual diagnostics** to catch a model that is leaving structure behind.
+- A time plot, always.
+- Whichever of the seasonal, subseries and ACF plots your argument actually uses.
+- The validation split on a plot: history, validation window, and your forecast over it.
+- One sentence per plot. **A plot with no reading attached earns nothing.**
+
+## 📐 Section 2 — Decomposition and forecast (3 points)
+
+| Item | Points | What earns them |
+|---|---:|---|
+| 2.1 | 1 | **The decomposition.** STL with `period` equal to your series' seasonal period, components plotted, and the seasonally adjusted series computed from it. A decomposition with the wrong period earns nothing here, and nothing after it. |
+| 2.2 | 1 | **The forecast, built from the parts.** The seasonally adjusted series forecast with a simple method, the seasonal component carried forward, the two added back. Candidates compared on the **validation window** — the last $h$ observations — with MASE, against all four simple methods. |
+| 2.3 | 1 | **The submission.** Your chosen approach refit on the **whole** history, $h$ steps ahead, with an 80% interval, written to the submission file by the notebook. |
+
+::: {.callout-warning}
+## Where this goes wrong
+
+- The seasonal period is `M` from the setup cell — 12 for monthly series, 4 for quarterly. Not the number of
+  years, not 7.
+- Forecast the **adjusted** series, not the raw one, and add the season back afterwards. Doing one
+  without the other is the most common way to lose both marks in 2.2.
+- `STL` needs `seasonal` to be an odd integer ≥ 3, and an `int`.
+- Refit on the whole history before forecasting the hidden horizon. Forecasting from the training
+  part only throws away your last $h$ observations — the most informative ones you have.
 
 📖 [FPP 5.7 forecasting with decomposition](https://otexts.com/fpp3/forecasting-decomposition.html) ·
 [FPP 5.4 residual diagnostics](https://otexts.com/fpp3/diagnostics.html) ·
 [FPP 5.8 evaluating accuracy](https://otexts.com/fpp3/accuracy.html) ·
 [FPP the Pythonic Way, ch. 5](https://otexts.com/fpppy/nbs/05-toolbox.html)
+:::
+
+### Your benchmark, for comparison
+
+The template computes it: the **best of the four simple methods** — `mean`, `naive`, `snaive`,
+`drift` — chosen by RMSE on the validation window, then refit on the whole history. It is not a
+target you are marked against this week, but it is the number Section 3 argues with, and the one the
+published score will use.
 
 ## ✍️ Section 3 — Justification block (3 points)
 
-Three points, and the only part of the work a human reads closely. Four things, roughly a paragraph
-each:
+Three points, and the part a human reads closely. Roughly a paragraph each, with numbers from your
+own cells rather than adjectives.
 
 | Item | Points | What earns them |
 |---|---:|---|
-| 3.1 What the data shows | 0.75 | Frequency, seasonal period, trend, level shifts, outliers — with the plot that shows each claim |
-| 3.2 Why this method | 0.75 | The method you submitted and **why it fits what you just described**, including what you tried and dropped |
-| 3.3 What the residuals say | 0.75 | ACF and a Ljung-Box test on your final model's residuals, read — what structure is left, and whether it matters at this horizon |
-| 3.4 What you expect | 0.75 | Your own MASE on the validation window against the benchmark's, and the number you expect on the hidden holdout |
+| 3.1 | 0.75 | **What the data shows.** Frequency, seasonal period, trend, level shifts, outliers — each claim tied to a plot from Section 1. |
+| 3.2 | 0.75 | **Why this decomposition and this level method.** Your choice of `seasonal` and `robust`, and of the method that forecasts the adjusted series, tied to what you just described. Say what you tried and dropped. |
+| 3.3 | 0.75 | **What the residuals say.** ACF and a Ljung-Box test on your final model's residuals, read: what structure is left, and what it damages — the point forecast or the interval. |
+| 3.4 | 0.75 | **What you expect.** Your MASE on the validation window against all four simple methods, and what you expect on the hidden horizon. If you expect to lose to a simple method, say which and why. |
 
 ::: {.callout-important}
-Marked on the reasoning, not on the outcome. A well-argued forecast that loses to the benchmark
-scores full marks in Section 3 — and if it loses, say what you think the holdout contained that your
-validation window did not.
+Marked on the reasoning. A decomposition forecast that loses to seasonal naive and explains exactly
+why scores full marks here; one that wins and cannot say why does not.
 :::
 
 ## 🧹 Section 4 — Code quality and reproducibility (1 point)
 
 - The notebook runs top to bottom on a fresh kernel without errors.
-- Your submission file is written **by the notebook**, not edited by hand.
+- The submission file is written **by the notebook**, not edited by hand.
 - No leakage: nothing after the end of your history exists, so nothing can be fitted to it. If you
-  tune on the validation window, say so in 3.2 — that is legitimate, and it is also why your
+  tuned on the validation window, say so in 3.2 — that is legitimate, and it is also why your
   validation MASE is optimistic.
+- Every number in your text comes from a cell.
 
 ## 📤 Submission
 
 Upload three files to the Week 4 activity on Moodle **before 23:59 today**:
 
-- `SURNAME_ch1_forecast.csv` — written by the last cell of the template. Exactly $h$ rows and these
-  columns:
+- `SURNAME_lab04_forecast.csv` — written by the last cell of the template. Exactly $h$ rows and
+  these columns:
 
   | Column | What |
   |---|---|
@@ -198,30 +188,29 @@ Upload three files to the Week 4 activity on Moodle **before 23:59 today**:
   | `code` | your series code, e.g. `TS-4DD7A` |
   | `ds` | the dates you are forecasting, in order |
   | `yhat` | your point forecast |
-  | `yhat_lo_80`, `yhat_hi_80` | your 80% interval — not marked this week, but the scorer records its coverage |
+  | `yhat_lo_80`, `yhat_hi_80` | your 80% interval |
 
-- `SURNAME_ch1.pdf` — the report, with the justification block;
-- `SURNAME_ch1.ipynb` — the source.
+- `SURNAME_lab04.pdf` — the report, with the justification block;
+- `SURNAME_lab04.ipynb` — the source.
 
 ::: {.callout-warning}
-## The scorer is strict about the format, and only about the format
+## The format matters even though accuracy does not
 
-Wrong dates, wrong number of rows, a missing column or a `NaN` in `yhat` cannot be scored, and
-Section 1 is then 0. The template writes the file correctly; if you rebuild it by hand, run the
-check cell it provides.
+Item 2.3 is the submission file, and it is marked on being correct: exactly $h$ rows, the dates asked
+for, no `NaN`, the interval around the point forecast. The template's check cell is the same one used
+to read your file, so if it passes, your file is fine.
 :::
 
 ## ⏱ How long this should take
 
 Ninety minutes if you follow the practice session's example, half of that if you reuse its code.
-The work is deliberately not bigger than a session — it moved home so that nobody has to produce a
-forecast and an argument in a room with a clock, not so that it could grow.
 
 ## 📚 For next week
 
-**Week 5 is the mid-term quiz** — no practice session and no challenge. It covers Weeks 1–4:
+**Week 5 is the mid-term quiz** — no practice session and no graded work. It covers Weeks 1–4:
 forecasting basics and graphics, decomposition, the toolbox, exponential smoothing.
 
-Challenge 2 is in Week 6, on this same series, with ETS — which is the Week 4 lecture, already
-published. Read [FPP3 ch. 8](https://otexts.com/fpp3/expsmooth.html) before then and your second
-challenge is half done.
+**Week 6 is Challenge 2**, on this same series, with ETS — the Week 4 lecture, already published.
+That one is marked on accuracy against your benchmark, and today's number is what it will be compared
+against. Read [FPP3 ch. 8](https://otexts.com/fpp3/expsmooth.html) before then and your challenge is
+half done.
