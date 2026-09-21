@@ -18,6 +18,7 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 3 — worked example (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab03_worked_example.ipynb) |
 | Week 3 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab03.ipynb) |
 | Week 4 — practice demo, the toolbox end to end (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo04.ipynb) |
+| Week 4 — practice, second case: Walmart weekly sales (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo04_walmart.ipynb) |
 | Week 4 — Lab 4 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab04.ipynb) |
 | Moodle | <https://teaching.kse.org.ua/course/view.php?id=4432> |
 
@@ -28,6 +29,7 @@ slides/   .00 syllabus, .01–.04 weeks 1–4 (dot-prefixed: not rendered into t
 labs/     .labNN.qmd handouts, _labNN.ipynb templates, _demoNN.ipynb practice demos,
           .demoNN-notes.md how to run the session
 data/     datasets served to students over raw.githubusercontent.com
+          walmart.csv is the Kaggle Walmart store-sales file, kept here so the demo has covariates
 data/trackb/  the issued Track B series, one CSV per code, plus index.csv
 infra/    publishing, deck PDFs, and the Track B pool and scorer
 project/  final project (Week 10)
