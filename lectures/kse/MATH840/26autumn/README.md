@@ -17,6 +17,7 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 3 — lab handout | <https://01a0a118-ef43-4671-3ca8-af3592c18aeb.share.connect.posit.cloud> |
 | Week 3 — worked example (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab03_worked_example.ipynb) |
 | Week 3 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab03.ipynb) |
+| Week 4 — lab handout | <https://01a0c501-dcd0-d7bb-7d4a-317b356764bc.share.connect.posit.cloud> |
 | Week 4 — practice demo, the toolbox end to end (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo04.ipynb) |
 | Week 4 — practice, second case: Walmart weekly sales (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo04_walmart.ipynb) |
 | Week 4 — Lab 4 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab04.ipynb) |
