@@ -32,8 +32,12 @@ COLUMNS = ["student_id", "code", "ds", "yhat", "yhat_lo_80", "yhat_hi_80"]
 
 
 def points_for(skill: float) -> int:
-    """The thresholds promised in Week 1: beat it, come within 10%, or explain yourself."""
-    if skill <= 1.0:
+    """The thresholds promised in Week 1: beat it, come within 10%, or explain yourself.
+
+    Strictly below 1: submitting the benchmark's own forecast is not beating it, and it should not
+    pay the same as a model that does.
+    """
+    if skill < 1.0:
         return 3
     if skill <= 1.1:
         return 2
@@ -102,8 +106,9 @@ def score_one(path: Path, pool: dict[str, dict]) -> dict:
         "points": points_for(skill),
         "coverage_80": round(float(inside), 2),
         "reference_skill": entry["skill"],
-        "note": "beat the benchmark" if skill <= 1 else
-                ("within 10%" if skill <= 1.1 else "worse than the benchmark - explanation required"),
+        "note": "beat the benchmark" if skill < 1 else
+                ("equal to the benchmark" if skill == 1 else
+                 ("within 10%" if skill <= 1.1 else "worse than the benchmark - explanation required")),
     })
     return row
 

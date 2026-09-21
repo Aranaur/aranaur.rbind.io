@@ -31,8 +31,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import time
 import warnings
+from multiprocessing import Pool
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -53,6 +55,7 @@ MIN_SERVED = {12: 180, 4: 56}
 MAX_SERVED = {12: 264, 4: 72}     # 22 years of months, 18 of quarters: enough to model, quick to fit
 VARIANTS = {12: 6, 4: 4}
 BAND = (0.70, 0.90)               # the promise on the Week 1 slide
+HONEST_BENCHMARK = 0.85           # how much better than the benchmark another simple method may be
 ETS_GATE = (0.70, 1.30)           # where it is still worth paying for AutoARIMA
 METHODS = ("mean", "naive", "snaive", "drift")
 
@@ -196,6 +199,17 @@ def reference(served: np.ndarray, holdout: np.ndarray, m: int, h: int, which: st
     return mase(holdout, forecast, served, m)
 
 
+def benchmark_quality(holdout, served, m, h, bench_mase) -> float:
+    """How close the *best* of the four simple methods on the holdout comes to the chosen benchmark.
+
+    Below 1 means another simple method would have done better: the validation window picked wrong.
+    Far below 1 means the series is trivially beatable and teaches nothing, so it is held back.
+    """
+    best_simple = min(mase(holdout, fc, served, m)
+                      for fc in benchmark_forecasts(served, h, m).values())
+    return best_simple / bench_mase
+
+
 def screen(src: Source, variant: int) -> dict | None:
     """Disguise, split, benchmark, reference - and decide whether this variant may be issued."""
     m, h = src.m, HORIZON[src.m]
@@ -228,6 +242,7 @@ def screen(src: Source, variant: int) -> dict | None:
 
     best = min([v for v in (ets, arima) if np.isfinite(v)])
     skill = best / bench_mase
+    quality = benchmark_quality(holdout, served, m, h, bench_mase)
 
     return {
         "code": code_for(src.key, variant),
@@ -247,7 +262,8 @@ def screen(src: Source, variant: int) -> dict | None:
         "ref_mase_arima": round(arima, 4) if np.isfinite(arima) else None,
         "ref_best": "AutoARIMA" if np.isfinite(arima) and arima < ets else "AutoETS",
         "skill": round(skill, 4),
-        "issued": bool(BAND[0] <= skill <= BAND[1]),
+        "benchmark_quality": round(quality, 4),
+        "issued": bool(BAND[0] <= skill <= BAND[1] and quality >= HONEST_BENCHMARK),
         **info,
         "holdout": [round(float(v), 3) for v in holdout],
         "valid_rmse": {k: round(v, 4) for k, v in valid_errors.items()},
@@ -256,24 +272,97 @@ def screen(src: Source, variant: int) -> dict | None:
     }
 
 
+_SOURCES: dict[str, Source] = {}
+
+
+def _init_worker() -> None:
+    """Each worker reads the source files once; only (key, variant) crosses the process boundary."""
+    global _SOURCES
+    _SOURCES = {s.key: s for s in sources()}
+
+
+def _screen_task(task: tuple[str, int]) -> dict | None:
+    key, variant = task
+    return screen(_SOURCES[key], variant)
+
+
+def refilter() -> None:
+    """Re-apply the issue rules to a pool that is already built, without refitting a single model.
+
+    Only ever demotes: the band uses the stored reference scores and the guard needs nothing but the
+    holdout and the served history, both of which are on disk.
+    """
+    path = PRIVATE / "trackb_pool.json"
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    demoted = []
+    for row in rows:
+        if not row.get("issued"):
+            continue
+        csv = PUBLIC / f"{row['code']}.csv"
+        if not csv.exists():
+            continue
+        served = pd.read_csv(csv)["y"].to_numpy(float)
+        holdout = np.asarray(row["holdout"], dtype=float)
+        m, h = row["m"], row["h"]
+        quality = benchmark_quality(holdout, served, m, h, row["benchmark_mase"])
+        row["benchmark_quality"] = round(quality, 4)
+        if quality < HONEST_BENCHMARK:
+            row["issued"] = False
+            demoted.append((row["code"], quality))
+            csv.unlink()
+
+    issued = [r for r in rows if r["issued"]]
+    path.write_text(json.dumps(rows, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    index = pd.DataFrame([{"code": r["code"], "freq": r["freq"], "m": r["m"], "h": r["h"],
+                           "n": r["n_served"], "start": r["served_start"], "end": r["served_end"]}
+                          for r in issued]).sort_values("code")
+    index.to_csv(PUBLIC / "index.csv", index=False)
+
+    print(f"demoted {len(demoted)} series whose benchmark another simple method beats by more than "
+          f"{(1 - HONEST_BENCHMARK) * 100:.0f}%:")
+    for code, q in sorted(demoted, key=lambda x: x[1]):
+        print(f"  {code}: best simple method is {q:.2f} of the benchmark")
+    print(f"issued now: {len(issued)}")
+    print(f"expected duplicate draws for 39 students: {39 * 38 / 2 / max(1, len(issued)):.1f} pairs")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, help="screen only the first N sources")
+    ap.add_argument("--refilter", action="store_true",
+                    help="re-apply the issue rules to the pool already on disk, and prune it")
+    ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) - 4),
+                    help="worker processes (1 runs in this process)")
     args = ap.parse_args()
 
-    pool = sources(args.limit)
-    print(f"{len(pool)} source series, up to {max(VARIANTS.values())} variants each")
+    if args.refilter:
+        refilter()
+        return
 
-    rows, started = [], time.time()
-    for i, src in enumerate(pool, 1):
-        for variant in range(VARIANTS[src.m]):
-            row = screen(src, variant)
+    pool = sources(args.limit)
+    tasks = [(src.key, variant) for src in pool for variant in range(VARIANTS[src.m])]
+    print(f"{len(pool)} source series, {len(tasks)} variants, {args.jobs} worker(s)", flush=True)
+
+    rows, started, done = [], time.time(), 0
+    if args.jobs > 1:
+        with Pool(args.jobs, initializer=_init_worker) as workers:
+            for row in workers.imap_unordered(_screen_task, tasks, chunksize=2):
+                done += 1
+                if row is not None:
+                    rows.append(row)
+                if done % 100 == 0:
+                    print(f"  [{done}/{len(tasks)}] issued {sum(r['issued'] for r in rows)}, "
+                          f"{time.time() - started:.0f}s", flush=True)
+    else:
+        _init_worker()
+        for task in tasks:
+            done += 1
+            row = _screen_task(task)
             if row is not None:
                 rows.append(row)
-        if i % 20 == 0 or args.limit:
-            issued = sum(r["issued"] for r in rows)
-            print(f"  [{i}/{len(pool)}] screened {len(rows)} variants, issued {issued}, "
-                  f"{time.time() - started:.0f}s")
+            if done % 50 == 0 or args.limit:
+                print(f"  [{done}/{len(tasks)}] issued {sum(r['issued'] for r in rows)}, "
+                      f"{time.time() - started:.0f}s", flush=True)
 
     issued = [r for r in rows if r["issued"]]
     print(f"\nscreened {len(rows)} variants | issued {len(issued)} | band {BAND[0]}-{BAND[1]} "
