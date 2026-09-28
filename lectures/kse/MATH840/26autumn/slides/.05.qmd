@@ -421,6 +421,88 @@ plt.show()
 - The honest sequence is the one from Week 3: **fit on a training set, score on data the model has not
   seen.**
 
+## R² grows with anything {.smaller}
+
+Ten thousand observations of pure noise. A thousand predictors, also pure noise. Nothing here is
+related to anything — and the regression still explains more and more of it.
+
+```{python}
+#| label: r2-noise
+#| fig-align: center
+rng = np.random.default_rng(1234)
+n_sim, k_sim = 10_000, 1_000
+y_sim = rng.normal(size=n_sim)
+X_sim = rng.normal(size=(n_sim, k_sim))
+
+
+def r2_path(X, y):
+    """R² after adding each column in turn, from one QR decomposition instead of k regressions."""
+    Xc, yc = X - X.mean(axis=0), y - y.mean()
+    Q, _ = np.linalg.qr(Xc)
+    return np.cumsum((Q.T @ yc) ** 2) / (yc @ yc)
+
+
+ks = np.arange(1, k_sim + 1)
+r2_sim = r2_path(X_sim, y_sim)
+adj_sim = 1 - (1 - r2_sim) * (n_sim - 1) / (n_sim - ks - 1)
+
+fig, ax = plt.subplots(figsize=(11, 4.2))
+ax.plot(ks, r2_sim, color="lightgray", linewidth=2.5, label="$R^2$")
+ax.plot(ks, ks / n_sim, "--", color=slate, linewidth=1, label="$k/n$")
+ax.plot(ks, adj_sim, color=red_pink, linewidth=1.6, label="adjusted $R^2$")
+ax.axhline(0, color="black", linewidth=0.8)
+ax.set_xlabel("number of predictors, all of them noise")
+ax.set_ylabel("$R^2$")
+ax.legend(loc="upper left")
+ax.set_title("A thousand predictors that mean nothing, fitted to noise")
+plt.show()
+
+print(f"R²: {r2_sim[199]:.3f} at k=200, {r2_sim[499]:.3f} at k=500, {r2_sim[-1]:.3f} at k={k_sim}")
+print(f"adjusted R² over the same path: mean {adj_sim.mean():+.4f}, max {adj_sim.max():+.4f}")
+```
+
+## What that costs you {.smaller}
+
+For predictors that are pure noise, the expected $R^2$ is
+
+$$
+\mathbb{E}\left[R^2\right] \approx \frac{k}{n}
+$$
+
+— the dashed line the simulation follows exactly. $R^2$ is not measuring a relationship; it is
+measuring **how much room you gave the model to fit the sample**.
+
+Adjusted $R^2$ subtracts precisely that, which is why the pink line sits on zero across a thousand
+useless predictors.
+
+::: {.callout-important}
+## Now count the free R² in our own model
+
+```{python}
+#| echo: true
+#| code-fold: false
+n_model, k_model = int(fits["+ economy"].nobs), int(fits["+ economy"].df_model)
+draws = [r2_path(rng.normal(size=(n_model, k_model)), rng.normal(size=n_model))[-1]
+         for _ in range(500)]
+print(f"n = {n_model}, k = {k_model}  ->  free R² for pure noise: k/n = {k_model / n_model:.3f}")
+print(f"500 noise draws at that size: mean R² {np.mean(draws):.3f}, "
+      f"95th percentile {np.percentile(draws, 95):.3f}")
+print(f"our model: R² {fits['+ economy'].rsquared:.3f}, adjusted {fits['+ economy'].rsquared_adj:.3f}")
+```
+:::
+
+## What that costs you: read it {.smaller}
+
+- Twelve predictors on 143 weeks buy about **8% of $R^2$ for free**, and one time in twenty a model of
+  pure noise that size would report $R^2 = 0.14$.
+- Our `+ economy` model reports 0.57. So the fit is real — but the gap between $R^2$ and adjusted
+  $R^2$, 0.04, is exactly the rent we pay for those twelve columns.
+- And the earlier tables already showed where that rent goes: the four economic predictors raised
+  adjusted $R^2$ by 0.01, raised AICc, and made the forecast worse.
+
+[Adjusted $R^2$ protects you from noise predictors. It does not protect you from overfitting the
+*shape* of a short series — only a holdout does that.]{.hi}
+
 # Two ways to fool yourself
 
 ## Residual autocorrelation {.smaller}
