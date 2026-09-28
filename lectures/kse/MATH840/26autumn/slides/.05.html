@@ -298,7 +298,7 @@ Ihor Miroshnychenko
 <section id="our-data-for-the-day" class="slide level2 smaller">
 <h2>Our data for the day</h2>
 <p>Walmart: 45 stores, weekly sales, February 2010 to October 2012, with the covariates the retailer actually had — a holiday flag, temperature, fuel price, CPI and unemployment.</p>
-<div id="30876087" class="cell" data-execution_count="2">
+<div id="27781158" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="" aria-hidden="true" tabindex="-1"></a>url <span class="op">=</span> <span class="st">'../data/walmart.csv'</span></span>
 <span id="cb1-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-3"><a href="" aria-hidden="true" tabindex="-1"></a>walmart <span class="op">=</span> pd.read_csv(url, parse_dates<span class="op">=</span>[<span class="st">"ds"</span>])</span>
@@ -379,7 +379,7 @@ Ihor Miroshnychenko
 </div>
 </div>
 </section>
-<section id="the-series-and-the-predictors-that-come-with-it" class="slide level2">
+<section id="the-series-and-the-predictors-that-come-with-it" class="slide level2 smaller">
 <h2>The series, and the predictors that come with it</h2>
 <div id="cell-walmart-overview" class="cell" data-execution_count="3">
 <details class="code-fold">
@@ -457,7 +457,7 @@ y_t = \beta_0 + \beta_1 x_{1,t} + \beta_2 x_{2,t} + \cdots + \beta_k x_{k,t} + \
 <section id="trend" class="slide level2 smaller">
 <h2>Trend</h2>
 <p>The simplest predictor is the row number: <span class="math inline">\(x_t = t\)</span>.</p>
-<div id="f28aec37" class="cell" data-execution_count="4">
+<div id="b67757d0" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="" aria-hidden="true" tabindex="-1"></a>chain[<span class="st">"trend"</span>] <span class="op">=</span> np.arange(<span class="dv">1</span>, <span class="bu">len</span>(chain) <span class="op">+</span> <span class="dv">1</span>)</span>
 <span id="cb4-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-3"><a href="" aria-hidden="true" tabindex="-1"></a>fit_trend <span class="op">=</span> sm.OLS(chain.y, sm.add_constant(chain[[<span class="st">"trend"</span>]])).fit()</span>
@@ -469,14 +469,28 @@ y_t = \beta_0 + \beta_1 x_{1,t} + \beta_2 x_{2,t} + \cdots + \beta_k x_{k,t} + \
 </div>
 </div>
 <p>Nothing. Two and a half years of Walmart have no linear trend worth naming — and a model that is only a trend is not a model, it is a ruler.</p>
-</section>
-<section id="seasonal-dummies-and-why-not-here" class="slide level2 smaller">
-<h2>Seasonal dummies, and why not here</h2>
+<div id="cell-trend-fit" class="cell" data-execution_count="5">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="dv">3</span>))</span>
+<span id="cb6-2"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(chain.ds, chain.y, color<span class="op">=</span><span class="st">"lightgray"</span>, linewidth<span class="op">=</span><span class="dv">1</span>, label<span class="op">=</span><span class="st">"sales"</span>)</span>
+<span id="cb6-3"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(chain.ds, fit_trend.fittedvalues, color<span class="op">=</span>red_pink, linewidth<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb6-4"><a href="" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="ss">f"trend: </span><span class="sc">{</span>fit_trend<span class="sc">.</span>params[<span class="st">'trend'</span>]<span class="sc">:+.3f}</span><span class="ss"> $m per week"</span>)</span>
+<span id="cb6-5"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"$m"</span>)</span>
+<span id="cb6-6"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend(loc<span class="op">=</span><span class="st">"upper left"</span>)</span>
+<span id="cb6-7"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"A straight line through the whole sample"</span>)</span>
+<span id="cb6-8"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".05_files/figure-revealjs/trend-fit-output-1.svg" id="trend-fit" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="seasonal-dummies-on-weekly-data" class="slide level2 smaller">
+<h2>Seasonal dummies on weekly data</h2>
 <p>For a quarterly series, three dummies (one quarter is the baseline) and you have the season.</p>
 <p>For <strong>weekly</strong> data the same idea needs <span class="math inline">\(52 - 1 = 51\)</span> dummies:</p>
-<div id="f1ac248f" class="cell" data-execution_count="5">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"observations: </span><span class="sc">{</span><span class="bu">len</span>(chain)<span class="sc">}</span><span class="ss">   dummies needed for a weekly season: </span><span class="sc">{</span>M <span class="op">-</span> <span class="dv">1</span><span class="sc">}</span><span class="ss">   "</span></span>
-<span id="cb6-2"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"left over: </span><span class="sc">{</span><span class="bu">len</span>(chain) <span class="op">-</span> (M <span class="op">-</span> <span class="dv">1</span>) <span class="op">-</span> <span class="dv">2</span><span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="add6bb1a" class="cell" data-execution_count="6">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"observations: </span><span class="sc">{</span><span class="bu">len</span>(chain)<span class="sc">}</span><span class="ss">   dummies needed for a weekly season: </span><span class="sc">{</span>M <span class="op">-</span> <span class="dv">1</span><span class="sc">}</span><span class="ss">   "</span></span>
+<span id="cb7-2"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"left over: </span><span class="sc">{</span><span class="bu">len</span>(chain) <span class="op">-</span> (M <span class="op">-</span> <span class="dv">1</span>) <span class="op">-</span> <span class="dv">2</span><span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>observations: 143   dummies needed for a weekly season: 51   left over: 90</code></pre>
 </div>
@@ -490,10 +504,95 @@ y_t = \beta_0 + \beta_1 x_{1,t} + \beta_2 x_{2,t} + \cdots + \beta_k x_{k,t} + \
 <p><strong>Warning</strong></p>
 </div>
 <div class="callout-content">
-<p>51 predictors on 143 observations is not a model of seasonality, it is a lookup table with two or three observations per entry. This is the same counting problem as in the practice notebook, in a different costume.</p>
+<p>51 predictors on 143 observations: every dummy rests on two or three weeks. Whether that is a model of seasonality or a lookup table depends on something the count cannot tell you: <strong>how much the same week differs from one year to the next.</strong></p>
 </div>
 </div>
 </div>
+</section>
+<section id="what-51-dummies-estimate" class="slide level2 smaller">
+<h2>What 51 dummies estimate</h2>
+<div id="cell-weekly-dummies" class="cell" data-execution_count="7">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="" aria-hidden="true" tabindex="-1"></a>chain[<span class="st">"year"</span>] <span class="op">=</span> chain.ds.dt.year</span>
+<span id="cb9-2"><a href="" aria-hidden="true" tabindex="-1"></a>chain[<span class="st">"week"</span>] <span class="op">=</span> chain.ds.dt.isocalendar().week.astype(<span class="bu">int</span>)</span>
+<span id="cb9-3"><a href="" aria-hidden="true" tabindex="-1"></a>week_d <span class="op">=</span> pd.get_dummies(chain.week, prefix<span class="op">=</span><span class="st">"w"</span>, drop_first<span class="op">=</span><span class="va">True</span>, dtype<span class="op">=</span><span class="bu">float</span>)</span>
+<span id="cb9-4"><a href="" aria-hidden="true" tabindex="-1"></a>fit_week <span class="op">=</span> sm.OLS(chain.y, sm.add_constant(pd.concat([chain[[<span class="st">"trend"</span>]], week_d], axis<span class="op">=</span><span class="dv">1</span>))).fit()</span>
+<span id="cb9-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-6"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">4.2</span>))</span>
+<span id="cb9-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> yr, colour <span class="kw">in</span> <span class="bu">zip</span>((<span class="dv">2010</span>, <span class="dv">2011</span>, <span class="dv">2012</span>), [turquoise, orange, blue]):</span>
+<span id="cb9-8"><a href="" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> chain[chain.year <span class="op">==</span> yr]</span>
+<span id="cb9-9"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(d.week, d.y, <span class="st">"o"</span>, color<span class="op">=</span>colour, markersize<span class="op">=</span><span class="dv">5</span>, alpha<span class="op">=</span><span class="fl">0.8</span>, label<span class="op">=</span><span class="bu">str</span>(yr))</span>
+<span id="cb9-10"><a href="" aria-hidden="true" tabindex="-1"></a>profile <span class="op">=</span> chain.groupby(<span class="st">"week"</span>).y.mean()</span>
+<span id="cb9-11"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(profile.index, profile.values, color<span class="op">=</span>red_pink, linewidth<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb9-12"><a href="" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="st">"what a week dummy estimates (the average)"</span>)</span>
+<span id="cb9-13"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"week of the year"</span>)</span>
+<span id="cb9-14"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"$m"</span>)</span>
+<span id="cb9-15"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend(loc<span class="op">=</span><span class="st">"upper left"</span>, ncol<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb9-16"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="ss">f"Trend + </span><span class="sc">{</span><span class="bu">len</span>(week_d.columns)<span class="sc">}</span><span class="ss"> week dummies on </span><span class="sc">{</span><span class="bu">int</span>(fit_week.nobs)<span class="sc">}</span><span class="ss"> weeks: "</span></span>
+<span id="cb9-17"><a href="" aria-hidden="true" tabindex="-1"></a>             <span class="st">"every dummy averages two or three points"</span>)</span>
+<span id="cb9-18"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".05_files/figure-revealjs/weekly-dummies-output-1.svg" id="weekly-dummies" class="quarto-figure quarto-figure-center r-stretch"><p>In-sample adj R² is 0.93. For Walmart the three years sit almost on top of each other, Thanksgiving and Christmas included, so an average of two or three points is already a good estimate. If the years disagreed, the same pink line would be mostly noise: same count, opposite verdict.</p>
+</section>
+<section id="what-if-we-aggregate-to-quarters" class="slide level2 smaller">
+<h2>What if we aggregate to quarters?</h2>
+<p>Average weekly sales per quarter (a mean, not a sum: quarters hold 12, 13 or 14 weeks), full quarters only, then trend plus three dummies:</p>
+<div id="125a4732" class="cell" data-execution_count="8">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="" aria-hidden="true" tabindex="-1"></a>q <span class="op">=</span> chain.set_index(<span class="st">"ds"</span>).y.resample(<span class="st">"QE"</span>).agg([<span class="st">"mean"</span>, <span class="st">"count"</span>])</span>
+<span id="cb10-2"><a href="" aria-hidden="true" tabindex="-1"></a>q <span class="op">=</span> q[q[<span class="st">"count"</span>] <span class="op">&gt;=</span> <span class="dv">12</span>].rename(columns<span class="op">=</span>{<span class="st">"mean"</span>: <span class="st">"y"</span>})          <span class="co"># drop the partial first and last quarter</span></span>
+<span id="cb10-3"><a href="" aria-hidden="true" tabindex="-1"></a>q[<span class="st">"trend"</span>] <span class="op">=</span> np.arange(<span class="dv">1</span>, <span class="bu">len</span>(q) <span class="op">+</span> <span class="dv">1</span>)</span>
+<span id="cb10-4"><a href="" aria-hidden="true" tabindex="-1"></a>dummies <span class="op">=</span> pd.get_dummies(q.index.quarter, prefix<span class="op">=</span><span class="st">"Q"</span>, drop_first<span class="op">=</span><span class="va">True</span>, dtype<span class="op">=</span><span class="bu">float</span>).set_index(q.index)</span>
+<span id="cb10-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-6"><a href="" aria-hidden="true" tabindex="-1"></a>fit_q <span class="op">=</span> sm.OLS(q.y, sm.add_constant(pd.concat([q[[<span class="st">"trend"</span>]], dummies], axis<span class="op">=</span><span class="dv">1</span>))).fit()</span>
+<span id="cb10-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="bu">int</span>(fit_q.nobs)<span class="sc">}</span><span class="ss"> quarters, </span><span class="sc">{</span><span class="bu">int</span>(fit_q.df_resid)<span class="sc">}</span><span class="ss"> residual df, adj R² </span><span class="sc">{</span>fit_q<span class="sc">.</span>rsquared_adj<span class="sc">:.2f}</span><span class="ss">"</span>)</span>
+<span id="cb10-8"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(pd.DataFrame({<span class="st">"coef"</span>: fit_q.params, <span class="st">"t"</span>: fit_q.tvalues, <span class="st">"p"</span>: fit_q.pvalues}).<span class="bu">round</span>(<span class="dv">3</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>10 quarters, 5 residual df, adj R² 0.91
+         coef       t      p
+const  44.001  61.104  0.000
+trend   0.141   1.704  0.149
+Q_2     2.132   3.138  0.026
+Q_3     1.211   1.795  0.133
+Q_4     6.821   9.175  0.000</code></pre>
+</div>
+</div>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Important</strong></p>
+</div>
+<div class="callout-content">
+<p>Aggregation adds no information: <span class="math inline">\(10 / 4 = 2.5\)</span> observations per quarter, against <span class="math inline">\(143 / 52 \approx 2.75\)</span> per week. <strong>You see each season as many times as you have years.</strong> It only trades 51 estimates for 3 coarse ones, and Thanksgiving and Christmas dissolve into a single Q4 number.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="quarterly-dummies-drawn" class="slide level2 smaller">
+<h2>Quarterly dummies, drawn</h2>
+<div id="cell-quarterly-dummies" class="cell" data-execution_count="9">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">4.5</span>))</span>
+<span id="cb12-2"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(chain.ds, chain.y, color<span class="op">=</span><span class="st">"lightgray"</span>, linewidth<span class="op">=</span><span class="dv">1</span>, label<span class="op">=</span><span class="st">"weekly sales"</span>)</span>
+<span id="cb12-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, (end, row) <span class="kw">in</span> <span class="bu">enumerate</span>(q.iterrows()):</span>
+<span id="cb12-4"><a href="" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> end <span class="op">-</span> pd.offsets.QuarterBegin(startingMonth<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb12-5"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.hlines(row.y, start, end, color<span class="op">=</span>slate, linewidth<span class="op">=</span><span class="fl">2.5</span>, label<span class="op">=</span><span class="st">"quarterly mean"</span> <span class="cf">if</span> i <span class="op">==</span> <span class="dv">0</span> <span class="cf">else</span> <span class="va">None</span>)</span>
+<span id="cb12-6"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.hlines(fit_q.fittedvalues[end], start, end, color<span class="op">=</span>red_pink, linewidth<span class="op">=</span><span class="dv">2</span>, linestyle<span class="op">=</span><span class="st">"--"</span>,</span>
+<span id="cb12-7"><a href="" aria-hidden="true" tabindex="-1"></a>              label<span class="op">=</span><span class="st">"trend + quarter dummies"</span> <span class="cf">if</span> i <span class="op">==</span> <span class="dv">0</span> <span class="cf">else</span> <span class="va">None</span>)</span>
+<span id="cb12-8"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"$m, average week"</span>)</span>
+<span id="cb12-9"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend(loc<span class="op">=</span><span class="st">"upper left"</span>)</span>
+<span id="cb12-10"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Quarterly dummies fit the averages well, and flatten the holiday weeks into Q4"</span>)</span>
+<span id="cb12-11"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".05_files/figure-revealjs/quarterly-dummies-output-1.svg" id="quarterly-dummies" class="quarto-figure quarto-figure-center r-stretch"><p>The dashed line is nearly on the solid one, and that is exactly the problem: the model is good at describing quarters, and the spikes that matter to a retailer live <strong>inside</strong> Q4, not between quarters.</p>
 </section>
 <section id="fourier-terms" class="slide level2 smaller">
 <h2>Fourier terms</h2>
@@ -511,32 +610,233 @@ y_t = \beta_0 + \sum_{i=1}^{K}\left[\alpha_i \sin\!\left(\frac{2\pi i t}{m}\righ
 </section>
 <section id="what-k-buys" class="slide level2 smaller">
 <h2>What K buys</h2>
-<div id="cell-fourier-shapes" class="cell" data-execution_count="6">
+<div id="cell-fourier-shapes" class="cell" data-execution_count="10">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fourier(index, m, k):</span>
-<span id="cb8-2"><a href="" aria-hidden="true" tabindex="-1"></a>    out <span class="op">=</span> {}</span>
-<span id="cb8-3"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, k <span class="op">+</span> <span class="dv">1</span>):</span>
-<span id="cb8-4"><a href="" aria-hidden="true" tabindex="-1"></a>        out[<span class="ss">f"sin</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>] <span class="op">=</span> np.sin(<span class="dv">2</span> <span class="op">*</span> np.pi <span class="op">*</span> i <span class="op">*</span> index <span class="op">/</span> m)</span>
-<span id="cb8-5"><a href="" aria-hidden="true" tabindex="-1"></a>        out[<span class="ss">f"cos</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>] <span class="op">=</span> np.cos(<span class="dv">2</span> <span class="op">*</span> np.pi <span class="op">*</span> i <span class="op">*</span> index <span class="op">/</span> m)</span>
-<span id="cb8-6"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> pd.DataFrame(out, index<span class="op">=</span>index.index)</span>
-<span id="cb8-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-8"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-9"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="dv">4</span>))</span>
-<span id="cb8-10"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(chain.ds, chain.y, color<span class="op">=</span><span class="st">"lightgray"</span>, linewidth<span class="op">=</span><span class="dv">1</span>, label<span class="op">=</span><span class="st">"sales"</span>)</span>
-<span id="cb8-11"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k, colour <span class="kw">in</span> <span class="bu">zip</span>((<span class="dv">1</span>, <span class="dv">3</span>, <span class="dv">6</span>), [red_pink, turquoise, blue]):</span>
-<span id="cb8-12"><a href="" aria-hidden="true" tabindex="-1"></a>    X <span class="op">=</span> sm.add_constant(pd.concat([chain[[<span class="st">"trend"</span>]], fourier(chain.trend, M, k)], axis<span class="op">=</span><span class="dv">1</span>))</span>
-<span id="cb8-13"><a href="" aria-hidden="true" tabindex="-1"></a>    fitted <span class="op">=</span> sm.OLS(chain.y, X).fit()</span>
-<span id="cb8-14"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(chain.ds, fitted.fittedvalues, color<span class="op">=</span>colour, linewidth<span class="op">=</span><span class="fl">1.6</span>,</span>
-<span id="cb8-15"><a href="" aria-hidden="true" tabindex="-1"></a>            label<span class="op">=</span><span class="ss">f"K = </span><span class="sc">{</span>k<span class="sc">}</span><span class="ss"> (</span><span class="sc">{</span><span class="dv">2</span> <span class="op">*</span> k<span class="sc">}</span><span class="ss"> terms), adj R² </span><span class="sc">{</span>fitted<span class="sc">.</span>rsquared_adj<span class="sc">:.2f}</span><span class="ss">"</span>)</span>
-<span id="cb8-16"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend(loc<span class="op">=</span><span class="st">"upper left"</span>)</span>
-<span id="cb8-17"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Trend plus Fourier terms, three values of K"</span>)</span>
-<span id="cb8-18"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"$m"</span>)</span>
-<span id="cb8-19"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fourier(index, m, k):</span>
+<span id="cb13-2"><a href="" aria-hidden="true" tabindex="-1"></a>    out <span class="op">=</span> {}</span>
+<span id="cb13-3"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, k <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb13-4"><a href="" aria-hidden="true" tabindex="-1"></a>        out[<span class="ss">f"sin</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>] <span class="op">=</span> np.sin(<span class="dv">2</span> <span class="op">*</span> np.pi <span class="op">*</span> i <span class="op">*</span> index <span class="op">/</span> m)</span>
+<span id="cb13-5"><a href="" aria-hidden="true" tabindex="-1"></a>        out[<span class="ss">f"cos</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>] <span class="op">=</span> np.cos(<span class="dv">2</span> <span class="op">*</span> np.pi <span class="op">*</span> i <span class="op">*</span> index <span class="op">/</span> m)</span>
+<span id="cb13-6"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> pd.DataFrame(out, index<span class="op">=</span>index.index)</span>
+<span id="cb13-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-8"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-9"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="dv">4</span>))</span>
+<span id="cb13-10"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(chain.ds, chain.y, color<span class="op">=</span><span class="st">"lightgray"</span>, linewidth<span class="op">=</span><span class="dv">1</span>, label<span class="op">=</span><span class="st">"sales"</span>)</span>
+<span id="cb13-11"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k, colour <span class="kw">in</span> <span class="bu">zip</span>((<span class="dv">1</span>, <span class="dv">3</span>, <span class="dv">6</span>), [red_pink, turquoise, blue]):</span>
+<span id="cb13-12"><a href="" aria-hidden="true" tabindex="-1"></a>    X <span class="op">=</span> sm.add_constant(pd.concat([chain[[<span class="st">"trend"</span>]], fourier(chain.trend, M, k)], axis<span class="op">=</span><span class="dv">1</span>))</span>
+<span id="cb13-13"><a href="" aria-hidden="true" tabindex="-1"></a>    fitted <span class="op">=</span> sm.OLS(chain.y, X).fit()</span>
+<span id="cb13-14"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(chain.ds, fitted.fittedvalues, color<span class="op">=</span>colour, linewidth<span class="op">=</span><span class="fl">1.6</span>,</span>
+<span id="cb13-15"><a href="" aria-hidden="true" tabindex="-1"></a>            label<span class="op">=</span><span class="ss">f"K = </span><span class="sc">{</span>k<span class="sc">}</span><span class="ss"> (</span><span class="sc">{</span><span class="dv">2</span> <span class="op">*</span> k<span class="sc">}</span><span class="ss"> terms), adj R² </span><span class="sc">{</span>fitted<span class="sc">.</span>rsquared_adj<span class="sc">:.2f}</span><span class="ss">"</span>)</span>
+<span id="cb13-16"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend(loc<span class="op">=</span><span class="st">"upper left"</span>)</span>
+<span id="cb13-17"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Trend plus Fourier terms, three values of K"</span>)</span>
+<span id="cb13-18"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"$m"</span>)</span>
+<span id="cb13-19"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 
 </div>
 <img data-src=".05_files/figure-revealjs/fourier-shapes-output-1.svg" id="fourier-shapes" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="how-the-harmonics-add-up" class="slide level2 smaller">
+<h2>How the harmonics add up</h2>
+<div id="fourier-3d" class="cell" data-execution_count="11">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> matplotlib.animation <span class="im">import</span> FuncAnimation, PillowWriter</span>
+<span id="cb14-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-3"><a href="" aria-hidden="true" tabindex="-1"></a>K_SHOW <span class="op">=</span> <span class="dv">8</span></span>
+<span id="cb14-4"><a href="" aria-hidden="true" tabindex="-1"></a>fit_show <span class="op">=</span> sm.OLS(chain.y, sm.add_constant(pd.concat([chain[[<span class="st">"trend"</span>]], fourier(chain.trend, M, K_SHOW)],</span>
+<span id="cb14-5"><a href="" aria-hidden="true" tabindex="-1"></a>                                                     axis<span class="op">=</span><span class="dv">1</span>))).fit()</span>
+<span id="cb14-6"><a href="" aria-hidden="true" tabindex="-1"></a>tau <span class="op">=</span> np.linspace(<span class="dv">0</span>, M, <span class="dv">400</span>)                               <span class="co"># one year, drawn smooth</span></span>
+<span id="cb14-7"><a href="" aria-hidden="true" tabindex="-1"></a>waves <span class="op">=</span> [fit_show.params[<span class="ss">f"sin</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>] <span class="op">*</span> np.sin(<span class="dv">2</span> <span class="op">*</span> np.pi <span class="op">*</span> i <span class="op">*</span> tau <span class="op">/</span> M)</span>
+<span id="cb14-8"><a href="" aria-hidden="true" tabindex="-1"></a>         <span class="op">+</span> fit_show.params[<span class="ss">f"cos</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>] <span class="op">*</span> np.cos(<span class="dv">2</span> <span class="op">*</span> np.pi <span class="op">*</span> i <span class="op">*</span> tau <span class="op">/</span> M) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, K_SHOW <span class="op">+</span> <span class="dv">1</span>)]</span>
+<span id="cb14-9"><a href="" aria-hidden="true" tabindex="-1"></a>amps <span class="op">=</span> [np.hypot(fit_show.params[<span class="ss">f"sin</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>], fit_show.params[<span class="ss">f"cos</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>]) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, K_SHOW <span class="op">+</span> <span class="dv">1</span>)]</span>
+<span id="cb14-10"><a href="" aria-hidden="true" tabindex="-1"></a>total <span class="op">=</span> np.<span class="bu">sum</span>(waves, axis<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb14-11"><a href="" aria-hidden="true" tabindex="-1"></a>colours <span class="op">=</span> plt.cm.viridis(np.linspace(<span class="fl">0.05</span>, <span class="fl">0.85</span>, K_SHOW))</span>
+<span id="cb14-12"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-13"><a href="" aria-hidden="true" tabindex="-1"></a>fig <span class="op">=</span> plt.figure(figsize<span class="op">=</span>(<span class="dv">9</span>, <span class="fl">5.4</span>), layout<span class="op">=</span><span class="va">None</span>)</span>
+<span id="cb14-14"><a href="" aria-hidden="true" tabindex="-1"></a>ax <span class="op">=</span> fig.add_axes([<span class="op">-</span><span class="fl">0.04</span>, <span class="fl">0.0</span>, <span class="fl">1.08</span>, <span class="fl">0.94</span>], projection<span class="op">=</span><span class="st">"3d"</span>, proj_type<span class="op">=</span><span class="st">"ortho"</span>)</span>
+<span id="cb14-15"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-16"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-17"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> draw(azim, elev, caption):</span>
+<span id="cb14-18"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.cla()</span>
+<span id="cb14-19"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_facecolor(<span class="st">"white"</span>)</span>
+<span id="cb14-20"><a href="" aria-hidden="true" tabindex="-1"></a>    side <span class="op">=</span> <span class="bu">float</span>(np.clip((azim <span class="op">+</span> <span class="dv">60</span>) <span class="op">/</span> <span class="dv">60</span>, <span class="dv">0</span>, <span class="dv">1</span>))          <span class="co"># 0 = the waves, 1 = the spectrum</span></span>
+<span id="cb14-21"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i, (wave, c) <span class="kw">in</span> <span class="bu">enumerate</span>(<span class="bu">zip</span>(waves, colours), start<span class="op">=</span><span class="dv">1</span>):</span>
+<span id="cb14-22"><a href="" aria-hidden="true" tabindex="-1"></a>        ax.plot(tau, np.full_like(tau, i), wave, color<span class="op">=</span>c, linewidth<span class="op">=</span><span class="fl">1.4</span>, alpha<span class="op">=</span><span class="dv">1</span> <span class="op">-</span> <span class="fl">0.9</span> <span class="op">*</span> side)</span>
+<span id="cb14-23"><a href="" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> side <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb14-24"><a href="" aria-hidden="true" tabindex="-1"></a>            ax.plot([M <span class="op">/</span> <span class="dv">2</span>] <span class="op">*</span> <span class="dv">2</span>, [i, i], [<span class="dv">0</span>, amps[i <span class="op">-</span> <span class="dv">1</span>]], color<span class="op">=</span>c, linewidth<span class="op">=</span><span class="dv">6</span>, alpha<span class="op">=</span>side,</span>
+<span id="cb14-25"><a href="" aria-hidden="true" tabindex="-1"></a>                    solid_capstyle<span class="op">=</span><span class="st">"round"</span>)</span>
+<span id="cb14-26"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(tau, np.zeros_like(tau), total, color<span class="op">=</span>red_pink, linewidth<span class="op">=</span><span class="fl">2.4</span>, alpha<span class="op">=</span><span class="dv">1</span> <span class="op">-</span> <span class="fl">0.9</span> <span class="op">*</span> side)</span>
+<span id="cb14-27"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_xlim(<span class="dv">0</span>, M <span class="op">+</span> <span class="dv">5</span>)</span>
+<span id="cb14-28"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_ylim(<span class="dv">0</span>, K_SHOW <span class="op">+</span> <span class="fl">0.5</span>)</span>
+<span id="cb14-29"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_zlim(total.<span class="bu">min</span>() <span class="op">-</span> <span class="dv">1</span>, total.<span class="bu">max</span>() <span class="op">+</span> <span class="dv">1</span>)</span>
+<span id="cb14-30"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_xlabel(<span class="st">"week of the year"</span>)</span>
+<span id="cb14-31"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_ylabel(<span class="st">"harmonic i"</span>)</span>
+<span id="cb14-32"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_zlabel(<span class="st">"$m"</span>)</span>
+<span id="cb14-33"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_yticks(<span class="bu">range</span>(<span class="dv">0</span>, K_SHOW <span class="op">+</span> <span class="dv">1</span>))</span>
+<span id="cb14-34"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_yticklabels([<span class="st">"sum"</span>] <span class="op">+</span> [<span class="bu">str</span>(i) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, K_SHOW <span class="op">+</span> <span class="dv">1</span>)])</span>
+<span id="cb14-35"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.set_box_aspect((<span class="dv">2</span>, <span class="fl">1.2</span>, <span class="dv">1</span>), zoom<span class="op">=</span><span class="fl">1.1</span>)</span>
+<span id="cb14-36"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.view_init(elev<span class="op">=</span>elev, azim<span class="op">=</span>azim)</span>
+<span id="cb14-37"><a href="" aria-hidden="true" tabindex="-1"></a>    fig.suptitle(caption, fontsize<span class="op">=</span><span class="dv">13</span>, y<span class="op">=</span><span class="fl">0.97</span>)</span>
+<span id="cb14-38"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-39"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-40"><a href="" aria-hidden="true" tabindex="-1"></a><span class="co"># keyframes: camera angle, caption, frames to hold it</span></span>
+<span id="cb14-41"><a href="" aria-hidden="true" tabindex="-1"></a>keys <span class="op">=</span> [(<span class="op">-</span><span class="dv">60</span>, <span class="dv">25</span>, <span class="st">"Eight harmonics, each one sin + cos pair"</span>, <span class="dv">12</span>),</span>
+<span id="cb14-42"><a href="" aria-hidden="true" tabindex="-1"></a>        (<span class="op">-</span><span class="dv">90</span>, <span class="dv">0</span>, <span class="st">"Time domain: add them up, and you get the seasonal shape"</span>, <span class="dv">16</span>),</span>
+<span id="cb14-43"><a href="" aria-hidden="true" tabindex="-1"></a>        (<span class="dv">0</span>, <span class="dv">0</span>, <span class="st">"Frequency domain: each wave collapses to its amplitude"</span>, <span class="dv">16</span>),</span>
+<span id="cb14-44"><a href="" aria-hidden="true" tabindex="-1"></a>        (<span class="op">-</span><span class="dv">60</span>, <span class="dv">25</span>, <span class="st">"Eight harmonics, each one sin + cos pair"</span>, <span class="dv">0</span>)]</span>
+<span id="cb14-45"><a href="" aria-hidden="true" tabindex="-1"></a>frames <span class="op">=</span> []</span>
+<span id="cb14-46"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (a0, e0, c0, hold), (a1, e1, c1, _) <span class="kw">in</span> <span class="bu">zip</span>(keys[:<span class="op">-</span><span class="dv">1</span>], keys[<span class="dv">1</span>:]):</span>
+<span id="cb14-47"><a href="" aria-hidden="true" tabindex="-1"></a>    frames <span class="op">+=</span> [(a0, e0, c0)] <span class="op">*</span> hold</span>
+<span id="cb14-48"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> s <span class="kw">in</span> np.linspace(<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">24</span>)[<span class="dv">1</span>:]:</span>
+<span id="cb14-49"><a href="" aria-hidden="true" tabindex="-1"></a>        s <span class="op">=</span> <span class="fl">0.5</span> <span class="op">-</span> <span class="fl">0.5</span> <span class="op">*</span> np.cos(np.pi <span class="op">*</span> s)                   <span class="co"># ease in and out</span></span>
+<span id="cb14-50"><a href="" aria-hidden="true" tabindex="-1"></a>        frames.append((a0 <span class="op">+</span> (a1 <span class="op">-</span> a0) <span class="op">*</span> s, e0 <span class="op">+</span> (e1 <span class="op">-</span> e0) <span class="op">*</span> s, c1 <span class="cf">if</span> s <span class="op">&gt;</span> <span class="fl">0.5</span> <span class="cf">else</span> c0))</span>
+<span id="cb14-51"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-52"><a href="" aria-hidden="true" tabindex="-1"></a>ani <span class="op">=</span> FuncAnimation(fig, <span class="kw">lambda</span> f: draw(<span class="op">*</span>f), frames<span class="op">=</span>frames)</span>
+<span id="cb14-53"><a href="" aria-hidden="true" tabindex="-1"></a>ani.save(<span class="st">"img/fourier_3d.gif"</span>, writer<span class="op">=</span>PillowWriter(fps<span class="op">=</span><span class="dv">12</span>), dpi<span class="op">=</span><span class="dv">100</span>)</span>
+<span id="cb14-54"><a href="" aria-hidden="true" tabindex="-1"></a>plt.close(fig)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+
+<img data-src="img/fourier_3d.gif" class="quarto-figure quarto-figure-center r-stretch" style="width:80.0%"><p>Each harmonic is a sine and a cosine at frequency <span class="math inline">\(i\)</span> cycles per year; the regression chooses their weights. The pink curve is their sum, the seasonal part of the <span class="math inline">\(K = 8\)</span> model fitted to Walmart.</p>
+</section>
+<section id="larger-k" class="slide level2 smaller">
+<h2>Larger K</h2>
+<div id="cell-fourier-large-k" class="cell" data-execution_count="12">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fourier_design(k):</span>
+<span id="cb15-2"><a href="" aria-hidden="true" tabindex="-1"></a>    F <span class="op">=</span> fourier(chain.trend, M, k)</span>
+<span id="cb15-3"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="dv">2</span> <span class="op">*</span> k <span class="op">==</span> M:</span>
+<span id="cb15-4"><a href="" aria-hidden="true" tabindex="-1"></a>        F <span class="op">=</span> F.drop(columns<span class="op">=</span><span class="ss">f"sin</span><span class="sc">{</span>k<span class="sc">}</span><span class="ss">"</span>)                       <span class="co"># sin(pi * t) is zero at every integer t</span></span>
+<span id="cb15-5"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> sm.add_constant(pd.concat([chain[[<span class="st">"trend"</span>]], F], axis<span class="op">=</span><span class="dv">1</span>))</span>
+<span id="cb15-6"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-8"><a href="" aria-hidden="true" tabindex="-1"></a>fits_k <span class="op">=</span> {k: sm.OLS(chain.y, fourier_design(k)).fit() <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, M <span class="op">//</span> <span class="dv">2</span> <span class="op">+</span> <span class="dv">1</span>)}</span>
+<span id="cb15-9"><a href="" aria-hidden="true" tabindex="-1"></a>k_path <span class="op">=</span> pd.DataFrame({<span class="st">"K"</span>: <span class="bu">list</span>(fits_k), <span class="st">"AICc"</span>: [aicc(f) <span class="cf">for</span> f <span class="kw">in</span> fits_k.values()]})</span>
+<span id="cb15-10"><a href="" aria-hidden="true" tabindex="-1"></a>best_k <span class="op">=</span> <span class="bu">int</span>(k_path.loc[k_path.AICc.idxmin(), <span class="st">"K"</span>])</span>
+<span id="cb15-11"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-12"><a href="" aria-hidden="true" tabindex="-1"></a>fig, (ax, ax2) <span class="op">=</span> plt.subplots(<span class="dv">2</span>, <span class="dv">1</span>, figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">5.2</span>), height_ratios<span class="op">=</span>[<span class="dv">2</span>, <span class="dv">1</span>])</span>
+<span id="cb15-13"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(chain.ds, chain.y, color<span class="op">=</span><span class="st">"lightgray"</span>, linewidth<span class="op">=</span><span class="dv">1</span>, label<span class="op">=</span><span class="st">"sales"</span>)</span>
+<span id="cb15-14"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k, colour <span class="kw">in</span> <span class="bu">zip</span>((<span class="dv">10</span>, M <span class="op">//</span> <span class="dv">2</span>), [turquoise, red_pink]):</span>
+<span id="cb15-15"><a href="" aria-hidden="true" tabindex="-1"></a>    ax.plot(chain.ds, fits_k[k].fittedvalues, color<span class="op">=</span>colour, linewidth<span class="op">=</span><span class="fl">1.6</span>,</span>
+<span id="cb15-16"><a href="" aria-hidden="true" tabindex="-1"></a>            label<span class="op">=</span><span class="ss">f"K = </span><span class="sc">{</span>k<span class="sc">}</span><span class="ss"> (</span><span class="sc">{</span><span class="bu">int</span>(fits_k[k].df_model) <span class="op">-</span> <span class="dv">1</span><span class="sc">}</span><span class="ss"> terms), adj R² </span><span class="sc">{</span>fits_k[k]<span class="sc">.</span>rsquared_adj<span class="sc">:.2f}</span><span class="ss">"</span>)</span>
+<span id="cb15-17"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend(loc<span class="op">=</span><span class="st">"upper left"</span>)</span>
+<span id="cb15-18"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"$m"</span>)</span>
+<span id="cb15-19"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Larger K: from a seasonal shape to a copy of the calendar"</span>)</span>
+<span id="cb15-20"><a href="" aria-hidden="true" tabindex="-1"></a>ax2.plot(k_path.K, k_path.AICc, <span class="st">"o-"</span>, color<span class="op">=</span>slate, markersize<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb15-21"><a href="" aria-hidden="true" tabindex="-1"></a>ax2.plot(best_k, k_path.AICc.<span class="bu">min</span>(), <span class="st">"o"</span>, color<span class="op">=</span>red_pink, markersize<span class="op">=</span><span class="dv">9</span>, label<span class="op">=</span><span class="ss">f"lowest AICc: K = </span><span class="sc">{</span>best_k<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb15-22"><a href="" aria-hidden="true" tabindex="-1"></a>ax2.set_xlabel(<span class="st">"K"</span>)</span>
+<span id="cb15-23"><a href="" aria-hidden="true" tabindex="-1"></a>ax2.set_ylabel(<span class="st">"AICc"</span>)</span>
+<span id="cb15-24"><a href="" aria-hidden="true" tabindex="-1"></a>ax2.legend(loc<span class="op">=</span><span class="st">"upper left"</span>)</span>
+<span id="cb15-25"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+
+</div>
+<img data-src=".05_files/figure-revealjs/fourier-large-k-output-1.svg" id="fourier-large-k" class="quarto-figure quarto-figure-center r-stretch"><p>AICc keeps falling all the way to <span class="math inline">\(K = 26\)</span>, where the 51 Fourier terms span the same space as 51 week dummies. The holiday weeks are narrow spikes, and only high frequencies can draw a narrow spike.</p>
+</section>
+<section id="larger-k-out-of-sample" class="slide level2 smaller">
+<h2>Larger K, out of sample</h2>
+<div id="d50fca3d" class="cell columns column-output-location" data-execution_count="13">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="" aria-hidden="true" tabindex="-1"></a>y_arr <span class="op">=</span> chain.y.to_numpy()</span>
+<span id="cb16-2"><a href="" aria-hidden="true" tabindex="-1"></a>scale <span class="op">=</span> <span class="bu">float</span>(np.mean(np.<span class="bu">abs</span>(y_arr[M:] <span class="op">-</span> y_arr[:<span class="op">-</span>M])))    <span class="co"># MASE scale</span></span>
+<span id="cb16-3"><a href="" aria-hidden="true" tabindex="-1"></a>origins <span class="op">=</span> <span class="bu">range</span>(<span class="bu">len</span>(chain) <span class="op">-</span> H <span class="op">-</span> <span class="dv">8</span>, <span class="bu">len</span>(chain) <span class="op">-</span> H)       <span class="co"># 8 origins, 13 weeks ahead</span></span>
+<span id="cb16-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> rolling_mase_k(k):</span>
+<span id="cb16-7"><a href="" aria-hidden="true" tabindex="-1"></a>    X, errors <span class="op">=</span> fourier_design(k), []</span>
+<span id="cb16-8"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> end <span class="kw">in</span> origins:</span>
+<span id="cb16-9"><a href="" aria-hidden="true" tabindex="-1"></a>        f <span class="op">=</span> sm.OLS(chain.y[:end], X[:end]).fit()</span>
+<span id="cb16-10"><a href="" aria-hidden="true" tabindex="-1"></a>        pred <span class="op">=</span> f.predict(X[end:end <span class="op">+</span> H])</span>
+<span id="cb16-11"><a href="" aria-hidden="true" tabindex="-1"></a>        errors.append(np.mean(np.<span class="bu">abs</span>(y_arr[end:end <span class="op">+</span> H] <span class="op">-</span> pred)) <span class="op">/</span> scale)</span>
+<span id="cb16-12"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">float</span>(np.mean(errors))</span>
+<span id="cb16-13"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-14"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-15"><a href="" aria-hidden="true" tabindex="-1"></a>snaive_k <span class="op">=</span> np.mean([np.mean(np.<span class="bu">abs</span>(y_arr[e:e <span class="op">+</span> H] <span class="op">-</span> y_arr[e <span class="op">-</span> M:e <span class="op">-</span> M <span class="op">+</span> H])) <span class="op">/</span> scale</span>
+<span id="cb16-16"><a href="" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">for</span> e <span class="kw">in</span> origins])</span>
+<span id="cb16-17"><a href="" aria-hidden="true" tabindex="-1"></a>k_table <span class="op">=</span> pd.DataFrame([{<span class="st">"model"</span>: <span class="ss">f"K = </span><span class="sc">{</span>k<span class="sc">}</span><span class="ss">"</span>, <span class="st">"AICc"</span>: aicc(fits_k[k]),</span>
+<span id="cb16-18"><a href="" aria-hidden="true" tabindex="-1"></a>                         <span class="st">"rolling MASE"</span>: rolling_mase_k(k)} <span class="cf">for</span> k <span class="kw">in</span> (<span class="dv">3</span>, <span class="dv">10</span>, <span class="dv">18</span>, <span class="dv">26</span>)]</span>
+<span id="cb16-19"><a href="" aria-hidden="true" tabindex="-1"></a>                       <span class="op">+</span> [{<span class="st">"model"</span>: <span class="st">"seasonal naive"</span>, <span class="st">"rolling MASE"</span>: snaive_k}])</span>
+<span id="cb16-20"><a href="" aria-hidden="true" tabindex="-1"></a>k_table.<span class="bu">round</span>(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-display" data-execution_count="13">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">model</th>
+<th data-quarto-table-cell-role="th">AICc</th>
+<th data-quarto-table-cell-role="th">rolling MASE</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>K = 3</td>
+<td>862.754</td>
+<td>1.451</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>K = 10</td>
+<td>817.592</td>
+<td>0.814</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>K = 18</td>
+<td>752.730</td>
+<td>0.617</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>K = 26</td>
+<td>604.155</td>
+<td>0.586</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>seasonal naive</td>
+<td>NaN</td>
+<td>0.719</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div></div>
+<p>The rolling origin agrees with AICc: more harmonics forecast better, and from <span class="math inline">\(K = 18\)</span> the regression beats seasonal naive.</p>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Important</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>“Small <span class="math inline">\(K\)</span>” is a default for smooth or noisy seasonality, not a law.</strong> Walmart’s season is sharp and lands on the same weeks every year, so the data asks for the whole calendar. Choose <span class="math inline">\(K\)</span> the way you choose any model: AICc to shortlist, a holdout to decide.</p>
+</div>
+</div>
+</div>
+</section>
 <section id="dummy-and-intervention-variables" class="slide level2 smaller">
 <h2>Dummy and intervention variables</h2>
 <p>A predictor that is 1 when something happens and 0 otherwise.</p>
@@ -592,14 +892,14 @@ y_t = \beta_0 + \sum_{i=1}^{K}\left[\alpha_i \sin\!\left(\frac{2\pi i t}{m}\righ
 </section>
 <section id="the-holiday-flag-that-ships-with-the-data" class="slide level2 smaller">
 <h2>The holiday flag that ships with the data</h2>
-<div id="12277dec" class="cell" data-execution_count="7">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="" aria-hidden="true" tabindex="-1"></a>chain[<span class="st">"prechristmas"</span>] <span class="op">=</span> (chain.ds.dt.month.eq(<span class="dv">12</span>) <span class="op">&amp;</span> chain.ds.dt.day.between(<span class="dv">10</span>, <span class="dv">26</span>)).astype(<span class="bu">int</span>)</span>
-<span id="cb9-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"the six biggest weeks in the series:"</span>)</span>
-<span id="cb9-4"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(chain.nlargest(<span class="dv">6</span>, <span class="st">"y"</span>).assign(week<span class="op">=</span><span class="kw">lambda</span> d: d.ds.dt.strftime(<span class="st">"%Y-%m-</span><span class="sc">%d</span><span class="st">"</span>))</span>
-<span id="cb9-5"><a href="" aria-hidden="true" tabindex="-1"></a>      [[<span class="st">"week"</span>, <span class="st">"y"</span>, <span class="st">"holiday"</span>, <span class="st">"prechristmas"</span>]].to_string(index<span class="op">=</span><span class="va">False</span>))</span>
-<span id="cb9-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">correlation with sales — shipped flag </span><span class="sc">{</span>np<span class="sc">.</span>corrcoef(chain.y, chain.holiday)[<span class="dv">0</span>, <span class="dv">1</span>]<span class="sc">:+.2f}</span><span class="ss">, "</span></span>
-<span id="cb9-7"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"pre-Christmas weeks </span><span class="sc">{</span>np<span class="sc">.</span>corrcoef(chain.y, chain.prechristmas)[<span class="dv">0</span>, <span class="dv">1</span>]<span class="sc">:+.2f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="8cd141bc" class="cell" data-execution_count="14">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="" aria-hidden="true" tabindex="-1"></a>chain[<span class="st">"prechristmas"</span>] <span class="op">=</span> (chain.ds.dt.month.eq(<span class="dv">12</span>) <span class="op">&amp;</span> chain.ds.dt.day.between(<span class="dv">10</span>, <span class="dv">26</span>)).astype(<span class="bu">int</span>)</span>
+<span id="cb17-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"the six biggest weeks in the series:"</span>)</span>
+<span id="cb17-4"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(chain.nlargest(<span class="dv">6</span>, <span class="st">"y"</span>).assign(week<span class="op">=</span><span class="kw">lambda</span> d: d.ds.dt.strftime(<span class="st">"%Y-%m-</span><span class="sc">%d</span><span class="st">"</span>))</span>
+<span id="cb17-5"><a href="" aria-hidden="true" tabindex="-1"></a>      [[<span class="st">"week"</span>, <span class="st">"y"</span>, <span class="st">"holiday"</span>, <span class="st">"prechristmas"</span>]].to_string(index<span class="op">=</span><span class="va">False</span>))</span>
+<span id="cb17-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">correlation with sales — shipped flag </span><span class="sc">{</span>np<span class="sc">.</span>corrcoef(chain.y, chain.holiday)[<span class="dv">0</span>, <span class="dv">1</span>]<span class="sc">:+.2f}</span><span class="ss">, "</span></span>
+<span id="cb17-7"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"pre-Christmas weeks </span><span class="sc">{</span>np<span class="sc">.</span>corrcoef(chain.y, chain.prechristmas)[<span class="dv">0</span>, <span class="dv">1</span>]<span class="sc">:+.2f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>the six biggest weeks in the series:
       week      y  holiday  prechristmas
@@ -621,32 +921,34 @@ correlation with sales — shipped flag +0.17, pre-Christmas weeks +0.70</code><
 <h1>Building a model</h1>
 
 </section>
-<section id="five-models-one-series" class="slide level2 smaller">
+<section id="five-models-one-series" class="slide level2 tiny">
 <h2>Five models, one series</h2>
-<div id="ab77991c" class="cell" data-execution_count="8">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="" aria-hidden="true" tabindex="-1"></a>F3 <span class="op">=</span> fourier(chain.trend, M, <span class="dv">3</span>)</span>
-<span id="cb11-2"><a href="" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> pd.concat([chain, F3], axis<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb11-3"><a href="" aria-hidden="true" tabindex="-1"></a>FOURIER <span class="op">=</span> <span class="bu">list</span>(F3.columns)</span>
-<span id="cb11-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-5"><a href="" aria-hidden="true" tabindex="-1"></a>SPECS <span class="op">=</span> {</span>
-<span id="cb11-6"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="st">"trend"</span>:                    [<span class="st">"trend"</span>],</span>
-<span id="cb11-7"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="st">"+ Fourier(K=3)"</span>:           [<span class="st">"trend"</span>] <span class="op">+</span> FOURIER,</span>
-<span id="cb11-8"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="st">"+ holiday flag"</span>:           [<span class="st">"trend"</span>] <span class="op">+</span> FOURIER <span class="op">+</span> [<span class="st">"holiday"</span>],</span>
-<span id="cb11-9"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="st">"+ pre-Christmas"</span>:          [<span class="st">"trend"</span>] <span class="op">+</span> FOURIER <span class="op">+</span> [<span class="st">"prechristmas"</span>],</span>
-<span id="cb11-10"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="st">"+ economy"</span>:                [<span class="st">"trend"</span>] <span class="op">+</span> FOURIER <span class="op">+</span> [<span class="st">"prechristmas"</span>, <span class="st">"temperature"</span>,</span>
-<span id="cb11-11"><a href="" aria-hidden="true" tabindex="-1"></a>                                                       <span class="st">"fuel_price"</span>, <span class="st">"cpi"</span>, <span class="st">"unemployment"</span>],</span>
-<span id="cb11-12"><a href="" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb11-13"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-14"><a href="" aria-hidden="true" tabindex="-1"></a>rows, fits <span class="op">=</span> [], {}</span>
-<span id="cb11-15"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, cols <span class="kw">in</span> SPECS.items():</span>
-<span id="cb11-16"><a href="" aria-hidden="true" tabindex="-1"></a>    res <span class="op">=</span> sm.OLS(data.y, sm.add_constant(data[cols])).fit()</span>
-<span id="cb11-17"><a href="" aria-hidden="true" tabindex="-1"></a>    fits[name] <span class="op">=</span> res</span>
-<span id="cb11-18"><a href="" aria-hidden="true" tabindex="-1"></a>    rows.append({<span class="st">"model"</span>: name, <span class="st">"k"</span>: <span class="bu">int</span>(res.df_model), <span class="st">"adj R²"</span>: res.rsquared_adj,</span>
-<span id="cb11-19"><a href="" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"AICc"</span>: aicc(res), <span class="st">"residual sd"</span>: res.resid.std(ddof<span class="op">=</span><span class="dv">1</span>),</span>
-<span id="cb11-20"><a href="" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"Ljung-Box p"</span>: acorr_ljungbox(res.resid, lags<span class="op">=</span>[<span class="dv">26</span>], model_df<span class="op">=</span><span class="dv">0</span>)[<span class="st">"lb_pvalue"</span>].iloc[<span class="dv">0</span>],</span>
-<span id="cb11-21"><a href="" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"acf(1)"</span>: pd.Series(res.resid).autocorr(<span class="dv">1</span>)})</span>
-<span id="cb11-22"><a href="" aria-hidden="true" tabindex="-1"></a>pd.DataFrame(rows).<span class="bu">round</span>(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
+<div id="61c0c281" class="cell columns column-output-location" data-execution_count="15">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="" aria-hidden="true" tabindex="-1"></a>F3 <span class="op">=</span> fourier(chain.trend, M, <span class="dv">3</span>)</span>
+<span id="cb19-2"><a href="" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> pd.concat([chain, F3], axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb19-3"><a href="" aria-hidden="true" tabindex="-1"></a>FOURIER <span class="op">=</span> <span class="bu">list</span>(F3.columns)</span>
+<span id="cb19-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-5"><a href="" aria-hidden="true" tabindex="-1"></a>SPECS <span class="op">=</span> {</span>
+<span id="cb19-6"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="st">"trend"</span>:                    [<span class="st">"trend"</span>],</span>
+<span id="cb19-7"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="st">"+ Fourier(K=3)"</span>:           [<span class="st">"trend"</span>] <span class="op">+</span> FOURIER,</span>
+<span id="cb19-8"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="st">"+ holiday flag"</span>:           [<span class="st">"trend"</span>] <span class="op">+</span> FOURIER <span class="op">+</span> [<span class="st">"holiday"</span>],</span>
+<span id="cb19-9"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="st">"+ pre-Christmas"</span>:          [<span class="st">"trend"</span>] <span class="op">+</span> FOURIER <span class="op">+</span> [<span class="st">"prechristmas"</span>],</span>
+<span id="cb19-10"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="st">"+ economy"</span>:                [<span class="st">"trend"</span>] <span class="op">+</span> FOURIER <span class="op">+</span> [<span class="st">"prechristmas"</span>, <span class="st">"temperature"</span>,</span>
+<span id="cb19-11"><a href="" aria-hidden="true" tabindex="-1"></a>                                                       <span class="st">"fuel_price"</span>, <span class="st">"cpi"</span>, <span class="st">"unemployment"</span>],</span>
+<span id="cb19-12"><a href="" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb19-13"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-14"><a href="" aria-hidden="true" tabindex="-1"></a>rows, fits <span class="op">=</span> [], {}</span>
+<span id="cb19-15"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, cols <span class="kw">in</span> SPECS.items():</span>
+<span id="cb19-16"><a href="" aria-hidden="true" tabindex="-1"></a>    res <span class="op">=</span> sm.OLS(data.y, sm.add_constant(data[cols])).fit()</span>
+<span id="cb19-17"><a href="" aria-hidden="true" tabindex="-1"></a>    fits[name] <span class="op">=</span> res</span>
+<span id="cb19-18"><a href="" aria-hidden="true" tabindex="-1"></a>    rows.append({<span class="st">"model"</span>: name, <span class="st">"k"</span>: <span class="bu">int</span>(res.df_model), <span class="st">"adj R²"</span>: res.rsquared_adj,</span>
+<span id="cb19-19"><a href="" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"AICc"</span>: aicc(res), <span class="st">"residual sd"</span>: res.resid.std(ddof<span class="op">=</span><span class="dv">1</span>),</span>
+<span id="cb19-20"><a href="" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"Ljung-Box p"</span>: acorr_ljungbox(res.resid, lags<span class="op">=</span>[<span class="dv">26</span>], model_df<span class="op">=</span><span class="dv">0</span>)[<span class="st">"lb_pvalue"</span>].iloc[<span class="dv">0</span>],</span>
+<span id="cb19-21"><a href="" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"acf(1)"</span>: pd.Series(res.resid).autocorr(<span class="dv">1</span>)})</span>
+<span id="cb19-22"><a href="" aria-hidden="true" tabindex="-1"></a>pd.DataFrame(rows).<span class="bu">round</span>(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-display" data-execution_count="15">
 <div>
 <style scoped="">
     .dataframe tbody tr th:only-of-type {
@@ -731,10 +1033,10 @@ correlation with sales — shipped flag +0.17, pre-Christmas weeks +0.70</code><
 
 </div>
 </div>
-</div>
+</div></div>
 </section>
-<section id="five-models-read-the-table" class="slide level2 smaller">
-<h2>Five models: read the table</h2>
+<section id="five-models" class="slide level2 smaller">
+<h2>Five models</h2>
 <ul>
 <li><strong>trend</strong> explains nothing: adj R² is <em>negative</em>, which is what that statistic does when a predictor earns less than it costs.</li>
 <li><strong>Fourier(K=3)</strong> lifts adj R² to 0.23. Six parameters for the annual shape, and worth it.</li>
@@ -742,16 +1044,17 @@ correlation with sales — shipped flag +0.17, pre-Christmas weeks +0.70</code><
 <li><strong>the pre-Christmas dummy</strong> takes adj R² to 0.52 and cuts AICc by 66 points. One column, placed where the mechanism is.</li>
 <li><strong>the economy</strong> raises adj R² by 0.01 and <strong>raises AICc</strong> — four predictors that do not pay for themselves.</li>
 </ul>
-<p><span class="hi">One well-timed dummy beat the trend, the Fourier terms and four macro series put together.</span></p>
+<p>All five keep <span class="math inline">\(K = 3\)</span> on purpose: a smooth shape leaves the holiday spikes to the dummies, so each dummy’s worth is visible. For forecasting alone, <em>Larger K</em> already showed the other road.</p>
+<p><span class="hi">One well-timed dummy beat the trend, the <span class="math inline">\(K = 3\)</span> shape and four macro series put together.</span></p>
 </section>
 <section id="the-coefficients-of-the-full-model" class="slide level2 smaller">
 <h2>The coefficients of the full model</h2>
-<div id="209551b3" class="cell" data-execution_count="9">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> fits[<span class="st">"+ economy"</span>]</span>
-<span id="cb12-2"><a href="" aria-hidden="true" tabindex="-1"></a>show <span class="op">=</span> [<span class="st">"const"</span>, <span class="st">"trend"</span>, <span class="st">"prechristmas"</span>, <span class="st">"temperature"</span>, <span class="st">"fuel_price"</span>, <span class="st">"cpi"</span>, <span class="st">"unemployment"</span>]</span>
-<span id="cb12-3"><a href="" aria-hidden="true" tabindex="-1"></a>pd.DataFrame({<span class="st">"coefficient"</span>: res.params[show], <span class="st">"t"</span>: res.tvalues[show],</span>
-<span id="cb12-4"><a href="" aria-hidden="true" tabindex="-1"></a>              <span class="st">"p-value"</span>: res.pvalues[show]}).<span class="bu">round</span>(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="9">
+<div id="de2c2b2e" class="cell" data-execution_count="16">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="" aria-hidden="true" tabindex="-1"></a>res <span class="op">=</span> fits[<span class="st">"+ economy"</span>]</span>
+<span id="cb20-2"><a href="" aria-hidden="true" tabindex="-1"></a>show <span class="op">=</span> [<span class="st">"const"</span>, <span class="st">"trend"</span>, <span class="st">"prechristmas"</span>, <span class="st">"temperature"</span>, <span class="st">"fuel_price"</span>, <span class="st">"cpi"</span>, <span class="st">"unemployment"</span>]</span>
+<span id="cb20-3"><a href="" aria-hidden="true" tabindex="-1"></a>pd.DataFrame({<span class="st">"coefficient"</span>: res.params[show], <span class="st">"t"</span>: res.tvalues[show],</span>
+<span id="cb20-4"><a href="" aria-hidden="true" tabindex="-1"></a>              <span class="st">"p-value"</span>: res.pvalues[show]}).<span class="bu">round</span>(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display" data-execution_count="16">
 <div>
 <style scoped="">
     .dataframe tbody tr th:only-of-type {
@@ -833,23 +1136,23 @@ correlation with sales — shipped flag +0.17, pre-Christmas weeks +0.70</code><
 </section>
 <section id="fitted-against-actual" class="slide level2 smaller">
 <h2>Fitted against actual</h2>
-<div id="cell-fitted-actual" class="cell" data-execution_count="10">
+<div id="cell-fitted-actual" class="cell" data-execution_count="17">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="" aria-hidden="true" tabindex="-1"></a>best <span class="op">=</span> fits[<span class="st">"+ pre-Christmas"</span>]</span>
-<span id="cb13-2"><a href="" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">4</span>))</span>
-<span id="cb13-3"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].plot(chain.ds, chain.y, color<span class="op">=</span>slate, linewidth<span class="op">=</span><span class="dv">1</span>, label<span class="op">=</span><span class="st">"actual"</span>)</span>
-<span id="cb13-4"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].plot(chain.ds, best.fittedvalues, color<span class="op">=</span>turquoise, linewidth<span class="op">=</span><span class="fl">1.4</span>, label<span class="op">=</span><span class="st">"fitted"</span>)</span>
-<span id="cb13-5"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].legend()</span>
-<span id="cb13-6"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="st">"trend + Fourier(K=3) + pre-Christmas"</span>)</span>
-<span id="cb13-7"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_ylabel(<span class="st">"$m"</span>)</span>
-<span id="cb13-8"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].scatter(best.fittedvalues, chain.y, s<span class="op">=</span><span class="dv">18</span>, color<span class="op">=</span>slate)</span>
-<span id="cb13-9"><a href="" aria-hidden="true" tabindex="-1"></a>lims <span class="op">=</span> [chain.y.<span class="bu">min</span>() <span class="op">*</span> <span class="fl">0.95</span>, chain.y.<span class="bu">max</span>() <span class="op">*</span> <span class="fl">1.02</span>]</span>
-<span id="cb13-10"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].plot(lims, lims, color<span class="op">=</span>red_pink, linewidth<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb13-11"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_xlabel(<span class="st">"fitted"</span>)</span>
-<span id="cb13-12"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_ylabel(<span class="st">"actual"</span>)</span>
-<span id="cb13-13"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_title(<span class="ss">f"adj R² = </span><span class="sc">{</span>best<span class="sc">.</span>rsquared_adj<span class="sc">:.2f}</span><span class="ss">"</span>)</span>
-<span id="cb13-14"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="" aria-hidden="true" tabindex="-1"></a>best <span class="op">=</span> fits[<span class="st">"+ pre-Christmas"</span>]</span>
+<span id="cb21-2"><a href="" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">4</span>))</span>
+<span id="cb21-3"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].plot(chain.ds, chain.y, color<span class="op">=</span>slate, linewidth<span class="op">=</span><span class="dv">1</span>, label<span class="op">=</span><span class="st">"actual"</span>)</span>
+<span id="cb21-4"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].plot(chain.ds, best.fittedvalues, color<span class="op">=</span>turquoise, linewidth<span class="op">=</span><span class="fl">1.4</span>, label<span class="op">=</span><span class="st">"fitted"</span>)</span>
+<span id="cb21-5"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].legend()</span>
+<span id="cb21-6"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="st">"trend + Fourier(K=3) + pre-Christmas"</span>)</span>
+<span id="cb21-7"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_ylabel(<span class="st">"$m"</span>)</span>
+<span id="cb21-8"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].scatter(best.fittedvalues, chain.y, s<span class="op">=</span><span class="dv">18</span>, color<span class="op">=</span>slate)</span>
+<span id="cb21-9"><a href="" aria-hidden="true" tabindex="-1"></a>lims <span class="op">=</span> [chain.y.<span class="bu">min</span>() <span class="op">*</span> <span class="fl">0.95</span>, chain.y.<span class="bu">max</span>() <span class="op">*</span> <span class="fl">1.02</span>]</span>
+<span id="cb21-10"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].plot(lims, lims, color<span class="op">=</span>red_pink, linewidth<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb21-11"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_xlabel(<span class="st">"fitted"</span>)</span>
+<span id="cb21-12"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_ylabel(<span class="st">"actual"</span>)</span>
+<span id="cb21-13"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_title(<span class="ss">f"adj R² = </span><span class="sc">{</span>best<span class="sc">.</span>rsquared_adj<span class="sc">:.2f}</span><span class="ss">"</span>)</span>
+<span id="cb21-14"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 
 </div>
@@ -865,39 +1168,39 @@ correlation with sales — shipped flag +0.17, pre-Christmas weeks +0.70</code><
 <section id="r²-grows-with-anything" class="slide level2 smaller">
 <h2>R² grows with anything</h2>
 <p>Ten thousand observations of pure noise. A thousand predictors, also pure noise. Nothing here is related to anything — and the regression still explains more and more of it.</p>
-<div id="cell-r2-noise" class="cell" data-execution_count="11">
+<div id="cell-r2-noise" class="cell" data-execution_count="18">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">1234</span>)</span>
-<span id="cb14-2"><a href="" aria-hidden="true" tabindex="-1"></a>n_sim, k_sim <span class="op">=</span> <span class="dv">10_000</span>, <span class="dv">1_000</span></span>
-<span id="cb14-3"><a href="" aria-hidden="true" tabindex="-1"></a>y_sim <span class="op">=</span> rng.normal(size<span class="op">=</span>n_sim)</span>
-<span id="cb14-4"><a href="" aria-hidden="true" tabindex="-1"></a>X_sim <span class="op">=</span> rng.normal(size<span class="op">=</span>(n_sim, k_sim))</span>
-<span id="cb14-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-6"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> r2_path(X, y):</span>
-<span id="cb14-8"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""R² after adding each column in turn, from one QR decomposition instead of k regressions."""</span></span>
-<span id="cb14-9"><a href="" aria-hidden="true" tabindex="-1"></a>    Xc, yc <span class="op">=</span> X <span class="op">-</span> X.mean(axis<span class="op">=</span><span class="dv">0</span>), y <span class="op">-</span> y.mean()</span>
-<span id="cb14-10"><a href="" aria-hidden="true" tabindex="-1"></a>    Q, _ <span class="op">=</span> np.linalg.qr(Xc)</span>
-<span id="cb14-11"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.cumsum((Q.T <span class="op">@</span> yc) <span class="op">**</span> <span class="dv">2</span>) <span class="op">/</span> (yc <span class="op">@</span> yc)</span>
-<span id="cb14-12"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-13"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-14"><a href="" aria-hidden="true" tabindex="-1"></a>ks <span class="op">=</span> np.arange(<span class="dv">1</span>, k_sim <span class="op">+</span> <span class="dv">1</span>)</span>
-<span id="cb14-15"><a href="" aria-hidden="true" tabindex="-1"></a>r2_sim <span class="op">=</span> r2_path(X_sim, y_sim)</span>
-<span id="cb14-16"><a href="" aria-hidden="true" tabindex="-1"></a>adj_sim <span class="op">=</span> <span class="dv">1</span> <span class="op">-</span> (<span class="dv">1</span> <span class="op">-</span> r2_sim) <span class="op">*</span> (n_sim <span class="op">-</span> <span class="dv">1</span>) <span class="op">/</span> (n_sim <span class="op">-</span> ks <span class="op">-</span> <span class="dv">1</span>)</span>
-<span id="cb14-17"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-18"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">4.2</span>))</span>
-<span id="cb14-19"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(ks, r2_sim, color<span class="op">=</span><span class="st">"lightgray"</span>, linewidth<span class="op">=</span><span class="fl">2.5</span>, label<span class="op">=</span><span class="st">"$R^2$"</span>)</span>
-<span id="cb14-20"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(ks, ks <span class="op">/</span> n_sim, <span class="st">"--"</span>, color<span class="op">=</span>slate, linewidth<span class="op">=</span><span class="dv">1</span>, label<span class="op">=</span><span class="st">"$k/n$"</span>)</span>
-<span id="cb14-21"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(ks, adj_sim, color<span class="op">=</span>red_pink, linewidth<span class="op">=</span><span class="fl">1.6</span>, label<span class="op">=</span><span class="st">"adjusted $R^2$"</span>)</span>
-<span id="cb14-22"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axhline(<span class="dv">0</span>, color<span class="op">=</span><span class="st">"black"</span>, linewidth<span class="op">=</span><span class="fl">0.8</span>)</span>
-<span id="cb14-23"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"number of predictors, all of them noise"</span>)</span>
-<span id="cb14-24"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"$R^2$"</span>)</span>
-<span id="cb14-25"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend(loc<span class="op">=</span><span class="st">"upper left"</span>)</span>
-<span id="cb14-26"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"A thousand predictors that mean nothing, fitted to noise"</span>)</span>
-<span id="cb14-27"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
-<span id="cb14-28"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-29"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"R²: </span><span class="sc">{</span>r2_sim[<span class="dv">199</span>]<span class="sc">:.3f}</span><span class="ss"> at k=200, </span><span class="sc">{</span>r2_sim[<span class="dv">499</span>]<span class="sc">:.3f}</span><span class="ss"> at k=500, </span><span class="sc">{</span>r2_sim[<span class="op">-</span><span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss"> at k=</span><span class="sc">{</span>k_sim<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb14-30"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"adjusted R² over the same path: mean </span><span class="sc">{</span>adj_sim<span class="sc">.</span>mean()<span class="sc">:+.4f}</span><span class="ss">, max </span><span class="sc">{</span>adj_sim<span class="sc">.</span><span class="bu">max</span>()<span class="sc">:+.4f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="" aria-hidden="true" tabindex="-1"></a>rng <span class="op">=</span> np.random.default_rng(<span class="dv">1234</span>)</span>
+<span id="cb22-2"><a href="" aria-hidden="true" tabindex="-1"></a>n_sim, k_sim <span class="op">=</span> <span class="dv">10_000</span>, <span class="dv">1_000</span></span>
+<span id="cb22-3"><a href="" aria-hidden="true" tabindex="-1"></a>y_sim <span class="op">=</span> rng.normal(size<span class="op">=</span>n_sim)</span>
+<span id="cb22-4"><a href="" aria-hidden="true" tabindex="-1"></a>X_sim <span class="op">=</span> rng.normal(size<span class="op">=</span>(n_sim, k_sim))</span>
+<span id="cb22-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-6"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> r2_path(X, y):</span>
+<span id="cb22-8"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""R² after adding each column in turn, from one QR decomposition instead of k regressions."""</span></span>
+<span id="cb22-9"><a href="" aria-hidden="true" tabindex="-1"></a>    Xc, yc <span class="op">=</span> X <span class="op">-</span> X.mean(axis<span class="op">=</span><span class="dv">0</span>), y <span class="op">-</span> y.mean()</span>
+<span id="cb22-10"><a href="" aria-hidden="true" tabindex="-1"></a>    Q, _ <span class="op">=</span> np.linalg.qr(Xc)</span>
+<span id="cb22-11"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.cumsum((Q.T <span class="op">@</span> yc) <span class="op">**</span> <span class="dv">2</span>) <span class="op">/</span> (yc <span class="op">@</span> yc)</span>
+<span id="cb22-12"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-13"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-14"><a href="" aria-hidden="true" tabindex="-1"></a>ks <span class="op">=</span> np.arange(<span class="dv">1</span>, k_sim <span class="op">+</span> <span class="dv">1</span>)</span>
+<span id="cb22-15"><a href="" aria-hidden="true" tabindex="-1"></a>r2_sim <span class="op">=</span> r2_path(X_sim, y_sim)</span>
+<span id="cb22-16"><a href="" aria-hidden="true" tabindex="-1"></a>adj_sim <span class="op">=</span> <span class="dv">1</span> <span class="op">-</span> (<span class="dv">1</span> <span class="op">-</span> r2_sim) <span class="op">*</span> (n_sim <span class="op">-</span> <span class="dv">1</span>) <span class="op">/</span> (n_sim <span class="op">-</span> ks <span class="op">-</span> <span class="dv">1</span>)</span>
+<span id="cb22-17"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-18"><a href="" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">11</span>, <span class="fl">4.2</span>))</span>
+<span id="cb22-19"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(ks, r2_sim, color<span class="op">=</span><span class="st">"lightgray"</span>, linewidth<span class="op">=</span><span class="fl">2.5</span>, label<span class="op">=</span><span class="st">"$R^2$"</span>)</span>
+<span id="cb22-20"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(ks, ks <span class="op">/</span> n_sim, <span class="st">"--"</span>, color<span class="op">=</span>slate, linewidth<span class="op">=</span><span class="dv">1</span>, label<span class="op">=</span><span class="st">"$k/n$"</span>)</span>
+<span id="cb22-21"><a href="" aria-hidden="true" tabindex="-1"></a>ax.plot(ks, adj_sim, color<span class="op">=</span>red_pink, linewidth<span class="op">=</span><span class="fl">1.6</span>, label<span class="op">=</span><span class="st">"adjusted $R^2$"</span>)</span>
+<span id="cb22-22"><a href="" aria-hidden="true" tabindex="-1"></a>ax.axhline(<span class="dv">0</span>, color<span class="op">=</span><span class="st">"black"</span>, linewidth<span class="op">=</span><span class="fl">0.8</span>)</span>
+<span id="cb22-23"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"number of predictors, all of them noise"</span>)</span>
+<span id="cb22-24"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"$R^2$"</span>)</span>
+<span id="cb22-25"><a href="" aria-hidden="true" tabindex="-1"></a>ax.legend(loc<span class="op">=</span><span class="st">"upper left"</span>)</span>
+<span id="cb22-26"><a href="" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"A thousand predictors that mean nothing, fitted to noise"</span>)</span>
+<span id="cb22-27"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb22-28"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-29"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"R²: </span><span class="sc">{</span>r2_sim[<span class="dv">199</span>]<span class="sc">:.3f}</span><span class="ss"> at k=200, </span><span class="sc">{</span>r2_sim[<span class="dv">499</span>]<span class="sc">:.3f}</span><span class="ss"> at k=500, </span><span class="sc">{</span>r2_sim[<span class="op">-</span><span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss"> at k=</span><span class="sc">{</span>k_sim<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb22-30"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"adjusted R² over the same path: mean </span><span class="sc">{</span>adj_sim<span class="sc">.</span>mean()<span class="sc">:+.4f}</span><span class="ss">, max </span><span class="sc">{</span>adj_sim<span class="sc">.</span><span class="bu">max</span>()<span class="sc">:+.4f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 
 <div class="cell-output cell-output-stdout">
@@ -923,14 +1226,14 @@ adjusted R² over the same path: mean +0.0049, max +0.0097</code></pre>
 <p><strong>Now count the free R² in our own model</strong></p>
 </div>
 <div class="callout-content">
-<div id="911c5702" class="cell" data-execution_count="12">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="" aria-hidden="true" tabindex="-1"></a>n_model, k_model <span class="op">=</span> <span class="bu">int</span>(fits[<span class="st">"+ economy"</span>].nobs), <span class="bu">int</span>(fits[<span class="st">"+ economy"</span>].df_model)</span>
-<span id="cb16-2"><a href="" aria-hidden="true" tabindex="-1"></a>draws <span class="op">=</span> [r2_path(rng.normal(size<span class="op">=</span>(n_model, k_model)), rng.normal(size<span class="op">=</span>n_model))[<span class="op">-</span><span class="dv">1</span>]</span>
-<span id="cb16-3"><a href="" aria-hidden="true" tabindex="-1"></a>         <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">500</span>)]</span>
-<span id="cb16-4"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"n = </span><span class="sc">{</span>n_model<span class="sc">}</span><span class="ss">, k = </span><span class="sc">{</span>k_model<span class="sc">}</span><span class="ss">  -&gt;  free R² for pure noise: k/n = </span><span class="sc">{</span>k_model <span class="op">/</span> n_model<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb16-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"500 noise draws at that size: mean R² </span><span class="sc">{</span>np<span class="sc">.</span>mean(draws)<span class="sc">:.3f}</span><span class="ss">, "</span></span>
-<span id="cb16-6"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"95th percentile </span><span class="sc">{</span>np<span class="sc">.</span>percentile(draws, <span class="dv">95</span>)<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
-<span id="cb16-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"our model: R² </span><span class="sc">{</span>fits[<span class="st">'+ economy'</span>]<span class="sc">.</span>rsquared<span class="sc">:.3f}</span><span class="ss">, adjusted </span><span class="sc">{</span>fits[<span class="st">'+ economy'</span>]<span class="sc">.</span>rsquared_adj<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="85658440" class="cell" data-execution_count="19">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="" aria-hidden="true" tabindex="-1"></a>n_model, k_model <span class="op">=</span> <span class="bu">int</span>(fits[<span class="st">"+ economy"</span>].nobs), <span class="bu">int</span>(fits[<span class="st">"+ economy"</span>].df_model)</span>
+<span id="cb24-2"><a href="" aria-hidden="true" tabindex="-1"></a>draws <span class="op">=</span> [r2_path(rng.normal(size<span class="op">=</span>(n_model, k_model)), rng.normal(size<span class="op">=</span>n_model))[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb24-3"><a href="" aria-hidden="true" tabindex="-1"></a>         <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">500</span>)]</span>
+<span id="cb24-4"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"n = </span><span class="sc">{</span>n_model<span class="sc">}</span><span class="ss">, k = </span><span class="sc">{</span>k_model<span class="sc">}</span><span class="ss">  -&gt;  free R² for pure noise: k/n = </span><span class="sc">{</span>k_model <span class="op">/</span> n_model<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb24-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"500 noise draws at that size: mean R² </span><span class="sc">{</span>np<span class="sc">.</span>mean(draws)<span class="sc">:.3f}</span><span class="ss">, "</span></span>
+<span id="cb24-6"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"95th percentile </span><span class="sc">{</span>np<span class="sc">.</span>percentile(draws, <span class="dv">95</span>)<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb24-7"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"our model: R² </span><span class="sc">{</span>fits[<span class="st">'+ economy'</span>]<span class="sc">.</span>rsquared<span class="sc">:.3f}</span><span class="ss">, adjusted </span><span class="sc">{</span>fits[<span class="st">'+ economy'</span>]<span class="sc">.</span>rsquared_adj<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>n = 143, k = 12  -&gt;  free R² for pure noise: k/n = 0.084
 500 noise draws at that size: mean R² 0.084, 95th percentile 0.143
@@ -941,8 +1244,8 @@ our model: R² 0.569, adjusted 0.529</code></pre>
 </div>
 </div>
 </section>
-<section id="what-that-costs-you-read-it" class="slide level2 smaller">
-<h2>What that costs you: read it</h2>
+<section id="what-that-costs-you-1" class="slide level2 smaller">
+<h2>What that costs you</h2>
 <ul>
 <li>Twelve predictors on 143 weeks buy about <strong>8% of <span class="math inline">\(R^2\)</span> for free</strong>, and one time in twenty a model of pure noise that size would report <span class="math inline">\(R^2 = 0.14\)</span>.</li>
 <li>Our <code>+ economy</code> model reports 0.57. So the fit is real — but the gap between <span class="math inline">\(R^2\)</span> and adjusted <span class="math inline">\(R^2\)</span>, 0.04, is exactly the rent we pay for those twelve columns.</li>
@@ -957,25 +1260,25 @@ our model: R² 0.569, adjusted 0.529</code></pre>
 </section>
 <section id="residual-autocorrelation" class="slide level2 smaller">
 <h2>Residual autocorrelation</h2>
-<div id="cell-residual-diagnostics" class="cell" data-execution_count="13">
+<div id="cell-residual-diagnostics" class="cell" data-execution_count="20">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="" aria-hidden="true" tabindex="-1"></a>resid <span class="op">=</span> best.resid</span>
-<span id="cb18-2"><a href="" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">13</span>, <span class="fl">3.4</span>))</span>
-<span id="cb18-3"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].plot(chain.ds, resid, color<span class="op">=</span>orange, linewidth<span class="op">=</span><span class="fl">0.9</span>)</span>
-<span id="cb18-4"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].axhline(<span class="dv">0</span>, color<span class="op">=</span><span class="st">"black"</span>, linewidth<span class="op">=</span><span class="fl">0.8</span>)</span>
-<span id="cb18-5"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="st">"residuals over time"</span>)</span>
-<span id="cb18-6"><a href="" aria-hidden="true" tabindex="-1"></a>plot_acf(resid, lags<span class="op">=</span><span class="dv">30</span>, ax<span class="op">=</span>axes[<span class="dv">1</span>], title<span class="op">=</span><span class="st">"ACF of residuals"</span>)</span>
-<span id="cb18-7"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].scatter(best.fittedvalues, resid, s<span class="op">=</span><span class="dv">16</span>, color<span class="op">=</span>slate)</span>
-<span id="cb18-8"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].axhline(<span class="dv">0</span>, color<span class="op">=</span>red_pink, linewidth<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb18-9"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].set_xlabel(<span class="st">"fitted"</span>)</span>
-<span id="cb18-10"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].set_title(<span class="st">"residuals against fitted"</span>)</span>
-<span id="cb18-11"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb18-12"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
-<span id="cb18-13"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-14"><a href="" aria-hidden="true" tabindex="-1"></a>lb <span class="op">=</span> acorr_ljungbox(resid, lags<span class="op">=</span>[<span class="dv">26</span>], model_df<span class="op">=</span><span class="dv">0</span>)</span>
-<span id="cb18-15"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Ljung-Box (26 lags): statistic </span><span class="sc">{</span>lb[<span class="st">'lb_stat'</span>]<span class="sc">.</span>iloc[<span class="dv">0</span>]<span class="sc">:.1f}</span><span class="ss">, p </span><span class="sc">{</span>lb[<span class="st">'lb_pvalue'</span>]<span class="sc">.</span>iloc[<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">"</span></span>
-<span id="cb18-16"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"   residual acf(1) </span><span class="sc">{</span>pd<span class="sc">.</span>Series(resid)<span class="sc">.</span>autocorr(<span class="dv">1</span>)<span class="sc">:+.2f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="" aria-hidden="true" tabindex="-1"></a>resid <span class="op">=</span> best.resid</span>
+<span id="cb26-2"><a href="" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">13</span>, <span class="fl">3.4</span>))</span>
+<span id="cb26-3"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].plot(chain.ds, resid, color<span class="op">=</span>orange, linewidth<span class="op">=</span><span class="fl">0.9</span>)</span>
+<span id="cb26-4"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].axhline(<span class="dv">0</span>, color<span class="op">=</span><span class="st">"black"</span>, linewidth<span class="op">=</span><span class="fl">0.8</span>)</span>
+<span id="cb26-5"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="st">"residuals over time"</span>)</span>
+<span id="cb26-6"><a href="" aria-hidden="true" tabindex="-1"></a>plot_acf(resid, lags<span class="op">=</span><span class="dv">30</span>, zero<span class="op">=</span><span class="va">False</span>, ax<span class="op">=</span>axes[<span class="dv">1</span>], title<span class="op">=</span><span class="st">"ACF of residuals"</span>)</span>
+<span id="cb26-7"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].scatter(best.fittedvalues, resid, s<span class="op">=</span><span class="dv">16</span>, color<span class="op">=</span>slate)</span>
+<span id="cb26-8"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].axhline(<span class="dv">0</span>, color<span class="op">=</span>red_pink, linewidth<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb26-9"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].set_xlabel(<span class="st">"fitted"</span>)</span>
+<span id="cb26-10"><a href="" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].set_title(<span class="st">"residuals against fitted"</span>)</span>
+<span id="cb26-11"><a href="" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb26-12"><a href="" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb26-13"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-14"><a href="" aria-hidden="true" tabindex="-1"></a>lb <span class="op">=</span> acorr_ljungbox(resid, lags<span class="op">=</span>[<span class="dv">26</span>], model_df<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb26-15"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Ljung-Box (26 lags): statistic </span><span class="sc">{</span>lb[<span class="st">'lb_stat'</span>]<span class="sc">.</span>iloc[<span class="dv">0</span>]<span class="sc">:.1f}</span><span class="ss">, p </span><span class="sc">{</span>lb[<span class="st">'lb_pvalue'</span>]<span class="sc">.</span>iloc[<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">"</span></span>
+<span id="cb26-16"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"   residual acf(1) </span><span class="sc">{</span>pd<span class="sc">.</span>Series(resid)<span class="sc">.</span>autocorr(<span class="dv">1</span>)<span class="sc">:+.2f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 
 <div class="cell-output cell-output-stdout">
@@ -996,20 +1299,20 @@ our model: R² 0.569, adjusted 0.529</code></pre>
 <section id="spurious-regression" class="slide level2 smaller">
 <h2>Spurious regression</h2>
 <p>Two series that trend, and nothing else in common.</p>
-<div id="6c3fb521" class="cell" data-execution_count="14">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="" aria-hidden="true" tabindex="-1"></a>emp <span class="op">=</span> pd.read_csv(<span class="st">'../data/us_employment_titles.csv'</span>, parse_dates<span class="op">=</span>[<span class="st">"ds"</span>])</span>
-<span id="cb20-2"><a href="" aria-hidden="true" tabindex="-1"></a>retail <span class="op">=</span> pd.read_csv(<span class="st">'../data/aus_retail.csv'</span>, parse_dates<span class="op">=</span>[<span class="st">"Month"</span>])</span>
-<span id="cb20-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-4"><a href="" aria-hidden="true" tabindex="-1"></a>a <span class="op">=</span> emp.query(<span class="st">"unique_id == 'CEU0500000001'"</span>).tail(<span class="dv">240</span>)[<span class="st">"y"</span>].to_numpy(<span class="bu">float</span>)</span>
-<span id="cb20-5"><a href="" aria-hidden="true" tabindex="-1"></a>b <span class="op">=</span> (retail.query(<span class="st">"State == 'Australian Capital Territory' and "</span></span>
-<span id="cb20-6"><a href="" aria-hidden="true" tabindex="-1"></a>                  <span class="st">"Industry == 'Cafes, restaurants and catering services'"</span>)</span>
-<span id="cb20-7"><a href="" aria-hidden="true" tabindex="-1"></a>     .tail(<span class="dv">240</span>)[<span class="st">"Turnover"</span>].to_numpy(<span class="bu">float</span>))</span>
-<span id="cb20-8"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-9"><a href="" aria-hidden="true" tabindex="-1"></a>spurious <span class="op">=</span> sm.OLS(a, sm.add_constant(b)).fit()</span>
-<span id="cb20-10"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"US private employment on Australian café turnover, 240 months"</span>)</span>
-<span id="cb20-11"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  R² </span><span class="sc">{</span>spurious<span class="sc">.</span>rsquared<span class="sc">:.2f}</span><span class="ss">   t </span><span class="sc">{</span>spurious<span class="sc">.</span>tvalues[<span class="dv">1</span>]<span class="sc">:.1f}</span><span class="ss">   p </span><span class="sc">{</span>spurious<span class="sc">.</span>pvalues[<span class="dv">1</span>]<span class="sc">:.1e}</span><span class="ss">"</span>)</span>
-<span id="cb20-12"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  residual acf(1) </span><span class="sc">{</span>pd<span class="sc">.</span>Series(spurious.resid)<span class="sc">.</span>autocorr(<span class="dv">1</span>)<span class="sc">:+.2f}</span><span class="ss">   "</span></span>
-<span id="cb20-13"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"Ljung-Box p </span><span class="sc">{</span>acorr_ljungbox(spurious.resid, lags<span class="op">=</span>[<span class="dv">24</span>], model_df<span class="op">=</span><span class="dv">0</span>)[<span class="st">'lb_pvalue'</span>]<span class="sc">.</span>iloc[<span class="dv">0</span>]<span class="sc">:.1e}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="721c6fe3" class="cell" data-execution_count="21">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="" aria-hidden="true" tabindex="-1"></a>emp <span class="op">=</span> pd.read_csv(<span class="st">'../data/us_employment_titles.csv'</span>, parse_dates<span class="op">=</span>[<span class="st">"ds"</span>])</span>
+<span id="cb28-2"><a href="" aria-hidden="true" tabindex="-1"></a>retail <span class="op">=</span> pd.read_csv(<span class="st">'../data/aus_retail.csv'</span>, parse_dates<span class="op">=</span>[<span class="st">"Month"</span>])</span>
+<span id="cb28-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-4"><a href="" aria-hidden="true" tabindex="-1"></a>a <span class="op">=</span> emp.query(<span class="st">"unique_id == 'CEU0500000001'"</span>).tail(<span class="dv">240</span>)[<span class="st">"y"</span>].to_numpy(<span class="bu">float</span>)</span>
+<span id="cb28-5"><a href="" aria-hidden="true" tabindex="-1"></a>b <span class="op">=</span> (retail.query(<span class="st">"State == 'Australian Capital Territory' and "</span></span>
+<span id="cb28-6"><a href="" aria-hidden="true" tabindex="-1"></a>                  <span class="st">"Industry == 'Cafes, restaurants and catering services'"</span>)</span>
+<span id="cb28-7"><a href="" aria-hidden="true" tabindex="-1"></a>     .tail(<span class="dv">240</span>)[<span class="st">"Turnover"</span>].to_numpy(<span class="bu">float</span>))</span>
+<span id="cb28-8"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-9"><a href="" aria-hidden="true" tabindex="-1"></a>spurious <span class="op">=</span> sm.OLS(a, sm.add_constant(b)).fit()</span>
+<span id="cb28-10"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"US private employment on Australian café turnover, 240 months"</span>)</span>
+<span id="cb28-11"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  R² </span><span class="sc">{</span>spurious<span class="sc">.</span>rsquared<span class="sc">:.2f}</span><span class="ss">   t </span><span class="sc">{</span>spurious<span class="sc">.</span>tvalues[<span class="dv">1</span>]<span class="sc">:.1f}</span><span class="ss">   p </span><span class="sc">{</span>spurious<span class="sc">.</span>pvalues[<span class="dv">1</span>]<span class="sc">:.1e}</span><span class="ss">"</span>)</span>
+<span id="cb28-12"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  residual acf(1) </span><span class="sc">{</span>pd<span class="sc">.</span>Series(spurious.resid)<span class="sc">.</span>autocorr(<span class="dv">1</span>)<span class="sc">:+.2f}</span><span class="ss">   "</span></span>
+<span id="cb28-13"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"Ljung-Box p </span><span class="sc">{</span>acorr_ljungbox(spurious.resid, lags<span class="op">=</span>[<span class="dv">24</span>], model_df<span class="op">=</span><span class="dv">0</span>)[<span class="st">'lb_pvalue'</span>]<span class="sc">.</span>iloc[<span class="dv">0</span>]<span class="sc">:.1e}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>US private employment on Australian café turnover, 240 months
   R² 0.41   t 12.8   p 8.9e-29
@@ -1080,28 +1383,30 @@ our model: R² 0.569, adjusted 0.529</code></pre>
 </div>
 <p>📖 <a href="https://otexts.com/fpp3/selecting-predictors.html">FPP 7.5 — selecting predictors</a></p>
 </section>
-<section id="aicc-against-a-rolling-origin" class="slide level2 smaller">
+<section id="aicc-against-a-rolling-origin" class="slide level2 tiny">
 <h2>AICc against a rolling origin</h2>
-<div id="fa41a2c9" class="cell" data-execution_count="15">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="" aria-hidden="true" tabindex="-1"></a>scale <span class="op">=</span> <span class="bu">float</span>(np.mean(np.<span class="bu">abs</span>(chain.y.to_numpy()[M:] <span class="op">-</span> chain.y.to_numpy()[:<span class="op">-</span>M])))   <span class="co"># MASE scale</span></span>
-<span id="cb22-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb22-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> rolling_mase(cols, windows<span class="op">=</span><span class="dv">8</span>, h<span class="op">=</span>H):</span>
-<span id="cb22-4"><a href="" aria-hidden="true" tabindex="-1"></a>    errors <span class="op">=</span> []</span>
-<span id="cb22-5"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> end <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(data) <span class="op">-</span> h <span class="op">-</span> windows, <span class="bu">len</span>(data) <span class="op">-</span> h):</span>
-<span id="cb22-6"><a href="" aria-hidden="true" tabindex="-1"></a>        tr, te <span class="op">=</span> data.iloc[:end], data.iloc[end:end <span class="op">+</span> h]</span>
-<span id="cb22-7"><a href="" aria-hidden="true" tabindex="-1"></a>        f <span class="op">=</span> sm.OLS(tr.y, sm.add_constant(tr[cols])).fit()</span>
-<span id="cb22-8"><a href="" aria-hidden="true" tabindex="-1"></a>        pred <span class="op">=</span> f.predict(sm.add_constant(te[cols], has_constant<span class="op">=</span><span class="st">"add"</span>))</span>
-<span id="cb22-9"><a href="" aria-hidden="true" tabindex="-1"></a>        errors.append(np.mean(np.<span class="bu">abs</span>(te.y.to_numpy() <span class="op">-</span> pred.to_numpy())) <span class="op">/</span> scale)</span>
-<span id="cb22-10"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">float</span>(np.mean(errors))</span>
-<span id="cb22-11"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb22-12"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb22-13"><a href="" aria-hidden="true" tabindex="-1"></a>comparison <span class="op">=</span> pd.DataFrame([</span>
-<span id="cb22-14"><a href="" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"model"</span>: name, <span class="st">"k"</span>: <span class="bu">int</span>(fits[name].df_model), <span class="st">"adj R²"</span>: fits[name].rsquared_adj,</span>
-<span id="cb22-15"><a href="" aria-hidden="true" tabindex="-1"></a>     <span class="st">"AICc"</span>: aicc(fits[name]), <span class="st">"rolling MASE"</span>: rolling_mase(cols)}</span>
-<span id="cb22-16"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> name, cols <span class="kw">in</span> SPECS.items()</span>
-<span id="cb22-17"><a href="" aria-hidden="true" tabindex="-1"></a>])</span>
-<span id="cb22-18"><a href="" aria-hidden="true" tabindex="-1"></a>comparison.<span class="bu">round</span>(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="15">
+<div id="3b379dbb" class="cell columns column-output-location" data-execution_count="22">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="" aria-hidden="true" tabindex="-1"></a>scale <span class="op">=</span> <span class="bu">float</span>(np.mean(np.<span class="bu">abs</span>(chain.y.to_numpy()[M:] <span class="op">-</span> chain.y.to_numpy()[:<span class="op">-</span>M])))   <span class="co"># MASE scale</span></span>
+<span id="cb30-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> rolling_mase(cols, windows<span class="op">=</span><span class="dv">8</span>, h<span class="op">=</span>H):</span>
+<span id="cb30-4"><a href="" aria-hidden="true" tabindex="-1"></a>    errors <span class="op">=</span> []</span>
+<span id="cb30-5"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> end <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(data) <span class="op">-</span> h <span class="op">-</span> windows, <span class="bu">len</span>(data) <span class="op">-</span> h):</span>
+<span id="cb30-6"><a href="" aria-hidden="true" tabindex="-1"></a>        tr, te <span class="op">=</span> data.iloc[:end], data.iloc[end:end <span class="op">+</span> h]</span>
+<span id="cb30-7"><a href="" aria-hidden="true" tabindex="-1"></a>        f <span class="op">=</span> sm.OLS(tr.y, sm.add_constant(tr[cols])).fit()</span>
+<span id="cb30-8"><a href="" aria-hidden="true" tabindex="-1"></a>        pred <span class="op">=</span> f.predict(sm.add_constant(te[cols], has_constant<span class="op">=</span><span class="st">"add"</span>))</span>
+<span id="cb30-9"><a href="" aria-hidden="true" tabindex="-1"></a>        errors.append(np.mean(np.<span class="bu">abs</span>(te.y.to_numpy() <span class="op">-</span> pred.to_numpy())) <span class="op">/</span> scale)</span>
+<span id="cb30-10"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">float</span>(np.mean(errors))</span>
+<span id="cb30-11"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-12"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-13"><a href="" aria-hidden="true" tabindex="-1"></a>comparison <span class="op">=</span> pd.DataFrame([</span>
+<span id="cb30-14"><a href="" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"model"</span>: name, <span class="st">"k"</span>: <span class="bu">int</span>(fits[name].df_model), <span class="st">"adj R²"</span>: fits[name].rsquared_adj,</span>
+<span id="cb30-15"><a href="" aria-hidden="true" tabindex="-1"></a>     <span class="st">"AICc"</span>: aicc(fits[name]), <span class="st">"rolling MASE"</span>: rolling_mase(cols)}</span>
+<span id="cb30-16"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> name, cols <span class="kw">in</span> SPECS.items()</span>
+<span id="cb30-17"><a href="" aria-hidden="true" tabindex="-1"></a>])</span>
+<span id="cb30-18"><a href="" aria-hidden="true" tabindex="-1"></a>comparison.<span class="bu">round</span>(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-display" data-execution_count="22">
 <div>
 <style scoped="">
     .dataframe tbody tr th:only-of-type {
@@ -1174,14 +1479,14 @@ our model: R² 0.569, adjusted 0.529</code></pre>
 
 </div>
 </div>
-</div>
+</div></div>
 </section>
-<section id="aicc-against-a-rolling-origin-read-it" class="slide level2 smaller">
-<h2>AICc against a rolling origin: read it</h2>
+<section id="aicc-against-a-rolling-origin-1" class="slide level2 smaller">
+<h2>AICc against a rolling origin</h2>
 <ul>
 <li><strong>AICc picks <code>+ pre-Christmas</code></strong>, and among the regressions the rolling origin agrees.</li>
 <li><strong><code>+ economy</code> is the worst out of sample</strong> — 1.72 against 1.27 — while having the second-best adjusted <span class="math inline">\(R^2\)</span>. Four predictors that improved the fit and damaged the forecast.</li>
-<li>And the uncomfortable line: <strong>plain <code>trend</code> forecasts better than four of the five models.</strong> A flat line is less wrong at thirteen weeks than a seasonal shape estimated from two and a half cycles.</li>
+<li>And the uncomfortable line: <strong>plain <code>trend</code> forecasts better than four of the five models.</strong> A flat line is less wrong at thirteen weeks than a <span class="math inline">\(K = 3\)</span> shape, which spreads the holiday spikes over the weeks around them.</li>
 </ul>
 <div class="callout callout-note callout-titled callout-style-default">
 <div class="callout-body">
@@ -1228,31 +1533,33 @@ our model: R² 0.569, adjusted 0.529</code></pre>
 <p>Calendar features are the free lunch — Fourier terms, trend and holiday dummies are known for any future date. Temperature and unemployment are not.</p>
 <p>📖 <a href="https://otexts.com/fpp3/forecasting-regression.html">FPP 7.6 — forecasting with regression</a></p>
 </section>
-<section id="the-same-model-three-ways" class="slide level2 smaller">
+<section id="the-same-model-three-ways" class="slide level2 tiny">
 <h2>The same model, three ways</h2>
-<div id="e1318784" class="cell" data-execution_count="16">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="" aria-hidden="true" tabindex="-1"></a>train, valid <span class="op">=</span> data.iloc[:<span class="op">-</span>H], data.iloc[<span class="op">-</span>H:]</span>
-<span id="cb23-2"><a href="" aria-hidden="true" tabindex="-1"></a>cols <span class="op">=</span> SPECS[<span class="st">"+ economy"</span>]</span>
-<span id="cb23-3"><a href="" aria-hidden="true" tabindex="-1"></a>fit <span class="op">=</span> sm.OLS(train.y, sm.add_constant(train[cols])).fit()</span>
-<span id="cb23-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb23-5"><a href="" aria-hidden="true" tabindex="-1"></a>mase <span class="op">=</span> <span class="kw">lambda</span> pred: <span class="bu">float</span>(np.mean(np.<span class="bu">abs</span>(valid.y.to_numpy() <span class="op">-</span> np.asarray(pred))) <span class="op">/</span> scale)</span>
-<span id="cb23-6"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb23-7"><a href="" aria-hidden="true" tabindex="-1"></a>ex_post <span class="op">=</span> fit.predict(sm.add_constant(valid[cols], has_constant<span class="op">=</span><span class="st">"add"</span>))</span>
-<span id="cb23-8"><a href="" aria-hidden="true" tabindex="-1"></a>frozen <span class="op">=</span> valid[cols].copy()</span>
-<span id="cb23-9"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> c <span class="kw">in</span> (<span class="st">"temperature"</span>, <span class="st">"fuel_price"</span>, <span class="st">"cpi"</span>, <span class="st">"unemployment"</span>):</span>
-<span id="cb23-10"><a href="" aria-hidden="true" tabindex="-1"></a>    frozen[c] <span class="op">=</span> train[c].iloc[<span class="op">-</span><span class="dv">1</span>]                      <span class="co"># "assume today lasts"</span></span>
-<span id="cb23-11"><a href="" aria-hidden="true" tabindex="-1"></a>ex_ante <span class="op">=</span> fit.predict(sm.add_constant(frozen, has_constant<span class="op">=</span><span class="st">"add"</span>))</span>
-<span id="cb23-12"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb23-13"><a href="" aria-hidden="true" tabindex="-1"></a>calendar_only <span class="op">=</span> sm.OLS(train.y, sm.add_constant(train[SPECS[<span class="st">"+ pre-Christmas"</span>]])).fit()</span>
-<span id="cb23-14"><a href="" aria-hidden="true" tabindex="-1"></a>no_economy <span class="op">=</span> calendar_only.predict(sm.add_constant(valid[SPECS[<span class="st">"+ pre-Christmas"</span>]],</span>
-<span id="cb23-15"><a href="" aria-hidden="true" tabindex="-1"></a>                                                  has_constant<span class="op">=</span><span class="st">"add"</span>))</span>
-<span id="cb23-16"><a href="" aria-hidden="true" tabindex="-1"></a>snaive <span class="op">=</span> np.array([train.y.to_numpy()[<span class="op">-</span>M <span class="op">+</span> (i <span class="op">%</span> M)] <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(H)])</span>
-<span id="cb23-17"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb23-18"><a href="" aria-hidden="true" tabindex="-1"></a>pd.DataFrame([{<span class="st">"forecast"</span>: <span class="st">"ex-post, true covariates"</span>, <span class="st">"MASE"</span>: mase(ex_post)},</span>
-<span id="cb23-19"><a href="" aria-hidden="true" tabindex="-1"></a>              {<span class="st">"forecast"</span>: <span class="st">"ex-ante, covariates frozen"</span>, <span class="st">"MASE"</span>: mase(ex_ante)},</span>
-<span id="cb23-20"><a href="" aria-hidden="true" tabindex="-1"></a>              {<span class="st">"forecast"</span>: <span class="st">"calendar features only"</span>, <span class="st">"MASE"</span>: mase(no_economy)},</span>
-<span id="cb23-21"><a href="" aria-hidden="true" tabindex="-1"></a>              {<span class="st">"forecast"</span>: <span class="st">"seasonal naive"</span>, <span class="st">"MASE"</span>: mase(snaive)}]).<span class="bu">round</span>(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="16">
+<div id="53a3d17f" class="cell columns column-output-location" data-execution_count="23">
+<div class="column">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="" aria-hidden="true" tabindex="-1"></a>train, valid <span class="op">=</span> data.iloc[:<span class="op">-</span>H], data.iloc[<span class="op">-</span>H:]</span>
+<span id="cb31-2"><a href="" aria-hidden="true" tabindex="-1"></a>cols <span class="op">=</span> SPECS[<span class="st">"+ economy"</span>]</span>
+<span id="cb31-3"><a href="" aria-hidden="true" tabindex="-1"></a>fit <span class="op">=</span> sm.OLS(train.y, sm.add_constant(train[cols])).fit()</span>
+<span id="cb31-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-5"><a href="" aria-hidden="true" tabindex="-1"></a>mase <span class="op">=</span> <span class="kw">lambda</span> pred: <span class="bu">float</span>(np.mean(np.<span class="bu">abs</span>(valid.y.to_numpy() <span class="op">-</span> np.asarray(pred))) <span class="op">/</span> scale)</span>
+<span id="cb31-6"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-7"><a href="" aria-hidden="true" tabindex="-1"></a>ex_post <span class="op">=</span> fit.predict(sm.add_constant(valid[cols], has_constant<span class="op">=</span><span class="st">"add"</span>))</span>
+<span id="cb31-8"><a href="" aria-hidden="true" tabindex="-1"></a>frozen <span class="op">=</span> valid[cols].copy()</span>
+<span id="cb31-9"><a href="" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> c <span class="kw">in</span> (<span class="st">"temperature"</span>, <span class="st">"fuel_price"</span>, <span class="st">"cpi"</span>, <span class="st">"unemployment"</span>):</span>
+<span id="cb31-10"><a href="" aria-hidden="true" tabindex="-1"></a>    frozen[c] <span class="op">=</span> train[c].iloc[<span class="op">-</span><span class="dv">1</span>]                      <span class="co"># "assume today lasts"</span></span>
+<span id="cb31-11"><a href="" aria-hidden="true" tabindex="-1"></a>ex_ante <span class="op">=</span> fit.predict(sm.add_constant(frozen, has_constant<span class="op">=</span><span class="st">"add"</span>))</span>
+<span id="cb31-12"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-13"><a href="" aria-hidden="true" tabindex="-1"></a>calendar_only <span class="op">=</span> sm.OLS(train.y, sm.add_constant(train[SPECS[<span class="st">"+ pre-Christmas"</span>]])).fit()</span>
+<span id="cb31-14"><a href="" aria-hidden="true" tabindex="-1"></a>no_economy <span class="op">=</span> calendar_only.predict(sm.add_constant(valid[SPECS[<span class="st">"+ pre-Christmas"</span>]],</span>
+<span id="cb31-15"><a href="" aria-hidden="true" tabindex="-1"></a>                                                  has_constant<span class="op">=</span><span class="st">"add"</span>))</span>
+<span id="cb31-16"><a href="" aria-hidden="true" tabindex="-1"></a>snaive <span class="op">=</span> np.array([train.y.to_numpy()[<span class="op">-</span>M <span class="op">+</span> (i <span class="op">%</span> M)] <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(H)])</span>
+<span id="cb31-17"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-18"><a href="" aria-hidden="true" tabindex="-1"></a>pd.DataFrame([{<span class="st">"forecast"</span>: <span class="st">"ex-post, true covariates"</span>, <span class="st">"MASE"</span>: mase(ex_post)},</span>
+<span id="cb31-19"><a href="" aria-hidden="true" tabindex="-1"></a>              {<span class="st">"forecast"</span>: <span class="st">"ex-ante, covariates frozen"</span>, <span class="st">"MASE"</span>: mase(ex_ante)},</span>
+<span id="cb31-20"><a href="" aria-hidden="true" tabindex="-1"></a>              {<span class="st">"forecast"</span>: <span class="st">"calendar features only"</span>, <span class="st">"MASE"</span>: mase(no_economy)},</span>
+<span id="cb31-21"><a href="" aria-hidden="true" tabindex="-1"></a>              {<span class="st">"forecast"</span>: <span class="st">"seasonal naive"</span>, <span class="st">"MASE"</span>: mase(snaive)}]).<span class="bu">round</span>(<span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div><div class="column">
+<div class="cell-output cell-output-display" data-execution_count="23">
 <div>
 <style scoped="">
     .dataframe tbody tr th:only-of-type {
@@ -1302,15 +1609,15 @@ our model: R² 0.569, adjusted 0.529</code></pre>
 
 </div>
 </div>
-</div>
+</div></div>
 </section>
 <section id="the-result-nobody-advertises" class="slide level2 smaller">
 <h2>The result nobody advertises</h2>
-<p>On this series, <strong>every regression loses to the one-line seasonal naive</strong> — and ex-post, with the true future of temperature, fuel, CPI and unemployment, is <em>worse</em> than ex-ante with those four frozen.</p>
+<p>On this series, <strong>every regression in the table loses to the one-line seasonal naive</strong> — and ex-post, with the true future of temperature, fuel, CPI and unemployment, is <em>worse</em> than ex-ante with those four frozen.</p>
 <p>Why, in order of importance:</p>
 <ol type="1">
 <li>The economy coefficients are <strong>noise fitted to 130 weeks</strong>. Feeding them true, moving values propagates that noise; freezing them at least keeps it constant.</li>
-<li>143 weeks is <strong>2.75 annual cycles</strong>. Every seasonal parameter, Fourier or dummy, rests on two or three observations.</li>
+<li><strong><span class="math inline">\(K = 3\)</span> cannot draw this season.</strong> The pre-Christmas dummy catches one spike; Thanksgiving and the rest are smeared. The <span class="math inline">\(K = 26\)</span> regression from <em>Larger K</em> did beat <code>snaive</code>, by becoming an average of past years plus a trend.</li>
 <li>The residuals are <strong>autocorrelated</strong>, so the model is ignoring the strongest predictor available: last week’s error.</li>
 </ol>
 <div class="callout callout-important callout-titled callout-style-default">
@@ -1330,17 +1637,17 @@ our model: R² 0.569, adjusted 0.529</code></pre>
 <section id="scenario-forecasting" class="slide level2 smaller">
 <h2>Scenario forecasting</h2>
 <p>The one thing regression does that no model in this course has done yet: answer a question about a future that has not happened.</p>
-<div id="3d44f971" class="cell" data-execution_count="17">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="" aria-hidden="true" tabindex="-1"></a>warm, cold <span class="op">=</span> valid[cols].copy(), valid[cols].copy()</span>
-<span id="cb24-2"><a href="" aria-hidden="true" tabindex="-1"></a>warm[<span class="st">"temperature"</span>] <span class="op">=</span> valid[<span class="st">"temperature"</span>] <span class="op">+</span> <span class="dv">5</span></span>
-<span id="cb24-3"><a href="" aria-hidden="true" tabindex="-1"></a>cold[<span class="st">"temperature"</span>] <span class="op">=</span> valid[<span class="st">"temperature"</span>] <span class="op">-</span> <span class="dv">5</span></span>
-<span id="cb24-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-5"><a href="" aria-hidden="true" tabindex="-1"></a>base <span class="op">=</span> fit.predict(sm.add_constant(valid[cols], has_constant<span class="op">=</span><span class="st">"add"</span>)).<span class="bu">sum</span>()</span>
-<span id="cb24-6"><a href="" aria-hidden="true" tabindex="-1"></a>spread <span class="op">=</span> (fit.predict(sm.add_constant(warm, has_constant<span class="op">=</span><span class="st">"add"</span>)).<span class="bu">sum</span>()</span>
-<span id="cb24-7"><a href="" aria-hidden="true" tabindex="-1"></a>          <span class="op">-</span> fit.predict(sm.add_constant(cold, has_constant<span class="op">=</span><span class="st">"add"</span>)).<span class="bu">sum</span>())</span>
-<span id="cb24-8"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"quarter total, as modelled: </span><span class="sc">{</span>base<span class="sc">:.0f}</span><span class="ss"> $m"</span>)</span>
-<span id="cb24-9"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"five degrees warmer minus five degrees colder: </span><span class="sc">{</span>spread<span class="sc">:+.1f}</span><span class="ss"> $m "</span></span>
-<span id="cb24-10"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"(</span><span class="sc">{</span>spread <span class="op">/</span> base<span class="sc">:+.1%}</span><span class="ss"> of the quarter)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="4c46e88b" class="cell" data-execution_count="24">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="" aria-hidden="true" tabindex="-1"></a>warm, cold <span class="op">=</span> valid[cols].copy(), valid[cols].copy()</span>
+<span id="cb32-2"><a href="" aria-hidden="true" tabindex="-1"></a>warm[<span class="st">"temperature"</span>] <span class="op">=</span> valid[<span class="st">"temperature"</span>] <span class="op">+</span> <span class="dv">5</span></span>
+<span id="cb32-3"><a href="" aria-hidden="true" tabindex="-1"></a>cold[<span class="st">"temperature"</span>] <span class="op">=</span> valid[<span class="st">"temperature"</span>] <span class="op">-</span> <span class="dv">5</span></span>
+<span id="cb32-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-5"><a href="" aria-hidden="true" tabindex="-1"></a>base <span class="op">=</span> fit.predict(sm.add_constant(valid[cols], has_constant<span class="op">=</span><span class="st">"add"</span>)).<span class="bu">sum</span>()</span>
+<span id="cb32-6"><a href="" aria-hidden="true" tabindex="-1"></a>spread <span class="op">=</span> (fit.predict(sm.add_constant(warm, has_constant<span class="op">=</span><span class="st">"add"</span>)).<span class="bu">sum</span>()</span>
+<span id="cb32-7"><a href="" aria-hidden="true" tabindex="-1"></a>          <span class="op">-</span> fit.predict(sm.add_constant(cold, has_constant<span class="op">=</span><span class="st">"add"</span>)).<span class="bu">sum</span>())</span>
+<span id="cb32-8"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"quarter total, as modelled: </span><span class="sc">{</span>base<span class="sc">:.0f}</span><span class="ss"> $m"</span>)</span>
+<span id="cb32-9"><a href="" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"five degrees warmer minus five degrees colder: </span><span class="sc">{</span>spread<span class="sc">:+.1f}</span><span class="ss"> $m "</span></span>
+<span id="cb32-10"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"(</span><span class="sc">{</span>spread <span class="op">/</span> base<span class="sc">:+.1%}</span><span class="ss"> of the quarter)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>quarter total, as modelled: 567 $m
 five degrees warmer minus five degrees colder: +8.4 $m (+1.5% of the quarter)</code></pre>
@@ -1394,9 +1701,9 @@ five degrees warmer minus five degrees colder: +8.4 $m (+1.5% of the quarter)</c
 </thead>
 <tbody>
 <tr class="odd">
-<td>Seasonal dummies on weekly or daily data</td>
-<td>51 or 364 predictors, two observations each</td>
-<td>Fourier terms, small <span class="math inline">\(K\)</span>, chosen by AICc</td>
+<td>Choosing <span class="math inline">\(K\)</span> by habit</td>
+<td>A smooth seasonal curve under spikes that repeat every year</td>
+<td>Let AICc and a rolling origin choose <span class="math inline">\(K\)</span>, up to <span class="math inline">\(m/2\)</span> when the season is sharp and stable</td>
 </tr>
 <tr class="even">
 <td>A dummy that marks the label, not the effect</td>
@@ -1426,7 +1733,7 @@ five degrees warmer minus five degrees colder: +8.4 $m (+1.5% of the quarter)</c
 <ul>
 <li><strong>Is:</strong> the only tool so far that lets outside information in, and the vocabulary — trend, Fourier, dummies, interventions — that every later model uses to say <em>when</em>.</li>
 <li><strong>Is:</strong> the right frame for a question like “how much of December is Christmas”, which no benchmark or ETS can answer at all.</li>
-<li><strong>Is not:</strong> a forecasting method that beats a seasonal benchmark by itself on a short series. Today it lost to <code>snaive</code> five times out of five.</li>
+<li><strong>Is not:</strong> automatically better than a seasonal benchmark. Our five specifications lost to <code>snaive</code>; the one that won, <span class="math inline">\(K = 26\)</span>, is <code>snaive</code> averaged over past years, with a trend.</li>
 <li><strong>Is not:</strong> finished. Its residuals still carry structure, and structure in residuals is exactly what ARIMA is for.</li>
 </ul>
 <p><span class="hi">Week 7 puts the two halves together: regression for the covariates, ARIMA for the errors.</span></p>

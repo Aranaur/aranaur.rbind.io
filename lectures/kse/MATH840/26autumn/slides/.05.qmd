@@ -155,7 +155,7 @@ print(f"{len(chain)} weeks, {chain.ds.min().date()} to {chain.ds.max().date()}")
 chain.head(3)
 ```
 
-## The series, and the predictors that come with it
+## The series, and the predictors that come with it {.smaller}
 
 ```{python}
 #| label: walmart-overview
@@ -232,7 +232,20 @@ print(f"slope {fit_trend.params['trend']:+.4f} $m per week   "
 Nothing. Two and a half years of Walmart have no linear trend worth naming — and a model that is only
 a trend is not a model, it is a ruler.
 
-## Seasonal dummies, and why not here {.smaller}
+```{python}
+#| label: trend-fit
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(11, 3))
+ax.plot(chain.ds, chain.y, color="lightgray", linewidth=1, label="sales")
+ax.plot(chain.ds, fit_trend.fittedvalues, color=red_pink, linewidth=2,
+        label=f"trend: {fit_trend.params['trend']:+.3f} $m per week")
+ax.set_ylabel("$m")
+ax.legend(loc="upper left")
+ax.set_title("A straight line through the whole sample")
+plt.show()
+```
+
+## Seasonal dummies on weekly data {.smaller}
 
 For a quarterly series, three dummies (one quarter is the baseline) and you have the season.
 
@@ -246,10 +259,85 @@ print(f"observations: {len(chain)}   dummies needed for a weekly season: {M - 1}
 ```
 
 ::: {.callout-warning}
-51 predictors on 143 observations is not a model of seasonality, it is a lookup table with two or three
-observations per entry. This is the same counting problem as in the practice notebook, in a different
-costume.
+51 predictors on 143 observations: every dummy rests on two or three weeks. Whether that is a model of
+seasonality or a lookup table depends on something the count cannot tell you: **how much the same
+week differs from one year to the next.**
 :::
+
+## What 51 dummies estimate {.smaller}
+
+```{python}
+#| label: weekly-dummies
+#| fig-align: center
+chain["year"] = chain.ds.dt.year
+chain["week"] = chain.ds.dt.isocalendar().week.astype(int)
+week_d = pd.get_dummies(chain.week, prefix="w", drop_first=True, dtype=float)
+fit_week = sm.OLS(chain.y, sm.add_constant(pd.concat([chain[["trend"]], week_d], axis=1))).fit()
+
+fig, ax = plt.subplots(figsize=(11, 4.2))
+for yr, colour in zip((2010, 2011, 2012), [turquoise, orange, blue]):
+    d = chain[chain.year == yr]
+    ax.plot(d.week, d.y, "o", color=colour, markersize=5, alpha=0.8, label=str(yr))
+profile = chain.groupby("week").y.mean()
+ax.plot(profile.index, profile.values, color=red_pink, linewidth=2,
+        label="what a week dummy estimates (the average)")
+ax.set_xlabel("week of the year")
+ax.set_ylabel("$m")
+ax.legend(loc="upper left", ncol=4)
+ax.set_title(f"Trend + {len(week_d.columns)} week dummies on {int(fit_week.nobs)} weeks: "
+             "every dummy averages two or three points")
+plt.show()
+```
+
+In-sample adj R² is `{python} f"{fit_week.rsquared_adj:.2f}"`. For Walmart the three years sit almost on top
+of each other, Thanksgiving and Christmas included, so an average of two or three points is already a
+good estimate. If the years disagreed, the same pink line would be mostly noise: same count, opposite
+verdict.
+
+## What if we aggregate to quarters? {.smaller}
+
+Average weekly sales per quarter (a mean, not a sum: quarters hold 12, 13 or 14 weeks), full quarters
+only, then trend plus three dummies:
+
+```{python}
+#| echo: true
+#| code-fold: false
+q = chain.set_index("ds").y.resample("QE").agg(["mean", "count"])
+q = q[q["count"] >= 12].rename(columns={"mean": "y"})          # drop the partial first and last quarter
+q["trend"] = np.arange(1, len(q) + 1)
+dummies = pd.get_dummies(q.index.quarter, prefix="Q", drop_first=True, dtype=float).set_index(q.index)
+
+fit_q = sm.OLS(q.y, sm.add_constant(pd.concat([q[["trend"]], dummies], axis=1))).fit()
+print(f"{int(fit_q.nobs)} quarters, {int(fit_q.df_resid)} residual df, adj R² {fit_q.rsquared_adj:.2f}")
+print(pd.DataFrame({"coef": fit_q.params, "t": fit_q.tvalues, "p": fit_q.pvalues}).round(3))
+```
+
+::: {.callout-important}
+Aggregation adds no information: $10 / 4 = 2.5$ observations per quarter, against
+$143 / 52 \approx 2.75$ per week. **You see each season as many times as you have years.** It only
+trades 51 estimates for 3 coarse ones, and Thanksgiving and Christmas dissolve into a single Q4 number.
+:::
+
+## Quarterly dummies, drawn {.smaller}
+
+```{python}
+#| label: quarterly-dummies
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(11, 4.5))
+ax.plot(chain.ds, chain.y, color="lightgray", linewidth=1, label="weekly sales")
+for i, (end, row) in enumerate(q.iterrows()):
+    start = end - pd.offsets.QuarterBegin(startingMonth=1)
+    ax.hlines(row.y, start, end, color=slate, linewidth=2.5, label="quarterly mean" if i == 0 else None)
+    ax.hlines(fit_q.fittedvalues[end], start, end, color=red_pink, linewidth=2, linestyle="--",
+              label="trend + quarter dummies" if i == 0 else None)
+ax.set_ylabel("$m, average week")
+ax.legend(loc="upper left")
+ax.set_title("Quarterly dummies fit the averages well, and flatten the holiday weeks into Q4")
+plt.show()
+```
+
+The dashed line is nearly on the solid one, and that is exactly the problem: the model is good at
+describing quarters, and the spikes that matter to a retailer live **inside** Q4, not between quarters.
 
 ## Fourier terms {.smaller}
 
@@ -293,6 +381,144 @@ ax.set_ylabel("$m")
 plt.show()
 ```
 
+## How the harmonics add up {.smaller}
+
+```{python}
+#| label: fourier-3d
+#| output: false
+from matplotlib.animation import FuncAnimation, PillowWriter
+
+K_SHOW = 8
+fit_show = sm.OLS(chain.y, sm.add_constant(pd.concat([chain[["trend"]], fourier(chain.trend, M, K_SHOW)],
+                                                     axis=1))).fit()
+tau = np.linspace(0, M, 400)                               # one year, drawn smooth
+waves = [fit_show.params[f"sin{i}"] * np.sin(2 * np.pi * i * tau / M)
+         + fit_show.params[f"cos{i}"] * np.cos(2 * np.pi * i * tau / M) for i in range(1, K_SHOW + 1)]
+amps = [np.hypot(fit_show.params[f"sin{i}"], fit_show.params[f"cos{i}"]) for i in range(1, K_SHOW + 1)]
+total = np.sum(waves, axis=0)
+colours = plt.cm.viridis(np.linspace(0.05, 0.85, K_SHOW))
+
+fig = plt.figure(figsize=(9, 5.4), layout=None)
+ax = fig.add_axes([-0.04, 0.0, 1.08, 0.94], projection="3d", proj_type="ortho")
+
+
+def draw(azim, elev, caption):
+    ax.cla()
+    ax.set_facecolor("white")
+    side = float(np.clip((azim + 60) / 60, 0, 1))          # 0 = the waves, 1 = the spectrum
+    for i, (wave, c) in enumerate(zip(waves, colours), start=1):
+        ax.plot(tau, np.full_like(tau, i), wave, color=c, linewidth=1.4, alpha=1 - 0.9 * side)
+        if side > 0:
+            ax.plot([M / 2] * 2, [i, i], [0, amps[i - 1]], color=c, linewidth=6, alpha=side,
+                    solid_capstyle="round")
+    ax.plot(tau, np.zeros_like(tau), total, color=red_pink, linewidth=2.4, alpha=1 - 0.9 * side)
+    ax.set_xlim(0, M + 5)
+    ax.set_ylim(0, K_SHOW + 0.5)
+    ax.set_zlim(total.min() - 1, total.max() + 1)
+    ax.set_xlabel("week of the year")
+    ax.set_ylabel("harmonic i")
+    ax.set_zlabel("$m")
+    ax.set_yticks(range(0, K_SHOW + 1))
+    ax.set_yticklabels(["sum"] + [str(i) for i in range(1, K_SHOW + 1)])
+    ax.set_box_aspect((2, 1.2, 1), zoom=1.1)
+    ax.view_init(elev=elev, azim=azim)
+    fig.suptitle(caption, fontsize=13, y=0.97)
+
+
+# keyframes: camera angle, caption, frames to hold it
+keys = [(-60, 25, "Eight harmonics, each one sin + cos pair", 12),
+        (-90, 0, "Time domain: add them up, and you get the seasonal shape", 16),
+        (0, 0, "Frequency domain: each wave collapses to its amplitude", 16),
+        (-60, 25, "Eight harmonics, each one sin + cos pair", 0)]
+frames = []
+for (a0, e0, c0, hold), (a1, e1, c1, _) in zip(keys[:-1], keys[1:]):
+    frames += [(a0, e0, c0)] * hold
+    for s in np.linspace(0, 1, 24)[1:]:
+        s = 0.5 - 0.5 * np.cos(np.pi * s)                   # ease in and out
+        frames.append((a0 + (a1 - a0) * s, e0 + (e1 - e0) * s, c1 if s > 0.5 else c0))
+
+ani = FuncAnimation(fig, lambda f: draw(*f), frames=frames)
+ani.save("img/fourier_3d.gif", writer=PillowWriter(fps=12), dpi=100)
+plt.close(fig)
+```
+
+![](img/fourier_3d.gif){fig-align="center" width="80%"}
+
+Each harmonic is a sine and a cosine at frequency $i$ cycles per year; the regression chooses their
+weights. The pink curve is their sum, the seasonal part of the $K = 8$ model fitted to Walmart.
+
+## Larger K {.smaller}
+
+```{python}
+#| label: fourier-large-k
+#| fig-align: center
+def fourier_design(k):
+    F = fourier(chain.trend, M, k)
+    if 2 * k == M:
+        F = F.drop(columns=f"sin{k}")                       # sin(pi * t) is zero at every integer t
+    return sm.add_constant(pd.concat([chain[["trend"]], F], axis=1))
+
+
+fits_k = {k: sm.OLS(chain.y, fourier_design(k)).fit() for k in range(1, M // 2 + 1)}
+k_path = pd.DataFrame({"K": list(fits_k), "AICc": [aicc(f) for f in fits_k.values()]})
+best_k = int(k_path.loc[k_path.AICc.idxmin(), "K"])
+
+fig, (ax, ax2) = plt.subplots(2, 1, figsize=(11, 5.2), height_ratios=[2, 1])
+ax.plot(chain.ds, chain.y, color="lightgray", linewidth=1, label="sales")
+for k, colour in zip((10, M // 2), [turquoise, red_pink]):
+    ax.plot(chain.ds, fits_k[k].fittedvalues, color=colour, linewidth=1.6,
+            label=f"K = {k} ({int(fits_k[k].df_model) - 1} terms), adj R² {fits_k[k].rsquared_adj:.2f}")
+ax.legend(loc="upper left")
+ax.set_ylabel("$m")
+ax.set_title("Larger K: from a seasonal shape to a copy of the calendar")
+ax2.plot(k_path.K, k_path.AICc, "o-", color=slate, markersize=4)
+ax2.plot(best_k, k_path.AICc.min(), "o", color=red_pink, markersize=9, label=f"lowest AICc: K = {best_k}")
+ax2.set_xlabel("K")
+ax2.set_ylabel("AICc")
+ax2.legend(loc="upper left")
+plt.show()
+```
+
+AICc keeps falling all the way to $K = 26$, where the 51 Fourier terms span the same space as 51 week
+dummies. The holiday weeks are narrow spikes, and only high frequencies can draw a narrow spike.
+
+## Larger K, out of sample {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| output-location: column
+y_arr = chain.y.to_numpy()
+scale = float(np.mean(np.abs(y_arr[M:] - y_arr[:-M])))    # MASE scale
+origins = range(len(chain) - H - 8, len(chain) - H)       # 8 origins, 13 weeks ahead
+
+
+def rolling_mase_k(k):
+    X, errors = fourier_design(k), []
+    for end in origins:
+        f = sm.OLS(chain.y[:end], X[:end]).fit()
+        pred = f.predict(X[end:end + H])
+        errors.append(np.mean(np.abs(y_arr[end:end + H] - pred)) / scale)
+    return float(np.mean(errors))
+
+
+snaive_k = np.mean([np.mean(np.abs(y_arr[e:e + H] - y_arr[e - M:e - M + H])) / scale
+                    for e in origins])
+k_table = pd.DataFrame([{"model": f"K = {k}", "AICc": aicc(fits_k[k]),
+                         "rolling MASE": rolling_mase_k(k)} for k in (3, 10, 18, 26)]
+                       + [{"model": "seasonal naive", "rolling MASE": snaive_k}])
+k_table.round(3)
+```
+
+The rolling origin agrees with AICc: more harmonics forecast better, and from $K = 18$ the regression
+beats seasonal naive.
+
+::: {.callout-important}
+**"Small $K$" is a default for smooth or noisy seasonality, not a law.** Walmart's season is sharp and
+lands on the same weeks every year, so the data asks for the whole calendar. Choose $K$ the way you
+choose any model: AICc to shortlist, a holdout to decide.
+:::
+
 ## Dummy and intervention variables {.smaller}
 
 A predictor that is 1 when something happens and 0 otherwise.
@@ -331,11 +557,12 @@ weeks of the whole series are not in it: the shopping happens *before* the holid
 
 # Building a model
 
-## Five models, one series {.smaller}
+## Five models, one series {.tiny}
 
 ```{python}
 #| echo: true
 #| code-fold: false
+#| output-location: column
 F3 = fourier(chain.trend, M, 3)
 data = pd.concat([chain, F3], axis=1)
 FOURIER = list(F3.columns)
@@ -360,7 +587,7 @@ for name, cols in SPECS.items():
 pd.DataFrame(rows).round(3)
 ```
 
-## Five models: read the table {.smaller}
+## Five models {.smaller}
 
 - **trend** explains nothing: adj R² is *negative*, which is what that statistic does when a predictor
   earns less than it costs.
@@ -372,7 +599,10 @@ pd.DataFrame(rows).round(3)
 - **the economy** raises adj R² by 0.01 and **raises AICc** — four predictors that do not pay for
   themselves.
 
-[One well-timed dummy beat the trend, the Fourier terms and four macro series put together.]{.hi}
+All five keep $K = 3$ on purpose: a smooth shape leaves the holiday spikes to the dummies, so each
+dummy's worth is visible. For forecasting alone, *Larger K* already showed the other road.
+
+[One well-timed dummy beat the trend, the $K = 3$ shape and four macro series put together.]{.hi}
 
 ## The coefficients of the full model {.smaller}
 
@@ -491,7 +721,7 @@ print(f"our model: R² {fits['+ economy'].rsquared:.3f}, adjusted {fits['+ econo
 ```
 :::
 
-## What that costs you: read it {.smaller}
+## What that costs you {.smaller}
 
 - Twelve predictors on 143 weeks buy about **8% of $R^2$ for free**, and one time in twenty a model of
   pure noise that size would report $R^2 = 0.14$.
@@ -515,7 +745,7 @@ fig, axes = plt.subplots(1, 3, figsize=(13, 3.4))
 axes[0].plot(chain.ds, resid, color=orange, linewidth=0.9)
 axes[0].axhline(0, color="black", linewidth=0.8)
 axes[0].set_title("residuals over time")
-plot_acf(resid, lags=30, ax=axes[1], title="ACF of residuals")
+plot_acf(resid, lags=30, zero=False, ax=axes[1], title="ACF of residuals")
 axes[2].scatter(best.fittedvalues, resid, s=16, color=slate)
 axes[2].axhline(0, color=red_pink, linewidth=1)
 axes[2].set_xlabel("fitted")
@@ -601,11 +831,12 @@ choose. Same rule as for ETS.
 
 📖 [FPP 7.5 — selecting predictors](https://otexts.com/fpp3/selecting-predictors.html)
 
-## AICc against a rolling origin {.smaller}
+## AICc against a rolling origin {.tiny}
 
 ```{python}
 #| echo: true
 #| code-fold: false
+#| output-location: column
 scale = float(np.mean(np.abs(chain.y.to_numpy()[M:] - chain.y.to_numpy()[:-M])))   # MASE scale
 
 def rolling_mase(cols, windows=8, h=H):
@@ -626,13 +857,14 @@ comparison = pd.DataFrame([
 comparison.round(3)
 ```
 
-## AICc against a rolling origin: read it {.smaller}
+## AICc against a rolling origin {.smaller}
 
 - **AICc picks `+ pre-Christmas`**, and among the regressions the rolling origin agrees.
 - **`+ economy` is the worst out of sample** — 1.72 against 1.27 — while having the second-best
   adjusted $R^2$. Four predictors that improved the fit and damaged the forecast.
 - And the uncomfortable line: **plain `trend` forecasts better than four of the five models.** A flat
-  line is less wrong at thirteen weeks than a seasonal shape estimated from two and a half cycles.
+  line is less wrong at thirteen weeks than a $K = 3$ shape, which spreads the holiday spikes over the
+  weeks around them.
 
 ::: {.callout-note}
 The same lesson as Week 4, in a different model family: in-sample criteria shortlist, out-of-sample
@@ -664,11 +896,12 @@ future date. Temperature and unemployment are not.
 
 📖 [FPP 7.6 — forecasting with regression](https://otexts.com/fpp3/forecasting-regression.html)
 
-## The same model, three ways {.smaller}
+## The same model, three ways {.tiny}
 
 ```{python}
 #| echo: true
 #| code-fold: false
+#| output-location: column
 train, valid = data.iloc[:-H], data.iloc[-H:]
 cols = SPECS["+ economy"]
 fit = sm.OLS(train.y, sm.add_constant(train[cols])).fit()
@@ -694,15 +927,16 @@ pd.DataFrame([{"forecast": "ex-post, true covariates", "MASE": mase(ex_post)},
 
 ## The result nobody advertises {.smaller}
 
-On this series, **every regression loses to the one-line seasonal naive** — and ex-post, with the true
+On this series, **every regression in the table loses to the one-line seasonal naive** — and ex-post, with the true
 future of temperature, fuel, CPI and unemployment, is *worse* than ex-ante with those four frozen.
 
 Why, in order of importance:
 
 1. The economy coefficients are **noise fitted to 130 weeks**. Feeding them true, moving values
    propagates that noise; freezing them at least keeps it constant.
-2. 143 weeks is **2.75 annual cycles**. Every seasonal parameter, Fourier or dummy, rests on two or
-   three observations.
+2. **$K = 3$ cannot draw this season.** The pre-Christmas dummy catches one spike; Thanksgiving and the
+   rest are smeared. The $K = 26$ regression from *Larger K* did beat `snaive`, by becoming an average
+   of past years plus a trend.
 3. The residuals are **autocorrelated**, so the model is ignoring the strongest predictor available:
    last week's error.
 
@@ -759,7 +993,7 @@ extrapolates. Quadratic trends in particular should be treated as a red flag.
 
 | Trap | What you see | Fix |
 |---|---|---|
-| Seasonal dummies on weekly or daily data | 51 or 364 predictors, two observations each | Fourier terms, small $K$, chosen by AICc |
+| Choosing $K$ by habit | A smooth seasonal curve under spikes that repeat every year | Let AICc and a rolling origin choose $K$, up to $m/2$ when the season is sharp and stable |
 | A dummy that marks the label, not the effect | Coefficient near zero on an event you can see in the plot | Move the dummy to where the mechanism is |
 | Reading $t$ statistics off autocorrelated residuals | Ljung-Box rejects, everything looks significant | Believe the point forecasts, not the $p$-values; Week 7 fixes it properly |
 | Two trending series regressed on each other | Huge $t$, residual acf near 1 | Check the residual ACF before the coefficient |
@@ -771,8 +1005,8 @@ extrapolates. Quadratic trends in particular should be treated as a red flag.
   dummies, interventions — that every later model uses to say *when*.
 - **Is:** the right frame for a question like "how much of December is Christmas", which no benchmark
   or ETS can answer at all.
-- **Is not:** a forecasting method that beats a seasonal benchmark by itself on a short series. Today
-  it lost to `snaive` five times out of five.
+- **Is not:** automatically better than a seasonal benchmark. Our five specifications lost to `snaive`;
+  the one that won, $K = 26$, is `snaive` averaged over past years, with a trend.
 - **Is not:** finished. Its residuals still carry structure, and structure in residuals is exactly
   what ARIMA is for.
 
