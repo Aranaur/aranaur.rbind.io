@@ -1,0 +1,203 @@
+---
+title: "Lab 6, Challenge 2: Exponential smoothing"
+subtitle: "MATH840 | Time Series | Week 6 — graded assignment 4 of 7"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    highlight-style: github
+    theme: [default, custom.scss]
+execute:
+  echo: true
+  warning: false
+  eval: false
+editor_options:
+  chunk_output_type: console
+---
+
+::: {.callout-important appearance="simple"}
+## What changes this week
+
+**Accuracy is marked from today.** Your forecast is scored on the hidden horizon against your own
+benchmark, and that is 3 of the 8 points. Everything else works as in Week 4: the practice session is a
+worked example, the graded work is done at home, due **23:59 today**.
+:::
+
+::: {.callout-tip appearance="simple"}
+## Open the notebook
+
+The template: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab06.ipynb)
+
+Click **Copy to Drive** before you start working, otherwise nothing you write is saved.
+
+The practice session's worked example, with the same helpers:
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo06.ipynb)
+:::
+
+## 🎯 The task
+
+Forecast **your series from Week 4** with exponential smoothing. The material is the Week 4 lecture,
+*Exponential Smoothing*.
+
+The order matters, and it is marked:
+
+1. **Specify the model by hand first** — error, trend, season, damping — from your own plots.
+2. **Then** let `AutoETS` choose, and compare.
+3. **Decide** between the candidates on a rolling origin, not on one window.
+4. Check what is left in the residuals, and submit the forecast with the model's own 80% interval.
+
+ETS only: no ARIMA, no regression, no averaging with other methods. Those come later, on this same
+series.
+
+::: {.callout-important}
+## This one counts
+
+8 points. **Deadline: 23:59 today**, on Moodle. The accuracy score is published the next morning;
+marks and comments come back before the next practice session.
+:::
+
+## 📋 What you are marked on
+
+| Section | Criteria | Points |
+|---|---|---:|
+| 1 | EDA and visualisation | 1 |
+| 2 | Forecast accuracy against your benchmark | 3 |
+| 3 | Justification block | 3 |
+| 4 | Code quality and reproducibility | 1 |
+| | **Total** | **8** |
+
+The notebook has one section per row. **Keep those headings.**
+
+## 📊 Section 1 — EDA and visualisation (1 point)
+
+You saw this series in Week 4. This time the plots have one job: to justify each letter of your
+specification **before** `AutoETS` runs.
+
+- A time plot, read for **trend**: is there one, and does it flatten (damping)?
+- The **seasonal swing against the level** — one point per year, max minus min of the year against its
+  mean. A flat cloud says additive season; a cloud that climbs with the level says multiplicative. The
+  template gives you `swing_against_level()`.
+- The validation split on a plot: history, validation window, your chosen model's forecast and 80%
+  interval over it.
+- One sentence per plot. **A plot with no reading attached earns nothing.**
+
+## 🎯 Section 2 — Forecast accuracy (3 points)
+
+Scored from your submission file, on the `h` observations after your history that nobody has seen.
+
+$$
+\text{skill} = \frac{\text{MASE of your forecast}}{\text{MASE of your benchmark}}
+$$
+
+| Skill | Points |
+|---|---:|
+| below 1 — you beat your benchmark | 3 |
+| 1 to 1.1 — within 10% | 2 |
+| above 1.1 | 1, and 3.3 must say why |
+
+- **Your benchmark** is the best of the four simple methods — `mean`, `naive`, `snaive`, `drift` —
+  by RMSE on the last `h` observations of your history, refitted on all of it. The template computes it
+  by exactly the scorer's rule, so the number you see is the one you are compared against.
+- **MASE** is scaled by the in-sample seasonal naive error of your whole history — the same `mase()` as
+  in the template.
+- You are never compared with your classmates.
+
+::: {.callout-note}
+## What the pool guarantees, and what it does not
+
+Every series in the pool was issued only if **`AutoETS` fitted on the whole history beats its
+benchmark** on the hidden horizon. That is a guarantee about `AutoETS` rerun on all of `y` — not about
+every ETS model, and not about the letters `AutoETS` picked on `train`.
+
+The Week 4 lecture's rule — shortlist on AICc, decide on a rolling origin — is still the right way to
+work, and it is what 3.2 pays for. Measured on the whole pool: shortlisting the three best models by
+AICc and choosing among them by a rolling origin beats the benchmark on **94%** of series and comes
+within 10% on 98%; choosing by a rolling origin among everything, 85%. If your evidence leads you away
+from `AutoETS`, follow it — and say in 3.2 what that evidence was.
+:::
+
+## ✍️ Section 3 — Justification block (3 points)
+
+The part a human reads closely. Roughly a paragraph each, with numbers from your own cells.
+
+| Item | Points | What earns them |
+|---|---:|---|
+| 3.1 | 1 | **Your specification, before the machine.** Each letter of `MY_SPEC` and the damping choice, tied to a plot from Section 1. What in the plots would have made you choose differently. |
+| 3.2 | 1 | **What `AutoETS` chose, and what you submitted.** Where `AutoETS` agrees or disagrees with you, and why. Your shortlist with AICc and rolling MASE. The model you submitted and the evidence for it — and if it is not `AutoETS`'s choice, what made you leave it. |
+| 3.3 | 1 | **What is left, and what you expect.** ACF and Ljung-Box on the **innovation** residuals, read: what structure is left and what it damages — the forecast or the interval. Your interval's coverage on the validation window. Your expected skill on the hidden horizon, and if you expect to lose, why. |
+
+::: {.callout-important}
+Marked on the reasoning. A specification by hand that `AutoETS` overrules, with a clear account of
+why, scores full marks in 3.1 and 3.2. A model that wins and cannot say why it was chosen does not.
+:::
+
+::: {.callout-warning}
+## Where this goes wrong
+
+- **Specifying after the fact.** `MY_SPEC` copied from `AutoETS` and justified backwards reads
+  exactly like that. Write 3.1 from Section 1 alone.
+- **Choosing on one window.** The validation window is one draw of `h` observations. In the practice
+  session it ranked a damped model first; over three windows the same model was last of the shortlist.
+- **Comparing AICc across transformations.** AICc is comparable between ETS models on the same `y`;
+  not between `y` and `log(y)`, and not against anything that is not ETS.
+- **`damped=None`.** With `model="AAA"` and no `damped`, `AutoETS` may return `ETS(A,Ad,A)`. The
+  template's `fit_ets()` passes `damped` explicitly — use it.
+- **Testing the wrong residuals.** Ljung-Box goes on `fit.model_["residuals"]` of the chosen model, not
+  on `y`.
+- **Forecasting from `train`.** The submission is refitted on the **whole** history.
+- **Freezing `AutoETS`'s letters from `train`.** If you choose `AutoETS`, submit `fit_ets(y)` — the
+  search rerun on all of `y`. On half the pool it lands on different letters than it did on `train`,
+  and the guarantee is about the rerun, not about the letters it found first.
+
+📖 [FPP3 ch. 8](https://otexts.com/fpp3/expsmooth.html) ·
+[FPP 8.6 estimation and model selection](https://otexts.com/fpp3/ets-estimation.html) ·
+[FPP 5.10 time series cross-validation](https://otexts.com/fpp3/tscv.html) ·
+[FPP the Pythonic Way, ch. 8](https://otexts.com/fpppy/nbs/08-exponential-smoothing.html)
+:::
+
+## 🧹 Section 4 — Code quality and reproducibility (1 point)
+
+- The notebook runs top to bottom on a fresh kernel without errors.
+- The submission file is written **by the notebook**, not edited by hand.
+- No leakage: candidates are compared on `train`/`valid` and `rolling_mase`; only the final model is
+  fitted on all of `y`.
+- Every number in your text comes from a cell.
+
+## 📤 Submission
+
+Upload three files to the Week 6 activity on Moodle **before 23:59 today**:
+
+- `SURNAME_lab06_forecast.csv` — written by the last cell of the template. Exactly $h$ rows and
+  these columns:
+
+  | Column | What |
+  |---|---|
+  | `student_id` | your identifier |
+  | `code` | your series code, the same as in Week 4 |
+  | `ds` | the dates you are forecasting, in order |
+  | `yhat` | your point forecast |
+  | `yhat_lo_80`, `yhat_hi_80` | your model's 80% interval |
+
+- `SURNAME_lab06.pdf` — the report, with the justification block;
+- `SURNAME_lab06.ipynb` — the source.
+
+::: {.callout-warning}
+## A file that cannot be read scores 0 for accuracy
+
+Exactly $h$ rows, the dates asked for, no `NaN`, the interval around the point forecast. The
+template's check cell is the same one the scorer uses — if it passes, your file is fine. The scorer
+reports format errors; it never repairs them.
+:::
+
+## ⏱ How long this should take
+
+Ninety minutes if you follow the practice session's example. `rolling_mase` refits every candidate
+three times, so a shortlist of six on a monthly series takes a minute or two to run.
+
+## 📚 For next week
+
+**Week 7 is Challenge 3, ARIMA**, on this same series — the Week 6 lecture, *ARIMA Models, Part 1*,
+already published. Before then: run `nsdiffs` and `ndiffs` on your series, and look at the ACF and
+PACF of what is left after differencing. That is where Challenge 3's specification by hand starts.

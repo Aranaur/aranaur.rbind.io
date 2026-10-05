@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Ihor Miroshnychenko">
+
+<title>Lab 6, Challenge 2: Exponential smoothing</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src=".lab06_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".lab06_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src=".lab06_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src=".lab06_files/libs/quarto-html/popper.min.js"></script>
+<script src=".lab06_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src=".lab06_files/libs/quarto-html/anchor.min.js"></script>
+<link href=".lab06_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".lab06_files/libs/quarto-html/quarto-syntax-highlighting-a6f4957c43e529dfa47e771024b1e13d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".lab06_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href=".lab06_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href=".lab06_files/libs/bootstrap/bootstrap-f0363865eaeadd24fdd349ba0d39ddd7.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#the-task" id="toc-the-task" class="nav-link active" data-scroll-target="#the-task">🎯 The task</a></li>
+  <li><a href="#what-you-are-marked-on" id="toc-what-you-are-marked-on" class="nav-link" data-scroll-target="#what-you-are-marked-on">📋 What you are marked on</a></li>
+  <li><a href="#section-1-eda-and-visualisation-1-point" id="toc-section-1-eda-and-visualisation-1-point" class="nav-link" data-scroll-target="#section-1-eda-and-visualisation-1-point">📊 Section 1 — EDA and visualisation (1 point)</a></li>
+  <li><a href="#section-2-forecast-accuracy-3-points" id="toc-section-2-forecast-accuracy-3-points" class="nav-link" data-scroll-target="#section-2-forecast-accuracy-3-points">🎯 Section 2 — Forecast accuracy (3 points)</a></li>
+  <li><a href="#section-3-justification-block-3-points" id="toc-section-3-justification-block-3-points" class="nav-link" data-scroll-target="#section-3-justification-block-3-points">✍️ Section 3 — Justification block (3 points)</a></li>
+  <li><a href="#section-4-code-quality-and-reproducibility-1-point" id="toc-section-4-code-quality-and-reproducibility-1-point" class="nav-link" data-scroll-target="#section-4-code-quality-and-reproducibility-1-point">🧹 Section 4 — Code quality and reproducibility (1 point)</a></li>
+  <li><a href="#submission" id="toc-submission" class="nav-link" data-scroll-target="#submission">📤 Submission</a></li>
+  <li><a href="#how-long-this-should-take" id="toc-how-long-this-should-take" class="nav-link" data-scroll-target="#how-long-this-should-take">⏱ How long this should take</a></li>
+  <li><a href="#for-next-week" id="toc-for-next-week" class="nav-link" data-scroll-target="#for-next-week">📚 For next week</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Lab 6, Challenge 2: Exponential smoothing</h1>
+<p class="subtitle lead">MATH840 | Time Series | Week 6 — graded assignment 4 of 7</p>
+</div>
+
+
+<div class="quarto-title-meta-author">
+  <div class="quarto-title-meta-heading">Author</div>
+  <div class="quarto-title-meta-heading">Affiliation</div>
+  
+    <div class="quarto-title-meta-contents">
+    <p class="author">Ihor Miroshnychenko </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            Kyiv School of Economics
+          </p>
+      </div>
+  </div>
+
+<div class="quarto-title-meta">
+
+      
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="callout callout-style-simple callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>What changes this week
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Accuracy is marked from today.</strong> Your forecast is scored on the hidden horizon against your own benchmark, and that is 3 of the 8 points. Everything else works as in Week 4: the practice session is a worked example, the graded work is done at home, due <strong>23:59 today</strong>.</p>
+</div>
+</div>
+<div class="callout callout-style-simple callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Open the notebook
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The template: <a href="https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab06.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" class="img-fluid" alt="Open In Colab"></a></p>
+<p>Click <strong>Copy to Drive</strong> before you start working, otherwise nothing you write is saved.</p>
+<p>The practice session’s worked example, with the same helpers: <a href="https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo06.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" class="img-fluid" alt="Open In Colab"></a></p>
+</div>
+</div>
+<section id="the-task" class="level2">
+<h2 class="anchored" data-anchor-id="the-task">🎯 The task</h2>
+<p>Forecast <strong>your series from Week 4</strong> with exponential smoothing. The material is the Week 4 lecture, <em>Exponential Smoothing</em>.</p>
+<p>The order matters, and it is marked:</p>
+<ol type="1">
+<li><strong>Specify the model by hand first</strong> — error, trend, season, damping — from your own plots.</li>
+<li><strong>Then</strong> let <code>AutoETS</code> choose, and compare.</li>
+<li><strong>Decide</strong> between the candidates on a rolling origin, not on one window.</li>
+<li>Check what is left in the residuals, and submit the forecast with the model’s own 80% interval.</li>
+</ol>
+<p>ETS only: no ARIMA, no regression, no averaging with other methods. Those come later, on this same series.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>This one counts
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>8 points. <strong>Deadline: 23:59 today</strong>, on Moodle. The accuracy score is published the next morning; marks and comments come back before the next practice session.</p>
+</div>
+</div>
+</section>
+<section id="what-you-are-marked-on" class="level2">
+<h2 class="anchored" data-anchor-id="what-you-are-marked-on">📋 What you are marked on</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Section</th>
+<th>Criteria</th>
+<th style="text-align: right;">Points</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>EDA and visualisation</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Forecast accuracy against your benchmark</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Justification block</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>Code quality and reproducibility</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td><strong>Total</strong></td>
+<td style="text-align: right;"><strong>8</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The notebook has one section per row. <strong>Keep those headings.</strong></p>
+</section>
+<section id="section-1-eda-and-visualisation-1-point" class="level2">
+<h2 class="anchored" data-anchor-id="section-1-eda-and-visualisation-1-point">📊 Section 1 — EDA and visualisation (1 point)</h2>
+<p>You saw this series in Week 4. This time the plots have one job: to justify each letter of your specification <strong>before</strong> <code>AutoETS</code> runs.</p>
+<ul>
+<li>A time plot, read for <strong>trend</strong>: is there one, and does it flatten (damping)?</li>
+<li>The <strong>seasonal swing against the level</strong> — one point per year, max minus min of the year against its mean. A flat cloud says additive season; a cloud that climbs with the level says multiplicative. The template gives you <code>swing_against_level()</code>.</li>
+<li>The validation split on a plot: history, validation window, your chosen model’s forecast and 80% interval over it.</li>
+<li>One sentence per plot. <strong>A plot with no reading attached earns nothing.</strong></li>
+</ul>
+</section>
+<section id="section-2-forecast-accuracy-3-points" class="level2">
+<h2 class="anchored" data-anchor-id="section-2-forecast-accuracy-3-points">🎯 Section 2 — Forecast accuracy (3 points)</h2>
+<p>Scored from your submission file, on the <code>h</code> observations after your history that nobody has seen.</p>
+<p><span class="math display">\[
+\text{skill} = \frac{\text{MASE of your forecast}}{\text{MASE of your benchmark}}
+\]</span></p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Skill</th>
+<th style="text-align: right;">Points</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>below 1 — you beat your benchmark</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="even">
+<td>1 to 1.1 — within 10%</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr class="odd">
+<td>above 1.1</td>
+<td style="text-align: right;">1, and 3.3 must say why</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Your benchmark</strong> is the best of the four simple methods — <code>mean</code>, <code>naive</code>, <code>snaive</code>, <code>drift</code> — by RMSE on the last <code>h</code> observations of your history, refitted on all of it. The template computes it by exactly the scorer’s rule, so the number you see is the one you are compared against.</li>
+<li><strong>MASE</strong> is scaled by the in-sample seasonal naive error of your whole history — the same <code>mase()</code> as in the template.</li>
+<li>You are never compared with your classmates.</li>
+</ul>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>What the pool guarantees, and what it does not
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Every series in the pool was issued only if <strong><code>AutoETS</code> fitted on the whole history beats its benchmark</strong> on the hidden horizon. That is a guarantee about <code>AutoETS</code> rerun on all of <code>y</code> — not about every ETS model, and not about the letters <code>AutoETS</code> picked on <code>train</code>.</p>
+<p>The Week 4 lecture’s rule — shortlist on AICc, decide on a rolling origin — is still the right way to work, and it is what 3.2 pays for. Measured on the whole pool: shortlisting the three best models by AICc and choosing among them by a rolling origin beats the benchmark on <strong>94%</strong> of series and comes within 10% on 98%; choosing by a rolling origin among everything, 85%. If your evidence leads you away from <code>AutoETS</code>, follow it — and say in 3.2 what that evidence was.</p>
+</div>
+</div>
+</section>
+<section id="section-3-justification-block-3-points" class="level2">
+<h2 class="anchored" data-anchor-id="section-3-justification-block-3-points">✍️ Section 3 — Justification block (3 points)</h2>
+<p>The part a human reads closely. Roughly a paragraph each, with numbers from your own cells.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 40%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Item</th>
+<th style="text-align: right;">Points</th>
+<th>What earns them</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>3.1</td>
+<td style="text-align: right;">1</td>
+<td><strong>Your specification, before the machine.</strong> Each letter of <code>MY_SPEC</code> and the damping choice, tied to a plot from Section 1. What in the plots would have made you choose differently.</td>
+</tr>
+<tr class="even">
+<td>3.2</td>
+<td style="text-align: right;">1</td>
+<td><strong>What <code>AutoETS</code> chose, and what you submitted.</strong> Where <code>AutoETS</code> agrees or disagrees with you, and why. Your shortlist with AICc and rolling MASE. The model you submitted and the evidence for it — and if it is not <code>AutoETS</code>’s choice, what made you leave it.</td>
+</tr>
+<tr class="odd">
+<td>3.3</td>
+<td style="text-align: right;">1</td>
+<td><strong>What is left, and what you expect.</strong> ACF and Ljung-Box on the <strong>innovation</strong> residuals, read: what structure is left and what it damages — the forecast or the interval. Your interval’s coverage on the validation window. Your expected skill on the hidden horizon, and if you expect to lose, why.</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Marked on the reasoning. A specification by hand that <code>AutoETS</code> overrules, with a clear account of why, scores full marks in 3.1 and 3.2. A model that wins and cannot say why it was chosen does not.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Where this goes wrong
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong>Specifying after the fact.</strong> <code>MY_SPEC</code> copied from <code>AutoETS</code> and justified backwards reads exactly like that. Write 3.1 from Section 1 alone.</li>
+<li><strong>Choosing on one window.</strong> The validation window is one draw of <code>h</code> observations. In the practice session it ranked a damped model first; over three windows the same model was last of the shortlist.</li>
+<li><strong>Comparing AICc across transformations.</strong> AICc is comparable between ETS models on the same <code>y</code>; not between <code>y</code> and <code>log(y)</code>, and not against anything that is not ETS.</li>
+<li><strong><code>damped=None</code>.</strong> With <code>model="AAA"</code> and no <code>damped</code>, <code>AutoETS</code> may return <code>ETS(A,Ad,A)</code>. The template’s <code>fit_ets()</code> passes <code>damped</code> explicitly — use it.</li>
+<li><strong>Testing the wrong residuals.</strong> Ljung-Box goes on <code>fit.model_["residuals"]</code> of the chosen model, not on <code>y</code>.</li>
+<li><strong>Forecasting from <code>train</code>.</strong> The submission is refitted on the <strong>whole</strong> history.</li>
+<li><strong>Freezing <code>AutoETS</code>’s letters from <code>train</code>.</strong> If you choose <code>AutoETS</code>, submit <code>fit_ets(y)</code> — the search rerun on all of <code>y</code>. On half the pool it lands on different letters than it did on <code>train</code>, and the guarantee is about the rerun, not about the letters it found first.</li>
+</ul>
+<p>📖 <a href="https://otexts.com/fpp3/expsmooth.html">FPP3 ch.&nbsp;8</a> · <a href="https://otexts.com/fpp3/ets-estimation.html">FPP 8.6 estimation and model selection</a> · <a href="https://otexts.com/fpp3/tscv.html">FPP 5.10 time series cross-validation</a> · <a href="https://otexts.com/fpppy/nbs/08-exponential-smoothing.html">FPP the Pythonic Way, ch.&nbsp;8</a></p>
+</div>
+</div>
+</section>
+<section id="section-4-code-quality-and-reproducibility-1-point" class="level2">
+<h2 class="anchored" data-anchor-id="section-4-code-quality-and-reproducibility-1-point">🧹 Section 4 — Code quality and reproducibility (1 point)</h2>
+<ul>
+<li>The notebook runs top to bottom on a fresh kernel without errors.</li>
+<li>The submission file is written <strong>by the notebook</strong>, not edited by hand.</li>
+<li>No leakage: candidates are compared on <code>train</code>/<code>valid</code> and <code>rolling_mase</code>; only the final model is fitted on all of <code>y</code>.</li>
+<li>Every number in your text comes from a cell.</li>
+</ul>
+</section>
+<section id="submission" class="level2">
+<h2 class="anchored" data-anchor-id="submission">📤 Submission</h2>
+<p>Upload three files to the Week 6 activity on Moodle <strong>before 23:59 today</strong>:</p>
+<ul>
+<li><p><code>SURNAME_lab06_forecast.csv</code> — written by the last cell of the template. Exactly <span class="math inline">\(h\)</span> rows and these columns:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Column</th>
+<th>What</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>student_id</code></td>
+<td>your identifier</td>
+</tr>
+<tr class="even">
+<td><code>code</code></td>
+<td>your series code, the same as in Week 4</td>
+</tr>
+<tr class="odd">
+<td><code>ds</code></td>
+<td>the dates you are forecasting, in order</td>
+</tr>
+<tr class="even">
+<td><code>yhat</code></td>
+<td>your point forecast</td>
+</tr>
+<tr class="odd">
+<td><code>yhat_lo_80</code>, <code>yhat_hi_80</code></td>
+<td>your model’s 80% interval</td>
+</tr>
+</tbody>
+</table></li>
+<li><p><code>SURNAME_lab06.pdf</code> — the report, with the justification block;</p></li>
+<li><p><code>SURNAME_lab06.ipynb</code> — the source.</p></li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>A file that cannot be read scores 0 for accuracy
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Exactly <span class="math inline">\(h\)</span> rows, the dates asked for, no <code>NaN</code>, the interval around the point forecast. The template’s check cell is the same one the scorer uses — if it passes, your file is fine. The scorer reports format errors; it never repairs them.</p>
+</div>
+</div>
+</section>
+<section id="how-long-this-should-take" class="level2">
+<h2 class="anchored" data-anchor-id="how-long-this-should-take">⏱ How long this should take</h2>
+<p>Ninety minutes if you follow the practice session’s example. <code>rolling_mase</code> refits every candidate three times, so a shortlist of six on a monthly series takes a minute or two to run.</p>
+</section>
+<section id="for-next-week" class="level2">
+<h2 class="anchored" data-anchor-id="for-next-week">📚 For next week</h2>
+<p><strong>Week 7 is Challenge 3, ARIMA</strong>, on this same series — the Week 6 lecture, <em>ARIMA Models, Part 1</em>, already published. Before then: run <code>nsdiffs</code> and <code>ndiffs</code> on your series, and look at the ACF and PACF of what is left after differencing. That is where Challenge 3’s specification by hand starts.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
