@@ -22,12 +22,15 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 4 — practice demo, the toolbox end to end (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo04.ipynb) |
 | Week 4 — practice, second case: Walmart weekly sales (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo04_walmart.ipynb) |
 | Week 4 — Lab 4 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab04.ipynb) |
+| Week 6 — lab handout, Challenge 2 (ETS) | <https://01a10c3d-2a4c-157e-a3c7-512b09bb4b32.share.connect.posit.cloud> |
+| Week 6 — practice demo, ETS by hand and by machine (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo06.ipynb) |
+| Week 6 — Lab 6 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab06.ipynb) |
 | Moodle | <https://teaching.kse.org.ua/course/view.php?id=4432> |
 
 ## Layout
 
 ```
-slides/   .00 syllabus, .01–.04 weeks 1–4 (dot-prefixed: not rendered into the site)
+slides/   .00 syllabus, .01–.06 weeks 1–6 (dot-prefixed: not rendered into the site)
 labs/     .labNN.qmd handouts, _labNN.ipynb templates, _demoNN.ipynb practice demos,
           .demoNN-notes.md how to run the session
 data/     datasets served to students over raw.githubusercontent.com
