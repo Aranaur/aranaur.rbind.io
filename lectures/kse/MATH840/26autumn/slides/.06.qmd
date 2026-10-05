@@ -1,0 +1,1237 @@
+---
+title: "ARIMA Models, Part 1"
+subtitle: "MATH840 | Time Series | Week 6"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=4432">🔗MATH840 | Time Series</a>
+format:
+  revealjs:
+    fragments: false   # show every slide in full; no click-through reveals
+    code-line-numbers: false
+    code-fold: true
+    code-summary: "Code"
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+    mermaid:
+      theme: forest
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+editor_options:
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+import warnings
+warnings.filterwarnings("ignore")
+import os
+os.environ["NIXTLA_ID_AS_COL"] = "true"
+import numpy as np
+np.set_printoptions(suppress=True)
+np.random.seed(1)
+import pandas as pd
+pd.set_option("display.width", 130)
+pd.set_option("display.precision", 3)
+import seaborn as sns
+sns.set_style("whitegrid")
+import matplotlib.pyplot as plt
+plt.style.use("ggplot")
+plt.rcParams.update({
+    "figure.figsize": (8, 5),
+    "figure.dpi": 100,
+    "savefig.dpi": 300,
+    "figure.constrained_layout.use": True,
+    "axes.titlesize": 12,
+    "axes.labelsize": 10,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+    "legend.fontsize": 9,
+})
+import matplotlib as mpl
+from cycler import cycler
+mpl.rcParams['axes.prop_cycle'] = cycler(color=[slate, blue, turquoise, orange, red, green, purple, yellow, red_pink])
+from matplotlib.ticker import MaxNLocator
+from fpppy.utils import plot_series
+
+from functools import partial
+import statsmodels.api as sm
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.stats.diagnostic import acorr_ljungbox
+from statsmodels.tsa.stattools import kpss, adfuller, acf, pacf
+from statsmodels.tsa.arima_process import ArmaProcess, arma2ma
+from statsforecast import StatsForecast
+from statsforecast.models import ARIMA, AutoARIMA, AutoETS, Naive, SeasonalNaive
+from statsforecast.arima import ARIMASummary, ndiffs, nsdiffs
+from utilsforecast.evaluation import evaluate
+from utilsforecast.losses import rmse, mase
+
+economy_df = pd.read_csv('../data/global_economy.csv', parse_dates=["ds"])
+
+
+def exports(country):
+    """One country's exports (% of GDP) in the unique_id / ds / y layout statsforecast expects."""
+    return (economy_df.query("unique_id == @country")[["unique_id", "ds", "Exports"]]
+            .rename(columns={"Exports": "y"}).dropna().reset_index(drop=True))
+
+
+def simulate(ar=(), ma=(), n=200, seed=1):
+    """A sample path of the ARMA process y_t = sum(ar) y_{t-i} + e_t + sum(ma) e_{t-i}."""
+    process = ArmaProcess(np.r_[1, -np.asarray(ar)], np.r_[1, np.asarray(ma)])
+    return process.generate_sample(n, distrvs=np.random.default_rng(seed).standard_normal)
+```
+
+# Where this fits
+
+## Five weeks, one question left open {.smaller}
+
+| Week | What the model describes |
+|---|---|
+| 2 | The series as trend + season + remainder |
+| 4 | A level, a slope and a season that update as data arrive |
+| 5 | $y$ as a function of the calendar and of outside predictors |
+
+. . .
+
+Every one of them describes the **shape** of the series and treats what is left over as noise. Week
+5 ended on the leftover that was not noise: residuals whose ACF said *this week's error looks like
+last week's*.
+
+[ARIMA turns that around: it models the autocorrelation itself, and lets the shape follow from it.]{.hi}
+
+## What this lecture is for {.smaller}
+
+1. **Stationarity and differencing** — the one transformation ARIMA cannot do without, and the tests
+   that tell you how much of it to apply.
+2. **AR, MA, ARIMA** — three building blocks, and the surprise that you have already used several of
+   them under other names.
+3. **Specifying a model by hand** from the ACF and PACF, and checking it against `AutoARIMA`.
+4. **Forecasting**, including where the prediction intervals come from.
+
+Part 2, next week, adds seasonal ARIMA terms and puts ARIMA against ETS.
+
+::: {.callout-tip}
+## Reading
+
+[FPP3 ch. 9, §9.1–9.8](https://otexts.com/fpp3/arima.html) ·
+[FPP the Pythonic Way, ch. 9](https://otexts.com/fpppy/nbs/09-arima.html)
+:::
+
+# Stationarity
+
+## What stationary means {.smaller}
+
+::: {.callout-note icon="false"}
+## Definition
+
+$y_t$ is **stationary** if for every $s$ the distribution of $(y_t, \dots, y_{t+s})$ does not depend
+on $t$.
+:::
+
+In words: pick any window of the series, slide it along, and the statistical picture does not change.
+In practice that means
+
+- **no trend** — the mean does not drift;
+- **constant variance** — the swings are the same size early and late;
+- **nothing predictable in the long run** — no seasonality, because a season tells you where the
+  series will be at a given time.
+
+::: {.callout-important}
+**Cycles are allowed.** A cycle of irregular length — a business cycle, a commodity boom — does not
+tell you *when* the next peak comes, so a series with cycles can be stationary. Seasonality can't be,
+because its period is fixed.
+:::
+
+## Which of these are stationary? {.smaller}
+
+```{python}
+#| label: stationarity-quiz
+#| fig-align: center
+gafa = pd.read_csv('../data/gafa_stock.csv', parse_dates=["ds"])
+google = gafa.query("unique_id == 'GOOG_Close' and ds.dt.year == 2015").reset_index(drop=True)
+eggs = pd.read_csv('../data/egg_prices.csv', parse_dates=["ds"])
+beer = pd.read_csv('../data/aus_production.csv', parse_dates=["ds"]).query("ds.dt.year >= 1992")
+employment = pd.read_csv('../data/us_employment.csv', parse_dates=["ds"])
+retail = employment.query("unique_id == 'Retail Trade' and ds.dt.year >= 1990").reset_index(drop=True)
+egypt = exports("Egypt, Arab Rep.")
+
+panels = {
+    "a": ("Google closing price, 2015", google.ds, google.y, 1),
+    "b": ("Google daily change, 2015", google.ds[1:], google.y.diff()[1:], 1),
+    "c": ("US egg prices, annual", eggs.ds, eggs.y, 1),
+    "d": ("Australian beer production, quarterly", beer.ds, beer.Beer, 4),
+    "e": ("Egyptian exports, % of GDP, annual", egypt.ds, egypt.y, 1),
+    "f": ("US retail employment, monthly", retail.ds, retail.y, 12),
+}
+fig, axes = plt.subplots(2, 3, figsize=(13, 5.6))
+for ax, (key, (title, x, y, _)) in zip(axes.flat, panels.items()):
+    ax.plot(x, y, color=slate, linewidth=0.9)
+    ax.set_title(f"({key}) {title}", fontsize=10)
+    ax.tick_params(labelsize=8)
+plt.show()
+```
+
+## The answer, computed {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| output-location: column
+rows = []
+for key, (title, _, y, m) in panels.items():
+    y = np.asarray(y, dtype=float)
+    D = nsdiffs(y, period=m) if m > 1 else 0
+    y_s = y[m:] - y[:-m] if D else y
+    rows.append({"series": f"({key})", "m": m,
+                 "seasonal diffs D": D,
+                 "first diffs d": ndiffs(y_s)})
+pd.DataFrame(rows)
+```
+
+- **(b)** and **(e)** need no differencing: the
+  changes in a stock price, and a series whose ups and downs are cycles of irregular length.
+- **(a)** and **(c)** wander, so they need a first difference; **(d)** and **(f)** have a season,
+  so they need a seasonal one.
+- `nsdiffs` and `ndiffs` are the tests behind `AutoARIMA`. We open them up later in this section.
+
+## The ACF says it too {.smaller}
+
+```{python}
+#| label: google-acf
+#| fig-align: center
+fig, axes = plt.subplots(1, 2, figsize=(12, 3.4))
+plot_acf(google.y, lags=30, zero=False, ax=axes[0], auto_ylims=True,
+         title="Google closing price: ACF")
+plot_acf(google.y.diff().dropna(), lags=30, zero=False, ax=axes[1], auto_ylims=True,
+         title="Daily change: ACF")
+plt.show()
+```
+
+```{python}
+#| echo: true
+#| code-fold: false
+change = google.y.diff().dropna()
+print(f"price:  r1 = {google.y.autocorr(1):.2f}")
+print(f"change: r1 = {change.autocorr(1):+.2f}   "
+      f"Ljung-Box (10 lags) p = {acorr_ljungbox(change, lags=[10])['lb_pvalue'].iloc[0]:.2f}")
+```
+
+- Non-stationary: the ACF decays **slowly**, and $r_1$ is large and positive.
+- Stationary: the ACF drops to zero **quickly**. The daily changes pass Ljung-Box, so they are white
+  noise. That makes the price a **random walk**, and the best forecast of it is the naive forecast
+  from Week 1.
+
+# Differencing
+
+## First and second differences {.smaller}
+
+Differencing removes a changing level. The new series is the **change** from one observation to the
+next:
+
+$$
+y'_t = y_t - y_{t-1}
+$$
+
+It has $T-1$ observations. If the changes still trend, difference again:
+
+$$
+y''_t = y'_t - y'_{t-1} = (y_t - y_{t-1}) - (y_{t-1} - y_{t-2}) = y_t - 2y_{t-1} + y_{t-2}
+$$
+
+That leaves $T-2$ observations, and it models the **change in the change**. In practice you almost
+never need to go beyond second order.
+
+## Seasonal differences {.smaller}
+
+The change from the **same season last year**:
+
+$$
+y'_t = y_t - y_{t-m}, \qquad m = \text{the seasonal period}
+$$
+
+- With $m = 12$ this is "this January minus last January". It takes out a fixed seasonal pattern.
+- If the seasonal difference still wanders, take a first difference of it as well:
+
+$$
+y''_t = (y_t - y_{t-m}) - (y_{t-1} - y_{t-m-1}) = y_t - y_{t-1} - y_{t-m} + y_{t-m-1}
+$$
+
+::: {.callout-note}
+A difference needs to mean something. A first difference is the change since last period, and a
+seasonal difference is the change since last year. Differences at other lags, say lag 3 on annual
+data, usually have no sensible interpretation.
+:::
+
+## US retail employment, differenced {.smaller}
+
+```{python}
+#| label: retail-differences
+#| fig-align: center
+y_r = retail.set_index("ds").y
+steps = {"raw": y_r,
+         "seasonal difference (lag 12)": y_r.diff(12),
+         "seasonal + first difference": y_r.diff(12).diff()}
+fig, axes = plt.subplots(3, 2, figsize=(13, 6.2), width_ratios=[2.2, 1])
+for (name, s), (ax_l, ax_r) in zip(steps.items(), axes):
+    ax_l.plot(s.index, s, color=slate, linewidth=0.9)
+    ax_l.set_title(name, fontsize=10)
+    plot_acf(s.dropna(), lags=36, zero=False, ax=ax_r, auto_ylims=True, title="")
+    ax_r.xaxis.set_major_locator(MaxNLocator(integer=True))
+fig.suptitle("Thousands of employees, 1990–2019")
+plt.show()
+```
+
+## Which difference, and how many {.smaller}
+
+- **Seasonal first** when the season is strong. The seasonal difference may already be stationary, and
+  here it is: `ndiffs` returned 0 after the seasonal difference. Order does not matter
+  mathematically, since $(1-B)(1-B^{12}) = (1-B^{12})(1-B)$, but it decides whether you stop after
+  one. The ACF of the seasonal difference still decays slowly, but KPSS does not reject, so the
+  remaining persistence is left to the AR terms rather than to a second difference.
+- **Do not over-difference.** Differencing a series that is already white noise does not leave white
+  noise:
+
+```{python}
+#| echo: true
+#| code-fold: false
+twice = change.diff().dropna()
+print(f"Google changes:          r1 = {change.autocorr(1):+.2f}")
+print(f"changes, differenced:    r1 = {twice.autocorr(1):+.2f}   (theory: -0.50)")
+```
+
+If $y_t = \varepsilon_t$, then $y'_t = \varepsilon_t - \varepsilon_{t-1}$, and that series has
+$\rho_1 = -0.5$. **A large negative spike at lag 1 after differencing is the sign you went one step too far.**
+
+## Unit root tests {.smaller}
+
+Tests that decide whether to difference. They come in two kinds, with **opposite null hypotheses**:
+
+| Test | $H_0$ | Small $p$ means |
+|---|---|---|
+| ADF (augmented Dickey–Fuller) | non-stationary | stationary, do not difference |
+| **KPSS** | **stationary** | non-stationary, **difference** |
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| output-location: column
+pd.DataFrame([
+    {"series": name,
+     "ADF p": adfuller(s)[1],
+     "KPSS p": kpss(s, nlags="auto")[1]}
+    for name, s in [("price", google.y), ("change", change)]
+]).round(3)
+```
+
+Both tests agree on Google. `statsmodels` clips the KPSS $p$ to $[0.01, 0.10]$, the range of its
+lookup table.
+
+`AutoARIMA` uses **KPSS**. It differences only when the data reject stationarity, so by default it
+leans towards *not* differencing.
+
+## The tests in one call {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+y_ret = retail.y.to_numpy(float)
+print("ndiffs, Google price:              ", ndiffs(google.y.to_numpy(float)))
+print("nsdiffs, retail employment (m=12):  ", nsdiffs(y_ret, period=12))
+print("ndiffs after the seasonal difference:", ndiffs(y_ret[12:] - y_ret[:-12]))
+```
+
+- `ndiffs` applies KPSS again and again: difference, test, repeat, up to $d = 2$.
+- `nsdiffs` uses the **seasonal strength** from Week 2:
+
+$$
+F_S = \max\left(0,\ 1 - \frac{\text{Var}(R_t)}{\text{Var}(S_t + R_t)}\right)
+$$
+
+and takes one seasonal difference if $F_S > 0.64$. You computed $F_S$ in Lab 3, and every Track B
+series was screened on it (the issue rule is $F_S \ge 0.6$), so expect $D = 1$ on your own series.
+
+# Backshift notation
+
+## The operator $B$ {.smaller}
+
+$$
+B y_t = y_{t-1}, \qquad B^2 y_t = y_{t-2}, \qquad B^{12} y_t = y_{t-12}
+$$
+
+Differences become polynomials in $B$, and polynomials multiply:
+
+| Operation | Written as |
+|---|---|
+| First difference $y_t - y_{t-1}$ | $(1-B)\,y_t$ |
+| Second-**order** difference $y_t - 2y_{t-1} + y_{t-2}$ | $(1-B)^2\,y_t$ |
+| $d$-th order difference | $(1-B)^d\,y_t$ |
+| Seasonal difference $y_t - y_{t-m}$ | $(1-B^m)\,y_t$ |
+| Seasonal then first | $(1-B)(1-B^m)\,y_t = y_t - y_{t-1} - y_{t-m} + y_{t-m-1}$ |
+
+::: {.callout-warning}
+$(1-B)^2$ is a second-*order* difference. $1-B^2$ is a *lag-2* difference, $y_t - y_{t-2}$. They are
+different things.
+:::
+
+# Autoregressive models
+
+## AR($p$) {.smaller}
+
+$$
+y_t = c + \phi_1 y_{t-1} + \phi_2 y_{t-2} + \dots + \phi_p y_{t-p} + \varepsilon_t,
+\qquad \varepsilon_t \sim \text{white noise}
+$$
+
+A regression of $y_t$ on **its own lags**. It is the Week 5 model with the lags of $y$ as the only
+predictors.
+
+```{python}
+#| label: ar-examples
+#| fig-align: center
+fig, axes = plt.subplots(1, 2, figsize=(12, 3.4), sharey=True)
+axes[0].plot(18 / 1.8 + simulate(ar=[-0.8], n=100, seed=7), color=slate)
+axes[0].set_title(r"AR(1): $y_t = 18 - 0.8\,y_{t-1} + \varepsilon_t$")
+axes[1].plot(20 + simulate(ar=[1.3, -0.7], n=100, seed=7), color=turquoise)
+axes[1].set_title(r"AR(2): $y_t = 8 + 1.3\,y_{t-1} - 0.7\,y_{t-2} + \varepsilon_t$")
+for ax in axes:
+    ax.set_xlabel("t")
+plt.show()
+```
+
+The left series flips sign every step. The right one moves in slow waves. Two coefficients are enough
+to make a cycle.
+
+## AR(1): what $\phi_1$ does {.smaller}
+
+$$
+y_t = c + \phi_1 y_{t-1} + \varepsilon_t
+$$
+
+| $\phi_1$ | $c$ | The process is |
+|---|---|---|
+| 0 | 0 | white noise |
+| 1 | 0 | a **random walk**: naive forecasts |
+| 1 | $\neq 0$ | a random walk **with drift**: the drift method |
+| $\lvert\phi_1\rvert < 1$ | any | stationary, pulled back to its mean |
+| $< 0$ | any | oscillating around the mean |
+
+For $|\phi_1| < 1$ the mean is not $c$:
+
+$$
+\mu = c + \phi_1\mu \quad\Rightarrow\quad \mu = \frac{c}{1-\phi_1}
+$$
+
+[Two of the four Week 1 benchmarks are AR(1) models with $\phi_1 = 1$.]{.hi}
+
+## Stationarity conditions {.smaller}
+
+```{python}
+#| label: ar2-triangle
+#| fig-align: center
+phi1 = np.linspace(-2, 2, 400)
+fig, ax = plt.subplots(figsize=(8.5, 4.4))
+ax.fill([-2, 2, 0], [-1, -1, 1], color=turquoise, alpha=0.18, label="stationary")
+ax.fill_between(phi1, -1, -phi1 ** 2 / 4, color=red_pink, alpha=0.18,
+                label=r"complex roots: cycles ($\phi_1^2 + 4\phi_2 < 0$)")
+ax.plot([-2, 2, 0, -2], [-1, -1, 1, -1], color=slate, linewidth=1.2)
+ax.plot(1.3, -0.7, "o", color=turquoise, markersize=9, label="the AR(2) on the previous slide")
+ax.set_xlabel(r"$\phi_1$")
+ax.set_ylabel(r"$\phi_2$")
+ax.set_xlim(-2.2, 2.2)
+ax.set_ylim(-1.15, 1.15)
+ax.legend(loc="upper left")
+ax.set_title("AR(2): where the coefficients have to live")
+plt.show()
+```
+
+- AR(1): $-1 < \phi_1 < 1$. AR(2): inside the triangle, $\ -1 < \phi_2 < 1,\ \phi_1 + \phi_2 < 1,\
+  \phi_2 - \phi_1 < 1$.
+- In the pink region the forecasts move in **cycles**. For $p \ge 3$ the conditions get complicated,
+  and the estimation software enforces them for you.
+
+# Moving average models
+
+## MA($q$) {.smaller}
+
+$$
+y_t = c + \varepsilon_t + \theta_1\varepsilon_{t-1} + \theta_2\varepsilon_{t-2} + \dots +
+\theta_q\varepsilon_{t-q}
+$$
+
+A regression on **past forecast errors**. You never observe them; the model reconstructs them as it
+goes, so this is not literally a regression you can run with OLS.
+
+::: {.callout-important}
+Not the moving average of Week 2. That one *smoothed* the series to estimate a trend. This one
+*generates* the series from past shocks.
+:::
+
+```{python}
+#| label: ma-examples
+#| fig-align: center
+fig, axes = plt.subplots(1, 2, figsize=(12, 3.0), sharey=True)
+axes[0].plot(20 + simulate(ma=[0.8], n=100, seed=3), color=slate)
+axes[0].set_title(r"MA(1): $y_t = 20 + \varepsilon_t + 0.8\,\varepsilon_{t-1}$")
+axes[1].plot(simulate(ma=[-1, 0.8], n=100, seed=3), color=turquoise)
+axes[1].set_title(r"MA(2): $y_t = \varepsilon_t - \varepsilon_{t-1} + 0.8\,\varepsilon_{t-2}$")
+plt.show()
+```
+
+## An AR(1) is an MA($\infty$) {.smaller}
+
+Substitute the model into itself:
+
+$$
+\begin{aligned}
+y_t &= \phi_1 y_{t-1} + \varepsilon_t
+     = \phi_1(\phi_1 y_{t-2} + \varepsilon_{t-1}) + \varepsilon_t \\
+    &= \phi_1^2 y_{t-2} + \phi_1\varepsilon_{t-1} + \varepsilon_t
+     = \dots = \varepsilon_t + \phi_1\varepsilon_{t-1} + \phi_1^2\varepsilon_{t-2} +
+       \phi_1^3\varepsilon_{t-3} + \cdots
+\end{aligned}
+$$
+
+That works only if $|\phi_1| < 1$, so that $\phi_1^k \to 0$. The same algebra works for any
+stationary AR($p$):
+
+```{python}
+#| echo: true
+#| code-fold: false
+print("MA weights of AR(1), phi = 0.8:   ", np.round(arma2ma([1, -0.8], [1], lags=6), 3))
+print("0.8 ** k:                         ", np.round(0.8 ** np.arange(6), 3))
+```
+
+Hold on to these **$\psi$ weights**. The prediction intervals at the end of the lecture are built from
+them.
+
+## Invertibility {.smaller}
+
+The reverse is also possible: an MA($q$) can be written as an AR($\infty$), but only if
+$|\theta_1| < 1$ (for $q = 1$). Why insist on it? Because **without it, the model is not identified**:
+
+```{python}
+#| echo: true
+#| code-fold: false
+for theta in (0.5, 2.0):
+    acf_theory = ArmaProcess([1], [1, theta]).acf(4)[1:]
+    print(f"MA(1) with theta = {theta}:  ACF = {np.round(acf_theory, 3)}")
+```
+
+$\rho_1 = \theta/(1+\theta^2)$ takes the same value at $\theta$ and at $1/\theta$. The data cannot tell
+the two apart, so we keep the one where recent errors matter more than old ones, $|\theta| < 1$.
+
+- MA(2): $-1 < \theta_2 < 1,\ \theta_1 + \theta_2 > -1,\ \theta_1 - \theta_2 < 1$.
+- Beyond that, again, the software enforces it.
+
+# ARIMA
+
+## ARMA, then ARIMA {.smaller}
+
+Put lagged values and lagged errors together:
+
+$$
+y'_t = c + \phi_1 y'_{t-1} + \dots + \phi_p y'_{t-p} + \theta_1\varepsilon_{t-1} + \dots +
+\theta_q\varepsilon_{t-q} + \varepsilon_t
+$$
+
+where $y'_t$ is the series after $d$ differences. This is **ARIMA($p, d, q$)**:
+
+- **AR** — $p$, the number of lagged values;
+- **I** — "integrated", $d$, the number of first differences;
+- **MA** — $q$, the number of lagged errors.
+
+In backshift notation, ARIMA(1,1,1):
+
+$$
+\underbrace{(1 - \phi_1 B)}_{\text{AR(1)}}\ \underbrace{(1 - B)}_{\text{first difference}}\ y_t
+\;=\; c + \underbrace{(1 + \theta_1 B)}_{\text{MA(1)}}\ \varepsilon_t
+$$
+
+## Models you already know {.smaller}
+
+| ARIMA | Is |
+|---|---|
+| (0, 0, 0), with $c$ | white noise around a mean: the **mean** method |
+| (0, 1, 0), no $c$ | random walk: the **naive** method |
+| (0, 1, 0), with $c$ | random walk with drift: the **drift** method |
+| ($p$, 0, 0) | AR($p$) |
+| (0, 0, $q$) | MA($q$) |
+| (0, 1, 1), no $c$ | **simple exponential smoothing**, with $\theta_1 = \alpha - 1$ |
+
+[Three of the four Week 1 benchmarks, and the simplest ETS model, are ARIMA models.]{.hi}
+
+The last row is a claim worth checking.
+
+## SES is ARIMA(0,1,1) {.smaller}
+
+Algeria's exports, the series from the Week 4 lecture:
+
+```{python}
+#| echo: true
+#| code-fold: false
+y_alg = exports("Algeria").y.to_numpy(float)
+
+ses = AutoETS(season_length=1, model="ANN").fit(y=y_alg)
+arima011 = ARIMA(order=(0, 1, 1)).fit(y=y_alg)
+
+alpha = ses.model_["par"][0]
+theta = arima011.model_["coef"]["ma1"]
+print(f"SES:          alpha = {alpha:.3f}  ->  alpha - 1 = {alpha - 1:+.3f}")
+print(f"ARIMA(0,1,1): theta = {theta:+.3f}")
+print(f"forecast, SES {ses.predict(h=1)['mean'][0]:.3f}  ARIMA {arima011.predict(h=1)['mean'][0]:.3f}")
+```
+
+The two are estimated by different software and from different starting points, so the numbers are
+not identical to the last digit. The forecasts agree to two decimals.
+
+What ARIMA adds is that **it does not stop at (0,1,1)**. ETS has a fixed menu of components; ARIMA
+lets the data pick any $p$ and $q$.
+
+## Egyptian exports {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+egypt.tail(3)
+```
+
+```{python}
+#| echo: true
+#| code-fold: false
+fit_egy = AutoARIMA().fit(y=egypt.y.to_numpy(float))
+coef = fit_egy.model_["coef"]
+print(ARIMASummary(fit_egy.model_))
+print({k: round(float(v), 3) for k, v in coef.items()},
+      f" sigma^2 {fit_egy.model_['sigma2']:.2f}   AICc {fit_egy.model_['aicc']:.2f}")
+```
+
+## Reading the fitted model {.smaller}
+
+`statsforecast` reports the **mean** $\mu$ as `intercept`, not the constant $c$. To write the
+equation, convert:
+
+```{python}
+#| echo: true
+#| code-fold: false
+c = coef["intercept"] * (1 - coef["ar1"] - coef["ar2"])
+cycle = 2 * np.pi / np.arccos(-coef["ar1"] * (1 - coef["ar2"]) / (4 * coef["ar2"]))
+print(f"c = mu (1 - phi1 - phi2) = {c:.2f}")
+print(f"phi1^2 + 4 phi2 = {coef['ar1'] ** 2 + 4 * coef['ar2']:+.2f}  ->  average cycle {cycle:.1f} years")
+```
+
+$$
+y_t = 2.56 + 1.68\,y_{t-1} - 0.80\,y_{t-2} - 0.69\,\varepsilon_{t-1} + \varepsilon_t,
+\qquad \hat\sigma = \sqrt{8.05} = 2.84
+$$
+
+- $d = 0$: the model treats exports as stationary, pulled back to a mean of
+  `{python} f"{coef['intercept']:.1f}"`% of GDP.
+- $(\phi_1, \phi_2)$ is in the pink region of the triangle, so the series **cycles**, with an
+  average length of about 18 years. Nothing in the data is labelled as a cycle. Two AR coefficients
+  are enough to produce one.
+
+## What $c$ and $d$ do to the long run {.smaller}
+
+```{python}
+#| label: long-run
+#| fig-align: center
+car = exports("Central African Republic")
+y_car = car.y.to_numpy(float)
+variants = [("ARIMA(1,0,0), c = 0",  ARIMA(order=(1, 0, 0), include_mean=False)),
+            ("ARIMA(1,0,0), c ≠ 0",  ARIMA(order=(1, 0, 0), include_mean=True)),
+            ("ARIMA(1,1,0), c = 0",  ARIMA(order=(1, 1, 0))),
+            ("ARIMA(1,1,0), c ≠ 0",  ARIMA(order=(1, 1, 0), include_drift=True)),
+            ("ARIMA(1,2,0), c = 0",  ARIMA(order=(1, 2, 0)))]
+h_long = 60
+t_hist = np.arange(len(y_car))
+t_fc = np.arange(len(y_car), len(y_car) + h_long)
+fig, axes = plt.subplots(2, 3, figsize=(13, 5.2), sharey=True)
+for ax, (name, model) in zip(axes.flat, variants):
+    fc = model.fit(y=y_car).predict(h=h_long, level=[80])
+    ax.plot(t_hist, y_car, color=slate, linewidth=0.9)
+    ax.plot(t_fc, fc["mean"], color=red_pink, linewidth=1.8)
+    ax.fill_between(t_fc, fc["lo-80"], fc["hi-80"], color=red_pink, alpha=0.15)
+    ax.set_title(name, fontsize=10)
+axes[0, 0].set_ylim(-15, 45)
+axes.flat[-1].axis("off")
+axes.flat[-1].text(0.05, 0.5, "c ≠ 0, d = 2 would give a\nquadratic trend.\n\n"
+                   "statsforecast does not allow it,\nand you should not want it.",
+                   fontsize=11, va="center")
+fig.suptitle("Central African Republic exports, % of GDP: the same AR(1), different c and d")
+plt.show()
+```
+
+## What $c$ and $d$ do to the long run {.smaller}
+
+| | $c = 0$ | $c \neq 0$ |
+|---|---|---|
+| $d = 0$ | forecasts go to **zero** | go to the **mean** of the data |
+| $d = 1$ | go to a **constant** | follow a **straight line** |
+| $d = 2$ | follow a **straight line** | a quadratic trend (never used) |
+
+- The higher $d$, the faster the prediction intervals widen. With $d = 0$ they stop growing.
+- Choosing $d$ and $c$ amounts to choosing what the forecast does far ahead. That decision is
+  yours, and you should make it on purpose. $p$ and $q$ only shape the first few steps.
+
+# Choosing p and q by eye
+
+## Partial autocorrelation {.smaller}
+
+The ACF at lag $k$ mixes direct and indirect links: $y_t$ is related to $y_{t-2}$ partly *through*
+$y_{t-1}$. The **partial** autocorrelation removes the intermediaries.
+
+::: {.callout-note icon="false"}
+## Definition
+
+$\alpha_k$ = the coefficient $\phi_k$ in the regression
+$y_t = c + \phi_1 y_{t-1} + \dots + \phi_k y_{t-k} + \varepsilon_t$.
+:::
+
+That is literally how you can compute it:
+
+```{python}
+#| echo: true
+#| code-fold: false
+lags = pd.DataFrame({f"lag{j}": egypt.y.shift(j) for j in range(1, 6)})
+by_regression = [sm.OLS(egypt.y, sm.add_constant(lags.iloc[:, :k]), missing="drop").fit().params.iloc[-1]
+                 for k in range(1, 6)]
+print("last coefficient of each regression:", np.round(by_regression, 3))
+print("pacf(method='ols'):                 ", np.round(pacf(egypt.y, nlags=5, method="ols")[1:], 3))
+```
+
+`plot_pacf` uses a Yule–Walker estimate by default. It gives slightly different numbers but the same
+idea, and it is judged against the same $\pm 1.96/\sqrt{T}$ band as the ACF.
+
+## The signatures {.smaller}
+
+| | ACF | PACF |
+|---|---|---|
+| **AR($p$)** | decays, exponentially or as a damped wave | **cuts off after lag $p$** |
+| **MA($q$)** | **cuts off after lag $q$** | decays |
+| **ARMA($p, q$)** | decays | decays |
+
+```{python}
+#| label: signatures
+#| fig-align: center
+sims = {"AR(2): 1.3, -0.7": simulate(ar=[1.3, -0.7], n=2000, seed=11),
+        "MA(2): -1, 0.8": simulate(ma=[-1, 0.8], n=2000, seed=11)}
+fig, axes = plt.subplots(2, 2, figsize=(12, 3.9))
+for row, (name, y_sim) in zip(axes, sims.items()):
+    plot_acf(y_sim, lags=12, zero=False, ax=row[0], auto_ylims=True, title=f"{name}: ACF")
+    plot_pacf(y_sim, lags=12, zero=False, ax=row[1], auto_ylims=True, title=f"{name}: PACF")
+    for ax in row:
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+plt.show()
+```
+
+When both decay, the plots do not give you the order. That is when AICc takes over.
+
+## Egyptian exports: ACF and PACF {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| fig-align: center
+fig, axes = plt.subplots(1, 2, figsize=(12, 3.4))
+plot_acf(egypt.y, lags=20, zero=False, ax=axes[0], auto_ylims=True)
+plot_pacf(egypt.y, lags=20, zero=False, ax=axes[1], auto_ylims=True)
+plt.show()
+```
+
+- ACF: decays in a wave, which is the AR shape.
+- PACF: significant up to **lag 4**, nothing after. That is an AR(4).
+
+## ARIMA(4,0,0), specified by hand {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+fit_400 = ARIMA(order=(4, 0, 0)).fit(y=egypt.y.to_numpy(float))
+print(ARIMASummary(fit_400.model_))
+print({k: round(float(v), 3) for k, v in fit_400.model_["coef"].items()})
+print(f"AICc: ARIMA(4,0,0) {fit_400.model_['aicc']:.2f}   AutoARIMA's ARIMA(2,0,1) {fit_egy.model_['aicc']:.2f}")
+```
+
+- The PACF suggested an AR(4), and AutoARIMA found an ARMA(2,1). The two AICc values are **less than
+  one unit apart**, so AICc cannot separate them.
+- That is normal. **Several specifications fit an autocorrelation structure about equally well**, and
+  the ACF/PACF reading gives you one reasonable candidate, not the correct answer.
+
+[By hand and automatic disagreeing is not a failure. It is the situation Week 4 told you how to handle:
+shortlist on AICc, decide on a holdout.]{.hi}
+
+# Estimation and order selection
+
+## Estimation and information criteria {.smaller}
+
+The parameters $c, \phi_1, \dots, \phi_p, \theta_1, \dots, \theta_q$ are found by **maximum
+likelihood**. For Gaussian errors that is close to minimising $\sum e_t^2$, but the errors depend on the
+parameters recursively, so it is numerical optimisation, as for ETS. Different software gives slightly
+different estimates.
+
+The orders are chosen with the criteria from Week 4, where $k = 1$ if $c \neq 0$:
+
+$$
+\begin{aligned}
+\text{AIC} &= -2\log L + 2(p+q+k+1) \\
+\text{AIC}_c &= \text{AIC} + \frac{2(p+q+k+1)(p+q+k+2)}{T-p-q-k-2} \\
+\text{BIC} &= \text{AIC} + [\log T - 2](p+q+k+1)
+\end{aligned}
+$$
+
+## Two comparisons AICc cannot make {.smaller}
+
+::: {.callout-warning}
+## Not across different $d$
+
+$L$ is the likelihood of the **differenced** series. ARIMA(2,1,0) and ARIMA(2,0,0) are fitted to
+different data, so their AICc are not comparable. Choose $d$ first, using the tests, and then compare
+$p$ and $q$ for that $d$.
+:::
+
+::: {.callout-warning}
+## Not across model families
+
+An ARIMA AICc and an ETS AICc are computed on different terms, so you cannot compare them either. To
+put ARIMA against ETS, use a holdout or cross-validation. That is part of next week's lecture.
+:::
+
+## How `AutoARIMA` searches {.smaller}
+
+The Hyndman–Khandakar algorithm (JSS, 2008):
+
+1. **Choose $d$** with repeated KPSS tests (`ndiffs`). Choose $D$ with seasonal strength (`nsdiffs`).
+2. **Start** from the best AICc among ARIMA(2,$d$,2), (0,$d$,0), (1,$d$,0), (0,$d$,1).
+3. **Move**: try $p \pm 1$, $q \pm 1$, both together, and with or without $c$. If a neighbour has a lower
+   AICc, it becomes the current model.
+4. **Repeat** until no neighbour improves.
+
+It is a **stepwise local search**. It visits a few dozen models instead of every one, so it can stop
+at a model that is not the best. `stepwise=False` searches the full grid, which is slower.
+
+## The AICc surface it walks on {.smaller}
+
+```{python}
+#| label: aicc-surface
+#| fig-align: center
+grid = pd.DataFrame(index=range(6), columns=range(6), dtype=float)
+for p in range(6):
+    for q in range(6):
+        try:
+            grid.loc[p, q] = ARIMA(order=(p, 1, q)).fit(y=y_car).model_["aicc"]
+        except Exception:
+            pass
+step_order = AutoARIMA().fit(y=y_car).model_["arma"]
+full_order = AutoARIMA(stepwise=False).fit(y=y_car).model_["arma"]
+
+fig, ax = plt.subplots(figsize=(8.5, 4.6))
+sns.heatmap(grid - np.nanmin(grid.values), annot=True, fmt=".1f", cmap="mako_r", vmax=10,
+            cbar_kws={"label": "AICc above the best"}, ax=ax)
+ax.add_patch(plt.Rectangle((step_order[1], step_order[0]), 1, 1, fill=False, edgecolor=orange, lw=3))
+ax.add_patch(plt.Rectangle((full_order[1], full_order[0]), 1, 1, fill=False, edgecolor=red_pink, lw=3))
+ax.set_xlabel("q")
+ax.set_ylabel("p")
+ax.set_title(f"Central African Republic exports, d = 1: orange = stepwise, "
+             f"pink = full search")
+plt.show()
+```
+
+The stepwise search stopped at ARIMA(`{python} f"{step_order[0]},1,{step_order[1]}"`). The grid's best is
+ARIMA(`{python} f"{full_order[0]},1,{full_order[1]}"`). The difference is 0.6 units of AICc, and three
+other models are within one unit of the best. The search did not fail. **The surface is flat**, and
+on a flat surface the minimum tells you very little.
+
+# The modelling procedure
+
+## By hand, or automatically {.smaller}
+
+:::: {.columns}
+::: {.column width="55%"}
+**By hand — what the challenge asks for first**
+
+1. Plot the data; transform if the variance grows.
+2. Difference until stationary: `nsdiffs`, then `ndiffs`.
+3. Read the ACF and PACF of the differenced series.
+4. Fit the candidates; shortlist on AICc.
+5. Residuals white noise? If not, back to step 3.
+6. Compare on a holdout, then forecast.
+:::
+
+::: {.column width="45%"}
+**Automatically — the check**
+
+1. Plot the data; transform if needed.
+2. `AutoARIMA` chooses $d$, $p$, $q$ and $c$.
+3. The same residual check.
+4. The same holdout.
+:::
+::::
+
+Each manual step leaves evidence you can cite in the justification. If `AutoARIMA` lands somewhere
+else, the interesting question is **why**.
+
+## Central African Republic exports {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| fig-align: center
+diff_car = car.y.diff().dropna()
+print("ndiffs:", ndiffs(y_car))
+
+fig, axes = plt.subplots(1, 3, figsize=(13, 3.2), width_ratios=[2, 1, 1])
+axes[0].plot(car.ds[1:], diff_car, marker="o", markersize=3, color=slate)
+axes[0].set_title("First difference of exports, % of GDP")
+plot_acf(diff_car, lags=16, zero=False, ax=axes[1], auto_ylims=True)
+plot_pacf(diff_car, lags=16, zero=False, ax=axes[2], auto_ylims=True)
+plt.show()
+```
+
+Two candidate readings: the PACF cuts off at lag 2, which suggests **ARIMA(2,1,0)**. The ACF cuts off at
+lag 3, which suggests **ARIMA(0,1,3)**.
+
+## Four candidates {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+candidates = [ARIMA(order=(2, 1, 0), alias="ARIMA(2,1,0)"),
+              ARIMA(order=(0, 1, 3), alias="ARIMA(0,1,3)"),
+              AutoARIMA(alias="stepwise"),
+              AutoARIMA(stepwise=False, alias="full search")]
+sf_car = StatsForecast(models=candidates, freq="YS")
+sf_car.fit(df=car)
+pd.DataFrame([{"model": m.alias, "chosen": str(ARIMASummary(m.model_)).strip(),
+               "AICc": m.model_["aicc"], "BIC": m.model_["bic"]}
+              for m in sf_car.fitted_[0]]).sort_values("AICc").round(2)
+```
+
+Both hand-picked models have a lower AICc than the stepwise search. The full search does slightly
+better than all of them, by a margin AICc cannot resolve.
+
+## Residuals: Ljung-Box with the right degrees of freedom {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+fit_210 = ARIMA(order=(2, 1, 0)).fit(y=y_car)
+resid_210 = fit_210.model_["residuals"]
+p, _, q = 2, 1, 0
+acorr_ljungbox(resid_210, lags=[10], model_df=p + q)
+```
+
+```{python}
+#| label: car-residuals
+#| fig-align: center
+fig, axes = plt.subplots(1, 3, figsize=(13, 2.9), width_ratios=[2, 1, 1])
+axes[0].plot(car.ds, resid_210, marker="o", markersize=3, color=orange)
+axes[0].axhline(0, color="black", linewidth=0.8)
+axes[0].set_title("Innovation residuals, ARIMA(2,1,0)")
+plot_acf(resid_210, lags=16, zero=False, ax=axes[1], auto_ylims=True)
+axes[2].hist(resid_210, bins=15, color=slate)
+axes[2].set_title("Histogram")
+plt.show()
+```
+
+The residuals of an ARIMA($p,d,q$) "spend" $p + q$ degrees of freedom, so the test uses $\ell - p - q$
+of them (`model_df`). Here the residuals pass.
+
+## AICc chose. Was it right? {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+benchmarks = [AutoETS(season_length=1, alias="AutoETS"), Naive(alias="naive")]
+cv_car = StatsForecast(models=candidates + benchmarks, freq="YS").cross_validation(
+    df=car, h=5, n_windows=10, step_size=1)
+cv_egy = StatsForecast(
+    models=[ARIMA(order=(2, 0, 1), alias="ARIMA(2,0,1)"),
+            ARIMA(order=(4, 0, 0), alias="ARIMA(4,0,0)")] + benchmarks,
+    freq="YS").cross_validation(df=egypt, h=5, n_windows=10, step_size=1)
+
+score = lambda cv, df: (evaluate(cv.drop(columns="cutoff"),
+                                 metrics=[partial(mase, seasonality=1)], train_df=df)
+                        .drop(columns=["unique_id", "metric"]).T.round(3))
+print("CAR, MASE:"); print(score(cv_car, car).to_string(header=False))
+print("\nEgypt, MASE:"); print(score(cv_egy, egypt).to_string(header=False))
+```
+
+## AICc chose. Was it right? {.smaller}
+
+- **Egypt:** both ARIMA models beat naive and ETS by a wide margin. ETS can only describe a level and a
+  trend, and it has nothing for an 18-year cycle. Of the two ARIMAs, the hand-specified AR(4) does
+  slightly better.
+- **Central African Republic:** the model with the **lowest AICc forecasts worst**, and naive is
+  hard to beat. When the AICc surface is that flat and the series is that short, the choice between
+  ARIMA orders is mostly noise.
+
+::: {.callout-important}
+The rule from Week 4 does not change with the model family: **AICc shortlists, cross-validation
+decides**, and a benchmark goes in every comparison. Sometimes the benchmark wins, and that is an
+honest result.
+:::
+
+# Forecasting
+
+## Point forecasts {.smaller}
+
+1. Write the model with $y_t$ alone on the left.
+2. Replace $t$ by $T + h$.
+3. On the right: replace future $y$ by their forecasts, **future errors by zero**, and past errors by
+   the residuals $e_t$.
+
+For Egypt's ARIMA(2,0,1):
+
+$$
+\begin{aligned}
+\hat y_{T+1|T} &= c + \phi_1 y_T + \phi_2 y_{T-1} + \theta_1 e_T \\
+\hat y_{T+2|T} &= c + \phi_1 \hat y_{T+1|T} + \phi_2 y_T \qquad (\theta_1 e_{T+1} \text{ is set to } 0)
+\end{aligned}
+$$
+
+After $q$ steps the MA part has no information left, and the forecast is driven by the AR part alone.
+
+## By hand, against `predict` {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+y_egy = egypt.y.to_numpy(float)
+e = fit_egy.model_["residuals"]
+f1 = c + coef["ar1"] * y_egy[-1] + coef["ar2"] * y_egy[-2] + coef["ma1"] * e[-1]
+f2 = c + coef["ar1"] * f1 + coef["ar2"] * y_egy[-1]
+
+fc_egy = fit_egy.predict(h=10, level=[95])
+print(f"h=1  by hand {f1:.4f}   predict {fc_egy['mean'][0]:.4f}")
+print(f"h=2  by hand {f2:.4f}   predict {fc_egy['mean'][1]:.4f}")
+```
+
+There is no black box. Once you have the coefficients and the last residual, the forecast is the
+recursion written out step by step.
+
+## Prediction intervals {.smaller}
+
+Write the model as an MA($\infty$), $y_t = \mu + \varepsilon_t + \psi_1\varepsilon_{t-1} +
+\psi_2\varepsilon_{t-2} + \cdots$ (the $\psi$ weights from earlier). The $h$-step error is the sum of
+the $h$ shocks that have not happened yet:
+
+$$
+v_{T+h|T} = \hat\sigma^2\left[1 + \psi_1^2 + \dots + \psi_{h-1}^2\right],
+\qquad \hat y_{T+h|T} \pm 1.96\sqrt{v_{T+h|T}}
+$$
+
+```{python}
+#| echo: true
+#| code-fold: false
+psi = arma2ma([1, -coef["ar1"], -coef["ar2"]], [1, coef["ma1"]], lags=5)
+half_width = 1.96 * np.sqrt(fit_egy.model_["sigma2"] * np.cumsum(psi ** 2))
+print("from psi weights:", np.round(half_width, 3))
+print("from predict:    ", np.round(np.asarray(fc_egy["hi-95"] - fc_egy["mean"])[:5], 3))
+```
+
+- $h = 1$: always $\hat\sigma^2$, for every ARIMA.
+- MA($q$): $\psi_j = \theta_j$ for $j \le q$ and 0 beyond, so the intervals **stop growing after $q$
+  steps**.
+
+## How intervals grow {.smaller}
+
+```{python}
+#| label: interval-growth
+#| fig-align: center
+h_show = 30
+fig, axes = plt.subplots(1, 2, figsize=(13, 3.8), sharey=False)
+for ax, (name, fit, y_hist, d) in zip(
+        axes, [("Egypt, ARIMA(2,0,1)", fit_egy, y_egy, 0), ("CAR, ARIMA(2,1,0)", fit_210, y_car, 1)]):
+    fc = fit.predict(h=h_show, level=[80, 95])
+    t_h, t_f = np.arange(len(y_hist)), np.arange(len(y_hist), len(y_hist) + h_show)
+    ax.plot(t_h, y_hist, color=slate, linewidth=0.9)
+    ax.plot(t_f, fc["mean"], color=red_pink, linewidth=1.8)
+    for lvl, a in [(95, 0.12), (80, 0.22)]:
+        ax.fill_between(t_f, fc[f"lo-{lvl}"], fc[f"hi-{lvl}"], color=red_pink, alpha=a)
+    if d == 0:
+        mu_hist, sd_hist = y_hist.mean(), y_hist.std()
+        ax.axhline(mu_hist + 1.96 * sd_hist, color=turquoise, linestyle="--", linewidth=1,
+                   label="mean ± 1.96 sd of the data")
+        ax.axhline(mu_hist - 1.96 * sd_hist, color=turquoise, linestyle="--", linewidth=1)
+        ax.legend(loc="upper left")
+    ax.set_title(f"{name}: d = {d}")
+plt.show()
+```
+
+- $d = 0$: the $\psi$ weights die out, and the interval settles at the **spread of the data itself**.
+  Far enough ahead, all the model knows is the unconditional distribution.
+- $d \ge 1$: the $\psi$ weights do not die out, and the interval **widens without limit**.
+
+## Why the intervals are too narrow {.smaller}
+
+The formula assumes the residuals are uncorrelated and normal, and it leaves three things out:
+
+- **parameter uncertainty**: $\hat\phi$ and $\hat\theta$ are treated as known;
+- **model uncertainty**: the CAR table showed four orders AICc could not separate, and the interval
+  uses only one of them;
+- **the future resembling the past**: the same structure is assumed to hold over the whole horizon.
+
+In practice, 95% ARIMA intervals often cover less than 95% out of sample. Check the coverage on your
+holdout before you defend the intervals.
+
+# ARIMA on a seasonal series
+
+## Non-seasonal ARIMA, monthly data {.smaller}
+
+Your Track B series is seasonal, so this is the case you will meet in practice.
+
+```{python}
+#| echo: true
+#| code-fold: false
+fit_ns = AutoARIMA(season_length=1).fit(y=y_ret)
+r_ns = pd.Series(fit_ns.model_["residuals"])
+print(ARIMASummary(fit_ns.model_), f"  residual acf at lag 12: {r_ns.autocorr(12):+.2f}")
+```
+
+```{python}
+#| label: retail-nonseasonal
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(11, 2.8))
+plot_acf(r_ns, lags=36, zero=False, ax=ax, auto_ylims=True,
+         title="Residuals of a non-seasonal ARIMA on monthly retail employment")
+ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+plt.show()
+```
+
+With `season_length=1` the model has no way to look 12 months back, so the whole season ends up
+in the residuals.
+
+## Seasonal difference first, then ARMA {.smaller}
+
+Do what the tests said: one seasonal difference, then let the non-seasonal part model the rest.
+
+```{python}
+#| echo: true
+#| code-fold: false
+fit_sd = AutoARIMA(season_length=12, max_P=0, max_Q=0).fit(y=y_ret)
+r_sd = pd.Series(fit_sd.model_["residuals"])
+print(ARIMASummary(fit_sd.model_), f"\nresidual acf at lag 12: {r_sd.autocorr(12):+.2f}\n")
+
+cv_ret = StatsForecast(
+    models=[AutoARIMA(season_length=1, alias="non-seasonal"),
+            AutoARIMA(season_length=12, max_P=0, max_Q=0, alias="D=1 + ARMA"),
+            SeasonalNaive(season_length=12, alias="snaive")],
+    freq="MS").cross_validation(df=retail, h=12, n_windows=5, step_size=12)
+evaluate(cv_ret.drop(columns="cutoff"), metrics=[partial(mase, seasonality=12)],
+         train_df=retail).round(3)
+```
+
+`max_P=0, max_Q=0` lets `AutoARIMA` take a seasonal difference but adds no seasonal AR or MA terms.
+In other words, it uses only today's material.
+
+## What is still left {.smaller}
+
+- The non-seasonal model **loses to seasonal naive**. The seasonal difference plus an ARMA **beats it
+  clearly**.
+- The residual autocorrelation at lag 12 is still `{python} f"{r_sd.autocorr(12):+.2f}"`. Seasonal
+  differencing over-corrects slightly, and that is the same over-differencing signature you saw at lag
+  1, now at lag 12.
+- The fix is a **seasonal MA term**, a $\Theta_1\varepsilon_{t-12}$. That is ARIMA$(p,d,q)(P,D,Q)_m$,
+  next week.
+
+::: {.callout-note}
+We ran the same three-way comparison on all 140 issued Track B series. Non-seasonal ARIMA beats the
+benchmark on **14%** of them, seasonal difference + ARMA on **60%**, and full seasonal `AutoARIMA` on
+**all** of them, which the pool screen guarantees. Seasonal differencing gets you most of the way, and
+part 2 covers the rest.
+:::
+
+# ARIMA in practice
+
+## Five ways to get this wrong {.smaller}
+
+| Trap | What you see | Fix |
+|---|---|---|
+| Comparing AICc across different $d$ | A "better" model that is fitted to different data | Fix $d$ with the tests first, then compare $p$ and $q$ |
+| Over-differencing | A large negative spike at lag 1 (or $m$) in the differenced ACF | Go back one difference |
+| Reading `intercept` as $c$ | The equation does not reproduce the forecasts | `statsforecast` reports the mean, so $c = \mu(1 - \sum\phi_i)$ |
+| Ljung-Box with `model_df=0` | Residuals look whiter than they are | `model_df = p + q` |
+| `season_length=1` on seasonal data | Residual ACF spike at lag $m$, and the model loses to `snaive` | Seasonal difference, then the seasonal terms from part 2 |
+
+## What ARIMA is, in one slide {.smaller}
+
+- **Is:** a model of the series' **autocorrelation**. Differencing removes what does not stay put, and
+  AR and MA terms describe what is left.
+- **Is:** a family that contains naive, drift, mean and SES as special cases, so the Week 1
+  benchmarks are ARIMA models that were never estimated.
+- **Is:** something you can specify by hand from evidence (tests, ACF, PACF) and check automatically.
+  When the two disagree you learn something either way.
+- **Is not:** interpretable in terms of trend and season the way ETS is. An ARIMA(2,0,1) does not
+  have a "level" you can plot.
+- **Is not:** finished on seasonal data yet. That is part 2.
+
+## In the practice session {.smaller}
+
+**Today's practice** is the worked example for **Challenge 2: ETS** on your own series, from the Week 4
+lecture. The ARIMA material from today goes into **next week's** practice and Challenge 3.
+
+For Challenge 3 the justification block asks you to **specify the model by hand first**:
+
+1. choose $D$ and $d$ from the tests and the plots, and show both;
+2. read $p$ and $q$ from the ACF and PACF of the differenced series, and name the lags you used;
+3. check the residuals with Ljung-Box and the right `model_df`;
+4. only then run `AutoARIMA`, and explain any difference from your choice.
+
+::: {.callout-tip}
+## Before Week 7
+
+Read [FPP3 §9.9–9.10](https://otexts.com/fpp3/seasonal-arima.html) on seasonal ARIMA and ARIMA vs ETS,
+and run `nsdiffs` and `ndiffs` on your own series. Today's last slides showed why you need them.
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe="colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=4432)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

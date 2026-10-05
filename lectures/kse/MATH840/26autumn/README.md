@@ -128,3 +128,5 @@ Weeks are offset by one against the 2025/26 decks, because Week 1 merged last ye
 | 2 | `.02` | `.03` |
 | 3 | `.03` | `.04` |
 | 4 | `.04` | `.05` |
+| 5 | `.05` | `.06` |
+| 6 | `.06` | `.07`, non-seasonal half |
