@@ -52,6 +52,7 @@ cd lectures/kse/MATH840/26autumn/infra
 python trackb_pool.py --jobs 16             # screen the pool and issue data/trackb/
 python trackb_pool.py --refilter            # re-apply the issue rules to a pool already on disk
 python trackb_score.py ../grading/submissions/lab04 --ungraded   # week 4: measured, not marked
+python trackb_score.py ../grading/submissions/lab07 --ungraded   # week 7: measured, not marked (no P, Q)
 python trackb_score.py ../grading/submissions/ch2 --out ../grading/ch2_scores.csv
 ```
 

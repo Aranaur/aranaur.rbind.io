@@ -156,7 +156,7 @@ def main() -> None:
         if len(scored):
             beat = {other: f"{(scored[f'vs_{other}'] < 1).mean():.0%}"
                     for other in ("mean", "naive", "snaive", "drift")}
-            print(f"  decomposition forecasts that beat each simple method: {beat}")
+            print(f"  forecasts that beat each simple method: {beat}")
     else:
         print(f"\n{len(scored)} of {len(scores)} scored | "
               f"points {dict(scores['points'].value_counts().sort_index())}")
