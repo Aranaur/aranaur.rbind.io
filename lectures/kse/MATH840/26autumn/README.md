@@ -26,6 +26,9 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 6 — Lab 5 handout: Exponential smoothing | <https://01a10c3d-2a4c-157e-a3c7-512b09bb4b32.share.connect.posit.cloud> |
 | Week 6 — practice demo, ETS by hand and by machine (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo06.ipynb) |
 | Week 6 — Lab 5 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab06.ipynb) |
+| Week 7 — Lab 6 handout: ARIMA | <https://01a12fd5-ca67-b048-bc96-0eb2d4cc40ba.share.connect.posit.cloud> |
+| Week 7 — practice demo, ARIMA by hand on four series (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo07.ipynb) |
+| Week 7 — Lab 6 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab07.ipynb) |
 | Moodle | <https://teaching.kse.org.ua/course/view.php?id=4432> |
 
 ## Layout
