@@ -1,0 +1,794 @@
+---
+title: "ARIMA Models, Part 2"
+subtitle: "MATH840 | Time Series | Week 7"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=4432">🔗MATH840 | Time Series</a>
+format:
+  revealjs:
+    fragments: false   # show every slide in full; no click-through reveals
+    code-line-numbers: false
+    code-fold: true
+    code-summary: "Code"
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+editor_options:
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+import warnings
+warnings.filterwarnings("ignore")
+import os
+os.environ["NIXTLA_ID_AS_COL"] = "true"
+import numpy as np
+np.set_printoptions(suppress=True)
+np.random.seed(1)
+import pandas as pd
+pd.set_option("display.width", 130)
+pd.set_option("display.precision", 3)
+import seaborn as sns
+sns.set_style("whitegrid")
+import matplotlib.pyplot as plt
+plt.style.use("ggplot")
+plt.rcParams.update({
+    "figure.figsize": (8, 5),
+    "figure.dpi": 100,
+    "savefig.dpi": 300,
+    "figure.constrained_layout.use": True,
+    "axes.titlesize": 12,
+    "axes.labelsize": 10,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+    "legend.fontsize": 9,
+})
+import matplotlib as mpl
+from cycler import cycler
+mpl.rcParams['axes.prop_cycle'] = cycler(color=[slate, blue, turquoise, orange, red, green, purple, yellow, red_pink])
+from matplotlib.ticker import MaxNLocator
+from fpppy.utils import plot_series
+
+from functools import partial
+import statsmodels.api as sm
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.stats.diagnostic import acorr_ljungbox
+from statsmodels.tsa.arima_process import ArmaProcess
+from statsforecast import StatsForecast
+from statsforecast.models import ARIMA, AutoARIMA, AutoETS, SeasonalNaive
+from statsforecast.arima import ARIMASummary, ndiffs, nsdiffs
+from utilsforecast.evaluation import evaluate
+from utilsforecast.losses import mase
+
+employment = pd.read_csv('../data/us_employment.csv', parse_dates=["ds"])
+
+
+def n_coef(fit):
+    """p + q + P + Q of a fitted statsforecast ARIMA: the degrees of freedom Ljung-Box must give back."""
+    p, q, P, Q = fit.model_["arma"][:4]
+    return p + q + P + Q
+
+
+def acf_pacf(series, lags, title, axes):
+    plot_acf(series, lags=lags, zero=False, ax=axes[0], auto_ylims=True, title=f"{title}: ACF")
+    plot_pacf(series, lags=lags, zero=False, ax=axes[1], auto_ylims=True, title=f"{title}: PACF")
+    for ax in axes:
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+```
+
+# Where this fits
+
+## Where part 1 stopped {.smaller}
+
+The last slides of part 1 ran a non-seasonal ARIMA on monthly US retail employment, and then a
+seasonal difference followed by an ARMA:
+
+| Model | Residual ACF at lag 12 | MASE, 5 years of rolling origins |
+|---|---:|---:|
+| non-seasonal `AutoARIMA` | +0.85 | 0.919 |
+| seasonal difference + ARMA | −0.35 | 0.336 |
+| seasonal naive | — | 0.587 |
+
+The seasonal difference did most of the work, and it **over-corrected**: a negative spike at lag 12 is
+the same over-differencing signature as a negative spike at lag 1, one season further back.
+
+[The fix is a moving-average term at lag 12. That is today's model.]{.hi}
+
+## What this lecture is for {.smaller}
+
+1. **Seasonal ARIMA**, $\text{ARIMA}(p,d,q)(P,D,Q)_m$ — specified by hand from the ACF and PACF at the
+   seasonal lags, and checked against `AutoARIMA`. This is the material for Lab 7, on your own series.
+2. **ARIMA against ETS** — where the two families are the same model, and how to choose between them
+   when they are not.
+3. **Dynamic regression** — Week 5's regression with ARIMA errors, the gap that lecture left open.
+
+::: {.callout-tip}
+## Reading
+
+[FPP3 §9.9–9.10](https://otexts.com/fpp3/seasonal-arima.html) ·
+[FPP3 ch. 10, §10.1–10.6](https://otexts.com/fpp3/dynamic.html) ·
+[FPP the Pythonic Way, ch. 9–10](https://otexts.com/fpppy/nbs/09-arima.html)
+:::
+
+# Seasonal ARIMA
+
+## The notation {.smaller}
+
+$$
+\text{ARIMA}\;\underbrace{(p,\,d,\,q)}_{\text{non-seasonal part}}\;\underbrace{(P,\,D,\,Q)_m}_{\text{seasonal part}}
+$$
+
+- $m$ — the seasonal period: 12 for monthly data, 4 for quarterly.
+- $P$, $D$, $Q$ — the same three ideas as $p$, $d$, $q$, but at **lags that are multiples of $m$**: a
+  seasonal AR term looks at $y_{t-12}$, a seasonal MA term at $\varepsilon_{t-12}$, a seasonal difference
+  is $y_t - y_{t-12}$.
+- Part 1's model with a seasonal difference was ARIMA$(2,0,1)(0,1,0)_{12}$. Today's fix adds $Q = 1$.
+
+## In backshift notation {.smaller}
+
+ARIMA$(1,1,1)(1,1,1)_4$, without a constant:
+
+$$
+\underbrace{(1 - \phi_1 B)}_{\substack{\text{non-seasonal} \\ \text{AR(1)}}}
+\underbrace{(1 - \Phi_1 B^4)}_{\substack{\text{seasonal} \\ \text{AR(1)}}}
+\underbrace{(1 - B)}_{\substack{\text{non-seasonal} \\ \text{difference}}}
+\underbrace{(1 - B^4)}_{\substack{\text{seasonal} \\ \text{difference}}}
+y_t =
+\underbrace{(1 + \theta_1 B)}_{\substack{\text{non-seasonal} \\ \text{MA(1)}}}
+\underbrace{(1 + \Theta_1 B^4)}_{\substack{\text{seasonal} \\ \text{MA(1)}}}
+\varepsilon_t
+$$
+
+The seasonal and non-seasonal parts **multiply**. That is why a seasonal model has terms at lags
+nobody asked for.
+
+## Multiplied out {.smaller}
+
+$$
+\begin{aligned}
+y_t &= (1 + \phi_1)y_{t-1} - \phi_1y_{t-2} + (1 + \Phi_1)y_{t-4} \\
+    &\quad - (1 + \phi_1 + \Phi_1 + \phi_1\Phi_1)y_{t-5} + (\phi_1 + \phi_1\Phi_1)y_{t-6} \\
+    &\quad - \Phi_1y_{t-8} + (\Phi_1 + \phi_1\Phi_1)y_{t-9} - \phi_1\Phi_1y_{t-10} \\
+    &\quad + \varepsilon_t + \theta_1\varepsilon_{t-1} + \Theta_1\varepsilon_{t-4} + \theta_1\Theta_1\varepsilon_{t-5}
+\end{aligned}
+$$
+
+- Four parameters, $\phi_1, \Phi_1, \theta_1, \Theta_1$, and they drive **ten** lags of $y$ and four of
+  $\varepsilon$.
+- The cross terms — $\phi_1\Phi_1$, $\theta_1\Theta_1$ — are what "multiplicative seasonal ARIMA"
+  means. They are not free: the model asserts that the seasonal and non-seasonal dynamics combine as a
+  product.
+
+## Seasonal signatures {.smaller}
+
+The same reading rules as part 1, applied at lags $m, 2m, 3m, \dots$:
+
+| | ACF at seasonal lags | PACF at seasonal lags |
+|---|---|---|
+| **Seasonal MA($Q$)**, e.g. $(0,0,0)(0,0,1)_{12}$ | **spike at 12**, nothing at 24, 36 | decays: 12, 24, 36, … |
+| **Seasonal AR($P$)**, e.g. $(0,0,0)(1,0,0)_{12}$ | decays: 12, 24, 36, … | **spike at 12**, nothing at 24 |
+
+```{python}
+#| label: seasonal-signatures
+#| fig-align: center
+def seasonal_sample(sar=0.0, sma=0.0, m=12, n=3000, seed=4):
+    ar, ma = np.zeros(m + 1), np.zeros(m + 1)
+    ar[0] = ma[0] = 1
+    ar[m], ma[m] = -sar, sma
+    return ArmaProcess(ar, ma).generate_sample(n, distrvs=np.random.default_rng(seed).standard_normal)
+
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 3.9))
+acf_pacf(seasonal_sample(sma=0.8), 40, r"$(0,0,0)(0,0,1)_{12}$, $\Theta_1=0.8$", axes[0])
+acf_pacf(seasonal_sample(sar=0.8), 40, r"$(0,0,0)(1,0,0)_{12}$, $\Phi_1=0.8$", axes[1])
+plt.show()
+```
+
+## Retail, finished {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+retail = employment.query("unique_id == 'Retail Trade' and ds.dt.year >= 1990").reset_index(drop=True)
+y_ret = retail["y"].to_numpy(float)
+
+d_only = AutoARIMA(season_length=12, max_P=0, max_Q=0).fit(y=y_ret)    # part 1: D = 1, no P or Q
+full = AutoARIMA(season_length=12).fit(y=y_ret)                        # today: P and Q allowed
+for name, fit in [("part 1", d_only), ("today ", full)]:
+    r = pd.Series(fit.model_["residuals"])
+    lb = acorr_ljungbox(r, lags=[24], model_df=n_coef(fit))["lb_pvalue"].iloc[0]
+    print(f"{name}: {ARIMASummary(fit.model_)}  acf(12) {r.autocorr(12):+.2f}  Ljung-Box p {lb:.3f}")
+```
+
+```{python}
+#| label: retail-residual-acf
+#| fig-align: center
+fig, axes = plt.subplots(1, 2, figsize=(12, 2.9), sharey=True)
+for ax, (name, fit) in zip(axes, [("seasonal difference + ARMA", d_only), ("+ seasonal MA(1)", full)]):
+    plot_acf(fit.model_["residuals"], lags=36, zero=False, ax=ax, title=f"Residual ACF: {name}")
+    ax.set_ylim(-0.45, 0.45)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+plt.show()
+```
+
+One parameter, $\Theta_1$, and the spike at lag 12 is gone.
+
+## Retail, scored {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| output-location: column
+def scored(cv, df, m):
+    # MASE per model, one column
+    out = evaluate(cv.drop(columns="cutoff"),
+                   metrics=[partial(mase, seasonality=m)],
+                   train_df=df)
+    return (out.drop(columns=["unique_id", "metric"])
+            .T.rename(columns={0: "MASE"}).round(3))
+
+
+models = [
+    AutoARIMA(season_length=12, max_P=0, max_Q=0,
+              alias="D=1 + ARMA"),
+    AutoARIMA(season_length=12, alias="seasonal ARIMA"),
+    AutoETS(season_length=12, alias="AutoETS"),
+    SeasonalNaive(season_length=12, alias="snaive"),
+]
+cv_ret = StatsForecast(models=models, freq="MS")    .cross_validation(df=retail, h=12, n_windows=5,
+                      step_size=12)
+scored(cv_ret, retail, 12)
+```
+
+- The seasonal MA term improves on part 1's model by a further sixth.
+- `AutoETS` loses to both ARIMA models here. That is one series, not a law — the ARIMA vs ETS section
+  comes back to it.
+
+# Specifying a seasonal ARIMA by hand
+
+## US leisure and hospitality employment {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+leisure = (employment.query("unique_id == 'Leisure and Hospitality' and ds.dt.year >= 2001")
+           .assign(y=lambda d: d["y"] / 1000).reset_index(drop=True))     # millions of people
+y_lei = leisure["y"].to_numpy(float)
+print(f"{len(leisure)} months, {leisure['ds'].min().date()} to {leisure['ds'].max().date()}")
+```
+
+```{python}
+#| label: leisure-plot
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(11, 3.4))
+ax.plot(leisure["ds"], y_lei, color=slate, linewidth=1)
+ax.set_ylabel("millions of people")
+ax.set_title("US employment: leisure and hospitality")
+plt.show()
+```
+
+A trend, a recession dip in 2008–2010, and a seasonal pattern of constant size: no transformation
+needed. The same series FPP uses, so you can check every step against the book.
+
+## Step 1: how many differences {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+D = nsdiffs(y_lei, period=12)
+y_s = y_lei[12:] - y_lei[:-12]
+d = ndiffs(y_s)
+print(f"nsdiffs: D = {D}    ndiffs after the seasonal difference: d = {d}")
+```
+
+```{python}
+#| label: leisure-seasonal-diff
+#| fig-align: center
+fig, axes = plt.subplots(1, 3, figsize=(13, 3.1), width_ratios=[2, 1, 1])
+axes[0].plot(leisure["ds"].iloc[12:], y_s, color=slate)
+axes[0].set_title("Seasonal difference: still wandering")
+acf_pacf(y_s, 36, "seasonal difference", axes[1:])
+plt.show()
+```
+
+The seasonal difference removes the season but not the trend: the ACF decays slowly, and KPSS asks for
+one more difference. So $D = 1$ **and** $d = 1$.
+
+## Step 2: read the ACF and PACF {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| fig-align: center
+y_sd = np.diff(y_s)                                   # seasonal, then first difference
+fig, axes = plt.subplots(1, 2, figsize=(12, 3.3))
+acf_pacf(y_sd, 36, "seasonal + first difference", axes)
+plt.show()
+```
+
+- **Seasonal lags.** A negative spike at **12** in the ACF and nothing at 24 or 36: a **seasonal
+  MA(1)**, $Q = 1$. (The PACF has spikes at 12 and 24 decaying — the MA signature from the other side.)
+- **Non-seasonal lags.** Significant spikes at lags 1 and 2 in the ACF suggest **MA(2)**, $q = 2$. The PACF
+  has the same two spikes, so **AR(2)**, $p = 2$, is the other reading.
+
+Two candidates: ARIMA$(0,1,2)(0,1,1)_{12}$ and ARIMA$(2,1,0)(0,1,1)_{12}$.
+
+## Step 3: candidates, against `AutoARIMA` {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+candidates = {
+    "MA reading":  ARIMA(order=(0, 1, 2), seasonal_order=(0, 1, 1), season_length=12),
+    "AR reading":  ARIMA(order=(2, 1, 0), seasonal_order=(0, 1, 1), season_length=12),
+    "stepwise":    AutoARIMA(season_length=12),
+    "full search": AutoARIMA(season_length=12, stepwise=False, approximation=False),
+}
+rows = []
+for name, model in candidates.items():
+    fit = model.fit(y=y_lei)
+    rows.append({"candidate": name, "model": str(ARIMASummary(fit.model_)).strip(),
+                 "AICc": fit.model_["aicc"],
+                 "Ljung-Box p (24 lags)": acorr_ljungbox(fit.model_["residuals"], lags=[24],
+                                                         model_df=n_coef(fit))["lb_pvalue"].iloc[0]})
+pd.DataFrame(rows).sort_values("AICc").round(3)
+```
+
+## Step 3: what the table says {.smaller}
+
+- All four pass Ljung-Box. The search prefers a **second** seasonal MA term, $Q = 2$, and the AICc gap
+  to the hand-specified models is two to four units — real, but small.
+- All four agree on $d = 1$, $D = 1$ and a seasonal MA. The ACF/PACF reading got the structure right.
+- What AICc cannot tell you is which of them forecasts best. That takes a rolling origin, three slides on.
+
+## How `AutoARIMA` searches seasonal models {.smaller}
+
+The same Hyndman–Khandakar algorithm as part 1, with the seasonal orders added:
+
+1. **$D$ from seasonal strength** (`nsdiffs`, $F_S > 0.64$), then **$d$ from KPSS** on the seasonally
+   differenced series (`ndiffs`). Never $D > 1$; $d + D \le 2$.
+2. **Start** from ARIMA$(2,d,2)(1,D,1)_m$ and three simple models.
+3. **Move** one of $p, q, P, Q$ by $\pm 1$, or toggle the constant; keep any improvement in AICc.
+
+| Option | Default | What it does |
+|---|---|---|
+| `stepwise` | `True` | `False`: try every model up to the limits — seconds on a monthly series |
+| `approximation` | `False` | `True`: approximate the likelihood during the search, for long series |
+| `max_P`, `max_Q` | 2 | caps on the seasonal orders — part 1 set them to 0 |
+
+## Residuals of the hand-specified model {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+by_hand = ARIMA(order=(0, 1, 2), seasonal_order=(0, 1, 1), season_length=12).fit(y=y_lei)
+acorr_ljungbox(by_hand.model_["residuals"], lags=[24], model_df=n_coef(by_hand))
+```
+
+```{python}
+#| label: leisure-residuals
+#| fig-align: center
+resid = by_hand.model_["residuals"]
+fig, axes = plt.subplots(1, 3, figsize=(13, 3), width_ratios=[2, 1, 1])
+axes[0].plot(leisure["ds"], resid, color=orange, linewidth=0.9)
+axes[0].set_title("Innovation residuals, ARIMA(0,1,2)(0,1,1)[12]")
+plot_acf(resid, lags=36, zero=False, ax=axes[1], auto_ylims=True)
+axes[2].hist(resid, bins=25, color=slate)
+axes[2].set_title("Histogram")
+plt.show()
+```
+
+The degrees of freedom are $p + q + P + Q = 3$. The large residuals at the start are the first twelve
+months, where a seasonally differenced model has no history to work from.
+
+## AICc chose. Was it right? {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| output-location: column
+sarima = partial(ARIMA, season_length=12)
+models = [
+    sarima(order=(0, 1, 2), seasonal_order=(0, 1, 1),
+           alias="(0,1,2)(0,1,1)"),
+    sarima(order=(2, 1, 0), seasonal_order=(0, 1, 1),
+           alias="(2,1,0)(0,1,1)"),
+    AutoARIMA(season_length=12, alias="AutoARIMA"),
+    AutoETS(season_length=12, alias="AutoETS"),
+    SeasonalNaive(season_length=12, alias="snaive"),
+]
+cv_lei = StatsForecast(models=models, freq="MS")    .cross_validation(df=leisure, h=12, n_windows=5,
+                      step_size=12)
+scored(cv_lei, leisure, 12)
+```
+
+- The **hand-specified MA reading forecasts best**, with the highest AICc of the ARIMA models. The
+  extra seasonal term the search added fitted the past and did not help the future.
+- Seasonal naive is far behind: a trending series, and last year's value is always one year of trend
+  short.
+
+## Forecasts {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| fig-align: center
+fc_lei = StatsForecast(
+    models=[ARIMA(order=(0, 1, 2), seasonal_order=(0, 1, 1), season_length=12, alias="ARIMA")],
+    freq="MS").forecast(df=leisure, h=36, level=[80, 95])
+plot_series(leisure, fc_lei, level=[80, 95], xlabel="Month", ylabel="millions of people",
+            title="US leisure and hospitality employment: ARIMA(0,1,2)(0,1,1)[12]", rm_legend=False)
+```
+
+$d + D = 2$, so the forecast follows a trend and the intervals widen without limit — the same rule as
+part 1, with $D$ counted in.
+
+# ARIMA and ETS
+
+## Two families, partly the same {.smaller}
+
+- **ETS** describes components — level, trend, season — and how they update. **ARIMA** describes the
+  autocorrelation of the (differenced) series.
+- The **six fully additive ETS models are ARIMA models**: same forecasts, same intervals, different
+  parameterisation.
+- The **multiplicative ETS models have no ARIMA counterpart**, and most ARIMA models have no ETS
+  counterpart. Every ETS model is non-stationary; ARIMA covers stationary series too.
+
+[Where they overlap, the choice between them is a choice of parameterisation, not of model.]{.hi}
+
+## Where they coincide {.smaller}
+
+| ETS model | ARIMA model | Parameters |
+|:---|:---|:---|
+| ETS(A,N,N) | ARIMA(0,1,1) | $\theta_1 = \alpha - 1$ |
+| ETS(A,A,N) | ARIMA(0,2,2) | $\theta_1 = \alpha + \beta - 2,\quad \theta_2 = 1 - \alpha$ |
+| ETS(A,A$_d$,N) | ARIMA(1,1,2) | $\phi_1 = \phi,\ \theta_1 = \alpha + \phi\beta - 1 - \phi,\ \theta_2 = (1 - \alpha)\phi$ |
+| ETS(A,N,A) | ARIMA$(0,1,m)(0,1,0)_m$ | |
+| ETS(A,A,A) | ARIMA$(0,1,m+1)(0,1,0)_m$ | |
+| ETS(A,A$_d$,A) | ARIMA$(1,0,m+1)(0,1,0)_m$ | |
+
+## Checking one: ETS(A,A,N) is ARIMA(0,2,2) {.smaller}
+
+Part 1 checked the first row on Algeria. The second, on Croatia's population:
+
+```{python}
+#| echo: true
+#| code-fold: false
+economy = pd.read_csv('../data/global_economy.csv', parse_dates=["ds"])
+y_hrv = economy.query("unique_id == 'Croatia'")["Population"].dropna().to_numpy(float) / 1e6
+
+holt = AutoETS(season_length=1, model="AAN", damped=False).fit(y=y_hrv)
+alpha, beta = holt.model_["par"][0], holt.model_["par"][1]
+implied = {"ma1": alpha + beta - 2, "ma2": 1 - alpha}
+
+same = ARIMA(order=(0, 2, 2), include_mean=False, fixed=implied).fit(y=y_hrv)  # theta taken from ETS
+free = ARIMA(order=(0, 2, 2)).fit(y=y_hrv)                                     # theta estimated
+print(f"ETS(A,A,N):  alpha {alpha:.3f}  beta {beta:.3f}  ->  theta1 {implied['ma1']:+.3f}  theta2 {implied['ma2']:+.3f}")
+print(f"ARIMA(0,2,2) estimated freely:        theta1 {free.model_['coef']['ma1']:+.3f}  theta2 {free.model_['coef']['ma2']:+.3f}")
+print("forecasts, ETS:           ", np.round(holt.predict(h=3)["mean"], 4))
+print("forecasts, ARIMA(0,2,2):  ", np.round(same.predict(h=3)["mean"], 4))
+```
+
+Fix the ARIMA's $\theta$ at the values the formula gives, and the forecasts are the ETS forecasts. Estimate
+them freely, and the optimiser lands on almost the same numbers by itself.
+
+## Which forecasts better? {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| output-location: column
+production = pd.read_csv('../data/aus_production.csv',
+                         parse_dates=["ds"])
+cement = (production.query("ds.dt.year >= 1988")
+          [["ds", "Cement"]].dropna()
+          .rename(columns={"Cement": "y"})
+          .assign(unique_id="Cement").reset_index(drop=True))
+
+models = [AutoARIMA(season_length=4),
+          AutoETS(season_length=4),
+          SeasonalNaive(season_length=4, alias="snaive")]
+cv_cem = StatsForecast(models=models, freq="QS")    .cross_validation(df=cement, h=8, n_windows=6,
+                      step_size=4)
+scored(cv_cem, cement, 4)
+```
+
+Australian cement, 1988–2010, two years ahead from six origins.
+
+## Four series, two winners {.smaller}
+
+| Series | Winner on a rolling origin |
+|---|---|
+| US retail employment | ARIMA, clearly |
+| US leisure employment | ARIMA, clearly |
+| Australian cement | **ETS** — and seasonal naive beats ARIMA |
+| The 140 Track B series, automatic models on the hidden horizon | ARIMA on 59%, ETS on 41% |
+
+## How to choose between them {.smaller}
+
+::: {.callout-warning}
+## Not on AICc
+
+An ARIMA likelihood is computed on the differenced series; an ETS likelihood on the original one. The
+two AICc are not comparable, for the same reason AICc across different $d$ is not (part 1).
+:::
+
+::: {.callout-note icon="false"}
+## On a rolling origin, with a benchmark in the table
+
+Fit both, score both on the horizon you will be judged on, over several windows. Across the Track B
+pool the automatic models land at a median skill of 0.81 (ARIMA) and 0.84 (ETS) — a difference smaller
+than the spread between series. **Neither family is better in general. One of them is better on your
+series**, and only the holdout can say which.
+:::
+
+# Dynamic regression
+
+## What Week 5 left open {.smaller}
+
+$$
+y_t = \beta_0 + \beta_1 x_{1,t} + \dots + \beta_k x_{k,t} + \eta_t
+$$
+
+Week 5 assumed $\eta_t$ was white noise, and the residuals said otherwise. Two things go wrong:
+
+- the **standard errors** are too small, so every $t$ statistic is inflated;
+- the **forecasts** ignore the strongest predictor available — the error of the last few periods.
+
+**Dynamic regression** lets the error follow an ARIMA model:
+
+$$
+\eta_t \sim \text{ARIMA}(p,d,q)(P,D,Q)_m, \qquad \varepsilon_t \sim \text{white noise}
+$$
+
+Two error terms now: $\eta_t$, the regression error, and $\varepsilon_t$, the ARIMA error. Only
+$\varepsilon_t$ should look like white noise.
+
+## Electricity demand and temperature {.smaller}
+
+Daily electricity demand in Victoria, Australia, 2014, with the day's maximum temperature and whether
+it was a working day.
+
+```{python}
+#| echo: true
+#| code-fold: false
+vic = pd.read_csv('../data/vic_elec.csv', parse_dates=["ds"])
+half_hourly = vic.pivot_table(index="ds", columns="unique_id", values="y")
+half_hourly["holiday"] = vic.query("unique_id == 'Demand'").set_index("ds")["Holiday"]
+
+daily = (half_hourly.groupby(half_hourly.index.date)
+         .agg(demand=("Demand", "sum"), temp=("Temperature", "max"), holiday=("holiday", "max"))
+         .rename_axis("ds").reset_index())
+daily["ds"] = pd.to_datetime(daily["ds"])
+daily = daily[daily["ds"].dt.year == 2014].reset_index(drop=True)
+daily["demand"] = daily["demand"] / 2 / 1000                      # half-hourly MW -> GWh per day
+daily["workday"] = ((daily["ds"].dt.dayofweek < 5) & ~daily["holiday"].astype(bool)).astype(int)
+daily[["ds", "demand", "temp", "workday"]].head(3)
+```
+
+## Demand against temperature {.smaller}
+
+```{python}
+#| label: elec-scatter
+#| fig-align: center
+fig, axes = plt.subplots(1, 2, figsize=(13, 3.9), width_ratios=[1, 1.4])
+for flag, colour, label in [(1, blue, "working day"), (0, orange, "weekend or holiday")]:
+    d = daily[daily["workday"] == flag]
+    axes[0].scatter(d["temp"], d["demand"], s=12, color=colour, label=label)
+axes[0].set_xlabel("maximum temperature, °C")
+axes[0].set_ylabel("GWh")
+axes[0].legend()
+axes[0].set_title("Heating on the left, cooling on the right")
+axes[1].plot(daily["ds"], daily["demand"], color=slate, linewidth=0.9)
+axes[1].set_title("Daily demand, 2014")
+plt.show()
+```
+
+The relationship is a curve — demand rises on cold days and on hot days — so the regression gets
+$x$ and $x^2$. Working days sit higher. Both are known in advance for the calendar; temperature is not.
+
+## OLS first {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+X = daily[["temp"]].assign(temp2=daily["temp"] ** 2, workday=daily["workday"]).to_numpy(float)
+y_el = daily["demand"].to_numpy(float)
+
+ols = sm.OLS(y_el, sm.add_constant(X)).fit()
+print(pd.DataFrame({"coef": ols.params, "t": ols.tvalues},
+                   index=["const", "temp", "temp²", "workday"]).round(3))
+print(f"\nresidual acf(1) {pd.Series(ols.resid).autocorr(1):+.2f}   "
+      f"Ljung-Box p (14 lags) {acorr_ljungbox(ols.resid, lags=[14])['lb_pvalue'].iloc[0]:.1e}")
+```
+
+$t$ statistics of 30 to 60, and residuals whose lag-1 autocorrelation is 0.5. Week 5 told you which of
+those two numbers to believe.
+
+## Regression with ARIMA errors {.smaller}
+
+In `statsforecast` the regressors go into `fit` as `X`, and the future regressors into `predict`:
+
+```{python}
+#| echo: true
+#| code-fold: false
+dyn = AutoARIMA(season_length=7).fit(y=y_el, X=X)
+coef = dyn.model_["coef"]
+print(ARIMASummary(dyn.model_))
+print("regression part:", {name: round(float(coef[f"ex_{i}"]), 3) for i, name in enumerate(["temp", "temp²", "workday"], 1)})
+print(f"residual acf(1) {pd.Series(dyn.model_['residuals']).autocorr(1):+.2f}   "
+      f"Ljung-Box p (14 lags) {acorr_ljungbox(dyn.model_['residuals'], lags=[14], model_df=n_coef(dyn))['lb_pvalue'].iloc[0]:.3f}")
+```
+
+- The error got a weekly seasonal ARIMA with $d = 1$. **Differencing the error differences the whole
+  regression**: the coefficients now describe how a *change* in temperature moves a *change* in demand,
+  which is why they moved.
+- Lag-1 autocorrelation is gone. Ljung-Box still rejects on 14 lags — smaller, but not nothing.
+
+## The residuals, side by side {.smaller}
+
+```{python}
+#| label: elec-residuals
+#| fig-align: center
+fig, axes = plt.subplots(1, 2, figsize=(12, 3.2), sharey=True)
+plot_acf(ols.resid, lags=28, zero=False, ax=axes[0], title="OLS residuals")
+plot_acf(dyn.model_["residuals"], lags=28, zero=False, ax=axes[1],
+         title="Regression with ARIMA errors: the ε residuals")
+for ax in axes:
+    ax.set_ylim(-0.3, 0.6)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+plt.show()
+```
+
+The structure OLS left in the residuals is now inside the model — which is exactly what makes its
+intervals and its forecasts better.
+
+## Forecasting needs the future of $x$ {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+H_EL, scale_el = 14, float(np.mean(np.abs(y_el[7:] - y_el[:-7])))
+ends = range(len(y_el) - 6 * H_EL, len(y_el), H_EL)          # six fortnights
+
+
+def score(forecaster):
+    return np.mean([np.mean(np.abs(y_el[e:e + H_EL] - forecaster(e))) / scale_el for e in ends])
+
+
+pd.Series({
+    "seasonal naive (m=7)": score(lambda e: np.array([y_el[e - 7 + i % 7] for i in range(H_EL)])),
+    "AutoARIMA, no x":      score(lambda e: AutoARIMA(season_length=7).fit(y=y_el[:e]).predict(h=H_EL)["mean"]),
+    "OLS":                  score(lambda e: sm.OLS(y_el[:e], sm.add_constant(X[:e])).fit()
+                                  .predict(sm.add_constant(X[e:e + H_EL], has_constant="add"))),
+    "regression + ARIMA errors": score(lambda e: AutoARIMA(season_length=7).fit(y=y_el[:e], X=X[:e])
+                                       .predict(h=H_EL, X=X[e:e + H_EL])["mean"]),
+}, name="MASE").round(3)
+```
+
+These are **ex-post** forecasts: they use the temperature that actually happened. A real forecast needs
+a temperature forecast — or a scenario, as in Week 5. The ordering still says what each half
+contributes: temperature beats no temperature, and modelling the error beats ignoring it.
+
+## And Walmart? {.smaller}
+
+The model Week 5 fitted — trend, Fourier $K = 3$, the pre-Christmas dummy — with ARIMA errors:
+
+```{python}
+#| echo: true
+#| code-fold: false
+walmart = pd.read_csv('../data/walmart.csv', parse_dates=["ds"])
+chain = walmart.groupby("ds", as_index=False)["y"].sum()
+y_wm = chain["y"].to_numpy(float) / 1e6
+t = np.arange(1, len(y_wm) + 1)
+X_wm = np.column_stack([np.sin(2 * np.pi * i * t / 52) if s else np.cos(2 * np.pi * i * t / 52)
+                        for i in range(1, 4) for s in (1, 0)]
+                       + [(chain["ds"].dt.month.eq(12) & chain["ds"].dt.day.between(10, 26)).astype(float)])
+
+wm = AutoARIMA(season_length=1).fit(y=y_wm, X=X_wm)
+print(ARIMASummary(wm.model_))
+print(f"OLS residual acf(1): {pd.Series(sm.OLS(y_wm, sm.add_constant(np.column_stack([t, X_wm]))).fit().resid).autocorr(1):+.2f}")
+```
+
+The search picks **no ARIMA structure at all**: the short-lag autocorrelation is negligible. The
+Ljung-Box rejection in Week 5 came from longer lags, where the $K = 3$ season is too smooth — a problem
+for the seasonal terms, not for the error model.
+
+[Dynamic regression fixes autocorrelated errors. Check that you have them before you reach for it.]{.hi}
+
+# In practice
+
+## Five ways to get this wrong {.smaller}
+
+| Trap | What you see | Fix |
+|---|---|---|
+| A seasonal series fitted with `season_length=1` | Residual ACF spikes at $m$, $2m$; loses to `snaive` | `season_length=m`, and let $D$ and $P, Q$ in |
+| Two seasonal differences | `D=2` forced by hand; wild forecasts | $D \le 1$, always; $d + D \le 2$ |
+| Ljung-Box with `model_df = p + q` only | Residuals look whiter than they are | `model_df = p + q + P + Q` |
+| Choosing between ARIMA and ETS on AICc | A comparison that means nothing | Rolling origin, same horizon, benchmark in the table |
+| Regression with ARIMA errors, future $x$ unknown | Ex-post accuracy reported as a forecast | Say ex-post, or forecast $x$, or use a scenario |
+
+## What seasonal ARIMA is, in one slide {.smaller}
+
+- **Is:** part 1's model, with the same three ideas — difference, AR, MA — applied a second time at the
+  seasonal lags. Read $P$ and $Q$ off the ACF and PACF at $m, 2m, 3m$ the way you read $p$ and $q$ at
+  $1, 2, 3$.
+- **Is:** equal to ETS for the additive models, and neither better nor worse than ETS in general — on
+  the Track B pool each family wins on part of the series.
+- **Is:** the error model of choice for regression, which turns Week 5's regression into something whose
+  standard errors and forecasts you can use.
+- **Is not:** a cure for a short history. Every seasonal parameter is estimated from one value per year.
+
+## In the practice session {.smaller}
+
+**Tomorrow's practice** is the worked example for **Lab 6: ARIMA**, from the part 1 lecture — on your own
+series, specified by hand from the ACF and PACF first.
+
+**Next week, Lab 7** is today's material on the same series:
+
+1. choose $D$ and $d$ with `nsdiffs` and `ndiffs`, and show the differenced series;
+2. read $p, q$ at the first lags and $P, Q$ at the seasonal lags, and name the lags you used;
+3. compare your specification with `AutoARIMA`, stepwise and full search, on AICc **and** a rolling origin;
+4. check the residuals with `model_df = p + q + P + Q`.
+
+::: {.callout-tip}
+## Before Week 8
+
+Read [FPP3 §9.9](https://otexts.com/fpp3/seasonal-arima.html) and plot the ACF and PACF of your series
+after $D$ and $d$ differences, out to lag $3m$. That plot is half of Lab 7.
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe="colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=4432)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
