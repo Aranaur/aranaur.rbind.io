@@ -707,9 +707,48 @@ These are **ex-post** forecasts: they use the temperature that actually happened
 a temperature forecast — or a scenario, as in Week 5. The ordering still says what each half
 contributes: temperature beats no temperature, and modelling the error beats ignoring it.
 
+## The six fortnights, drawn {.smaller}
+
+```{python}
+#| label: elec-forecasts
+#| fig-align: center
+fig, axes = plt.subplots(2, 3, figsize=(13, 5.6), sharey=True)
+for ax, e in zip(axes.flat, ends):
+    days = daily["ds"].iloc[e - 14:e + H_EL]
+    fc = AutoARIMA(season_length=7).fit(y=y_el[:e], X=X[:e]).predict(h=H_EL, X=X[e:e + H_EL], level=[80])
+    ols_fc = sm.OLS(y_el[:e], sm.add_constant(X[:e])).fit().predict(sm.add_constant(X[e:e + H_EL], has_constant="add"))
+    window = daily["ds"].iloc[e:e + H_EL]
+    ax.plot(days, y_el[e - 14:e + H_EL], color=slate, linewidth=1.2, label="actual")
+    ax.fill_between(window, fc["lo-80"], fc["hi-80"], color=turquoise, alpha=0.2)
+    ax.plot(window, fc["mean"], color=turquoise, linewidth=1.8, label="regression + ARIMA errors (80%)")
+    ax.plot(window, ols_fc, "--", color=orange, linewidth=1.4, label="OLS")
+    ax.plot(window, [y_el[e - 7 + i % 7] for i in range(H_EL)], ":", color=red_pink, linewidth=1.6,
+            label="seasonal naive")
+    ax.axvline(daily["ds"].iloc[e], color="grey", linewidth=0.8)
+    ax.set_title(f"from {daily['ds'].iloc[e].date()}", fontsize=10)
+    ax.tick_params(axis="x", labelsize=7, rotation=30)
+axes[0, 0].set_ylabel("GWh")
+axes[1, 0].set_ylabel("GWh")
+axes[0, 0].legend(fontsize=7, loc="upper left")
+plt.show()
+```
+
+Teal: regression with ARIMA errors and its 80% interval. Orange: OLS. Pink: seasonal naive.
+
+## The fortnights: what to see {.smaller}
+
+- Both regressions follow the **shape** of each fortnight — the working-day steps and the temperature
+  swings — because they are given the actual temperature. Seasonal naive only copies last week, and is
+  worst wherever the weather changed.
+- OLS and the dynamic regression differ mostly in **level**: OLS starts from the average relationship, the
+  dynamic regression from where the last few days' errors left it. In most fortnights that puts teal
+  closer — that is the error model at work.
+- The last fortnight is where all three fail: demand drops after Christmas further than temperature
+  and a working-day flag can explain. A predictor the model does not have is a gap no error model fills.
+
 ## And Walmart? {.smaller}
 
-The model Week 5 fitted — trend, Fourier $K = 3$, the pre-Christmas dummy — with ARIMA errors:
+The model Week 5 fitted — Fourier $K = 3$ and the pre-Christmas dummy — with ARIMA errors:
 
 ```{python}
 #| echo: true
@@ -718,20 +757,126 @@ walmart = pd.read_csv('../data/walmart.csv', parse_dates=["ds"])
 chain = walmart.groupby("ds", as_index=False)["y"].sum()
 y_wm = chain["y"].to_numpy(float) / 1e6
 t = np.arange(1, len(y_wm) + 1)
-X_wm = np.column_stack([np.sin(2 * np.pi * i * t / 52) if s else np.cos(2 * np.pi * i * t / 52)
-                        for i in range(1, 4) for s in (1, 0)]
-                       + [(chain["ds"].dt.month.eq(12) & chain["ds"].dt.day.between(10, 26)).astype(float)])
+prechristmas = (chain["ds"].dt.month.eq(12) & chain["ds"].dt.day.between(10, 26)).to_numpy(float)
 
-wm = AutoARIMA(season_length=1).fit(y=y_wm, X=X_wm)
+
+def walmart_X(k, trend=False):
+    """Fourier terms of order k for a 52-week season, the pre-Christmas dummy, optionally a trend."""
+    fourier = [f(2 * np.pi * i * t / 52) for i in range(1, k + 1) for f in (np.sin, np.cos)]
+    return np.column_stack(([t] if trend else []) + fourier + [prechristmas])
+
+
+wm = AutoARIMA(season_length=1).fit(y=y_wm, X=walmart_X(3))
 print(ARIMASummary(wm.model_))
-print(f"OLS residual acf(1): {pd.Series(sm.OLS(y_wm, sm.add_constant(np.column_stack([t, X_wm]))).fit().resid).autocorr(1):+.2f}")
+print(f"OLS residual acf(1): {pd.Series(sm.OLS(y_wm, sm.add_constant(walmart_X(3, trend=True))).fit().resid).autocorr(1):+.2f}")
 ```
 
-The search picks **no ARIMA structure at all**: the short-lag autocorrelation is negligible. The
-Ljung-Box rejection in Week 5 came from longer lags, where the $K = 3$ season is too smooth — a problem
-for the seasonal terms, not for the error model.
+The search picks **no ARIMA structure at all**: at $K = 3$ the short-lag autocorrelation is negligible.
+Week 5's Ljung-Box rejection came from longer lags, where a $K = 3$ season is too smooth. But Week 5
+also found that larger $K$ forecasts better. What happens to the errors there?
 
-[Dynamic regression fixes autocorrelated errors. Check that you have them before you reach for it.]{.hi}
+## Walmart with more harmonics {.smaller}
+
+```{python}
+#| label: walmart-helpers
+H_WM = 13
+origins = range(len(y_wm) - H_WM - 8, len(y_wm) - H_WM)     # Week 5's eight origins
+scale_wm = float(np.mean(np.abs(y_wm[52:] - y_wm[:-52])))
+
+
+def rolling_wm(forecaster):
+    return np.mean([np.mean(np.abs(y_wm[e:e + H_WM] - forecaster(e))) / scale_wm
+                    for e in origins])
+
+
+def ols_fc(Xo, e):
+    fit = sm.OLS(y_wm[:e], sm.add_constant(Xo[:e])).fit()
+    new = sm.add_constant(Xo[e:e + H_WM], has_constant="add")
+    return fit.predict(new)
+
+
+def dyn_fc(Xd, e):
+    fit = AutoARIMA(season_length=1).fit(y=y_wm[:e], X=Xd[:e])
+    return fit.predict(h=H_WM, X=Xd[e:e + H_WM])["mean"]
+```
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| output-location: column
+rows = []
+for k in (3, 10, 18):
+    Xo, Xd = walmart_X(k, trend=True), walmart_X(k)
+    resid = sm.OLS(y_wm, sm.add_constant(Xo)).fit().resid
+    errors = AutoARIMA(season_length=1).fit(y=y_wm, X=Xd)
+    rows.append({
+        "K": k,
+        "OLS acf(1)": pd.Series(resid).autocorr(1),
+        "errors": str(ARIMASummary(errors.model_))[16:28],
+        "OLS": rolling_wm(lambda e: ols_fc(Xo, e)),
+        "+ ARIMA errors": rolling_wm(lambda e: dyn_fc(Xd, e)),
+    })
+snaive_wm = rolling_wm(lambda e: y_wm[e - 52:e - 52 + H_WM])
+print(f"seasonal naive: {snaive_wm:.3f}")
+pd.DataFrame(rows).round(3)
+```
+
+## Walmart: what the table says {.smaller}
+
+- With more harmonics the OLS residuals **do** become autocorrelated — but **negatively**, and strongly.
+  That is not persistence the next week could exploit; it is what a curve with dozens of terms leaves
+  when it bends to fit two or three values per week.
+- The error model reacts the way it should to negative lag-1 autocorrelation: it **differences**
+  ($d = 1$) and adds an MA term. The residuals pass Ljung-Box.
+- And the forecasts get **no better**: worse at $K = 3$ and $K = 10$, a tie at $K = 18$. Differencing the
+  errors throws away the level the Fourier terms had estimated, and a 143-week series has little to
+  replace it with.
+
+[Whiter residuals are not better forecasts. The error model earns its place when the errors persist —
+as with electricity — not when they are an artefact of over-fitting.]{.hi}
+
+## Walmart forecasts, drawn {.smaller}
+
+```{python}
+#| label: walmart-forecasts
+#| fig-align: center
+K_DRAW = 10
+Xo, Xd = walmart_X(K_DRAW, trend=True), walmart_X(K_DRAW)
+christmas_origin = int(np.searchsorted(chain["ds"], pd.Timestamp("2011-11-01")))
+fig, axes = plt.subplots(1, 2, figsize=(13, 4.2), sharey=True)
+for ax, e, title in [(axes[0], christmas_origin, "Christmas 2011: one Christmas in the training data"),
+                     (axes[1], len(y_wm) - H_WM, "The last 13 weeks: Week 5's validation window")]:
+    window = chain["ds"].iloc[e:e + H_WM]
+    fc = AutoARIMA(season_length=1).fit(y=y_wm[:e], X=Xd[:e]).predict(h=H_WM, X=Xd[e:e + H_WM], level=[80])
+    ols_fc = sm.OLS(y_wm[:e], sm.add_constant(Xo[:e])).fit().predict(sm.add_constant(Xo[e:e + H_WM], has_constant="add"))
+    context = slice(e - 30, e + H_WM)
+    ax.plot(chain["ds"].iloc[context], y_wm[context], color=slate, linewidth=1.2, label="actual")
+    ax.fill_between(window, fc["lo-80"], fc["hi-80"], color=turquoise, alpha=0.2)
+    ax.plot(window, fc["mean"], color=turquoise, linewidth=1.8, label=f"K={K_DRAW} + ARIMA errors (80%)")
+    ax.plot(window, ols_fc, "--", color=orange, linewidth=1.6, label=f"OLS, K={K_DRAW}")
+    ax.plot(window, y_wm[e - 52:e - 52 + H_WM], ":", color=red_pink, linewidth=1.8, label="seasonal naive")
+    ax.axvline(chain["ds"].iloc[e], color="grey", linewidth=0.8)
+    ax.set_title(title, fontsize=10)
+    ax.tick_params(axis="x", labelsize=8, rotation=20)
+axes[0].set_ylabel("$m per week")
+axes[0].legend(fontsize=8, loc="upper left")
+plt.show()
+```
+
+Left: an origin in November 2011, trained on 91 weeks. Right: Week 5's validation window. $K = 10$ in both.
+
+## Walmart forecasts: what to see {.smaller}
+
+- **Christmas 2011.** The training data hold a single Christmas. Thanksgiving falls on a different week
+  each year, so the smooth Fourier season puts its spike a week early and invents a dip after it; the
+  Christmas peak itself is undershot by both regressions. Seasonal naive copies last year's weeks and is
+  closest. A dummy estimated from one event is one data point.
+- **The last 13 weeks.** Nothing happens in late summer, and all three forecasts sit close to the actuals.
+  The difference is the interval: the dynamic regression's is the widest — differenced errors make it less
+  sure of the level, and the rolling-origin table shows that uncertainty was warranted.
+
+[On Walmart the problem is not the errors. It is a seasonal pattern seen two and a half times, with a
+holiday that moves.]{.hi}
 
 # In practice
 
