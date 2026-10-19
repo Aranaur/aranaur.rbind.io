@@ -13,6 +13,7 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 4 — Exponential Smoothing | <https://01a0beea-9ee5-a9ef-49a2-7329aa93e476.share.connect.posit.cloud> |
 | Week 6 — ARIMA Models, Part 1 | <https://01a10c29-ffd3-a579-8f9a-96d293b1253c.share.connect.posit.cloud> |
 | Week 7 — ARIMA Models, Part 2 | <https://01a12fb5-a567-80a7-6706-fdc668266ba4.share.connect.posit.cloud> |
+| Week 8 — Advanced Forecasting Methods | <https://01a15453-1b58-4c5c-72f6-bd43ca8ed1f8.share.connect.posit.cloud> |
 | Week 1 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab01.ipynb) |
 | Week 2 — lab handout | <https://01a07874-b74d-873c-a106-e68a78304698.share.connect.posit.cloud> |
 | Week 2 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab02.ipynb) |
@@ -34,7 +35,7 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 ## Layout
 
 ```
-slides/   .00 syllabus, .01–.07 weeks 1–7 (dot-prefixed: not rendered into the site)
+slides/   .00 syllabus, .01–.08 weeks 1–8 (dot-prefixed: not rendered into the site)
 labs/     .labNN.qmd handouts, _labNN.ipynb templates, _demoNN.ipynb practice demos,
           .demoNN-notes.md how to run the session
 data/     datasets served to students over raw.githubusercontent.com
@@ -140,3 +141,4 @@ Weeks are offset by one against the 2025/26 decks, because Week 1 merged last ye
 | 5 | `.05` | `.06` |
 | 6 | `.06` | `.07`, non-seasonal half |
 | 7 | `.07` | `.07`, seasonal half, plus dynamic regression |
+| 8 | `.08` | `.08` |
