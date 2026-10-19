@@ -32,6 +32,7 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 7 — Lab 6 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab07.ipynb) |
 | Week 8 — Lab 7 handout: Seasonal ARIMA | <https://01a1548d-4e96-54e5-f256-4aaa20d7cd33.share.connect.posit.cloud> |
 | Week 8 — practice demo, seasonal ARIMA in four real cases (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo08.ipynb) |
+| Week 8 — practice, Ukrainian version with full analysis and conclusions (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo08_uk.ipynb) |
 | Week 8 — Lab 7 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab08.ipynb) |
 | Moodle | <https://teaching.kse.org.ua/course/view.php?id=4432> |
 
