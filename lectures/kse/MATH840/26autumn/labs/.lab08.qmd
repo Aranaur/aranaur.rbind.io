@@ -1,0 +1,186 @@
+---
+title: "Lab 7: Seasonal ARIMA"
+subtitle: "MATH840 | Time Series | Week 8 — graded assignment 6 of 7"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    highlight-style: github
+    theme: [default, custom.scss]
+execute:
+  echo: true
+  warning: false
+  eval: false
+editor_options:
+  chunk_output_type: console
+---
+
+::: {.callout-important appearance="simple"}
+## This week: accuracy is marked again
+
+Lab 6 measured your ARIMA without marking it, because a model without seasonal terms could not be
+expected to beat every benchmark. This week the seasonal terms are in, every series in the pool is one
+a seasonal ARIMA is known to beat, and the accuracy points are back: **3 of the 8**.
+:::
+
+::: {.callout-tip appearance="simple"}
+## Open the notebook
+
+The template: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab08.ipynb)
+
+Click **Copy to Drive** before you start working, otherwise nothing you write is saved.
+
+The practice session's four cases, with the same helpers:
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo08.ipynb)
+:::
+
+## 🎯 The task
+
+Forecast **your series from Week 4** with seasonal ARIMA, $\text{ARIMA}(p,d,q)(P,D,Q)_m$ — the *ARIMA
+Models, Part 2* lecture. The order matters, and it is marked:
+
+1. **Difference** — $D$ and $d$ from the tests, $\log y$ if the seasonal swing grows with the level.
+2. **Read** the ACF and PACF of the differenced series: $p, q$ at lags $1, 2, 3$; $P, Q$ at lags
+   $m, 2m, 3m$.
+3. **Specify by hand** at least two candidates — then add `AutoARIMA`.
+4. **Decide** on a rolling origin, check the residuals with $p + q + P + Q$, submit.
+
+ARIMA only: no ETS, no regression, no averaging with other methods. Combining is next week's lecture.
+
+::: {.callout-important}
+## This one counts
+
+8 points. **Deadline: 23:59 today**, on Moodle. The accuracy score is published the next morning; marks
+and comments come back before the next practice session.
+:::
+
+## 📋 What you are marked on
+
+| Section | Criteria | Points |
+|---|---|---:|
+| 1 | EDA and visualisation | 1 |
+| 2 | Forecast accuracy against your benchmark | 3 |
+| 3 | Justification block | 3 |
+| 4 | Code quality and reproducibility | 1 |
+| | **Total** | **8** |
+
+The notebook has one section per row. **Keep those headings.**
+
+## 📊 Section 1 — EDA and visualisation (1 point)
+
+- A time plot, read for trend, season, and whether the seasonal swing grows with the level — your case
+  for or against `log=True`.
+- The validation split on a plot: history, validation window, your chosen model's forecast and 80%
+  interval over it.
+- One sentence per plot. **A plot with no reading attached earns nothing.**
+
+## 🎯 Section 2 — Forecast accuracy (3 points)
+
+Scored from your submission file on the `h` observations after your history that nobody has seen:
+
+$$
+\text{skill} = \frac{\text{MASE of your forecast}}{\text{MASE of your benchmark}}
+$$
+
+| Skill | Points |
+|---|---:|
+| below 1 — you beat your benchmark | 3 |
+| 1 to 1.1 — within 10% | 2 |
+| above 1.1 | 1, and 3.3 must say why |
+
+::: {.callout-note}
+## What the pool guarantees, and what it does not
+
+Every series in the pool was issued only if **`AutoARIMA` with `season_length=m`, fitted on the whole raw
+history**, beats its benchmark on the hidden horizon. That is a guarantee about that one model: not
+about every seasonal ARIMA, not about `AutoARIMA` on $\log y$, and not about the orders `AutoARIMA` found
+on `train`.
+
+Measured on the whole pool with this template: choosing among the airline model and `AutoARIMA`, each
+with and without a log, by `rolling_mase`, beats the benchmark on **89%** of series, comes within 10% on
+another **9%**, and loses on **2%**. `AutoARIMA` on the raw history alone beats it on all 140 — the
+screen guarantees that.
+
+Hand-specified models and logs are what the rubric asks you to try — follow your evidence, and say in 3.2
+what it was.
+:::
+
+## ✍️ Section 3 — Justification block (3 points)
+
+The part a human reads closely. Roughly a paragraph each, with numbers from your own cells.
+
+| Item | Points | What earns them |
+|------|------:|------------------------------------------------------------------------|
+| 3.1 | 1 | **The specification, before the machine.** $D$, $d$ and the log decision, each tied to a test or a plot. The lags at the start of the ACF/PACF that named $p, q$, and the seasonal lags that named $P, Q$. |
+| 3.2 | 1 | **What `AutoARIMA` chose, and what you submitted.** Where it agrees or disagrees with your reading, and why. Your candidates with AICc and rolling MASE. The model you submitted and the evidence for it — and if it is not `AutoARIMA`'s choice, what made you leave it. |
+| 3.3 | 1 | **What is left, and what you expect.** Ljung-Box with $p + q + P + Q$ degrees of freedom, read. The residual autocorrelation at lag $m$, against your Lab 6 model. The interval's coverage on the validation window. Your expected skill — and if you expect to lose, why. |
+
+::: {.callout-important}
+Marked on the reasoning. A hand reading that `AutoARIMA` overrules, with a clear account of why, scores
+full marks in 3.1 and 3.2. So does a model that loses to the benchmark, if 3.3 explains the loss with
+numbers.
+:::
+
+::: {.callout-warning}
+## Where this goes wrong
+
+- **Reading only the first lags.** $P$ and $Q$ live at $m, 2m, 3m$ — the shaded lags on the template's
+  plot. A spike at lag 12 with nothing at 24 is a seasonal MA(1); a decay over 12, 24, 36 is seasonal AR.
+- **Two seasonal differences.** $D \le 1$, always, and $d + D \le 2$.
+- **Comparing AICc across different $d$, $D$ or log choices.** Across those, `rolling_mase` decides.
+- **Ljung-Box with $p + q$ only.** The seasonal terms spend degrees of freedom too: $p + q + P + Q$.
+- **Freezing `AutoARIMA`'s orders from `train`.** If you choose `AutoARIMA`, submit it refitted on all of
+  `y` — that is the model the pool guarantee is about.
+- **Forecasting from `train`.** The submission is refitted on the whole history.
+
+📖 [FPP3 §9.9 seasonal ARIMA](https://otexts.com/fpp3/seasonal-arima.html) ·
+[§9.10 ARIMA vs ETS](https://otexts.com/fpp3/arima-ets.html) ·
+[FPP the Pythonic Way, ch. 9](https://otexts.com/fpppy/nbs/09-arima.html)
+:::
+
+## 🧹 Section 4 — Code quality and reproducibility (1 point)
+
+- The notebook runs top to bottom on a fresh kernel without errors.
+- The submission file is written **by the notebook**, not edited by hand.
+- No leakage: candidates are compared on `train`/`valid` and `rolling_mase`; only the final model is fitted
+  on all of `y`.
+- Every number in your text comes from a cell.
+
+## 📤 Submission
+
+Upload three files to the Week 8 activity on Moodle **before 23:59 today**:
+
+- `SURNAME_lab08_forecast.csv` — written by the last cell of the template. Exactly $h$ rows and these
+  columns:
+
+  | Column | What |
+  |---|---|
+  | `student_id` | your identifier |
+  | `code` | your series code, the same as before |
+  | `ds` | the dates you are forecasting, in order |
+  | `yhat` | your point forecast |
+  | `yhat_lo_80`, `yhat_hi_80` | your model's 80% interval |
+
+- `SURNAME_lab08.pdf` — the report, with the justification block;
+- `SURNAME_lab08.ipynb` — the source.
+
+::: {.callout-warning}
+## A file that cannot be read scores 0 for accuracy
+
+Exactly $h$ rows, the dates asked for, no `NaN`, the interval around the point forecast. The template's
+check cell is the same one the scorer uses — if it passes, your file is fine.
+:::
+
+## ⏱ How long this should take
+
+Ninety minutes if you follow the practice session's first case. A seasonal `AutoARIMA` inside
+`rolling_mase` refits three times; on a monthly series a full table takes a few minutes, so run it once
+and keep the result.
+
+## 📚 For next week
+
+**Lab 8** is the last weekly lab: the *Advanced Forecasting Methods* lecture, already published —
+combining the models you have built in Labs 5–7. Keep your Lab 5 and Lab 7 notebooks: next week you
+average their forecasts.
