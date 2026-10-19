@@ -388,25 +388,33 @@ spaced data or interpolated gaps, and it fits fast — but $y_{t-1}$ never enter
 There is no ARIMA error and no ETS state: short-run dynamics stay in the residuals.
 :::
 
-## The classic example: Peyton Manning {.smaller}
+## Lionel Messi on Wikipedia {.smaller}
 
-Log daily page views of the Wikipedia article on Peyton Manning, 2007–2016 — the example from Prophet's
-own documentation.
+Daily views of the English Wikipedia article on Lionel Messi, July 2015 to September 2026 (Wikimedia
+pageviews API). On logs, because a World Cup final multiplies the views by a hundred.
 
 ```{python}
 #| echo: true
 #| code-fold: false
-peyton = pd.read_csv('../data/peyton_manning.csv', parse_dates=["ds"])
-print(f"{len(peyton)} days, {peyton['ds'].min():%Y-%m-%d} to {peyton['ds'].max():%Y-%m-%d}")
+messi = pd.read_csv('../data/messi_wikipedia.csv', parse_dates=["ds"])
+print(f"{len(messi)} days, {messi['ds'].min():%Y-%m-%d} to {messi['ds'].max():%Y-%m-%d};  "
+      f"median {messi['y'].median():,.0f} views a day, record {messi['y'].max():,.0f} "
+      f"on {messi.loc[messi['y'].idxmax(), 'ds']:%Y-%m-%d}")
+messi["y"] = np.log(messi["y"])
 ```
 
 ```{python}
-#| label: peyton-raw
+#| label: messi-raw
 #| fig-align: center
-fig, ax = plt.subplots(figsize=(12, 3.2))
-ax.plot(peyton["ds"], peyton["y"], ".", color=slate, markersize=1.5)
+fig, ax = plt.subplots(figsize=(12, 3.3))
+ax.plot(messi["ds"], messi["y"], ".", color=slate, markersize=1.5)
+for date, label in [("2016-06-27", "retires from Argentina\n(and returns)"), ("2021-08-08", "leaves Barcelona"),
+                    ("2022-12-18", "World Cup final"), ("2026-07-19", "World Cup 2026")]:
+    when = pd.Timestamp(date)
+    ax.annotate(label, (when, messi.loc[messi["ds"] == when, "y"].iloc[0]), xytext=(0, 8),
+                textcoords="offset points", ha="center", fontsize=8, color=red_pink)
 ax.set_ylabel("log views")
-ax.set_title("Each NFL season is a peak; each off-season a trough")
+ax.set_title("Every tournament is a spike; a weekly rhythm underneath")
 plt.show()
 ```
 
@@ -418,7 +426,7 @@ The interface follows scikit-learn: build, `fit`, extend the dates, `predict`.
 #| echo: true
 #| code-fold: false
 m = Prophet()
-m.fit(peyton)
+m.fit(messi)
 future = m.make_future_dataframe(periods=365)          # one year past the data
 forecast = m.predict(future)
 forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(3)
@@ -427,7 +435,7 @@ forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]].tail(3)
 ## The forecast {.smaller}
 
 ```{python}
-#| label: peyton-forecast
+#| label: messi-forecast
 #| fig-align: center
 fig = m.plot(forecast, figsize=(12, 4.2))
 plt.title("Prophet's default plot: data (dots), forecast (line), 80% interval (band)")
@@ -458,7 +466,7 @@ to choose which knots matter.
    up at or near zero; only real changes in slope survive.
 
 ```{python}
-#| label: peyton-changepoints
+#| label: messi-changepoints
 #| fig-align: center
 fig = m.plot(forecast, figsize=(12, 3.6))
 add_changepoints_to_plot(fig.gca(), m, forecast)
@@ -474,25 +482,27 @@ straight.
 ```{python}
 #| echo: true
 #| code-fold: false
-flexible = Prophet(changepoint_prior_scale=0.5).fit(peyton)
-stiff = Prophet(changepoint_prior_scale=0.001).fit(peyton)
+flexible = Prophet(changepoint_prior_scale=0.5).fit(messi)
+stiff = Prophet(changepoint_prior_scale=0.001).fit(messi)
 fc_flexible, fc_stiff = flexible.predict(future), stiff.predict(future)
 ```
 
 ```{python}
-#| label: peyton-flexibility
+#| label: messi-flexibility
 #| fig-align: center
 fig, ax = plt.subplots(figsize=(12, 3.3))
-ax.plot(peyton["ds"], peyton["y"], ".", color="lightgray", markersize=1.5)
+ax.plot(messi["ds"], messi["y"], ".", color="lightgray", markersize=1.5)
 ax.plot(fc_flexible["ds"], fc_flexible["trend"], color=red_pink, linewidth=1.8, label="trend, τ = 0.5")
 ax.plot(fc_stiff["ds"], fc_stiff["trend"], color=blue, linewidth=1.8, label="trend, τ = 0.001")
 ax.plot(forecast["ds"], forecast["trend"], "--", color=turquoise, linewidth=1.5, label="trend, default τ = 0.05")
-ax.legend(loc="upper right")
+ax.set_ylim(9, 11.5)
+ax.legend(loc="upper left")
 plt.show()
 ```
 
-The flexible trend follows the last decline and extrapolates it; the stiff one barely moves. Same data,
-very different forecasts a year out — $\tau$ is a forecasting decision, not a fitting detail.
+The flexible trend bends into every tournament — up to 2023 it is mostly a record of World Cups — and
+leaves the data with a slight upward slope it carries into next year. The stiff one barely moves. Same data, different forecasts a year out:
+$\tau$ is a forecasting decision, not a fitting detail.
 
 ## Forecast uncertainty from the trend {.smaller}
 
@@ -539,51 +549,90 @@ m.add_seasonality(name="monthly", period=30.5, fourier_order=5)
 ## The components {.smaller}
 
 ```{python}
-#| label: peyton-components
+#| label: messi-components
 #| fig-align: center
 fig = m.plot_components(forecast, figsize=(12, 5.2))
 plt.show()
 ```
 
-Trend, weekly, yearly — each a function you can read: views peak on Mondays after Sunday games, and in
-January around the play-offs.
+Views peak on **Sundays** — match days — and in **June and July**, when the summer tournaments are played.
+But read the yearly curve with suspicion: it is three World Cups and four Copas averaged into one shape —
+the December bump is Qatar 2022, the one World Cup played in winter.
+A season of length one year cannot know that a World Cup comes every **four** years — that is a job for
+the next slide.
 
 ## Holidays and events $h(t)$ {.smaller}
 
-A holiday is a dummy variable — with a **window** of days before and after it, because the effect of
-Christmas starts before the 25th. Built-in country calendars, or your own table of events (games,
-launches, promotions).
+A holiday is a dummy variable with a **window** of days around it. Built-in country calendars exist; for
+Messi, the calendar that matters is football's — written down by the analyst:
 
 ```{python}
 #| echo: true
 #| code-fold: false
-with_holidays = Prophet()
-with_holidays.add_country_holidays(country_name="US")
-with_holidays.fit(peyton)
-fc_holidays = with_holidays.predict(future)
-print(with_holidays.train_holiday_names.to_list()[:6])
+def tournament(name, starts_and_days):
+    return [{"holiday": name, "ds": start, "lower_window": 0, "upper_window": days}
+            for start, days in starts_and_days]
+
+
+events = pd.DataFrame(
+    tournament("World Cup", [("2018-06-14", 31), ("2022-11-20", 28), ("2026-06-11", 38)])
+    + tournament("Copa America", [("2016-06-03", 23), ("2019-06-14", 23),
+                                  ("2021-06-13", 27), ("2024-06-20", 24)])
+    + [{"holiday": "World Cup final", "ds": "2022-12-18", "lower_window": 0, "upper_window": 2}]
+    + [{"holiday": "transfer", "ds": d, "lower_window": -2, "upper_window": 7}
+       for d in ("2021-08-05", "2023-06-07")])
+events["ds"] = pd.to_datetime(events["ds"])
+
+with_events = Prophet(holidays=events).fit(messi)
+fc_events = with_events.predict(future)
+peak = {name: f"x{np.exp(fc_events[name].max()):.0f}" for name in events["holiday"].unique()}
+print("largest effect on views, as a multiplier:", peak)
 ```
 
-For Peyton Manning the effect that matters is the **Super Bowl**, which is not a public holiday. Prophet's
-documentation adds playoff and Super Bowl dates as a custom events table — the analyst in the loop.
+## What the events buy {.smaller}
+
+```{python}
+#| label: messi-events
+#| fig-align: center
+in_window = lambda df: df[(df["ds"] >= "2022-10-15") & (df["ds"] <= "2023-01-15")]
+fig, ax = plt.subplots(figsize=(12, 3.8))
+ax.plot(in_window(messi)["ds"], in_window(messi)["y"], color=slate, linewidth=1.2, label="actual")
+for fc, colour, label in [(forecast, blue, "plain Prophet"), (fc_events, red_pink, "with the events table")]:
+    ax.plot(in_window(fc)["ds"], in_window(fc)["yhat"], color=colour, linewidth=1.6, label=label)
+ax.set_ylabel("log views")
+ax.legend(loc="upper left")
+ax.set_title("The 2022 World Cup, fitted")
+plt.show()
+```
+
+Without the table the World Cup is an unexplained burst, smeared into the trend and the yearly curve.
+With it, the spike has a name and a size — and the trend no longer has to bend for it. The limit is the
+**future**: World Cup dates are known years ahead; a transfer is not.
 
 ## Prophet's own cross-validation {.smaller}
 
 Prophet ships a rolling-origin evaluation: `initial` days of training, a new origin every `period`,
-`horizon` days ahead — the same idea as Week 3.
+`horizon` days ahead — the same idea as Week 3. Both models, the same origins:
 
 ```{python}
 #| echo: true
 #| code-fold: false
 #| output-location: column
-cv_peyton = cross_validation(m, initial="1825 days", period="180 days",
-                             horizon="365 days", disable_tqdm=True)
-metrics = performance_metrics(cv_peyton, rolling_window=0.1)
-metrics[["horizon", "rmse", "mae", "coverage"]].iloc[::60].round(3)
+def prophet_cv(model):
+    cv = cross_validation(
+        model, initial="1825 days", period="180 days",
+        horizon="365 days", disable_tqdm=True)
+    metrics = performance_metrics(cv, rolling_window=0.1)
+    columns = ["mae", "coverage"]
+    return metrics.set_index("horizon")[columns].iloc[::60]
+
+
+pd.concat({"plain": prophet_cv(m),
+           "with events": prophet_cv(with_events)}, axis=1).round(2)
 ```
 
-`coverage` is the share of actual values inside the 80% interval, by horizon. It sits mostly **below
-0.80** — the too-narrow intervals the previous slides predicted for a model without error dynamics.
+The events table lowers the error at every horizon; **coverage** of the 80% interval sits far below
+0.80 for both — the too-narrow intervals predicted for a model without error dynamics.
 
 ## Prophet against the models of this course {.smaller}
 
@@ -662,7 +711,8 @@ elec_scores.round(3)
 ## What Prophet is, and is not {.smaller}
 
 - **Is:** a convenient regression — piecewise trend, Fourier seasons, holiday windows — with good
-  defaults, a readable decomposition, and fast fits. On Peyton Manning, its home ground, it does what it
+  defaults, a readable decomposition, and fast fits. On daily, event-driven data like Messi's page
+  views it does what it
   was built for.
 - **Is not:** a better forecaster by default. On cement it loses to ETS, ARIMA **and** seasonal naive;
   on half-hourly electricity it loses to MSTL and to harmonic regression, and only temperature brings
