@@ -98,12 +98,58 @@ logging.getLogger("prophet").setLevel(logging.ERROR)
 from prophet import Prophet
 from prophet.diagnostics import cross_validation, performance_metrics
 from prophet.plot import add_changepoints_to_plot
+from great_tables import GT, loc, style as gt_style
+from matplotlib.colors import LinearSegmentedColormap, to_hex
 
 
 def scored(cv, df, m):
     """MASE of every model in a cross-validation frame, one column."""
     out = evaluate(cv.drop(columns="cutoff"), metrics=[partial(mase, seasonality=m)], train_df=df)
     return out.drop(columns=["unique_id", "metric"]).T.rename(columns={0: "MASE"}).round(3)
+
+
+shade = LinearSegmentedColormap.from_list("shade", ["#bfe0b0", "#ffffff", "#f5b8cb"])
+
+
+def scoreboard(table, rules=None, by="column", decimals=3):
+    """A results table in Great Tables: green is better, pink is worse, the best in bold.
+
+    rules maps a metric to "lower", "higher" or a target value (default: every column "lower").
+    by="column" compares the rows of each column; by="row" shades each metric on one scale
+    and bolds the best of each row.
+    """
+    df = table.to_frame() if isinstance(table, pd.Series) else table.copy()
+    df.index = [f"{i.days} days" if isinstance(i, pd.Timedelta) else str(i) for i in df.index]
+    nested = isinstance(df.columns, pd.MultiIndex)
+    groups = list(dict.fromkeys(df.columns.get_level_values(0))) if nested else []
+    df.columns = ["|".join(map(str, c)) if nested else str(c) for c in df.columns]
+    metric = {c: c.split("|")[-1] for c in df.columns}
+    rules = rules or {m: "lower" for m in metric.values()}
+
+    gt = (GT(df.reset_index(names="row"), rowname_col="row")
+          .fmt_number(columns=list(df.select_dtypes("number").columns), decimals=decimals)
+          .sub_missing(missing_text="")
+          .cols_label(cases=metric)
+          .tab_options(table_font_size="0.75em", data_row_padding="4px"))
+    for g in groups:
+        gt = gt.tab_spanner(label=g, columns=[c for c in df.columns if c.startswith(f"{g}|")])
+
+    for m, rule in rules.items():
+        cols = [c for c in df.columns if metric[c] == m]
+        values = df[cols].astype(float)
+        bad = values if rule == "lower" else -values if rule == "higher" else (values - rule).abs()
+        blocks = [bad[[c]] for c in cols] if by == "column" else [bad]
+        for block in blocks:
+            lo, hi = np.nanmin(block.values), np.nanmax(block.values)
+            for c in block.columns:
+                for i, b in enumerate(block[c]):
+                    if np.isnan(b):
+                        continue
+                    fill = to_hex(shade((b - lo) / (hi - lo) if hi > lo else 0.0))
+                    best = b == (block[c].min() if by == "column" else bad.iloc[i].min())
+                    look = [gt_style.fill(color=fill)] + ([gt_style.text(weight="bold")] if best else [])
+                    gt = gt.tab_style(style=look, locations=loc.body(columns=c, rows=[i]))
+    return gt
 ```
 
 # Where this fits
@@ -313,7 +359,7 @@ elec_scores = pd.DataFrame({
     "+ temperature": score(lambda e: dhr_fc(e, X_weather)),
 }, index=[f"from {elec['ds'].iloc[e]:%m-%d}" for e in ends]).T
 elec_scores["mean"] = elec_scores.mean(axis=1)
-elec_scores.round(3)
+scoreboard(elec_scores)
 ```
 
 ## Three weeks ahead, drawn {.smaller}
@@ -627,8 +673,10 @@ def prophet_cv(model):
     return metrics.set_index("horizon")[columns].iloc[::60]
 
 
-pd.concat({"plain": prophet_cv(m),
-           "with events": prophet_cv(with_events)}, axis=1).round(2)
+cv_table = pd.concat({"plain": prophet_cv(m),
+                      "with events": prophet_cv(with_events)}, axis=1)
+scoreboard(cv_table, rules={"mae": "lower", "coverage": 0.80},
+           by="row", decimals=2)
 ```
 
 The events table lowers the error at every horizon; **coverage** of the 80% interval sits far below
@@ -673,12 +721,12 @@ def stats_cem(model):
 #| echo: true
 #| code-fold: false
 #| output-location: column
-pd.Series({
+scoreboard(pd.Series({
     "Prophet": cem_score(prophet_cem),
     "AutoETS": cem_score(stats_cem(AutoETS(season_length=4))),
     "AutoARIMA": cem_score(stats_cem(AutoARIMA(season_length=4))),
     "snaive": cem_score(lambda e: y_cem[e - 4:e][np.arange(H_CEM) % 4]),
-}, name="cement, MASE").round(3)
+}, name="cement, MASE"))
 ```
 
 ## Back to half-hourly electricity {.smaller}
@@ -702,10 +750,12 @@ def prophet_elec(e, with_temp):
     return model.predict(window)["yhat"].to_numpy()
 
 
-elec_scores.loc["Prophet"] = score(lambda e: prophet_elec(e, False)) + [np.nan]
-elec_scores.loc["Prophet + temperature"] = score(lambda e: prophet_elec(e, True)) + [np.nan]
+for name, with_temp in [("Prophet", False),
+                        ("Prophet + temperature", True)]:
+    elec_scores.loc[name] = score(
+        lambda e: prophet_elec(e, with_temp)) + [np.nan]
 elec_scores["mean"] = elec_scores.iloc[:, :3].mean(axis=1)
-elec_scores.round(3)
+scoreboard(elec_scores)
 ```
 
 ## What Prophet is, and is not {.smaller}
@@ -772,8 +822,8 @@ for K in (2, 4, 6):
     fit = AutoARIMA(season_length=1).fit(y=train_wk, X=X[:-H_WK])
     weekly_fc[f"harmonic, K={K}"] = fit.predict(h=H_WK, X=X[-H_WK:])["mean"]
 
-pd.Series({k: np.mean(np.abs(test_wk - f)) / scale_wk
-           for k, f in weekly_fc.items()}, name="MASE").round(3)
+scoreboard(pd.Series({k: np.mean(np.abs(test_wk - f)) / scale_wk
+                      for k, f in weekly_fc.items()}, name="MASE"))
 ```
 
 ## Weekly electricity, drawn {.smaller}
@@ -840,7 +890,7 @@ for name, start in [("Leisure and Hospitality", 2001),
     cv["ETS+ARIMA"] = (cv["ETS"] + cv["ARIMA"]) / 2
     cv["ETS+ARIMA+Theta"] = (cv["ETS"] + cv["ARIMA"] + cv["Theta"]) / 3
     tables[name.split()[0]] = scored(cv, df, 12)["MASE"]
-pd.DataFrame(tables)
+scoreboard(pd.DataFrame(tables))
 ```
 
 ## Rarely the best, never the worst {.smaller}
@@ -859,12 +909,16 @@ On every issued Track B series: either **select** between `AutoETS` and `AutoARI
 the served history (the Lab 5 and Lab 6 way), or **average** them. Both scored on the hidden horizon
 against each series' benchmark.
 
-| Strategy | Beats the benchmark | Median skill | Mean skill | Worst skill |
-|---|---:|---:|---:|---:|
-| `AutoETS` alone | 100% | 0.835 | 0.840 | 0.999 |
-| `AutoARIMA` alone | 100% | 0.809 | 0.816 | 0.999 |
-| select the better on validation | 100% | 0.815 | 0.826 | 0.995 |
-| **average ETS and ARIMA** | 100% | **0.805** | **0.793** | **0.933** |
+```{python}
+#| label: select-or-combine
+pool_skill = pd.DataFrame(
+    [[0.835, 0.840, 0.999], [0.809, 0.816, 0.999], [0.815, 0.826, 0.995], [0.805, 0.793, 0.933]],
+    index=["AutoETS alone", "AutoARIMA alone", "select the better on validation",
+           "average ETS and ARIMA"],
+    columns=["median skill", "mean skill", "worst skill"])
+pool_skill.insert(0, "beats the benchmark", "100%")
+scoreboard(pool_skill, rules={c: "lower" for c in pool_skill.columns[1:]})
+```
 
 ## Select or combine: what the table says {.smaller}
 
@@ -978,11 +1032,12 @@ intervals = {f"{name}'s own": (fc["lo-80"], fc["hi-80"])
 intervals["combination, averaged bounds"] = (avg_lo, avg_hi)
 intervals["combination, conformal"] = (conf_lo, conf_hi)
 
-pd.DataFrame({
+scores = pd.DataFrame({
     name: {"coverage": coverage(test_lei, lo, hi),
            "Winkler": winkler(test_lei, lo, hi)}
     for name, (lo, hi) in intervals.items()
-}).T.round(3)
+}).T
+scoreboard(scores, rules={"coverage": 0.80, "Winkler": "lower"})
 ```
 
 ## What the intervals did {.smaller}
@@ -1145,7 +1200,9 @@ for name, model in candidates.items():
                  "MAE": np.mean(np.abs(future_demand - fc)),
                  "RMSE": np.sqrt(np.mean((future_demand - fc) ** 2)),
                  "13-week total error": abs(fc.sum() - future_demand.sum())})
-pd.DataFrame(rows).round(2)
+errors = ["MAE", "RMSE", "13-week total error"]
+scoreboard(pd.DataFrame(rows).set_index("forecast"),
+           rules={e: "lower" for e in errors}, decimals=2)
 ```
 
 - **MAE is won by "zero".** The median of a mostly-zero series is zero, and MAE rewards the median —
