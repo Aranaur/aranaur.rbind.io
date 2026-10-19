@@ -118,7 +118,7 @@ Credentials are read from the environment and are never stored in this repositor
 
 The decks need more than `pyproject.toml` declares: `statsforecast`, `utilsforecast`,
 `statsmodels`, `scipy`, `scikit-learn`, `duckdb`, `plotly`, `seaborn`, `tsfeatures`,
-`great_tables` and `fpppy`. They are installed in `.venv` but not recorded as project
+`great_tables`, `fpppy` and `prophet` (Week 8). They are installed in `.venv` but not recorded as project
 dependencies, so **`uv sync` removes them** and the decks stop rendering. Reinstall with
 `uv pip install --link-mode=copy <packages>` if that happens.
 
