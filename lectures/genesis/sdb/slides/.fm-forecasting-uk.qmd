@@ -126,6 +126,37 @@ series = {name: g.set_index("ds")["y"] for name, g in views.groupby("unique_id")
 thousands = mpl.ticker.FuncFormatter(lambda v, _: f"{v / 1000:,.0f} тис.")
 ```
 
+# Про мене {.unnumbered .unlisted .smaller}
+
+::: nonincremental
+:::: {.columns}
+::: {.column width="65%"}
+- **Мірошниченко Ігор Вікторович**
+- Керівник напрямку інтеграції ШІ в освіту KSE
+- Кандидат економічних наук, доцент
+- Старший викладач факультету комп'ютерних наук
+:::
+
+::: {.column width="35%"}
+![](img/miv.png){width=60%}
+
+::: contacts
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
+
+{{< iconify mdi github >}} [aranaur](https://github.com/Aranaur)
+
+{{< iconify mdi envelope >}} <imiroshnychenko@kse.org.ua>
+
+{{< iconify mdi linkedin >}} [ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+:::
+:::
+::::
+:::
+
 # Навіщо взагалі прогнозувати
 
 ## Кожен план — це прогноз {.smaller}
@@ -771,21 +802,218 @@ scoreboard(pd.DataFrame({"MASE, середнє": llm_mase.mean(),
 6. **Чого він не знає?** Кампаній, запусків, змін цін, зламів — і хто їх додасть.
 7. **Яке рішення зміниться**, якщо реальність опиниться на P10, а не на P50?
 
-# Практика: ваша метрика
+# Практика: розібраний приклад, потім ваш
 
-## Робота руками {.smaller}
+## Розібраний приклад: ChatGPT {.smaller}
 
-Відкрийте ноутбук — він працює в браузері, нічого встановлювати не треба:
+Один продукт — уся процедура, яку потім повторимо на ваших даних: **подивитися → бектест дев'яти
+прогнозистів → розібрати похибки, горизонт і діапазони → поєднати → спрогнозувати → зробити висновки.**
 
-**[→ Відкрити ноутбук у Google Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/genesis/sdb/labs/forecast_your_metric_uk.ipynb)**
+```{python}
+#| label: we-look
+#| fig-align: center
+we = series["ChatGPT"].asfreq("D")
+recent = we[we.index >= we.index.max() - pd.Timedelta(days=3 * 365)]
+rel = recent / recent.groupby(recent.index.year).transform("mean") - 1
+fig, axes = plt.subplots(1, 2, figsize=(13, 3.3))
+for year, g in rel.groupby(rel.index.year):
+    axes[0].plot(range(7), g.groupby(g.index.dayofweek).mean().reindex(range(7)).values, "o-", label=str(year))
+    axes[1].plot(range(1, 13), g.groupby(g.index.month).mean().reindex(range(1, 13)).values, "o-", label=str(year))
+axes[0].set_xticks(range(7), ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"])
+axes[0].set_title("День тижня за роками (відносно середнього дня року)", fontsize=10)
+axes[1].set_xticks(range(1, 13))
+axes[1].set_title("Місяць за роками (відносно середнього дня року)", fontsize=10)
+for ax in axes:
+    ax.yaxis.set_major_formatter(mpl.ticker.PercentFormatter(1.0))
+    ax.legend(fontsize=8)
+plt.show()
+```
 
-1. **Оберіть ряд:** один із сьогоднішніх десяти продуктів або власний CSV з двома колонками — дата й
-   значення (щоденні інстали, сесії, виручка, тікети…). Лише публічні або анонімізовані дані.
-2. **Запустіть бектест:** «як тиждень тому» проти Chronos-2, шість вікон по 28 днів.
-3. **Прочитайте результат:** чи обіграє модель правило? Наскільки? Чи відкалібрований діапазон?
-4. **Ухваліть рішення:** одне речення — що б ви спланували за цим прогнозом і що змусило б вас змінити план?
+- **Тиждень:** вівторок–середа на 12–20% вище за середній день, субота на 21–25% нижче — щороку однаково.
+- **Рік:** глибокі літні провали у 2024 і 2026, у 2025 — жодного. Сезон є, але нестабільний.
+- Добрий прогнозист відтворює тиждень і не надто покладається на рік.
 
-У командах: кожен приносить один результат, порівнюємо, де модель виграла, а де програла.
+```{python}
+#| include: false
+from statsforecast.models import AutoARIMA, AutoTheta, MSTL
+
+we_df = pd.DataFrame({"unique_id": "ChatGPT", "ds": we.index, "y": we.values})
+classical_we = [Naive(alias="Наївний"), SeasonalNaive(7, alias="Сезонний наївний"),
+                AutoETS(season_length=7, alias="ETS"), AutoARIMA(season_length=7, alias="ARIMA"),
+                AutoTheta(season_length=7, alias="Theta"), MSTL(season_length=[7, 365], alias="MSTL")]
+wres = StatsForecast(models=classical_we, freq="D").cross_validation(df=we_df, h=28, n_windows=6, step_size=28,
+                                                                     level=[80])
+parts = []
+for cut in sorted(wres["cutoff"].unique()):
+    ctx = torch.tensor(we[we.index <= cut].values, dtype=torch.float32)
+    qc, _ = chronos2.predict_quantiles([ctx], prediction_length=28, quantile_levels=[0.1, 0.5, 0.9])
+    qc = np.asarray(qc[0]).reshape(28, 3)
+    pt, qt = tfm.forecast(horizon=28, inputs=[ctx.numpy()])
+    qt = np.asarray(qt)[0]
+    qx, mx = tirex_model.forecast(context=[ctx], prediction_length=28)
+    qx = np.asarray(qx)[0]
+    parts.append(pd.DataFrame({"ds": pd.date_range(cut + pd.Timedelta(days=1), periods=28), "cutoff": cut,
+                               "Chronos-2": qc[:, 1], "Chronos-2-lo-80": qc[:, 0], "Chronos-2-hi-80": qc[:, 2],
+                               "TimesFM": np.asarray(pt)[0], "TimesFM-lo-80": qt[:, 1], "TimesFM-hi-80": qt[:, 9],
+                               "TiRex": np.asarray(mx)[0], "TiRex-lo-80": qx[:, 0], "TiRex-hi-80": qx[:, 8]}))
+wres = wres.merge(pd.concat(parts), on=["ds", "cutoff"])
+wres["h"] = wres.groupby("cutoff").cumcount() + 1
+wres["ETS + Chronos-2"] = wres[["ETS", "Chronos-2"]].mean(axis=1)
+past_we = we[we.index <= wres["cutoff"].min()].values[-365:]
+scale_we = np.mean(np.abs(past_we[7:] - past_we[:-7]))
+we_names = ["Наївний", "Сезонний наївний", "ETS", "ARIMA", "Theta", "MSTL", "Chronos-2", "TimesFM", "TiRex"]
+we_board = {}
+for m in we_names + ["ETS + Chronos-2"]:
+    e = wres["y"] - wres[m]
+    row = {"MASE": np.mean(np.abs(e)) / scale_we, "MAPE, %": 100 * np.mean(np.abs(e) / wres["y"]),
+           "зсув, %": 100 * np.mean(-e / wres["y"])}
+    if f"{m}-lo-80" in wres:
+        row["у межах P10–P90"] = np.mean((wres["y"] >= wres[f"{m}-lo-80"]) & (wres["y"] <= wres[f"{m}-hi-80"]))
+    we_board[m] = row
+we_board = pd.DataFrame(we_board).T
+```
+
+## Дев'ять прогнозистів, шість вікон {.smaller}
+
+:::: {.columns}
+::: {.column width="55%"}
+```{python}
+scoreboard(we_board.loc[we_names], rules={"MASE": "lower", "MAPE, %": "lower", "зсув, %": 0.0,
+                                          "у межах P10–P90": 0.8}, size="0.78em")
+```
+:::
+
+::: {.column width="45%"}
+Шість вікон по 28 днів, травень–жовтень 2026, як і раніше; класичні моделі навчені лише на ChatGPT.
+
+- **Рейтинг не той, що на десяти продуктах.** Лідирують TiRex і **Theta** — метод 2000 року;
+  Chronos-2, найкращий на десяти продуктах, лише третій.
+- **MSTL** (тиждень + рік) — найгірший: річну форму, яка щороку інша, не вивчити.
+- **Діапазони:** у класичних заширокі (майже кожен день усередині), у foundation models завузькі
+  (близько 70–77%).
+:::
+::::
+
+## Де похибки {.smaller}
+
+```{python}
+#| label: we-errors
+#| fig-align: center
+show = ["Сезонний наївний", "ETS", "Theta", "Chronos-2", "TiRex"]
+by_h = wres.groupby((wres["h"] - 1) // 7).apply(
+    lambda g: pd.Series({m: np.mean(np.abs(g["y"] - g[m])) / scale_we for m in show}), include_groups=False)
+by_w = wres.groupby("cutoff").apply(
+    lambda g: pd.Series({m: np.mean(np.abs(g["y"] - g[m])) / scale_we for m in we_names}), include_groups=False)
+fig, axes = plt.subplots(1, 2, figsize=(13, 3.9), width_ratios=[1, 1.4])
+for m in show:
+    axes[0].plot(by_h.index + 1, by_h[m], "o-", label=m)
+axes[0].set_xticks(by_h.index + 1)
+axes[0].set_xlabel("тиждень горизонту")
+axes[0].set_ylabel("MASE")
+axes[0].legend(fontsize=8)
+im = axes[1].imshow(by_w.T.values, cmap="RdYlGn_r", vmin=0.2, vmax=1.6, aspect="auto")
+axes[1].set_yticks(range(len(we_names)), we_names)
+axes[1].set_xticks(range(len(by_w)), [f"{c:%d.%m}" for c in by_w.index])
+for i in range(len(we_names)):
+    for j in range(len(by_w)):
+        axes[1].text(j, i, f"{by_w.iloc[j, i]:.2f}", ha="center", va="center", fontsize=7)
+axes[1].set_title("MASE за вікнами бектесту (останній день історії)", fontsize=10)
+plt.show()
+```
+
+- **Перший тиждень — найлегший:** похибка приблизно вдвічі менша, ніж у тижні 2–4. Оновлюйте прогноз щотижня.
+- **Вікна відрізняються сильніше, ніж моделі.** Травневе вікно складне для всіх, серпневе легке для
+  більшості; MSTL розвалюється в червні (3,6). Будь-яке одне вікно розповіло б іншу історію.
+
+## Діапазони й комбінація {.smaller}
+
+```{python}
+#| label: we-coverage
+#| fig-align: center
+covered = we_board["у межах P10–P90"].dropna()
+fig, ax = plt.subplots(figsize=(12, 2.2))
+ax.bar(covered.index, covered.values,
+       color=[red_pink if m in ("Chronos-2", "TimesFM", "TiRex") else slate for m in covered.index])
+ax.axhline(0.8, color="black", linewidth=1, linestyle="--")
+ax.yaxis.set_major_formatter(mpl.ticker.PercentFormatter(1.0))
+ax.set_ylim(0, 1.05)
+ax.set_title("Частка днів у межах 80% діапазону — пунктир показує ціль", fontsize=10)
+plt.show()
+```
+
+:::: {.columns}
+::: {.column width="45%"}
+```{python}
+scoreboard(we_board.loc[["ETS", "Chronos-2", "ETS + Chronos-2"], ["MASE", "MAPE, %"]], size="0.85em")
+```
+:::
+
+::: {.column width="55%"}
+- Діапазон — це обіцянка; **порахуйте**, як часто її дотримано, і розширте чи звузьте за тим, що бачите.
+- **Середнє ETS і Chronos-2** — пара, обрана *до* того, як ми побачили оцінки, — краще за обидві
+  складові. Обирати одного переможця за тестовою оцінкою — саме та помилка, від якої захищає бектест.
+:::
+::::
+
+## Наступні чотири тижні {.smaller}
+
+```{python}
+#| label: we-final
+#| fig-align: center
+mid, lo, hi = (lambda q: (q[:, 1], q[:, 0], q[:, 2]))(np.asarray(
+    chronos2.predict_quantiles([torch.tensor(we.values, dtype=torch.float32)], prediction_length=28,
+                               quantile_levels=[0.1, 0.5, 0.9])[0][0]).reshape(28, 3))
+ets_final = StatsForecast(models=[AutoETS(season_length=7)], freq="D").forecast(df=we_df, h=28)["AutoETS"].values
+future_we = pd.date_range(we.index[-1] + pd.Timedelta(days=1), periods=28)
+fig, ax = plt.subplots(figsize=(12, 3.3))
+ax.plot(we.index[-90:], we.values[-90:], color=slate, linewidth=1, label="факт")
+ax.fill_between(future_we, lo, hi, color=red_pink, alpha=0.2, label="Chronos-2 P10–P90")
+ax.plot(future_we, mid, color=red_pink, linewidth=2, label="Chronos-2")
+ax.plot(future_we, (mid + ets_final) / 2, "--", color=blue, linewidth=1.5, label="ETS + Chronos-2")
+ax.yaxis.set_major_formatter(thousands)
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%d.%m"))
+ax.legend(loc="upper left", fontsize=8)
+plt.show()
+days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"]
+print(f"Найвищий P90: {days[future_we[np.argmax(hi)].dayofweek]} {future_we[np.argmax(hi)]:%d.%m}, "
+      f"{hi.max() / 1000:.0f} тис. переглядів;  найнижчий P10: {days[future_we[np.argmin(lo)].dayofweek]} "
+      f"{future_we[np.argmin(lo)]:%d.%m}, {lo.min() / 1000:.0f} тис.")
+```
+
+Читайте це як план: будні — потужності до лінії P90, вихідні — для техробіт. Ряд стрибнув в останній
+тиждень; прогноз повертається до звичного патерну, а ширина діапазону показує, наскільки модель не
+певна, що стрибок мине.
+
+## Що каже розібраний приклад {.smaller}
+
+1. **Бектест на власному ряді.** Найкраща модель на десяти продуктах тут лише третя; метод 2000 року —
+   серед лідерів. Жоден рейтинг не переноситься.
+2. **Спершу бенчмарки.** Шість із восьми моделей обіграли «як тиждень тому» — з відривом, але без
+   чудес; дві не обіграли зовсім.
+3. **Зважайте на горизонт.** Перший тиждень приблизно вдвічі точніший за наступні: оновлюйте прогноз
+   щотижня.
+4. **Перевірте діапазон, перш ніж ним користуватися.** Тут у класичних моделей він заширокий, у
+   foundation models — завузький. Порахуйте на своїх даних.
+5. **Поєднуйте.** Класична і foundation model, усереднені за правилом, визначеним заздалегідь, обіграли
+   обидві.
+
+Повний аналіз з усіма графіками й таблицями — у ноутбуці, який можна читати без запуску:
+**[розібраний приклад (Colab)](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/genesis/sdb/labs/worked_example_uk.ipynb)**.
+
+## Ваша черга: шаблон {.smaller}
+
+**[→ Відкрити шаблон у Google Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/genesis/sdb/labs/template_uk.ipynb)**
+— той самий інструментарій для вашого ряду. Змініть одну клітинку, запустіть усе.
+
+1. **Налаштування:** продукт із сьогоднішніх десяти або власний CSV (дата, значення — щоденні чи
+   щотижневі; лише публічні або анонімізовані дані); сезон, горизонт, кількість вікон; які прогнозисти
+   порівнювати.
+2. **Запуск:** ноутбук малює ваші дані, робить бектест, рахує оцінки й прогнозує переможцем бектесту.
+3. **Висновки:** чотири питання наприкінці — хто виграв і наскільки, чи відкалібрований діапазон, як
+   швидко зростає похибка і чого прогноз не знає?
+
+У командах: кожен приносить один результат, порівнюємо, де виграли foundation models — і де метод
+2000 року не програв.
 
 ## Що забрати з собою {.smaller}
 

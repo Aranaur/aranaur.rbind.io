@@ -124,6 +124,37 @@ series = {name: g.set_index("ds")["y"] for name, g in views.groupby("unique_id")
 thousands = mpl.ticker.FuncFormatter(lambda v, _: f"{v / 1000:,.0f}k")
 ```
 
+# About me {.unnumbered .unlisted .smaller}
+
+::: nonincremental
+:::: {.columns}
+::: {.column width="65%"}
+- **Ihor Miroshnychenko**
+- Head of AI Integration in Education, Kyiv School of Economics
+- PhD in Economics, Associate Professor
+- Senior Lecturer, Faculty of Computer Science, KSE
+:::
+
+::: {.column width="35%"}
+![](img/miv.png){width=60%}
+
+::: contacts
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
+
+{{< iconify mdi github >}} [aranaur](https://github.com/Aranaur)
+
+{{< iconify mdi envelope >}} <imiroshnychenko@kse.org.ua>
+
+{{< iconify mdi linkedin >}} [ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+:::
+:::
+::::
+:::
+
 # Why forecast at all
 
 ## Every plan is a forecast {.smaller}
@@ -766,22 +797,213 @@ Before a forecast goes into a plan, ask — or ask your agent to show:
 6. **What does it not know?** Campaigns, launches, price changes, breaks — and who adds them.
 7. **What decision changes** if the truth lands at P10 instead of P50?
 
-# Practice: your own metric
+# Practice: a worked example, then your own
 
-## Hands-on {.smaller}
+## Worked example: ChatGPT, end to end {.smaller}
 
-Open the notebook — it runs in the browser, nothing to install:
+One product, the whole procedure we will then repeat on your data: **look → backtest nine forecasters →
+read errors, horizons and ranges → combine → forecast → conclude.**
 
-**[→ Open the notebook in Google Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/genesis/sdb/labs/forecast_your_metric.ipynb)**
+```{python}
+#| label: we-look
+#| fig-align: center
+we = series["ChatGPT"].asfreq("D")
+recent = we[we.index >= we.index.max() - pd.Timedelta(days=3 * 365)]
+rel = recent / recent.groupby(recent.index.year).transform("mean") - 1
+fig, axes = plt.subplots(1, 2, figsize=(13, 3.3))
+for year, g in rel.groupby(rel.index.year):
+    axes[0].plot(range(7), g.groupby(g.index.dayofweek).mean().reindex(range(7)).values, "o-", label=str(year))
+    axes[1].plot(range(1, 13), g.groupby(g.index.month).mean().reindex(range(1, 13)).values, "o-", label=str(year))
+axes[0].set_xticks(range(7), ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
+axes[0].set_title("Day of week, by year (vs the year's average day)", fontsize=10)
+axes[1].set_xticks(range(1, 13))
+axes[1].set_title("Month, by year (vs the year's average day)", fontsize=10)
+for ax in axes:
+    ax.yaxis.set_major_formatter(mpl.ticker.PercentFormatter(1.0))
+    ax.legend(fontsize=8)
+plt.show()
+```
 
-1. **Pick a series:** one of today's ten products, or your own CSV with two columns — date and value
-   (daily installs, sessions, revenue, tickets…). Public or anonymised data only.
-2. **Run the backtest:** "same day last week" vs Chronos-2, six windows of 28 days.
-3. **Read it:** does the model beat the rule? By how much? Is the range calibrated?
-4. **Decide:** one sentence — what would you plan with this forecast, and what would make you change
-   the plan?
+- **Week:** Tuesday–Wednesday 12–20% above the average day, Saturday 21–25% below — the same every year.
+- **Year:** deep summer dips in 2024 and 2026, none in 2025 — a season, but not a stable one.
+- A good forecaster reproduces the week and does not lean too hard on the year.
 
-In teams: bring one result each, and compare where the model won and where it lost.
+```{python}
+#| include: false
+from statsforecast.models import AutoARIMA, AutoTheta, MSTL
+
+we_df = pd.DataFrame({"unique_id": "ChatGPT", "ds": we.index, "y": we.values})
+classical_we = [Naive(alias="Naive"), SeasonalNaive(7, alias="Seasonal naive"), AutoETS(season_length=7, alias="ETS"),
+                AutoARIMA(season_length=7, alias="ARIMA"), AutoTheta(season_length=7, alias="Theta"),
+                MSTL(season_length=[7, 365], alias="MSTL")]
+wres = StatsForecast(models=classical_we, freq="D").cross_validation(df=we_df, h=28, n_windows=6, step_size=28,
+                                                                     level=[80])
+parts = []
+for cut in sorted(wres["cutoff"].unique()):
+    ctx = torch.tensor(we[we.index <= cut].values, dtype=torch.float32)
+    qc, _ = chronos2.predict_quantiles([ctx], prediction_length=28, quantile_levels=[0.1, 0.5, 0.9])
+    qc = np.asarray(qc[0]).reshape(28, 3)
+    pt, qt = tfm.forecast(horizon=28, inputs=[ctx.numpy()])
+    qt = np.asarray(qt)[0]
+    qx, mx = tirex_model.forecast(context=[ctx], prediction_length=28)
+    qx = np.asarray(qx)[0]
+    parts.append(pd.DataFrame({"ds": pd.date_range(cut + pd.Timedelta(days=1), periods=28), "cutoff": cut,
+                               "Chronos-2": qc[:, 1], "Chronos-2-lo-80": qc[:, 0], "Chronos-2-hi-80": qc[:, 2],
+                               "TimesFM": np.asarray(pt)[0], "TimesFM-lo-80": qt[:, 1], "TimesFM-hi-80": qt[:, 9],
+                               "TiRex": np.asarray(mx)[0], "TiRex-lo-80": qx[:, 0], "TiRex-hi-80": qx[:, 8]}))
+wres = wres.merge(pd.concat(parts), on=["ds", "cutoff"])
+wres["h"] = wres.groupby("cutoff").cumcount() + 1
+wres["ETS + Chronos-2"] = wres[["ETS", "Chronos-2"]].mean(axis=1)
+past_we = we[we.index <= wres["cutoff"].min()].values[-365:]
+scale_we = np.mean(np.abs(past_we[7:] - past_we[:-7]))
+we_names = ["Naive", "Seasonal naive", "ETS", "ARIMA", "Theta", "MSTL", "Chronos-2", "TimesFM", "TiRex"]
+we_board = {}
+for m in we_names + ["ETS + Chronos-2"]:
+    e = wres["y"] - wres[m]
+    row = {"MASE": np.mean(np.abs(e)) / scale_we, "MAPE, %": 100 * np.mean(np.abs(e) / wres["y"]),
+           "bias, %": 100 * np.mean(-e / wres["y"])}
+    if f"{m}-lo-80" in wres:
+        row["inside P10–P90"] = np.mean((wres["y"] >= wres[f"{m}-lo-80"]) & (wres["y"] <= wres[f"{m}-hi-80"]))
+    we_board[m] = row
+we_board = pd.DataFrame(we_board).T
+```
+
+## Nine forecasters, six windows {.smaller}
+
+:::: {.columns}
+::: {.column width="55%"}
+```{python}
+scoreboard(we_board.loc[we_names], rules={"MASE": "lower", "MAPE, %": "lower", "bias, %": 0.0,
+                                          "inside P10–P90": 0.8}, size="0.78em")
+```
+:::
+
+::: {.column width="45%"}
+Six windows of 28 days, May–October 2026, as before; classical models fitted to ChatGPT alone.
+
+- **The ranking is not the ten-product ranking.** TiRex and **Theta** — a method from 2000 — lead;
+  Chronos-2, the best on the ten products, is only third.
+- **MSTL** (week + year) is worst: a yearly shape that changes from year to year cannot be learned.
+- **Ranges:** classical ones are too wide (almost every day inside), foundation models' too narrow
+  (around 70–77%).
+:::
+::::
+
+## Where the errors are {.smaller}
+
+```{python}
+#| label: we-errors
+#| fig-align: center
+show = ["Seasonal naive", "ETS", "Theta", "Chronos-2", "TiRex"]
+by_h = wres.groupby((wres["h"] - 1) // 7).apply(
+    lambda g: pd.Series({m: np.mean(np.abs(g["y"] - g[m])) / scale_we for m in show}), include_groups=False)
+by_w = wres.groupby("cutoff").apply(
+    lambda g: pd.Series({m: np.mean(np.abs(g["y"] - g[m])) / scale_we for m in we_names}), include_groups=False)
+fig, axes = plt.subplots(1, 2, figsize=(13, 3.9), width_ratios=[1, 1.4])
+for m in show:
+    axes[0].plot(by_h.index + 1, by_h[m], "o-", label=m)
+axes[0].set_xticks(by_h.index + 1)
+axes[0].set_xlabel("week of the horizon")
+axes[0].set_ylabel("MASE")
+axes[0].legend(fontsize=8)
+im = axes[1].imshow(by_w.T.values, cmap="RdYlGn_r", vmin=0.2, vmax=1.6, aspect="auto")
+axes[1].set_yticks(range(len(we_names)), we_names)
+axes[1].set_xticks(range(len(by_w)), [f"{c:%d %b}" for c in by_w.index])
+for i in range(len(we_names)):
+    for j in range(len(by_w)):
+        axes[1].text(j, i, f"{by_w.iloc[j, i]:.2f}", ha="center", va="center", fontsize=7)
+axes[1].set_title("MASE by backtest window (last day of history)", fontsize=10)
+plt.show()
+```
+
+- **The first week is the easy one** — about half the error of weeks 2–4. Re-forecast weekly.
+- **Windows differ more than models.** The May window is hard for everyone, August easy for most; MSTL
+  falls apart in June (3.6). Any single window would have told a different story.
+
+## Ranges and a combination {.smaller}
+
+```{python}
+#| label: we-coverage
+#| fig-align: center
+covered = we_board["inside P10–P90"].dropna()
+fig, ax = plt.subplots(figsize=(12, 2.2))
+ax.bar(covered.index, covered.values,
+       color=[red_pink if m in ("Chronos-2", "TimesFM", "TiRex") else slate for m in covered.index])
+ax.axhline(0.8, color="black", linewidth=1, linestyle="--")
+ax.yaxis.set_major_formatter(mpl.ticker.PercentFormatter(1.0))
+ax.set_ylim(0, 1.05)
+ax.set_title("Share of days inside the 80% range — the dashed line is the target", fontsize=10)
+plt.show()
+```
+
+:::: {.columns}
+::: {.column width="45%"}
+```{python}
+scoreboard(we_board.loc[["ETS", "Chronos-2", "ETS + Chronos-2"], ["MASE", "MAPE, %"]], size="0.85em")
+```
+:::
+
+::: {.column width="55%"}
+- A range is a promise; **count** how often it is kept, and widen or narrow it by what you see.
+- The **average of ETS and Chronos-2** — a pair fixed *before* looking at scores — beats both of its
+  parts. Picking the single winner by its test score is the mistake a backtest exists to prevent.
+:::
+::::
+
+## The next four weeks {.smaller}
+
+```{python}
+#| label: we-final
+#| fig-align: center
+mid, lo, hi = (lambda q: (q[:, 1], q[:, 0], q[:, 2]))(np.asarray(
+    chronos2.predict_quantiles([torch.tensor(we.values, dtype=torch.float32)], prediction_length=28,
+                               quantile_levels=[0.1, 0.5, 0.9])[0][0]).reshape(28, 3))
+ets_final = StatsForecast(models=[AutoETS(season_length=7)], freq="D").forecast(df=we_df, h=28)["AutoETS"].values
+future_we = pd.date_range(we.index[-1] + pd.Timedelta(days=1), periods=28)
+fig, ax = plt.subplots(figsize=(12, 3.3))
+ax.plot(we.index[-90:], we.values[-90:], color=slate, linewidth=1, label="actual")
+ax.fill_between(future_we, lo, hi, color=red_pink, alpha=0.2, label="Chronos-2 P10–P90")
+ax.plot(future_we, mid, color=red_pink, linewidth=2, label="Chronos-2")
+ax.plot(future_we, (mid + ets_final) / 2, "--", color=blue, linewidth=1.5, label="ETS + Chronos-2")
+ax.yaxis.set_major_formatter(thousands)
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+ax.legend(loc="upper left", fontsize=8)
+plt.show()
+print(f"Highest P90 day: {future_we[np.argmax(hi)]:%a %d %b}, {hi.max() / 1000:.0f}k views;  "
+      f"lowest P10 day: {future_we[np.argmin(lo)]:%a %d %b}, {lo.min() / 1000:.0f}k")
+```
+
+Read it as a plan: weekdays up to the P90 line for capacity, weekends for maintenance. The series jumped
+in its last week; the forecast falls back towards the usual pattern, and the width of the range is how
+unsure it is that the jump will fade.
+
+## What the worked example says {.smaller}
+
+1. **Backtest on your own series.** The best model on ten products is third on this one; a 2000-era
+   method is near the top. No ranking transfers.
+2. **Baselines first.** Six of eight models beat "same day last week" — by margins, not miracles; two did
+   not beat it at all.
+3. **Mind the horizon.** Week one is about twice as accurate as the weeks after it: re-forecast weekly.
+4. **Check the range before you use it.** Too wide for the classical models, too narrow for the
+   foundation models — here. Count it on your data.
+5. **Combine.** A classical and a foundation model, averaged by a rule fixed in advance, beat both.
+
+The full analysis, with every chart and table, is a notebook you can read without running:
+**[worked example (Colab)](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/genesis/sdb/labs/worked_example.ipynb)**.
+
+## Your turn: the template {.smaller}
+
+**[→ Open the template in Google Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/genesis/sdb/labs/template.ipynb)**
+— the same toolkit, for your series. Change one cell, run everything.
+
+1. **Settings:** a product from today's ten, or your own CSV (date, value — daily or weekly; public or
+   anonymised data only); the season, the horizon, the number of windows; which forecasters to compare.
+2. **Run:** the notebook draws your data, backtests, scores, and forecasts with the backtest winner.
+3. **Conclude:** four questions at the end — who won and by how much, is the range calibrated, how fast
+   does the error grow, and what does the forecast not know?
+
+In teams: bring one result each, and compare where the foundation models won — and where a 2000-era
+method did not lose.
 
 ## What to take away {.smaller}
 
