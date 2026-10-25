@@ -15,6 +15,7 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 7 — ARIMA Models, Part 2 | <https://01a12fb5-a567-80a7-6706-fdc668266ba4.share.connect.posit.cloud> |
 | Week 8 — Advanced Forecasting Methods | <https://01a15453-1b58-4c5c-72f6-bd43ca8ed1f8.share.connect.posit.cloud> |
 | Week 9 — Neural Networks for Forecasting | <https://01a1732c-ef1d-4ab1-d798-31fa2d27c8bb.share.connect.posit.cloud> |
+| Week 10 — Foundation Models for Time Series | <https://01a17388-d829-f290-4fb0-0660a964a50c.share.connect.posit.cloud> |
 | Week 1 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab01.ipynb) |
 | Week 2 — lab handout | <https://01a07874-b74d-873c-a106-e68a78304698.share.connect.posit.cloud> |
 | Week 2 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab02.ipynb) |
@@ -35,6 +36,7 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 8 — practice demo, seasonal ARIMA in four real cases (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo08.ipynb) |
 | Week 8 — practice, Ukrainian version with full analysis and conclusions (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo08_uk.ipynb) |
 | Week 8 — Lab 7 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab08.ipynb) |
+| Week 10 — TimeGPT: getting an API key (handout) | <https://01a17389-2e7b-9235-0fc3-163f41b0e192.share.connect.posit.cloud> |
 | Moodle | <https://teaching.kse.org.ua/course/view.php?id=4432> |
 
 ## Layout
