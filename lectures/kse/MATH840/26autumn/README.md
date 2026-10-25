@@ -14,6 +14,7 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 6 — ARIMA Models, Part 1 | <https://01a10c29-ffd3-a579-8f9a-96d293b1253c.share.connect.posit.cloud> |
 | Week 7 — ARIMA Models, Part 2 | <https://01a12fb5-a567-80a7-6706-fdc668266ba4.share.connect.posit.cloud> |
 | Week 8 — Advanced Forecasting Methods | <https://01a15453-1b58-4c5c-72f6-bd43ca8ed1f8.share.connect.posit.cloud> |
+| Week 9 — Neural Networks for Forecasting | <https://01a1732c-ef1d-4ab1-d798-31fa2d27c8bb.share.connect.posit.cloud> |
 | Week 1 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab01.ipynb) |
 | Week 2 — lab handout | <https://01a07874-b74d-873c-a106-e68a78304698.share.connect.posit.cloud> |
 | Week 2 — practice notebook (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab02.ipynb) |
