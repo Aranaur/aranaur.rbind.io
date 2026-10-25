@@ -1,0 +1,127 @@
+---
+title: "TimeGPT: getting an API key"
+subtitle: "MATH840 | Time Series | Foundation models"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    highlight-style: github
+    theme: [default, custom.scss]
+execute:
+  echo: true
+  eval: false
+---
+
+::: {.callout-note appearance="simple"}
+## Why a key
+
+Every other foundation model in the lecture — Chronos, TimesFM, Moirai, TiRex — is downloaded and runs
+on your machine. **TimeGPT** does not: it runs on Nixtla's servers, and your notebook sends it the data
+and receives the forecast. The key tells Nixtla who is calling. Ten minutes, once.
+:::
+
+## 1. Create the account
+
+1. Go to <https://dashboard.nixtla.io>.
+2. Sign in with **Google** or **GitHub**. No credit card is asked for.
+3. You land on the dashboard. A new account starts a **30-day free trial**. When it ends, **access
+   ends too** unless the account is upgraded to a paid plan
+   ([Nixtla's plans page](https://www.nixtla.io/docs/introduction/timegpt_subscription_plans)).
+
+::: {.callout-important}
+## Create the key when you need it
+
+Thirty days is the whole budget. Create the account when you start the work that needs TimeGPT — the
+final project — not weeks before. If you need more time for coursework, Nixtla asks to be contacted at
+support@nixtla.io.
+:::
+
+::: {.callout-warning}
+## Mind the quota
+
+Every `forecast`, `cross_validation` or `detect_anomalies` call is a request to Nixtla's servers and
+counts against your plan. Develop on a small piece of data, check the result, then run the full
+experiment once. Keep the results in a CSV instead of calling the API again every time you rerun a
+notebook.
+:::
+
+## 2. Create the key
+
+1. In the dashboard, open **API Keys**.
+2. **Create** a new key and give it a name you will recognise, e.g. `math840`.
+3. **Copy** the whole key, with no spaces around it. Treat it like a password.
+
+## 3. Store it where code can read it — and nobody else
+
+### In Google Colab
+
+1. Click the **key icon (Secrets)** in the left sidebar.
+2. **Add new secret**: name `NIXTLA_API_KEY`, value — your key.
+3. Switch on **Notebook access** for that secret.
+4. In the notebook:
+
+```python
+import os
+from google.colab import userdata
+os.environ["NIXTLA_API_KEY"] = userdata.get("NIXTLA_API_KEY")
+```
+
+The secret stays in your Colab account. When you share the notebook, the key does not travel with it.
+
+### On your own computer
+
+Create a file called `.env` next to your notebook, containing one line:
+
+```text
+NIXTLA_API_KEY=paste-your-key-here
+```
+
+and load it at the top of the notebook:
+
+```python
+from dotenv import load_dotenv   # pip install python-dotenv
+load_dotenv()
+```
+
+If your project is a git repository, add `.env` to `.gitignore` **before** the first commit.
+
+## 4. Check that it works
+
+```python
+!pip install -q nixtla
+from nixtla import NixtlaClient
+
+client = NixtlaClient()           # reads NIXTLA_API_KEY from the environment
+client.validate_api_key()         # True means you are ready
+```
+
+A first forecast, on the Walmart stores of the lecture (one API call):
+
+```python
+import pandas as pd
+
+url = ("https://raw.githubusercontent.com/Aranaur/aranaur.rbind.io/main/"
+       "lectures/kse/MATH840/26autumn/data/walmart.csv")
+walmart = pd.read_csv(url, parse_dates=["ds"])
+store_1 = walmart.query("unique_id == 1")[["unique_id", "ds", "y"]]
+
+forecast = client.forecast(df=store_1, h=8, freq="W-FRI", level=[80],
+                           time_col="ds", target_col="y", id_col="unique_id")
+forecast.head()
+```
+
+## Never do this
+
+- **Do not paste the key into a notebook cell**, `NixtlaClient(api_key="...")`. Notebooks get shared,
+  submitted and pushed to GitHub; the key goes with them.
+- **Do not put the key in a submission.** A notebook that reads `NIXTLA_API_KEY` from the environment is
+  reproducible without it; we will run it with our own key.
+- If a key has leaked, **delete it** in the dashboard and create a new one. Deleting takes effect at once.
+
+## What you send to Nixtla
+
+TimeGPT sees the data you forecast. For the course datasets that is fine — they are public. For data
+from an employer or a client, ask first: the model's convenience comes from running on someone else's
+server.

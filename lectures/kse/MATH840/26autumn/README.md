@@ -40,13 +40,14 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 ## Layout
 
 ```
-slides/   .00 syllabus, .01–.09 weeks 1–9 (dot-prefixed: not rendered into the site)
+slides/   .00 syllabus, .01–.10 weeks 1–10 (dot-prefixed: not rendered into the site)
 labs/     .labNN.qmd handouts, _labNN.ipynb templates, _demoNN.ipynb practice demos,
           .demoNN-notes.md how to run the session
 data/     datasets served to students over raw.githubusercontent.com
           walmart.csv is the Kaggle Walmart store-sales file, kept here so the demo has covariates
           m3_monthly.csv is the M3 competition monthly set (Week 9); neuralprophet_*.csv are built
-          by infra/neuralprophet_messi.py, foundation_leakage.csv by infra/foundation_leakage.py
+          by infra/neuralprophet_messi.py, foundation_leakage.csv by infra/foundation_leakage.py,
+          fm_timegpt_*.csv by infra/timegpt_walmart.py, fm_moirai_*.csv by infra/moirai_walmart.py
 data/trackb/  the issued Track B series, one CSV per code, plus index.csv
 infra/    publishing, deck PDFs, the Track B pool and scorer, and the Week 9 experiments
 project/  final project (Week 10)
@@ -141,9 +142,18 @@ on a laptop CPU (TFT alone, ten).
 `pandas<3`. `infra/neuralprophet_messi.py` runs in its own `.venv-neuralprophet` (Python 3.12; the
 commands are in its docstring) and writes the CSVs the Week 9 deck reads.
 
-`slides/.foundation-models-draft.qmd` is the foundation-models material (Chronos, Chronos-2, the
-pretraining-leakage test) cut from Week 9, kept for its own lecture. It renders as it stands, with the
-Chronos packages above and the Hugging Face weights.
+The Week 10 deck (foundation models; follows Peixeiro, *Time Series Forecasting Using Foundation
+Models*, 2026) adds `timesfm`, `tirex-ts`, `jax[cpu]` (for TimesFM's covariates) and `nixtla` — the last
+installed with `--no-deps`, because it declares `pandas<3` and works with pandas 3. Two of its models are
+precomputed into `data/`:
+
+- **Moirai** (`uni2ts`) needs `numpy<2` and `pandas` 2.1: `infra/moirai_walmart.py` runs in its own
+  `.venv-moirai` (Python 3.11; commands in its docstring).
+- **TimeGPT** runs on Nixtla's servers and needs an API key. `infra/timegpt_walmart.py` reads
+  `NIXTLA_API_KEY` from the environment or from `.env` at the repository root (gitignored); six calls.
+  The free trial lasts 30 days, so rerun it only when the TimeGPT results must change.
+
+The book itself sits in `slides/data/` for reference and is gitignored (`slides/data/*.pdf`).
 
 Pandas is 3.0.5, which satisfies the `>= 3.0.2` pin. Pandas 3 dropped the legacy
 frequency aliases, so use `QE`/`QS`, `ME`/`MS`, `YE`/`YS` and lowercase `h` in any new
@@ -165,3 +175,4 @@ Weeks are offset by one against the 2025/26 decks, because Week 1 merged last ye
 | 7 | `.07` | `.07`, seasonal half, plus dynamic regression |
 | 8 | `.08` | `.08` |
 | 9 | `.09` | `.09` (neural networks, rewritten), plus NeuralProphet and the `neuralforecast` zoo |
+| 10 | `.10` | new: foundation models, after Peixeiro (2026) |

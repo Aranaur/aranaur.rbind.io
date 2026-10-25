@@ -1,0 +1,1339 @@
+---
+title: "Foundation Models for Time Series"
+subtitle: "MATH840 | Time Series | Week 10"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=4432">🔗MATH840 | Time Series</a>
+format:
+  revealjs:
+    fragments: false   # show every slide in full; no click-through reveals
+    code-line-numbers: false
+    code-fold: true
+    code-summary: "Code"
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+editor_options:
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+import warnings
+warnings.filterwarnings("ignore")
+import os
+os.environ["NIXTLA_ID_AS_COL"] = "true"
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+import logging
+for name in ("lightning", "lightning.pytorch", "pytorch_lightning", "neuralforecast", "transformers",
+             "cmdstanpy"):
+    logging.getLogger(name).setLevel(logging.ERROR)
+import transformers
+transformers.utils.logging.disable_progress_bar()
+import time
+import numpy as np
+np.set_printoptions(suppress=True)
+np.random.seed(1)
+import pandas as pd
+pd.set_option("display.width", 130)
+pd.set_option("display.precision", 3)
+import seaborn as sns
+sns.set_style("whitegrid")
+import matplotlib.pyplot as plt
+plt.style.use("ggplot")
+plt.rcParams.update({
+    "figure.figsize": (8, 5),
+    "figure.dpi": 100,
+    "savefig.dpi": 300,
+    "figure.constrained_layout.use": True,
+    "axes.titlesize": 12,
+    "axes.labelsize": 10,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+    "legend.fontsize": 9,
+})
+import matplotlib as mpl
+from cycler import cycler
+mpl.rcParams['axes.prop_cycle'] = cycler(color=[slate, blue, turquoise, orange, red, green, purple, yellow, red_pink])
+from matplotlib.patches import FancyBboxPatch
+
+import torch
+torch.manual_seed(1)
+from scipy import stats
+from statsforecast import StatsForecast
+from statsforecast.models import AutoARIMA, AutoETS, SeasonalNaive
+from great_tables import GT, loc, style as gt_style
+from matplotlib.colors import LinearSegmentedColormap, to_hex
+
+shade = LinearSegmentedColormap.from_list("shade", ["#bfe0b0", "#ffffff", "#f5b8cb"])
+
+
+def scoreboard(table, rules=None, by="column", decimals=3, size="0.75em", padding="3px"):
+    """A results table in Great Tables: green is better, pink is worse, the best in bold."""
+    df = table.to_frame() if isinstance(table, pd.Series) else table.copy()
+    df.index = [str(i) for i in df.index]
+    df.columns = [str(c) for c in df.columns]
+    rules = rules or {c: "lower" for c in df.columns}
+    gt = (GT(df.reset_index(names="row"), rowname_col="row")
+          .fmt_number(columns=list(df.select_dtypes("number").columns), decimals=decimals)
+          .sub_missing(missing_text="")
+          .tab_options(table_font_size=size, data_row_padding=padding))
+    for c, rule in rules.items():
+        values = df[c].astype(float)
+        bad = values if rule == "lower" else -values if rule == "higher" else (values - rule).abs()
+        lo, hi = np.nanmin(bad), np.nanmax(bad)
+        for i, b in enumerate(bad):
+            if np.isnan(b):
+                continue
+            fill = to_hex(shade((b - lo) / (hi - lo) if hi > lo else 0.0))
+            look = [gt_style.fill(color=fill)] + ([gt_style.text(weight="bold")] if b == np.nanmin(bad) else [])
+            gt = gt.tab_style(style=look, locations=loc.body(columns=c, rows=[i]))
+    return gt
+
+
+def box(ax, x, y, w, h, text, colour, size=13):
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02", facecolor="white",
+                                edgecolor=colour, linewidth=2))
+    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=size)
+
+
+def arrow(ax, x0, y0, x1, y1, colour="grey"):
+    ax.annotate("", xy=(x1, y1), xytext=(x0, y0), arrowprops=dict(arrowstyle="->", color=colour, lw=1.5))
+
+
+# The case of the book from chapter 3 on: weekly sales of four Walmart stores
+walmart = pd.read_csv("../data/walmart.csv", parse_dates=["ds"])
+walmart = (walmart[walmart["unique_id"].isin([1, 2, 3, 4])]
+           .sort_values(["unique_id", "ds"]).reset_index(drop=True))
+H, WINDOWS = 8, 4
+dates = np.sort(walmart["ds"].unique())
+cutoffs = [dates[len(dates) - (WINDOWS - k) * H - 1] for k in range(WINDOWS)]
+
+
+def windows():
+    """The book's protocol: four windows of eight weeks; each model sees only the weeks before."""
+    for cutoff in cutoffs:
+        history = walmart[walmart["ds"] <= cutoff]
+        window = walmart[walmart["ds"] > cutoff].groupby("unique_id").head(H)
+        yield cutoff, history, window
+
+
+def contexts(history):
+    return [torch.tensor(g["y"].to_numpy(), dtype=torch.float32) for _, g in history.groupby("unique_id")]
+
+
+cv = {}          # model name -> DataFrame of unique_id, ds, prediction over the four windows
+seconds = {}     # model name -> inference time over the four windows
+
+
+def record(name, frames, start):
+    cv[name] = pd.concat(frames)[["unique_id", "ds", name]]
+    seconds[name] = time.time() - start
+
+
+def smape(y, f):
+    return float(np.mean(200 * np.abs(y - f) / (np.abs(y) + np.abs(f))))
+```
+
+# Where this fits
+
+## The last step away from "one series" {.smaller}
+
+| Week | Models | Trained on | At forecast time |
+|---|---|---|---|
+| 1–8 | ETS, ARIMA, regression, Prophet | **your series** | fit, then forecast |
+| 9 | NNAR, NeuralProphet | your series | fit, then forecast |
+| 9 | LightGBM, N-BEATS, N-HiTS, TFT | **your dataset** | fit, then forecast |
+| **10** | **TimeGPT, Chronos, Moirai, TimesFM** | **millions of other series** | **forecast only** |
+
+Week 9's verdict: on M3, ten neural architectures trained on 1428 series, untuned, did not beat ETS
+and Theta. Today's models were trained on hundreds of thousands of series, by teams with clusters of
+GPUs — and you use them **without training anything**.
+
+The question has not changed: **does it beat the benchmark on a holdout it never saw?** — and, more
+than ever, *how do we know it never saw it?*
+
+## The book this lecture follows {.smaller}
+
+:::: {.columns}
+::: {.column width="62%"}
+**Marco Peixeiro, *Time Series Forecasting Using Foundation Models*** (Manning, 2026) — the course's
+reference for this week. We take its steps in its order:
+
+1. What a foundation model is; the transformer, seen from a time series.
+2. **Building a tiny foundation model** yourself.
+3. **TimeGPT** — the first one, behind an API.
+4. **Lag-Llama** — open, probabilistic.
+5. **Chronos** — a language model that reads tokens of a series.
+6. **Moirai** — any number of variables.
+7. **TimesFM** — a point forecaster, mostly trained on web traffic.
+8. **LLMs** asked to forecast in plain text, and **Time-LLM**.
+9. A **capstone**: every model on one case, one protocol.
+:::
+
+::: {.column width="38%"}
+::: {.callout-tip}
+## Reading
+
+Peixeiro (2026), ch. 1–10 ·
+[Ansari et al. (2024), *Chronos*](https://arxiv.org/abs/2403.07815) ·
+[Ansari et al. (2025), *Chronos-2*](https://arxiv.org/abs/2510.15821) ·
+[Das et al. (2024), *TimesFM*](https://arxiv.org/abs/2310.10688) ·
+[Woo et al. (2024), *Moirai*](https://arxiv.org/abs/2402.02592) ·
+[Garza et al. (2023), *TimeGPT-1*](https://arxiv.org/abs/2310.03589)
+:::
+
+The book's running case is ours too: **weekly sales of four Walmart stores**, 2010–2012, with a holiday
+flag — the Kaggle data from the Week 4 practice.
+:::
+::::
+
+# Understanding foundation models
+
+## Algorithm, model, foundation model {.smaller}
+
+An **algorithm** is the recipe; the **data** are the ingredients; the **model** is the cake. Least
+squares is an algorithm; *your* regression line is a model. The same recipe on different data gives a
+different model.
+
+A **foundation model** (Stanford HAI, 2021) is a model trained on **large, diverse data** so that it can
+be applied to **many tasks**. Peixeiro's four marks of one:
+
+| | What it means for forecasting |
+|---|---|
+| **large, diverse training data** | billions of observations, every frequency and domain |
+| **a large model** | tens of millions to hundreds of millions of weights |
+| **many tasks** | any series, any frequency, any horizon — without retraining |
+| **adaptable** | can be **fine-tuned**: a few more training steps on your data |
+
+Almost all of them are **transformers** — so before any of them, what a transformer does with a series.
+
+## A transformer, from a time series' point of view {.smaller}
+
+```{python}
+#| label: transformer
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(12, 3.6))
+box(ax, 0.0, 0.40, 1.3, 0.22, "raw series", slate)
+box(ax, 1.8, 0.40, 1.5, 0.22, "tokens\n(values or patches)", blue)
+box(ax, 3.8, 0.40, 1.7, 0.22, "embedding\n+ positional encoding", blue)
+box(ax, 6.0, 0.62, 1.7, 0.26, "encoder\nself-attention × N", turquoise)
+box(ax, 6.0, 0.12, 1.7, 0.26, "decoder\nmasked attention × N", red_pink)
+box(ax, 8.3, 0.12, 1.5, 0.26, "linear\nprojection", orange)
+box(ax, 10.3, 0.12, 1.4, 0.26, "next value(s)", slate)
+for x0, x1 in [(1.3, 1.8), (3.3, 3.8)]:
+    arrow(ax, x0, 0.51, x1, 0.51)
+arrow(ax, 5.5, 0.55, 6.0, 0.72)
+arrow(ax, 6.85, 0.62, 6.85, 0.38, turquoise)
+arrow(ax, 7.7, 0.25, 8.3, 0.25)
+arrow(ax, 9.8, 0.25, 10.3, 0.25)
+ax.annotate("", xy=(6.85, 0.11), xytext=(11.0, 0.11), arrowprops=dict(arrowstyle="->", color=red_pink, lw=1.2,
+            connectionstyle="arc3,rad=0.25"))
+ax.text(9.0, -0.07, "each prediction is fed back to the decoder (autoregression)", color=red_pink, ha="center", fontsize=9)
+ax.set_xlim(-0.2, 11.9)
+ax.set_ylim(-0.15, 0.95)
+ax.axis("off")
+plt.show()
+```
+
+**Tokens** — single values or **patches**; **embedding** — each token as a long vector; **encoder** —
+how tokens relate; **decoder** — the forecast, piece by piece, each fed back in. Many models keep only
+one half: that choice is most of the difference between them.
+
+## Positional encoding: telling the model *when* {.smaller}
+
+Attention by itself sees a **set** of tokens, not a sequence: shuffle them and it cannot tell. So each
+position $p$ gets a fixed vector added to its embedding:
+
+$$
+PE_{(p,\,2i)} = \sin\!\left(\frac{p}{10000^{2i/d}}\right), \qquad
+PE_{(p,\,2i+1)} = \cos\!\left(\frac{p}{10000^{2i/d}}\right)
+$$
+
+```{python}
+#| label: positional
+#| fig-align: center
+positions, d = 64, 64
+p = np.arange(positions)[:, None]
+i = np.arange(d // 2)[None, :]
+pe = np.zeros((positions, d))
+pe[:, 0::2] = np.sin(p / 10000 ** (2 * i / d))
+pe[:, 1::2] = np.cos(p / 10000 ** (2 * i / d))
+fig, axes = plt.subplots(1, 2, figsize=(12, 2.9), width_ratios=[1.3, 1])
+axes[0].imshow(pe.T, aspect="auto", cmap="RdBu_r")
+axes[0].set_xlabel("position in the series")
+axes[0].set_ylabel("embedding dimension")
+axes[0].set_title("The positional-encoding matrix")
+for dim, colour in zip([0, 6, 20], [red_pink, blue, turquoise]):
+    axes[1].plot(pe[:, dim], color=colour, label=f"dimension {dim}")
+axes[1].legend(fontsize=8)
+axes[1].set_title("Clock hands at different speeds")
+plt.show()
+```
+
+Peixeiro's image: **clock hands**. Each dimension turns at its own speed; read together they give the
+exact position — as hour, minute and second hands give the exact time.
+
+## Self-attention: which past matters {.smaller}
+
+Each token asks a **query** $q$, every token offers a **key** $k$ and a **value** $v$; the output is
+a weighted average of values, weighted by how well query and key match:
+
+$$
+\text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d}}\right) V
+$$
+
+```{python}
+#| label: attention
+#| fig-align: center
+co2 = pd.read_csv("../data/co2_mauna_loa.csv", parse_dates=["ds"])
+recent = co2[co2["ds"] >= "2015-01-01"].reset_index(drop=True)
+values = recent["y"].to_numpy()
+tokens = np.array([values[t - 11:t + 1] - values[t - 11:t + 1].mean() for t in range(11, len(values))])
+tokens = tokens / tokens.std(axis=1, keepdims=True)
+query = tokens[-1]
+scores = tokens[:-1] @ query / np.sqrt(tokens.shape[1])
+weights = np.exp(scores - scores.max())
+weights /= weights.sum()
+fig, ax = plt.subplots(figsize=(12, 2.8))
+lag = np.arange(len(weights), 0, -1)
+ax.bar(lag, weights, color=[red_pink if l % 12 == 0 else "lightgray" for l in lag], width=0.8)
+ax.set_xlabel("how many months back the token is")
+ax.set_ylabel("attention weight")
+ax.invert_xaxis()
+ax.set_title("The latest 12-month window of CO₂ attends to its own months in earlier years (lags 12, 24, 36, … in pink)")
+plt.show()
+```
+
+No weights were trained here: each token is a 12-month stretch of CO₂, and $q \cdot k$ is their
+similarity. Even so, attention finds the season by itself. A trained model learns **projections** for
+$Q, K, V$, and runs many such **heads** in parallel — one may track the trend, another the season.
+
+## Five models, three shapes {.smaller}
+
+| Model | From | Transformer part | Tokens | Output | Covariates |
+|---|---|---|---|---|---|
+| **TimeGPT** | Nixtla | encoder + decoder | values | point + conformal interval | yes |
+| **Lag-Llama** | academic | decoder only | lags + calendar features | Student-$t$ distribution | no |
+| **Chronos** | Amazon | encoder + decoder (T5) | binned values | distribution over 4096 bins | Chronos-2: yes |
+| **Moirai** | Salesforce | encoder only | patches | mixture of distributions | yes |
+| **TimesFM** | Google | decoder only | patches | point (+ quantiles) | yes |
+
+: {tbl-colwidths="[13,11,17,19,24,16]"}
+
+**Pros**, as Peixeiro lists them: forecasting out of the box; good with few data points; less expertise
+needed; one model for many tasks. **Cons**: privacy (some run on someone else's server); no control over
+what the model can do; not best for every case; heavy — gigabytes of weights, a GPU for speed.
+
+# Building a tiny foundation model
+
+## Pretrain, transfer, fine-tune — at home {.smaller}
+
+Peixeiro's chapter 2 builds a foundation model in miniature, to make three words concrete:
+
+- **Pretraining:** train once on many series.
+- **Transfer learning:** apply the trained model to a series it has **never seen**. With no further
+  training, that is **zero-shot** forecasting.
+- **Fine-tuning:** a few more training steps on the new series, starting from the pretrained weights.
+
+Our pretraining corpus: all 1428 **M3 Monthly** series from Week 9. The model: **N-BEATS**, 12 months
+ahead from 24 months of input.
+
+```{python}
+#| echo: true
+#| code-fold: false
+from neuralforecast import NeuralForecast
+from neuralforecast.models import NBEATS
+
+quiet = dict(enable_progress_bar=False, logger=False, enable_model_summary=False)
+m3 = pd.read_csv("../data/m3_monthly.csv", parse_dates=["ds"])
+pretrained = NeuralForecast(
+    models=[NBEATS(h=12, input_size=24, max_steps=1000, scaler_type="robust", random_seed=1, **quiet)],
+    freq="MS")
+pretrained.fit(m3)                      # about a minute on a laptop CPU
+```
+
+`scaler_type="robust"` is our one change to the book's code: without scaling, the network fitted on
+M3's scales is thrown by CO₂'s ~400 ppm, and a single fine-tuning step moved its forecast by 100 ppm.
+
+## Zero-shot, fine-tuned, trained from scratch {.smaller}
+
+The new series: **CO₂ at Mauna Loa** (Week 8's practice), monthly since 2005 — not in M3. Last 12 months
+held out.
+
+```{python}
+#| echo: true
+#| code-fold: false
+import copy
+
+co2_df = co2[co2["ds"] >= "2005-01-01"].assign(unique_id="co2")[["unique_id", "ds", "y"]]
+co2_train, co2_test = co2_df.iloc[:-12], co2_df.iloc[-12:]
+
+zero_shot = pretrained.predict(df=co2_train)                     # never trained on CO₂
+
+fine_tuned = copy.deepcopy(pretrained)
+fine_tuned.models[0].trainer_kwargs["max_steps"] = 10            # ten more steps, on CO₂ only
+fine_tuned.fit(co2_train)
+
+from_scratch = NeuralForecast(
+    models=[NBEATS(h=12, input_size=24, max_steps=100, scaler_type="robust", random_seed=1, **quiet)],
+    freq="MS")
+from_scratch.fit(co2_train)
+```
+
+```{python}
+#| include: false
+tiny = {"zero-shot (pretrained on M3)": zero_shot["NBEATS"].to_numpy(),
+        "fine-tuned, 10 steps": fine_tuned.predict()["NBEATS"].to_numpy(),
+        "trained on CO₂ only": from_scratch.predict()["NBEATS"].to_numpy(),
+        "seasonal naive": co2_train["y"].to_numpy()[-12:]}
+co2_y = co2_test["y"].to_numpy()
+tiny_table = pd.DataFrame({name: {"MAE": np.mean(np.abs(co2_y - f)), "sMAPE, %": smape(co2_y, f)}
+                           for name, f in tiny.items()}).T
+```
+
+## What transfer bought on CO₂ {.smaller}
+
+:::: {.columns}
+::: {.column width="58%"}
+```{python}
+#| label: tiny-co2
+fig, ax = plt.subplots(figsize=(7, 4))
+ax.plot(co2_df["ds"].iloc[-48:], co2_df["y"].iloc[-48:], color=slate, label="actual")
+for (name, f), colour in zip(list(tiny.items())[:3], [red_pink, orange, blue]):
+    ax.plot(co2_test["ds"], f, color=colour, linewidth=1.8, label=name)
+ax.set_ylabel("ppm")
+ax.legend(loc="upper left", fontsize=8)
+plt.show()
+```
+:::
+
+::: {.column width="42%"}
+```{python}
+scoreboard(tiny_table)
+```
+:::
+::::
+
+**Zero-shot works** — a third of seasonal naive's error on a series the model never saw. Ten fine-tuning
+steps change nothing. A network trained on CO₂ alone is **better still**: twenty regular years are enough.
+The book found the pretrained model first on its series; the order depends on what the new series can teach.
+
+## Another frequency {.smaller}
+
+The book's second test: the model pretrained on **monthly** data, asked about **daily** data. Ours:
+Melbourne's daily maximum temperature, 2012–2014 (`vic_elec`, Week 7), 12 days ahead, over **ten
+windows** — one 12-day window of weather is mostly noise.
+
+```{python}
+#| echo: true
+#| code-fold: false
+vic = pd.read_csv("../data/vic_elec.csv", parse_dates=["ds"])
+daily = (vic[vic["unique_id"] == "Temperature"].set_index("ds")["y"].resample("D").max()
+         .reset_index().assign(unique_id="temp")[["unique_id", "ds", "y"]])
+start = len(daily) - 10 * 12
+daily_errors = {"zero-shot (monthly model)": [], "naive": []}
+for k in range(10):
+    history = daily.iloc[:start + 12 * k]
+    actual = daily["y"].iloc[start + 12 * k:start + 12 * (k + 1)].to_numpy()
+    daily_errors["zero-shot (monthly model)"].append(
+        np.mean(np.abs(actual - pretrained.predict(df=history)["NBEATS"].to_numpy())))
+    daily_errors["naive"].append(np.mean(np.abs(actual - history["y"].iloc[-1])))
+
+daily_model = NeuralForecast(
+    models=[NBEATS(h=12, input_size=24, max_steps=500, scaler_type="robust", random_seed=1, **quiet)],
+    freq="D")
+daily_cv = daily_model.cross_validation(df=daily, n_windows=10, step_size=12, refit=False)
+daily_errors["trained on the daily series"] = [np.mean(np.abs(g["y"] - g["NBEATS"]))
+                                               for _, g in daily_cv.groupby("cutoff")]
+```
+
+## The monthly model on daily data {.smaller}
+
+```{python}
+#| label: tiny-daily
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(12, 3.0))
+for (name, errs), colour in zip(daily_errors.items(), [red_pink, slate, blue]):
+    ax.plot(range(1, 11), errs, "o-", color=colour, label=f"{name}: mean MAE {np.mean(errs):.2f} °C")
+ax.set_xlabel("window")
+ax.set_ylabel("MAE, °C")
+ax.legend(fontsize=8)
+plt.show()
+```
+
+In the book, the monthly model failed on daily data. **Ours did not**: over ten windows it beat both
+the naive forecast and a network trained on the daily series itself. Twelve days of weather are mostly
+noise around a level, and a robustly scaled N-BEATS forecasts a level well whatever frequency it learned
+on. One experiment is not a law — the book's or ours. That is the point of scoring every claim.
+
+## What a real foundation model needs {.smaller}
+
+What our miniature could not do, and every model that follows was built to fix:
+
+- **One horizon.** It forecasts exactly 12 steps — the `h` it was trained with. A real one must take any
+  horizon: 7 days or 168 hours. Solved by **generating** the output step by step (TimeGPT, Chronos) or
+  in long **output patches** (TimesFM).
+- **One frequency, one domain.** Trained on M3's monthly series only. Real corpora mix every frequency
+  from seconds to years and domains from electricity to web traffic — billions of observations.
+- **Data.** Text is everywhere; public time series are scarce. That is why the teams build their own
+  corpora, mix series together and generate synthetic ones — and why they rarely say exactly what is in
+  them.
+- **Compute.** Our pretraining took a minute on a laptop. Chronos-T5 (Large) took 18 hours on eight
+  A100 GPUs.
+
+# TimeGPT
+
+## A generative pretrained transformer for time series {.smaller}
+
+**TimeGPT** (Garza et al., 2023; Nixtla) was the first foundation model for forecasting — and the only
+one here you cannot download.
+
+- A full **encoder–decoder** transformer. **Generative**: the decoder produces the forecast one step at a
+  time, feeding each back in, so the horizon can be any length.
+- It estimates the conditional distribution of the future given the past **and covariates**:
+  $$P\left(y_{t+1:t+h} \mid y_{0:t},\, x_{0:t+h}\right) = f_\theta\left(y_{0:t},\, x_{0:t+h}\right)$$
+  The covariates $x$ are needed **up to $t + h$**: their future must be known, or forecast first.
+- Trained on about **100 billion** observations from finance, health, energy, web and more — the
+  sources are not disclosed. Kept raw: noise and outliers included.
+
+## Intervals by conformal prediction {.smaller}
+
+TimeGPT's intervals do not come from a distribution in the model. They come from its **errors on the
+past** — Week 8's conformal intervals:
+
+```{python}
+#| label: conformal
+#| fig-align: center
+actual = np.array([[8, 4, 5], [7, 5, 6]])
+predicted = np.array([[6, 7, 4], [8.5, 2.5, 5.2]])
+scores = np.abs(actual - predicted).ravel()                 # conformity scores, all windows
+forecast = np.array([6.0, 7.0, 8.0])
+candidates = forecast[:, None] + np.concatenate([scores, -scores])[None, :]
+lo, hi = np.percentile(candidates, [10, 90], axis=1)
+fig, ax = plt.subplots(figsize=(12, 2.7))
+for step in range(3):
+    ax.scatter(np.full(candidates.shape[1], step + 1), candidates[step], color="lightgray", s=40, zorder=2)
+ax.fill_between([1, 2, 3], lo, hi, color=red_pink, alpha=0.2, label="80% interval: 10th–90th percentile")
+ax.plot([1, 2, 3], forecast, "o-", color=red_pink, label="point forecast")
+ax.set_xticks([1, 2, 3], ["h = 1", "h = 2", "h = 3"])
+ax.legend(fontsize=8, loc="upper left")
+ax.set_title(f"The book's example: errors {np.round(scores, 1).tolist()} from two past windows")
+plt.show()
+```
+
+1. Forecast past windows, where the answer is known (cross-validation); keep the absolute errors.
+2. Add and subtract every error to the new point forecast: a cloud of possible values.
+3. The 80% interval is its 10th to 90th percentile — here **3.55 to 8.45** around the first forecast of 6.
+
+## Access: an API key {.smaller}
+
+TimeGPT runs on Nixtla's servers: your notebook sends the data and receives the forecast.
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| eval: false
+from nixtla import NixtlaClient
+
+client = NixtlaClient()                 # reads NIXTLA_API_KEY from the environment
+client.validate_api_key()
+
+forecast = client.forecast(df=history, h=8, freq="W-FRI", level=[80],
+                           time_col="ds", target_col="y", id_col="unique_id")
+```
+
+- **The key:** sign in at [dashboard.nixtla.io](https://dashboard.nixtla.io) with Google or GitHub,
+  *API Keys* → *Create*. Step by step, with Colab secrets: the **TimeGPT setup handout** on Moodle.
+- **The trial:** 30 days, free, no card; then access ends unless the account is paid for. Create the
+  key when you need it — for the final project — not before.
+- **The data leaves your machine.** Fine for public data; ask first for an employer's.
+
+The TimeGPT numbers in this lecture were computed once by `infra/timegpt_walmart.py` and are read from a
+file, so rendering the slides spends no calls.
+
+## The case: four Walmart stores {.smaller}
+
+```{python}
+#| label: walmart
+#| fig-align: center
+fig, axes = plt.subplots(2, 2, figsize=(12, 3.8), sharex=True)
+for ax, (store, g) in zip(axes.ravel(), walmart.groupby("unique_id")):
+    ax.plot(g["ds"], g["y"] / 1e6, color=slate, linewidth=1)
+    holidays = g[g["holiday"] == 1]
+    ax.scatter(holidays["ds"], holidays["y"] / 1e6, color=red_pink, s=14, zorder=3)
+    ax.axvspan(cutoffs[0], g["ds"].max(), color=orange, alpha=0.08)
+    ax.set_title(f"Store {store}", fontsize=10)
+axes[0, 0].set_ylabel("$ million / week")
+fig.suptitle("Weekly sales, Feb 2010 – Oct 2012; pink: holiday weeks; shaded: the 32 weeks of the four test windows",
+             fontsize=11)
+plt.show()
+```
+
+**The protocol, for every model from here on:** the last 32 weeks cut into **four windows of 8 weeks**;
+for each window the model sees only the weeks before it. Scored by MAE and sMAPE, as in the book. The
+one covariate is the **holiday flag** — the only one whose future is genuinely known.
+
+```{python}
+#| include: false
+from pathlib import Path
+HAVE_TIMEGPT = Path("../data/fm_timegpt_walmart.csv").exists()
+if HAVE_TIMEGPT:
+    timegpt = pd.read_csv("../data/fm_timegpt_walmart.csv", parse_dates=["ds", "cutoff"])
+    for name in ["TimeGPT", "TimeGPT fine-tuned", "TimeGPT fine-tuned, depth 2", "TimeGPT + holiday"]:
+        cv[name] = timegpt[["unique_id", "ds", name]]
+    timing = pd.read_csv("../data/fm_timegpt_timing.csv", index_col=0)["seconds"]
+    seconds.update(timing.to_dict())
+```
+
+## TimeGPT, zero-shot {.smaller}
+
+```{python}
+#| label: timegpt-zero
+#| fig-align: center
+if HAVE_TIMEGPT:
+    fig, axes = plt.subplots(2, 2, figsize=(12, 4.0), sharex=True)
+    for ax, (store, g) in zip(axes.ravel(), timegpt.groupby("unique_id")):
+        hist = walmart[(walmart["unique_id"] == store) & (walmart["ds"] > dates[-60])]
+        ax.plot(hist["ds"], hist["y"] / 1e6, color=slate, linewidth=1)
+        for cutoff, w in g.groupby("cutoff"):
+            ax.fill_between(w["ds"], w["TimeGPT-lo-80"] / 1e6, w["TimeGPT-hi-80"] / 1e6, color=red_pink, alpha=0.18)
+            ax.plot(w["ds"], w["TimeGPT"] / 1e6, color=red_pink, linewidth=1.6)
+        ax.set_title(f"Store {store}", fontsize=10)
+    fig.suptitle("Four windows, each forecast from the weeks before it; band: 80% conformal interval", fontsize=11)
+    plt.show()
+else:
+    print("Run infra/timegpt_walmart.py to fetch the TimeGPT forecasts.")
+```
+
+Each window's forecast follows the store's level and its weekly swings; the four 80% bands differ in
+width from store to store and window to window — each built from that store's past errors. Over the
+32 weeks TimeGPT's sMAPE is about 3.1%, on the same level as Chronos-2's.
+
+## Fine-tuning TimeGPT {.smaller}
+
+Fine-tuning is a request parameter: the server trains a copy of the model on your series for a few
+steps, then forecasts.
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| eval: false
+client.cross_validation(df=history, h=8, n_windows=4, step_size=8, freq="W-FRI",
+                        finetune_steps=10,          # gradient steps on your data
+                        finetune_loss="mae",        # what those steps minimise
+                        finetune_depth=2)           # 1 = only the last layers ... 5 = all of them
+```
+
+```{python}
+#| echo: false
+if HAVE_TIMEGPT:
+    variants = ["TimeGPT", "TimeGPT fine-tuned", "TimeGPT fine-tuned, depth 2", "TimeGPT + holiday"]
+    display(scoreboard(pd.DataFrame({v: {"MAE": np.mean(np.abs(timegpt["y"] - timegpt[v])),
+                                         "sMAPE, %": smape(timegpt["y"], timegpt[v]),
+                                         "seconds": seconds.get(v, np.nan)}
+                                     for v in variants}).T, decimals=2))
+```
+
+- Ten fine-tuning steps improve the MAE by about 1% — less than the 6% the book reports on its data.
+- **Depth 2 gives exactly the same forecasts as depth 1** here. The documentation does not say what each
+  depth tunes; on four short series, more of the model had nothing more to learn.
+- The holiday flag helps a little more than fine-tuning, and costs nothing extra.
+
+## What the holiday flag contributes {.smaller}
+
+With covariates, TimeGPT can return **Shapley values**: how much each covariate moved each forecast.
+
+```{python}
+#| label: timegpt-shap
+#| fig-align: center
+if HAVE_TIMEGPT:
+    shap = pd.read_csv("../data/fm_timegpt_shap.csv", parse_dates=["ds"])
+    fig, ax = plt.subplots(figsize=(12, 2.8))
+    for store, g in shap.groupby("unique_id"):
+        ax.plot(g["ds"], g["holiday"] / 1e3, "o-", label=f"Store {store}")
+    ax.axhline(0, color="grey", linewidth=0.8)
+    ax.set_ylabel("$ thousand")
+    ax.legend(fontsize=8, ncol=4)
+    ax.set_title("Shapley value of the holiday flag in each forecast week of the last window")
+    plt.show()
+```
+
+The last window has one holiday week per store — Labor Day. The flag's Shapley value is no larger that
+week than on ordinary weeks, and its sign changes from week to week. A Shapley value describes how the
+**model** responds to an input, not the effect of a holiday on sales; with one holiday in the window
+there is little for either to show.
+
+## Anomalies, by the same machinery {.smaller}
+
+TimeGPT has no separate anomaly model. It forecasts every past week from the weeks before it with a
+**99% interval**; a week outside its interval is flagged.
+
+```{python}
+#| label: timegpt-anomalies
+#| fig-align: center
+if HAVE_TIMEGPT:
+    anomalies = pd.read_csv("../data/fm_timegpt_anomalies.csv", parse_dates=["ds"])
+    fig, axes = plt.subplots(1, 2, figsize=(12, 3.0), sharey=False)
+    for ax, store in zip(axes, [1, 2]):
+        g = anomalies[anomalies["unique_id"] == store]
+        ax.plot(walmart.loc[walmart["unique_id"] == store, "ds"], walmart.loc[walmart["unique_id"] == store, "y"] / 1e6,
+                color=slate, linewidth=1)
+        ax.fill_between(g["ds"], g["TimeGPT-lo-99"] / 1e6, g["TimeGPT-hi-99"] / 1e6, color=turquoise, alpha=0.2)
+        flagged = g[g["anomaly"].astype(bool)]
+        ax.scatter(flagged["ds"], flagged["y"] / 1e6, color=red_pink, s=30, zorder=3)
+        ax.set_title(f"Store {store}: {len(flagged)} weeks flagged", fontsize=10)
+    plt.show()
+```
+
+- The nine flagged weeks are **Black Friday and the week before Christmas 2011** in all four stores, and
+  Easter 2012 in one. They are the year's predictable peaks — outside the interval because the
+  interval was built from ordinary weeks. "Anomalous" means *surprising to the model*, not to the store.
+- The first year is the context for the first forecast, so it cannot be checked. The client's default
+  model flagged *every* week here; `model="timegpt-1"`, the book's, works — check before you trust.
+
+# Lag-Llama
+
+## Open, probabilistic, decoder-only {.smaller}
+
+**Lag-Llama** (Rasul et al., 2024) borrows Meta's **LLaMA** language model — decoder only — and changes
+what a token is:
+
+- A token for time $t$ holds **lagged values** $y_{t-1}, y_{t-7}, y_{t-12}, \dots$ from a fixed context,
+  plus **calendar features** at every scale: second-of-minute up to quarter-of-year. Which of them
+  change from step to step tells the model the frequency.
+- The output is not a number but the three parameters of a **Student-$t$** distribution — mean, scale,
+  degrees of freedom — so every forecast comes with its spread (Week 9's DeepAR, pretrained).
+- Pretrained on 20 datasets — energy, transport, nature, air quality — at **daily, hourly, 15-minute and
+  1-minute** frequencies only, on horizons of 24 to 60 steps.
+
+That last line is a warning: it has **never seen weekly or monthly data**. Chapter 2's experiment
+predicts what follows. Peixeiro recommends fine-tuning it before use outside its frequencies.
+
+In practice it is a research repository, not a package: you clone it and work inside it. The book's
+current code no longer uses it; neither do we.
+
+# Chronos
+
+## A language model that reads a time series {.smaller}
+
+**Chronos** (Ansari et al., 2024; Amazon) changes nothing in the language model. It changes the series,
+so that an off-the-shelf **T5** can read it:
+
+```{python}
+#| label: chronos-tokens
+#| fig-align: center
+store1 = walmart[walmart["unique_id"] == 1]["y"].to_numpy()
+scaled = store1 / np.mean(np.abs(store1))
+fig, axes = plt.subplots(1, 3, figsize=(13, 2.8))
+axes[0].plot(store1 / 1e6, color=slate)
+axes[0].set_title("Store 1, $ million")
+for ax, bins, colour in zip(axes[1:], [100, 5], [blue, red_pink]):
+    edges = np.linspace(scaled.min(), scaled.max(), bins + 1)
+    token = np.clip(np.digitize(scaled, edges) - 1, 0, bins - 1)
+    ax.step(range(len(token)), token, where="mid", color=colour)
+    ax.set_title(f"Mean-scaled, then {bins} bins: the tokens", fontsize=10)
+plt.show()
+```
+
+1. **Mean scaling:** divide by the mean absolute value — millions of dollars and dozens of cars on one
+   scale.
+2. **Quantisation:** clip to $[-15, 15]$ and cut into **4094 equal bins**. Each value becomes a bin
+   number: a word from a vocabulary. With 5 bins (right) the series says almost nothing.
+3. Train the T5 to predict the next token with **cross-entropy** — regression done as classification.
+   Forecasting is sampling tokens; many samples give the quantiles.
+
+## Where the data came from {.smaller}
+
+Public time series are scarce, so Chronos made more of them:
+
+```{python}
+#| label: augmentation
+#| fig-align: center
+rng = np.random.default_rng(3)
+sales = store1[:100] / np.mean(np.abs(store1[:100]))
+traffic_ = vic[vic["unique_id"] == "Demand"]["y"].to_numpy()[:100 * 48:48]
+traffic_ = traffic_ / np.mean(np.abs(traffic_))
+lam = 0.6
+t = np.arange(100)
+kernel_trend, kernel_season = 0.01 * t, 0.5 * np.sin(2 * np.pi * t / 12)
+fig, axes = plt.subplots(1, 2, figsize=(12, 2.8))
+axes[0].plot(sales, color="lightgray", label="Walmart store 1")
+axes[0].plot(traffic_, color="silver", linestyle="--", label="Victoria electricity")
+axes[0].plot(lam * sales + (1 - lam) * traffic_, color=red_pink, linewidth=1.8, label="TSMixup, λ = 0.6")
+axes[0].legend(fontsize=8)
+axes[0].set_title("TSMixup: a convex mix of real series")
+axes[1].plot(kernel_trend, color="lightgray", label="linear kernel")
+axes[1].plot(kernel_season, color="silver", linestyle="--", label="periodic kernel")
+axes[1].plot(kernel_trend + kernel_season + rng.normal(0, 0.08, 100), color=blue, linewidth=1.8,
+             label="sum, with noise")
+axes[1].legend(fontsize=8)
+axes[1].set_title("KernelSynth: random kernels, combined")
+plt.show()
+```
+
+- **TSMixup:** scale random series from different domains and take a weighted average — new series with
+  the shapes of several.
+- **KernelSynth:** sample basic patterns — trend, periodic, noise — and add or multiply them: a million
+  synthetic series.
+- With these, 28 real datasets — about **890,000 series, 84 billion observations** — became 10 million
+  training series.
+
+## The Chronos family {.smaller}
+
+| Model | Parameters | Pretraining | What changed |
+|---|---:|---|---|
+| Chronos-T5 tiny … large | 8M … 710M | up to 18 h on 8 A100 GPUs ($2,066) | the original: tokens, sampled one at a time |
+| **Chronos-Bolt** small | 48M | | reads **patches**, outputs all quantiles at once: up to 250× faster |
+| **Chronos-2** | 120M | | **group attention**: several series and **covariates** in one forecast |
+
+The book's warning about binning: the model has a bin for the largest value it has seen, and **no token
+for a new record**. On a strong trend with a short context its forecasts tend to flatten.
+
+## Chronos on the four stores {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+from chronos import BaseChronosPipeline
+
+bolt = BaseChronosPipeline.from_pretrained("amazon/chronos-bolt-small", device_map="cpu")
+chronos2 = BaseChronosPipeline.from_pretrained("amazon/chronos-2", device_map="cpu")
+
+for name, pipe in [("Chronos-Bolt", bolt), ("Chronos-2", chronos2)]:
+    start, frames = time.time(), []
+    for cutoff, history, window in windows():
+        _, mean = pipe.predict_quantiles(contexts(history), prediction_length=H, quantile_levels=[0.5])
+        frames.append(window.assign(**{name: np.concatenate([np.asarray(m).ravel() for m in mean])}))
+    record(name, frames, start)
+
+start, frames = time.time(), []                       # Chronos-2 with the holiday flag as a known covariate
+for cutoff, history, window in windows():
+    out = chronos2.predict_df(history[["unique_id", "ds", "y", "holiday"]],
+                              future_df=window[["unique_id", "ds", "holiday"]],
+                              id_column="unique_id", timestamp_column="ds", target="y",
+                              prediction_length=H, quantile_levels=[0.5])
+    frames.append(window.merge(out.rename(columns={"predictions": "Chronos-2 + holiday"}),
+                               on=["unique_id", "ds"]))
+record("Chronos-2 + holiday", frames, start)
+```
+
+```{python}
+#| echo: false
+truth = walmart[["unique_id", "ds", "y"]]
+
+
+def score(names):
+    rows = {}
+    for name in names:
+        merged = truth.merge(cv[name], on=["unique_id", "ds"])
+        rows[name] = {"MAE": np.mean(np.abs(merged["y"] - merged[name])),
+                      "sMAPE, %": smape(merged["y"], merged[name]),
+                      "seconds": seconds.get(name, np.nan)}
+    return pd.DataFrame(rows).T
+
+
+scoreboard(score(["Chronos-Bolt", "Chronos-2", "Chronos-2 + holiday"]), decimals=2)
+```
+
+## Fine-tuning Chronos-2 {.smaller}
+
+Since version 2 the package fine-tunes on a laptop:
+
+```{python}
+#| echo: true
+#| code-fold: false
+import tempfile
+
+first_history = walmart[walmart["ds"] <= cutoffs[0]]            # only the weeks before all four windows
+tuned = chronos2.fit(contexts(first_history), prediction_length=H, num_steps=50, batch_size=32,
+                     learning_rate=1e-5, output_dir=tempfile.mkdtemp(), remove_printer_callback=True,
+                     disable_tqdm=True, report_to="none")
+
+start, frames = time.time(), []
+for cutoff, history, window in windows():
+    _, mean = tuned.predict_quantiles(contexts(history), prediction_length=H, quantile_levels=[0.5])
+    frames.append(window.assign(**{"Chronos-2 fine-tuned": np.concatenate([np.asarray(m).ravel() for m in mean])}))
+record("Chronos-2 fine-tuned", frames, start)
+```
+
+```{python}
+#| echo: false
+scoreboard(score(["Chronos-2", "Chronos-2 fine-tuned"]), decimals=2)
+```
+
+Fifty steps on the weeks before the first window move the score in the second decimal. The learning
+rate is small on purpose: fine-tuning should adjust a pretrained model, not overwrite it. Like every
+other choice, it is a candidate to be scored, not an improvement to be assumed.
+
+## A covariate that matters more {.smaller}
+
+The holiday flag is one week in a few. A bigger test of covariates — Week 8's **Messi page views**, the
+2026 World Cup. Chronos-2 was released in October 2025: it **cannot have seen** this.
+
+```{python}
+#| label: world-cup
+#| fig-align: center
+messi = pd.read_csv("../data/messi_wikipedia.csv", parse_dates=["ds"]).assign(item_id="messi")
+messi["y"] = np.log(messi["y"])
+tournaments = [("2016-06-03", 23), ("2018-06-14", 31), ("2019-06-14", 23), ("2021-06-13", 27),
+               ("2022-11-20", 28), ("2024-06-20", 24), ("2026-06-11", 38)]
+messi["tournament"] = 0
+for begin, days in tournaments:
+    messi.loc[messi["ds"].between(begin, pd.Timestamp(begin) + pd.Timedelta(days=days)), "tournament"] = 1
+history_wc = messi[messi["ds"] < "2026-06-11"]
+future_wc = messi[messi["ds"] >= "2026-06-11"].head(51)
+settings = dict(id_column="item_id", timestamp_column="ds", target="y", prediction_length=51,
+                quantile_levels=[0.1, 0.5, 0.9])
+alone = chronos2.predict_df(history_wc[["item_id", "ds", "y"]], **settings)
+with_flag = chronos2.predict_df(history_wc[["item_id", "ds", "y", "tournament"]],
+                                future_df=future_wc[["item_id", "ds", "tournament"]], **settings)
+fig, ax = plt.subplots(figsize=(12, 3.0))
+recent_m = messi[messi["ds"].between("2026-04-01", future_wc["ds"].max())]
+ax.plot(recent_m["ds"], recent_m["y"], color=slate, linewidth=1.2, label="actual")
+ax.plot(future_wc["ds"], alone["predictions"], color=blue, linewidth=1.8, label="Chronos-2, history only")
+ax.plot(future_wc["ds"], with_flag["predictions"], color=red_pink, linewidth=1.8, label="Chronos-2 + tournament flag")
+ax.axvspan(pd.Timestamp("2026-06-11"), pd.Timestamp("2026-07-19"), color=orange, alpha=0.08)
+ax.set_ylabel("log views")
+ax.legend(loc="upper left", fontsize=8)
+plt.show()
+wc_y = future_wc["y"].to_numpy()
+print(f"MAE on log views: history only {np.mean(np.abs(wc_y - alone['predictions'])):.2f}, "
+      f"with the flag {np.mean(np.abs(wc_y - with_flag['predictions'])):.2f}")
+```
+
+The flag lifts the forecast for the tournament and brings it down after the final — learned from the
+six earlier tournaments in the context, with nothing fitted. It still falls far short of the peaks.
+
+# Moirai
+
+## Built for any number of variables {.smaller}
+
+**Moirai** (Woo et al., 2024; Salesforce) — an **encoder-only** transformer with three ideas:
+
+```{python}
+#| label: moirai-ideas
+#| fig-align: center
+fig, axes = plt.subplots(1, 2, figsize=(12, 3.2))
+x = np.linspace(-4, 8, 400)
+comp = {"Student-t": 0.5 * stats.t.pdf(x, df=3, loc=0, scale=1), "log-normal": 0.5 * stats.lognorm.pdf(x, s=0.5, scale=2.5)}
+for (name, dens), colour in zip(comp.items(), ["silver", "lightgray"]):
+    axes[0].plot(x, dens, color=colour, linestyle="--", label=f"{name}, weight 0.5")
+axes[0].plot(x, sum(comp.values()), color=red_pink, linewidth=2, label="the mixture")
+axes[0].legend(fontsize=8)
+axes[0].set_title("A mixture of distributions: asymmetric if it needs to be")
+series = {"target": walmart[walmart["unique_id"] == 1]["y"].to_numpy()[:16] / 1e6,
+          "holiday": walmart[walmart["unique_id"] == 1]["holiday"].to_numpy()[:16] * 0.3 + 1.2}
+pos = 0
+for (name, v), colour in zip(series.items(), [blue, orange]):
+    for patch in range(4):
+        axes[1].plot(range(pos + 4 * patch, pos + 4 * patch + 4), v[4 * patch:4 * patch + 4], color=colour, linewidth=2)
+        axes[1].axvspan(pos + 4 * patch, pos + 4 * patch + 3.8, color=colour, alpha=0.06)
+    axes[1].text(pos + 8, 2.0, name, color=colour, ha="center")
+    pos += 17
+axes[1].set_yticks([])
+axes[1].set_title("Any-variate: every variable patched and laid end to end")
+plt.show()
+```
+
+- **Patches** whose length depends on the frequency: 8 for yearly data, 16–32 for weekly, 32–128 for
+  per-minute. One embedding layer per patch size.
+- **Any-variate attention:** the target and every covariate are flattened into **one long sequence**; a
+  learned bias tells attention whether two patches come from the same variable or from different ones.
+  Add a covariate and the sequence just gets longer.
+- A **mixture** of Student-$t$, log-normal, negative binomial and a low-variance normal as output.
+
+## LOTSA, and what came after {.smaller}
+
+Moirai's team published its corpus: **LOTSA**, 27 billion observations from nine domains — the largest
+open collection at the time.
+
+| Frequency | Datasets | Observations |
+|---|---:|---:|
+| yearly, quarterly | 9 | 3.2 million |
+| monthly, weekly | 17 | 29.5 million |
+| daily | 21 | 709 million |
+| hourly | 31 | 19.9 billion |
+| minute, second | 27 | 7.0 billion |
+
+72% of it is hourly; yearly series are 0.003%. Training therefore **caps** each dataset's share, so the
+model does not become an hourly specialist.
+
+**Moirai-MoE** (2024) switches to a decoder with a **mixture of experts** — several feed-forward networks,
+a gate picking two per token. **Moirai 2.0** (2025) is the current version.
+
+## Moirai on the four stores {.smaller}
+
+`uni2ts`, Moirai's package, needs older `numpy` and `pandas` than this course, so it runs in its own
+environment (`infra/moirai_walmart.py`); the deck reads its forecasts.
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| eval: false
+from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
+
+model = MoiraiForecast(module=MoiraiModule.from_pretrained("Salesforce/moirai-1.1-R-small"),
+                       prediction_length=8, context_length=128, patch_size="auto", num_samples=200,
+                       target_dim=1, feat_dynamic_real_dim=1, past_feat_dynamic_real_dim=0)
+forecasts = model.create_predictor(batch_size=32).predict(dataset)   # a GluonTS dataset
+```
+
+```{python}
+#| echo: false
+moirai = pd.read_csv("../data/fm_moirai_walmart.csv", parse_dates=["ds", "cutoff"])
+for name in ["Moirai", "Moirai + holiday", "Moirai-2.0"]:
+    cv[name] = moirai[["unique_id", "ds", name]]
+seconds.update(pd.read_csv("../data/fm_moirai_timing.csv", index_col=0)["seconds"].to_dict())
+scoreboard(score(["Moirai", "Moirai + holiday", "Moirai-2.0"]), decimals=2)
+```
+
+Moirai-1.1 small is the weakest foundation model on this case; the holiday flag helps it more than any
+other model here, and the newer Moirai 2.0 beats both. The book's capstone found the same — Moirai
+small among the weakest — and pointed to the size: it is the smallest model of its family.
+
+# TimesFM
+
+## A point forecaster with long output patches {.smaller}
+
+**TimesFM** (Das et al., 2024; Google) is **decoder-only** and, unlike the others, trained for a **point
+forecast** — mean squared error, not a distribution.
+
+```{python}
+#| label: timesfm-patches
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(12, 2.3))
+for k in range(4):
+    box(ax, k * 1.05, 0.3, 1.0, 0.4, f"input patch\n32 values", blue, 11)
+box(ax, 4.5, 0.3, 1.4, 0.4, "decoder", red_pink, 12)
+box(ax, 6.4, 0.3, 4.2, 0.4, "output patch: 128 values at once", orange, 12)
+arrow(ax, 4.2, 0.5, 4.5, 0.5)
+arrow(ax, 5.9, 0.5, 6.4, 0.5)
+ax.text(5.3, 0.05, "256 steps ahead = 2 passes, not 8", ha="center", fontsize=12, color=slate)
+ax.set_xlim(-0.1, 10.8)
+ax.set_ylim(0, 0.8)
+ax.axis("off")
+plt.show()
+```
+
+- Input **patches of 32**, output **patches of 128**: long horizons need few autoregressive passes, so
+  errors compound less. Random masking during training makes any context length work.
+- Pretrained on about **380 billion** observations — and roughly **98% of them are Wikipedia page
+  views**, plus Google Trends, M4 and synthetic series.
+
+That corpus has a consequence for Week 8's Messi example: Wikipedia page views up to the model's
+training date may well be **in** it. A zero-shot score on page views says less about TimesFM than about
+any other model here.
+
+## TimesFM on the four stores {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+import timesfm
+
+tfm = timesfm.TimesFM_2p5_200M_torch.from_pretrained("google/timesfm-2.5-200m-pytorch")
+tfm.compile(timesfm.ForecastConfig(max_context=512, max_horizon=128, normalize_inputs=True,
+                                   use_continuous_quantile_head=True, return_backcast=True))
+
+for name in ["TimesFM", "TimesFM + holiday"]:
+    start, frames = time.time(), []
+    for cutoff, history, window in windows():
+        inputs = [c.numpy() for c in contexts(history)]
+        if name == "TimesFM":
+            point, _ = tfm.forecast(horizon=H, inputs=inputs)
+            point = [p[-H:] for p in np.asarray(point)]
+        else:          # flag over context + horizon; a linear "xreg" step: pip install "timesfm[xreg]"
+            flags = [np.concatenate([h["holiday"], w["holiday"]]).tolist() for (_, h), (_, w)
+                     in zip(history.groupby("unique_id"), window.groupby("unique_id"))]
+            point, _ = tfm.forecast_with_covariates(inputs=[i.tolist() for i in inputs],
+                                                    dynamic_numerical_covariates={"holiday": flags})
+            point = [np.asarray(p)[-H:] for p in point]
+        frames.append(window.assign(**{name: np.concatenate(point)}))
+    record(name, frames, start)
+```
+
+```{python}
+#| echo: false
+scoreboard(score(["TimesFM", "TimesFM + holiday"]), decimals=2)
+```
+
+
+# Language models as forecasters
+
+## Forecasting as a question {.smaller}
+
+Peixeiro's chapter 8 asks plain LLMs — Flan-T5, Llama-3.2 — for a forecast, in words. The recipe:
+**scale** the series, show one **worked example** (few-shot), ask, then **parse** numbers out of the text.
+
+```{python}
+#| echo: true
+#| code-fold: false
+import re
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base")
+flan = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-base")
+
+history1 = walmart[(walmart["unique_id"] == 1) & (walmart["ds"] <= cutoffs[-1])]["y"].to_numpy()
+low, high = history1.min(), history1.max()
+scale = lambda v: (v - low) / (high - low)
+text = lambda v: ", ".join(f"{x:.3f}" for x in v)
+prompt = (f"Input: The last 16 scaled values of weekly sales were {text(scale(history1[-32:-16]))}. "
+          f"What will be the next 8 values?\nOutput: {text(scale(history1[-16:-8]))}\n"
+          f"Input: The last 16 scaled values of weekly sales were {text(scale(history1[-16:]))}. "
+          f"What will be the next 8 values?\nOutput:")
+answer = tokenizer.decode(flan.generate(tokenizer(prompt, return_tensors="pt").input_ids,
+                                        max_new_tokens=80, do_sample=False)[0], skip_special_tokens=True)
+```
+
+```{python}
+#| echo: false
+numbers = [float(x) for x in re.findall(r"-?\d+\.\d+|-?\d+", answer)][:H]
+llm_forecast = np.array((numbers + [numbers[-1]] * H)[:H]) * (high - low) + low
+actual1 = walmart[(walmart["unique_id"] == 1)]["y"].to_numpy()[-H:]
+print(f"The model answered: '{answer}'  ({len(numbers)} numbers for 8 weeks)")
+print(f"sMAPE: Flan-T5 {smape(actual1, llm_forecast):.2f}%,  "
+      f"seasonal naive {smape(actual1, history1[-52:-52 + H]):.2f}%  — store 1, last window")
+```
+
+## Time-LLM, and what language models add {.smaller}
+
+**Time-LLM** (Jin et al., 2024; chapter 9) keeps a frozen LLM and learns a translation into it:
+
+- **Patch reprogramming:** each patch of the series is mapped onto a small set of learned **text
+  prototypes** — combinations of the LLM's word embeddings that come to mean "short up, then steady
+  down".
+- **Prompt-as-prefix:** a text description of the data and the task is put in front of the patches.
+- It has **no zero-shot mode**: the translation layer must be trained on your data every time. It is in
+  `neuralforecast` as `TimeLLM`.
+
+Peixeiro's verdict across chapters 8–10: asking an LLM in words works, roughly, and loses to the models
+built for time series; Time-LLM does better than plain prompting, at the cost of training. Our one
+window above says the same: a language model answers a question about numbers with **words** — here,
+fewer than were asked for.
+
+# The capstone
+
+## Every model, one protocol {.smaller}
+
+The book's chapter 10 ends with a model comparison on data no model could have seen. Ours: the four
+stores, four windows of 8 weeks, with **the benchmarks of this course** alongside — they are what the
+book's comparison does not include.
+
+```{python}
+#| echo: true
+#| code-fold: false
+for model in [SeasonalNaive(season_length=52, alias="seasonal naive"),
+              AutoETS(season_length=1, alias="ETS"),          # weekly: m = 52 is beyond ETS
+              AutoARIMA(season_length=52, alias="ARIMA")]:
+    start, frames = time.time(), []
+    for cutoff, history, window in windows():
+        local = StatsForecast(models=[model], freq="W-FRI")
+        frames.append(window.merge(local.forecast(df=history[["unique_id", "ds", "y"]], h=H),
+                                   on=["unique_id", "ds"]))
+    record(model.alias, frames, start)
+
+import tirex
+tirex_model = tirex.load_model("NX-AI/TiRex", device="cpu")      # xLSTM-based, 35M parameters, 2025
+start, frames = time.time(), []
+for cutoff, history, window in windows():
+    _, mean = tirex_model.forecast(context=contexts(history), prediction_length=H)
+    frames.append(window.assign(TiRex=np.asarray(mean).ravel()))
+record("TiRex", frames, start)
+```
+
+## The scoreboard {.smaller}
+
+```{python}
+#| echo: false
+order = ["seasonal naive", "ETS", "ARIMA", "TimeGPT", "TimeGPT fine-tuned", "TimeGPT fine-tuned, depth 2",
+         "TimeGPT + holiday", "Chronos-Bolt", "Chronos-2", "Chronos-2 + holiday", "Chronos-2 fine-tuned",
+         "Moirai", "Moirai + holiday", "Moirai-2.0", "TimesFM", "TimesFM + holiday", "TiRex"]
+board = score([name for name in order if name in cv])
+board["seconds"] = [seconds.get(name, np.nan) for name in board.index]
+scoreboard(board.sort_values("sMAPE, %"), decimals=2, size="0.68em", padding="1px")
+```
+
+## Accuracy against time {.smaller}
+
+```{python}
+#| label: accuracy-time
+#| fig-align: center
+local_names = {"seasonal naive", "ETS", "ARIMA"}
+fig, ax = plt.subplots(figsize=(12, 4.2))
+for name, row in board.iterrows():
+    colour = slate if name in local_names else (orange if name.startswith("TimeGPT") else red_pink)
+    ax.scatter(max(row["seconds"], 0.05), row["sMAPE, %"], s=60, color=colour, zorder=3)
+    ax.annotate(name, (max(row["seconds"], 0.05), row["sMAPE, %"]), xytext=(5, 3), textcoords="offset points",
+                fontsize=8)
+ax.set_xscale("log")
+ax.set_xlabel("seconds for all four windows (log scale; TimeGPT includes the network round trip)")
+ax.set_ylabel("sMAPE, %")
+ax.set_title("Grey: this course's models · pink: open foundation models · orange: TimeGPT, through the API")
+plt.show()
+```
+
+## What the scoreboard says {.smaller}
+
+- **The top five are all foundation models**, Chronos-2 with the holiday flag first. TimeGPT, Chronos-2 and
+  TimesFM are within a few tenths of a point of each other.
+- **ARIMA is the best of this course's models** — ahead of TiRex, Chronos-Bolt and every Moirai. ETS, with
+  no weekly season to model, and seasonal naive are last.
+- **Most open models forecast four stores × four windows in a few seconds or less on a CPU** — less than
+  ARIMA's search over orders. Timings move from run to run; TimeGPT's are mostly the network round trip.
+- **Four series, 128 forecasts.** A difference of a tenth of a point is within noise here. What the board
+  shows is the band each model falls in, not a ranking to trust to the decimal.
+
+# Did it see the answer?
+
+## Leakage, tested {.smaller}
+
+A zero-shot score is only zero-shot if the test data were not in the pretraining corpus. **M4 Monthly**
+is in the corpora of Chronos and Chronos-2, with each series' last 18 months held out; **M3** is in
+neither. If a model **remembers**, it should do unusually well on the M4 months it saw.
+
+```{python}
+#| echo: false
+leak = pd.read_csv("../data/foundation_leakage.csv")       # built by infra/foundation_leakage.py
+
+
+def memory_effect(df, model):
+    r = np.log(df[model] / df["ETS"]).groupby([df["dataset"], df["window"]]).mean()
+    return np.exp((r["M4", "pretraining window"] - r["M4", "held-out test"])
+                  - (r["M3", "pretraining window"] - r["M3", "held-out test"]))
+
+
+def resample(df, rng):
+    parts = []
+    for _, d in df.groupby("dataset"):
+        ids = d["unique_id"].unique()
+        parts.append(d.set_index("unique_id").loc[rng.choice(ids, len(ids))].reset_index())
+    return pd.concat(parts)
+
+
+rng = np.random.default_rng(1)
+rows = {}
+for model in ["Chronos-Bolt", "Chronos-2", "snaive"]:
+    boot = [memory_effect(resample(leak, rng), model) for _ in range(300)]
+    rows[model] = {"memory effect": memory_effect(leak, model),
+                   "2.5%": np.percentile(boot, 2.5), "97.5%": np.percentile(boot, 97.5)}
+scoreboard(pd.DataFrame(rows).T, rules={"memory effect": 1.0})
+```
+
+- 1000 series from each set, two windows each, MASE relative to ETS. Below 1 would mean "better on what
+  it saw". **Both Chronos models sit at 1**: no memory of the windows they were trained on.
+- The seasonal-naive row is a **placebo**: it moves (1.14) because the windows differ — so the test can
+  see a difference when there is one.
+- What this does not show: that the corpus never matters. If your **holdout itself** were in it, nothing
+  but the release date would protect you.
+
+## A zero-shot comparison you can trust {.smaller}
+
+The final project asks for one — 2 points, for the setup, not for who wins:
+
+1. **Same cutoff, same horizon, same metric** as your own model. The foundation model gets the training
+   history as context and nothing after it.
+2. **No choosing on the test set.** Picking the best of five foundation models by their test score is
+   selection on the test — Week 3's oldest mistake. Choose on validation windows.
+3. **Check the corpus.** Chronos: the paper's Table 3; Chronos-2: Table 6; TimesFM: Wikipedia, Google
+   Trends, M4; TimeGPT: undisclosed. If your data, or a public version of it, is listed, say so.
+4. **Check the dates.** A model released before your holdout began cannot have seen it.
+5. **Report the interval too**, and score its coverage (Week 8).
+6. **For TimeGPT:** your own key, in a Colab secret — never in the notebook you submit.
+
+# Wrapping up
+
+## Eight ways to get this wrong {.tiny}
+
+| Trap | What you see | Fix |
+|---|---|---|
+| A test window inside the pretraining corpus | Results that look too good | Corpus lists, release dates, data newer than the model |
+| Choosing the foundation model on the test | An optimistic winner | Validation windows, then one test |
+| A model used outside its frequencies | Lag-Llama on monthly data | Check what it was trained on; fine-tune or choose another |
+| Covariates whose future is not known | A forecast that cannot be made in practice | Only truly known covariates, or forecast them first |
+| Fine-tuning taken as an improvement | Sometimes it is worse | Score it like any candidate |
+| An API key in a notebook | A leaked key, a spent quota | Environment variable or Colab secret |
+| Company data sent to an API | A privacy problem | Ask first; an open model runs locally |
+| "Foundation" read as "better" | Losing to ARIMA on your series | One more candidate on the rolling origin |
+
+## What this lecture is, in one slide {.smaller}
+
+- A **foundation model** is a model trained once on large, diverse data and used on many tasks — here,
+  any series, zero-shot. Almost always a **transformer**: tokens, positional encoding, attention.
+- **Pretraining → transfer → fine-tuning**, done in miniature with N-BEATS on M3, works — and is limited
+  by one horizon, one frequency, one corpus. The real models fix those with generation, patches and
+  billions of observations.
+- **TimeGPT** (API, conformal intervals, covariates), **Lag-Llama** (open, Student-$t$, sub-daily only),
+  **Chronos** (a language model on binned values), **Moirai** (any-variate, mixture output), **TimesFM**
+  (point forecasts, long output patches) differ in architecture, output, covariates and access.
+- On our four stores they forecast well with no fitting; how they compare with ARIMA, and with each
+  other, is a question for **your** data and **your** holdout — never settled by a benchmark table.
+
+## What to do with it {.smaller}
+
+**Final project:** the foundation-model comparison (2 points), by the checklist two slides back.
+
+**Try it first on your own Track B series:** Chronos-2, TimesFM and TiRex zero-shot — a few lines each —
+scored on the validation window you used in Lab 7, next to your own model.
+
+::: {.callout-tip}
+## TimeGPT
+
+The free trial lasts **30 days**, so create the key when you start the project — the setup handout on
+Moodle, ten minutes — and check it with one `client.forecast`. Everything else today runs without one.
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe="colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=4432)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
