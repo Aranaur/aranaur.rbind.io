@@ -1,0 +1,822 @@
+---
+title: "Часові ряди в епоху AI"
+subtitle: "Foundation models для прогнозування | School of Digital Business 5.0"
+author: "Ігор Мірошниченко"
+institute: Київська школа економіки
+lang: uk
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: colored-particles/index.html
+footer: "Genesis × KSE | School of Digital Business"
+format:
+  revealjs:
+    fragments: false
+    code-line-numbers: false
+    code-fold: true
+    code-summary: "Код"
+    toc-title: "Зміст"
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+editor_options:
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+green      = "#8bb174"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+import warnings
+warnings.filterwarnings("ignore")
+import os
+os.environ["NIXTLA_ID_AS_COL"] = "true"
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+import logging
+for name in ("transformers", "lightning", "pytorch_lightning"):
+    logging.getLogger(name).setLevel(logging.ERROR)
+import transformers
+transformers.utils.logging.disable_progress_bar()
+import numpy as np
+np.random.seed(1)
+import pandas as pd
+pd.set_option("display.precision", 3)
+import seaborn as sns
+sns.set_style("whitegrid")
+import matplotlib.pyplot as plt
+plt.style.use("ggplot")
+plt.rcParams.update({"figure.figsize": (8, 5), "figure.dpi": 100, "savefig.dpi": 300,
+                     "figure.constrained_layout.use": True, "axes.titlesize": 12, "axes.labelsize": 10,
+                     "xtick.labelsize": 9, "ytick.labelsize": 9, "legend.fontsize": 9})
+import matplotlib as mpl
+from cycler import cycler
+mpl.rcParams['axes.prop_cycle'] = cycler(color=[slate, blue, turquoise, orange, red, green, purple, red_pink])
+import matplotlib.dates as mdates
+from matplotlib.patches import FancyBboxPatch
+
+import torch
+torch.manual_seed(1)
+from statsmodels.tsa.seasonal import STL
+from statsforecast import StatsForecast
+from statsforecast.models import AutoETS, Naive, SeasonalNaive
+from great_tables import GT, loc, style as gt_style
+from matplotlib.colors import LinearSegmentedColormap, to_hex
+
+shade = LinearSegmentedColormap.from_list("shade", ["#bfe0b0", "#ffffff", "#f5b8cb"])
+
+
+def scoreboard(table, rules=None, decimals=2, size="0.8em"):
+    """A results table: green is better, pink is worse, the best in bold."""
+    df = table.to_frame() if isinstance(table, pd.Series) else table.copy()
+    df.index = [str(i) for i in df.index]
+    df.columns = [str(c) for c in df.columns]
+    rules = rules or {c: "lower" for c in df.columns}
+    gt = (GT(df.reset_index(names="row"), rowname_col="row")
+          .fmt_number(columns=list(df.select_dtypes("number").columns), decimals=decimals)
+          .sub_missing(missing_text="")
+          .tab_options(table_font_size=size, data_row_padding="3px"))
+    for c, rule in rules.items():
+        values = df[c].astype(float)
+        bad = values if rule == "lower" else -values if rule == "higher" else (values - rule).abs()
+        lo, hi = np.nanmin(bad), np.nanmax(bad)
+        for i, b in enumerate(bad):
+            if np.isnan(b):
+                continue
+            fill = to_hex(shade((b - lo) / (hi - lo) if hi > lo else 0.0))
+            look = [gt_style.fill(color=fill)] + ([gt_style.text(weight="bold")] if b == np.nanmin(bad) else [])
+            gt = gt.tab_style(style=look, locations=loc.body(columns=c, rows=[i]))
+    return gt
+
+
+def box(ax, x, y, w, h, text, colour, size=12):
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02", facecolor="white",
+                                edgecolor=colour, linewidth=2))
+    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=size)
+
+
+views = pd.read_csv("../data/pageviews.csv", parse_dates=["ds"])
+series = {name: g.set_index("ds")["y"] for name, g in views.groupby("unique_id")}
+thousands = mpl.ticker.FuncFormatter(lambda v, _: f"{v / 1000:,.0f} тис.")
+```
+
+# Навіщо взагалі прогнозувати
+
+## Кожен план — це прогноз {.smaller}
+
+:::: {.columns}
+::: {.column width="55%"}
+Хай навіть ніхто так це не називає, digital-бізнес прогнозує щотижня:
+
+| Рішення | Прогноз, що стоїть за ним |
+|---|---|
+| Рекламний бюджет на наступний місяць | інстали, CPI, конверсія |
+| Сервери, зміни підтримки | трафік, тікети по годинах |
+| План виручки для борду | підписки, продовження, відтік |
+| Коли кампанія окупиться | крива виручки когорти |
+| Алерт на дашборді | «що сьогодні нормально?» |
+:::
+
+::: {.column width="45%"}
+Корисний прогноз має чотири складники:
+
+1. **Число** — найімовірніше значення.
+2. **Діапазон** — наскільки воно може розійтися з реальністю.
+3. **Горизонт** — на скільки вперед йому можна вірити.
+4. **Рішення**, яке він живить. Прогноз, за яким ніхто не діє, — це просто графік.
+
+[Сьогодні: як отримати всі чотири — і чи дають їх нові AI-моделі краще за старі інструменти.]{.hi}
+:::
+::::
+
+## Що нового у 2026 році {.smaller}
+
+Ви вже користуєтеся **foundation models** для тексту: одна модель, навчена на більшій частині інтернету,
+відповідає на питання про документи, яких ніколи не бачила.
+
+З 2023–24 років та сама ідея існує для **часових рядів**: моделі, навчені на **сотнях мільярдів** точок
+даних — вебтрафік, енергетика, ритейл, погода, — які прогнозують **вашу** метрику **без жодного
+навчання**. Їх випускають Amazon, Google, Salesforce і Nixtla; більшість — безкоштовні.
+
+Три питання на сьогодні:
+
+- **Чи працюють вони** на таких числах, як у вас, — увага до продукту, продажі, трафік?
+- **Де вони помиляються** і як помітити це раніше, ніж борд?
+- **Хіба не можна просто вставити числа в ChatGPT чи Claude?** Ми це виміряємо.
+
+::: {.callout-note}
+## Наші дані сьогодні
+
+Щоденні **перегляди сторінок Вікіпедії** реальних продуктів і подій — ChatGPT, Duolingo, Spotify, Netflix,
+Tinder, Strava, TikTok, Notion, Threads, Black Friday. Публічний і чесний індикатор **уваги** до продукту з
+тими самими звичками, що й ваші дашборди: тижневий ритм, сезони, кампанії, запуски, спад.
+:::
+
+# База: як читати часовий ряд
+
+## Чотири складники будь-якого ряду {.smaller}
+
+```{python}
+#| label: anatomy
+#| fig-align: center
+fig, axes = plt.subplots(2, 2, figsize=(13, 5.4))
+cases = [("Tinder", "2019-01-01", "Тренд: повільний спад роками", slate),
+         ("ChatGPT", "2026-07-01", "Тижнева сезонність: будні проти вихідних", blue),
+         ("Black Friday", "2019-01-01", "Річна подія: щороку той самий тиждень", turquoise),
+         ("Duolingo", "2024-09-01", "Шок: разова кампанія", red_pink)]
+for ax, (name, start, title, colour) in zip(axes.ravel(), cases):
+    s = series[name][start:]
+    ax.plot(s.index, s.values, color=colour, linewidth=0.9)
+    ax.set_title(f"{name} — {title}", fontsize=11)
+    ax.yaxis.set_major_formatter(thousands)
+plt.show()
+```
+
+**Тренд**, **сезонність**, **події**, **шум** — кожен метод, класичний чи AI, розділяє ці чотири складники
+і продовжує перші три.
+
+## Розкладаємо ряд на частини {.smaller}
+
+```{python}
+#| label: stl
+#| fig-align: center
+chatgpt = series["ChatGPT"]["2025-01-01":]
+parts = STL(np.log(chatgpt), period=7, robust=True).fit()
+fig, axes = plt.subplots(1, 3, figsize=(13, 3.2))
+axes[0].plot(chatgpt.index, np.exp(parts.trend), color=blue)
+axes[0].set_title("Тренд (без тижневого ритму)")
+axes[0].yaxis.set_major_formatter(thousands)
+week = pd.Series(np.exp(parts.seasonal.values), index=chatgpt.index).groupby(chatgpt.index.dayofweek).mean()
+axes[1].bar(["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"], week.values - 1, color=turquoise)
+axes[1].set_title("Тижнева сезонність: % від середнього дня")
+axes[1].yaxis.set_major_formatter(mpl.ticker.PercentFormatter(1.0))
+axes[2].plot(chatgpt.index, np.exp(parts.resid) - 1, color="grey", linewidth=0.6)
+axes[2].set_title("Що лишилося: шум і події")
+axes[2].yaxis.set_major_formatter(mpl.ticker.PercentFormatter(1.0))
+plt.show()
+```
+
+- **Тижнева сезонність:** вівторок і середа приблизно на **16%** вищі за середній день, субота — приблизно
+  на **22%** нижча. Це ритм роботи й навчання. Прогноз, який його пропускає, помиляється щовихідних.
+- **Тренд:** після прибирання тижневого ритму лишається те, що змінюється повільно, — саме це й
+  продовжує прогноз.
+- **Що лишилося** — здебільшого дрібний шум і кілька величезних днів: події, яких історія не пояснює.
+
+## Перші прогнози, з яких варто почати {.smaller}
+
+Ще до будь-якої моделі — три правила, які кожен порахує в таблиці:
+
+```{python}
+#| label: baselines
+#| fig-align: center
+s = series["ChatGPT"]["2026-08-01":"2026-10-24"]
+cut = pd.Timestamp("2026-09-26")
+hist, future = s[:cut], s[cut + pd.Timedelta(days=1):]
+h = len(future)
+rules = {"наївний: як учора": np.repeat(hist.iloc[-1], h),
+         "сезонний наївний: як тиждень тому": hist.iloc[-7:].to_numpy()[np.arange(h) % 7],
+         "середнє за 4 тижні": np.repeat(hist.iloc[-28:].mean(), h)}
+fig, ax = plt.subplots(figsize=(12, 3.4))
+ax.plot(s.index, s.values, color=slate, linewidth=1, label="факт")
+for (name, f), colour in zip(rules.items(), [orange, red_pink, blue]):
+    ax.plot(future.index, f, color=colour, linewidth=1.8, label=name)
+ax.axvline(cut, color="grey", linewidth=0.8)
+ax.yaxis.set_major_formatter(thousands)
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%d.%m"))
+ax.legend(loc="lower left", fontsize=8, ncol=3)
+ax.set_title("Перегляди ChatGPT: чотири тижні вперед від 26 вересня 2026")
+plt.show()
+print({name: f"MAE {np.mean(np.abs(future.values - f)) / 1000:.1f} тис." for name, f in rules.items()})
+```
+
+Це **бенчмарки**. Модель — будь-яка, хоч яка розумна — заслуговує на місце, лише якщо обіграє їх на даних,
+яких не бачила. Напрочуд часто вона цього не робить.
+
+## Як чесно оцінити прогноз: бектест {.smaller}
+
+```{python}
+#| label: backtest
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(12, 2.0))
+for k in range(4):
+    y = 3 - k
+    ax.add_patch(plt.Rectangle((0, y), 6 + k, 0.6, color=blue, alpha=0.6))
+    ax.add_patch(plt.Rectangle((6 + k, y), 1, 0.6, color=red_pink, alpha=0.8))
+    ax.text(-0.2, y + 0.3, f"вікно {k + 1}", ha="right", va="center", fontsize=13)
+ax.text(3, 4.0, "історія для моделі", color=blue, ha="center", fontsize=13)
+ax.text(10, 4.0, "період прогнозу", color=red_pink, ha="center", fontsize=13)
+ax.set_xlim(-2, 12)
+ax.set_ylim(-0.2, 4.4)
+ax.axis("off")
+plt.show()
+```
+
+- Обріжте історію на якійсь даті в минулому, спрогнозуйте наступні тижні, **порівняйте з тим, що сталося
+  насправді**. Посуньте дату вперед і повторіть: одне вікно — це везіння, шість вікон — це доказ.
+- **Ніколи** не оцінюйте модель на даних, на яких її навчали, і не перемішуйте дні випадково — майбутнє
+  має лишатися в майбутньому.
+- Оцінюйте похибкою, яку можна пояснити: **MAE** (середній промах у переглядах), **MAPE** (середній
+  промах у %).
+
+::: {.callout-note}
+## Для аналітиків
+
+MAPE вибухає біля нуля й заохочує заниження прогнозу; моделі краще порівнювати **масштабованою**
+похибкою. Ми використовуємо **MASE**: MAE моделі, поділене на MAE правила «як тиждень тому» в минулому.
+Менше за 1 — краще за це правило.
+:::
+
+## Діапазон, а не число {.smaller}
+
+```{python}
+#| label: quantiles
+#| fig-align: center
+from chronos import BaseChronosPipeline
+
+chronos2 = BaseChronosPipeline.from_pretrained("amazon/chronos-2", device_map="cpu")
+q, _ = chronos2.predict_quantiles([torch.tensor(series["ChatGPT"][:cut].values, dtype=torch.float32)],
+                                  prediction_length=h, quantile_levels=[0.1, 0.5, 0.9])
+q = np.asarray(q[0]).reshape(h, 3)
+fig, ax = plt.subplots(figsize=(12, 3.3))
+ax.plot(s.index, s.values, color=slate, linewidth=1, label="факт")
+ax.fill_between(future.index, q[:, 0], q[:, 2], color=red_pink, alpha=0.2, label="P10–P90")
+ax.plot(future.index, q[:, 1], color=red_pink, linewidth=2, label="P50 (медіана)")
+ax.axvline(cut, color="grey", linewidth=0.8)
+ax.yaxis.set_major_formatter(thousands)
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%d.%m"))
+ax.legend(loc="lower left", fontsize=8)
+plt.show()
+inside = np.mean((future.values >= q[:, 0]) & (future.values <= q[:, 2]))
+print(f"Днів усередині смуги P10–P90: {inside:.0%} (у каліброваній смузі — близько 80%)")
+```
+
+- **P50**: половина днів буде вище, половина — нижче. **P10 / P90**: поганий і хороший сценарій.
+- Плануйте бюджет на P50, тримайте резерв на P90, перевірте, що P10 нічого не ламає.
+- Смуга чогось варта, лише якщо вона **відкалібрована**: порахуйте, як часто реальність потрапляє всередину.
+
+## Класичний інструментарій на одному слайді {.smaller}
+
+| Метод | Ідея | Добре справляється з | Слабкий у |
+|---|---|---|---|
+| **Сезонний наївний** | повторити минулий тиждень / рік | сильна сезонність | усьому іншому |
+| **Експоненційне згладжування (ETS)** | недавнє минуле важить більше | рівень, тренд, один сезон | події, кілька сезонів |
+| **ARIMA** | регресія на власне минуле | короткострокова динаміка | довгі горизонти, зміна режиму |
+| **Prophet** | тренд + сезони + свята | зрозумілий, швидкий | не пам'ятає вчорашнього дня |
+| **Градієнтний бустинг** (LightGBM) | ознаки → число, на багатьох рядах | багато схожих рядів | потребує роботи з ознаками |
+
+: {tbl-colwidths="[22,28,25,25]"}
+
+Усі вони **підганяються під ваш ряд**: хтось обирає модель, її налаштування, ознаки й перенавчає її з
+надходженням даних. Саме цю роботу foundation model обіцяє прибрати.
+
+# Foundation models для часових рядів
+
+## Та сама ідея, що й у вашого чат-асистента {.smaller}
+
+```{python}
+#| label: fm-idea
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(12, 2.7))
+box(ax, 0.0, 0.35, 2.6, 0.5, "мільярди точок\nз тисяч доменів", slate)
+box(ax, 3.3, 0.35, 2.0, 0.5, "претренування\n(раз, на GPU)", blue)
+box(ax, 6.0, 0.35, 2.0, 0.5, "одна модель", red_pink)
+box(ax, 8.7, 0.6, 3.0, 0.35, "історія вашої метрики  →", orange)
+box(ax, 8.7, 0.1, 3.0, 0.35, "→  прогноз + діапазон", turquoise)
+for x0, x1 in [(2.6, 3.3), (5.3, 6.0)]:
+    ax.annotate("", xy=(x1, 0.6), xytext=(x0, 0.6), arrowprops=dict(arrowstyle="->", lw=1.5, color="grey"))
+ax.annotate("", xy=(8.7, 0.6), xytext=(8.0, 0.6), arrowprops=dict(arrowstyle="<-", lw=1.5, color="grey"))
+ax.annotate("", xy=(8.7, 0.3), xytext=(8.0, 0.5), arrowprops=dict(arrowstyle="->", lw=1.5, color="grey"))
+ax.set_xlim(-0.1, 11.8)
+ax.set_ylim(0, 1.05)
+ax.axis("off")
+plt.show()
+```
+
+- **Претренування:** трансформер — архітектура, на якій працює ChatGPT, — вчиться на величезному й
+  різноманітному масиві рядів, що зазвичай іде далі.
+- **Zero-shot:** ви даєте історію — отримуєте прогноз. Без підгонки, без вибору моделі.
+- **Токени:** мовна модель читає слова, а ці моделі — значення або короткі **патчі** значень. Chronos,
+  наприклад, масштабує ряд і перетворює кожне значення на одне з 4096 «слів».
+
+## Хто їх робить {.smaller}
+
+| Модель | Компанія | Реліз | Доступ | Коваріати | Примітка |
+|---|---|---|---|---|---|
+| **Chronos-2** | Amazon | жовт. 2025 | безкоштовно, працює на ноутбуці | так | сильна на публічних бенчмарках |
+| **TimesFM 2.5** | Google | вер. 2025 | безкоштовно, працює на ноутбуці | так (лінійна надбудова) | навчена переважно на переглядах Вікіпедії |
+| **TimeGPT** | Nixtla | з 2023 | платний API, 30 днів пробно | так | ваші дані йдуть на їхні сервери |
+| **Moirai 2.0** | Salesforce | 2025 | безкоштовно | так | першу версію навчено на відкритому корпусі LOTSA |
+| **TiRex** | NX-AI | 2025 | безкоштовно, мала (35M) | ні | рекурентна архітектура (xLSTM) |
+
+: {tbl-colwidths="[14,11,10,22,14,29]"}
+
+**Відкриті** моделі працюють на вашій машині — дані її не покидають. **API**-моделі потребують акаунта,
+коштують грошей на масштабі й надсилають ваші числа на чужий сервер: спитайте, перш ніж завантажувати
+дані компанії.
+
+## Zero-shot у чотири рядки {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| eval: false
+from chronos import BaseChronosPipeline
+import torch
+
+model = BaseChronosPipeline.from_pretrained("amazon/chronos-2", device_map="cpu")   # ~500 МБ, один раз
+quantiles, mean = model.predict_quantiles([torch.tensor(history)], prediction_length=28,
+                                          quantile_levels=[0.1, 0.5, 0.9])
+```
+
+Це все: жодного сезонного періоду, жодних параметрів, жодного навчання. Саме ці чотири рядки намалювали
+смугу P10–P90 на графіку ChatGPT вище.
+
+Питання не в тому, чи це запускається. Питання в тому, чи **обіграє воно «як тиждень тому»** — на багатьох
+продуктах, у багатьох тижнях, на даних, яких модель **не могла бачити**.
+
+## Тест: десять продуктів, шість місяців {.smaller}
+
+- **Десять** щоденних рядів, від ChatGPT до Black Friday.
+- **Шість вікон** по **28 днів**, травень–жовтень 2026 — усі **після** релізу кожної моделі в тесті, тож
+  жодна з них не могла бачити відповідей.
+- **Шість** прогнозистів: три класичні правила й моделі, три foundation models. Однакова історія для всіх.
+
+```{python}
+#| echo: true
+#| code-fold: true
+#| code-summary: "Бектест у коді"
+import timesfm
+import tirex
+
+products = ["ChatGPT", "Duolingo", "Spotify", "Netflix", "Tinder", "Strava", "TikTok", "Notion",
+            "Threads", "Black Friday"]
+panel = views[views["unique_id"].isin(products) & (views["ds"] >= "2023-01-01")].dropna()
+H, WINDOWS = 28, 6
+dates = np.sort(panel["ds"].unique())
+cutoffs = [dates[len(dates) - (WINDOWS - k) * H - 1] for k in range(WINDOWS)]
+
+tfm = timesfm.TimesFM_2p5_200M_torch.from_pretrained("google/timesfm-2.5-200m-pytorch")
+tfm.compile(timesfm.ForecastConfig(max_context=1024, max_horizon=128, normalize_inputs=True,
+                                   use_continuous_quantile_head=True))
+tirex_model = tirex.load_model("NX-AI/TiRex", device="cpu")
+
+frames = []
+for cutoff in cutoffs:
+    history = panel[panel["ds"] <= cutoff]
+    window = panel[panel["ds"] > cutoff].groupby("unique_id").head(H).copy()
+    classic = StatsForecast(models=[Naive(alias="Наївний"), SeasonalNaive(7, alias="Сезонний наївний"),
+                                    AutoETS(season_length=7, alias="ETS")], freq="D")
+    window = window.merge(classic.forecast(df=history[history["ds"] > cutoff - np.timedelta64(730, "D")], h=H),
+                          on=["unique_id", "ds"])
+    ids = sorted(history["unique_id"].unique())
+    contexts = [torch.tensor(history[history["unique_id"] == i]["y"].values, dtype=torch.float32) for i in ids]
+    keys = pd.DataFrame({"unique_id": np.repeat(ids, H), "ds": np.tile(np.sort(window["ds"].unique()), len(ids))})
+    q, _ = chronos2.predict_quantiles(contexts, prediction_length=H, quantile_levels=[0.1, 0.5, 0.9])
+    keys["Chronos-2"] = np.concatenate([np.asarray(x).reshape(-1, 3)[:, 1] for x in q])
+    keys["Chronos-2 P10"] = np.concatenate([np.asarray(x).reshape(-1, 3)[:, 0] for x in q])
+    keys["Chronos-2 P90"] = np.concatenate([np.asarray(x).reshape(-1, 3)[:, 2] for x in q])
+    point, _ = tfm.forecast(horizon=H, inputs=[c.numpy() for c in contexts])
+    keys["TimesFM"] = np.asarray(point).ravel()
+    _, mean = tirex_model.forecast(context=contexts, prediction_length=H)
+    keys["TiRex"] = np.asarray(mean).ravel()
+    frames.append(window.merge(keys, on=["unique_id", "ds"]).assign(cutoff=cutoff))
+backtest = pd.concat(frames)
+
+scale = {}
+for name in products:                                   # MAE правила «як тиждень тому» за рік до тесту
+    v = panel[(panel["unique_id"] == name) & (panel["ds"] <= cutoffs[0])]["y"].values[-365:]
+    scale[name] = np.mean(np.abs(v[7:] - v[:-7]))
+forecasters = ["Наївний", "Сезонний наївний", "ETS", "Chronos-2", "TimesFM", "TiRex"]
+mase = backtest.groupby("unique_id").apply(
+    lambda g: pd.Series({m: np.mean(np.abs(g["y"] - g[m])) / scale[g.name] for m in forecasters}),
+    include_groups=False)
+```
+
+## Результат {.smaller}
+
+:::: {.columns}
+::: {.column width="48%"}
+```{python}
+summary = pd.DataFrame({
+    "MASE, середнє": mase.mean(),
+    "краще за сезонний наївний": mase.lt(mase["Сезонний наївний"], axis=0).sum().astype(int).astype(str) + " з 10"})
+summary = summary.loc[forecasters]
+scoreboard(summary, rules={"MASE, середнє": "lower"}, size="0.9em")
+```
+:::
+
+::: {.column width="52%"}
+```{python}
+#| label: per-product
+fig, ax = plt.subplots(figsize=(7, 4.6))
+order = mase["Сезонний наївний"].sort_values().index
+y = np.arange(len(order))
+ax.scatter(mase.loc[order, "Сезонний наївний"], y, color=slate, s=40, label="Сезонний наївний", zorder=3)
+ax.scatter(mase.loc[order, "Chronos-2"], y, color=red_pink, s=40, label="Chronos-2", zorder=3)
+for i, name in enumerate(order):
+    ax.plot([mase.loc[name, "Сезонний наївний"], mase.loc[name, "Chronos-2"]], [i, i], color="lightgray", zorder=1)
+ax.set_yticks(y, order)
+ax.set_xlabel("MASE (менше — краще)")
+ax.legend(fontsize=8, loc="lower right")
+ax.set_title("По продуктах: правило проти foundation model", fontsize=10)
+plt.show()
+```
+:::
+::::
+
+**Chronos-2 обіграла «як тиждень тому» на всіх десяти продуктах** без налаштувань; TimesFM і TiRex — на
+дев'яти, ETS — на шести. Похибка найкращого простого правила — мінус **12–16%**.
+
+## Як виглядає прогноз на 28 днів {.smaller}
+
+```{python}
+#| label: examples
+#| fig-align: center
+last = backtest[backtest["cutoff"] == cutoffs[-1]]
+fig, axes = plt.subplots(1, 3, figsize=(13, 3.4))
+for ax, name in zip(axes, ["ChatGPT", "Netflix", "Spotify"]):
+    hist_ = panel[(panel["unique_id"] == name) & (panel["ds"] > cutoffs[-1] - np.timedelta64(70, "D"))]
+    g = last[last["unique_id"] == name]
+    ax.plot(hist_["ds"], hist_["y"], color=slate, linewidth=1)
+    ax.fill_between(g["ds"], g["Chronos-2 P10"], g["Chronos-2 P90"], color=red_pink, alpha=0.2)
+    ax.plot(g["ds"], g["Chronos-2"], color=red_pink, linewidth=1.8, label="Chronos-2")
+    ax.plot(g["ds"], g["Сезонний наївний"], "--", color=blue, linewidth=1.2, label="як тиждень тому")
+    ax.set_title(f"{name}: MASE {mase.loc[name, 'Chronos-2']:.2f} проти {mase.loc[name, 'Сезонний наївний']:.2f}",
+                 fontsize=10)
+    ax.yaxis.set_major_formatter(thousands)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%d.%m"))
+axes[0].legend(fontsize=8, loc="lower left")
+plt.show()
+```
+
+Модель відтворює тижневий ритм і рівень кожного продукту; смуга ширшає там, де історія була нестабільною
+(Netflix), і лишається вузькою там, де ні. Spotify — найважчий ряд із десяти для кожного методу, MASE понад 1
+в усіх: останні місяці змінилися так, як його минуле не передвіщало.
+
+# Події: найважливіша частина
+
+## Передбачуваний пік: Black Friday {.smaller}
+
+Щороку той самий тиждень. Чи може модель, якій ніхто не казав про Black Friday, побачити його наближення
+лише з історії? Прогноз зроблено **1 жовтня 2025 року** на 90 днів уперед:
+
+```{python}
+#| label: black-friday
+#| fig-align: center
+bf = series["Black Friday"]
+cut_bf = pd.Timestamp("2025-10-01")
+ctx_bf = torch.tensor(bf[:cut_bf].values, dtype=torch.float32)
+qb, _ = chronos2.predict_quantiles([ctx_bf], prediction_length=90, quantile_levels=[0.1, 0.5, 0.9])
+qb = np.asarray(qb[0]).reshape(90, 3)
+future_bf = bf[cut_bf + pd.Timedelta(days=1):][:90]
+last_year = bf[cut_bf - pd.Timedelta(days=364) + pd.Timedelta(days=1):][:90].values      # той самий день тижня рік тому
+fig, ax = plt.subplots(figsize=(12, 3.4))
+ax.plot(bf["2025-08-01":"2026-01-05"].index, bf["2025-08-01":"2026-01-05"].values, color=slate, label="факт")
+ax.fill_between(future_bf.index, qb[:, 0], qb[:, 2], color=red_pink, alpha=0.2)
+ax.plot(future_bf.index, qb[:, 1], color=red_pink, linewidth=1.8, label="Chronos-2, від 1 жовтня")
+ax.plot(future_bf.index, last_year, "--", color=blue, linewidth=1.2, label="як рік тому")
+ax.set_yscale("log")
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%d.%m"))
+ax.legend(loc="upper left", fontsize=8)
+plt.show()
+peak_day = future_bf.idxmax()
+print(f"Фактичний пік {peak_day:%d.%m} ({future_bf.max():,.0f} переглядів); найвищий день у Chronos-2 "
+      f"{future_bf.index[np.argmax(qb[:, 1])]:%d.%m} ({qb[:, 1].max():,.0f})")
+```
+
+Модель **побачила пік** з самої історії — на день раніше, — але **недооцінила висоту** (55 тис. проти
+83 тис.). За 90 днів обіграла «як рік тому» на третину (промах 1,9 тис. проти 2,8 тис.).
+
+## Непередбачуваний пік: кампанія {.smaller}
+
+11 лютого 2025 року Duolingo оголосив, що його маскот, зелена сова, «помер» — вірусний маркетинговий хід.
+Перегляди за два дні зросли приблизно з 2 тис. до 75 тис. на день. Та сама модель, прогноз за тиждень до того:
+
+```{python}
+#| label: duolingo
+#| fig-align: center
+duo = series["Duolingo"]
+cut_d = pd.Timestamp("2025-02-04")
+qd, _ = chronos2.predict_quantiles([torch.tensor(duo[:cut_d].values, dtype=torch.float32)],
+                                   prediction_length=28, quantile_levels=[0.1, 0.5, 0.9])
+qd = np.asarray(qd[0]).reshape(28, 3)
+future_d = duo[cut_d + pd.Timedelta(days=1):][:28]
+fig, ax = plt.subplots(figsize=(12, 3.2))
+ax.plot(duo["2025-01-25":"2025-03-10"].index, duo["2025-01-25":"2025-03-10"].values, color=slate, label="факт")
+ax.fill_between(future_d.index, qd[:, 0], qd[:, 2], color=red_pink, alpha=0.25, label="Chronos-2 P10–P90")
+ax.plot(future_d.index, qd[:, 1], color=red_pink, linewidth=1.8)
+ax.set_yscale("log")
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%d.%m"))
+ax.legend(loc="upper left", fontsize=8)
+plt.show()
+print(f"Пік {future_d.idxmax():%d.%m}: {future_d.max():,.0f} переглядів; P90 моделі на цей день: "
+      f"{qd[np.argmax(future_d.values), 2]:,.0f}")
+```
+
+**90-й перцентиль** моделі на день піку — близько **5 000** переглядів; день приніс **75 000**. Жодна модель
+не могла цього знати — **знала маркетингова команда.** Така подія потрапляє в прогноз лише через людину: як
+сценарій або як коваріата.
+
+## Якщо знаєте дату — скажіть моделі {.smaller}
+
+**Коваріата** — це те, що ви знаєте про майбутнє: дата релізу, промокалендар, свято, зміна ціни. Chronos-2
+вміє її враховувати. Приклад: перегляди сторінки Лео Мессі під час **ЧС-2026**, прогноз від 10 червня
+2026 року — один раз лише з історії, другий — з прапорцем «день турніру» (0/1).
+
+```{python}
+#| label: world-cup
+#| fig-align: center
+messi = views[views["unique_id"] == "Lionel Messi"][["ds", "y"]].assign(item_id="messi")
+messi["y"] = np.log(messi["y"])
+tournaments = [("2016-06-03", 23), ("2018-06-14", 31), ("2019-06-14", 23), ("2021-06-13", 27),
+               ("2022-11-20", 28), ("2024-06-20", 24), ("2026-06-11", 38)]
+messi["tournament"] = 0
+for begin, days in tournaments:
+    messi.loc[messi["ds"].between(begin, pd.Timestamp(begin) + pd.Timedelta(days=days)), "tournament"] = 1
+before = messi[messi["ds"] < "2026-06-11"]
+after = messi[messi["ds"] >= "2026-06-11"].head(51)
+kw = dict(id_column="item_id", timestamp_column="ds", target="y", prediction_length=51, quantile_levels=[0.5])
+alone = chronos2.predict_df(before[["item_id", "ds", "y"]], **kw)
+flagged = chronos2.predict_df(before[["item_id", "ds", "y", "tournament"]],
+                              future_df=after[["item_id", "ds", "tournament"]], **kw)
+fig, ax = plt.subplots(figsize=(12, 3.0))
+recent = messi[messi["ds"].between("2026-04-15", after["ds"].max())]
+ax.plot(recent["ds"], np.exp(recent["y"]), color=slate, label="факт")
+ax.plot(after["ds"], np.exp(alone["predictions"]), color=blue, linewidth=1.8, label="лише історія")
+ax.plot(after["ds"], np.exp(flagged["predictions"]), color=red_pink, linewidth=1.8, label="+ прапорець турніру")
+ax.axvspan(pd.Timestamp("2026-06-11"), pd.Timestamp("2026-07-19"), color=orange, alpha=0.08)
+ax.set_yscale("log")
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%d.%m"))
+ax.legend(loc="upper left", fontsize=8)
+plt.show()
+y_wc = after["y"].values
+print(f"Середній промах (у логарифмах): лише історія {np.mean(np.abs(y_wc - alone['predictions'])):.2f}, "
+      f"з прапорцем {np.mean(np.abs(y_wc - flagged['predictions'])):.2f}")
+```
+
+Прапорець зменшив середній промах приблизно на **третину** — модель дізналася, що робить турнір, із шести
+попередніх в історії. Піки вона все одно недооцінила. Дати релізів, промокалендар і свята — коваріати, які
+продуктова команда має завжди.
+
+## Прогноз як сигналізація {.smaller}
+
+Той самий діапазон перетворюється на **монітор**: прогнозуйте кожен день за попередніми; якщо день виходить
+за межі діапазону 1%–99%, піднімайте прапорець. Netflix, останні 120 днів:
+
+```{python}
+#| label: monitor
+#| fig-align: center
+nf = series["Netflix"]
+days = nf.index[-120:]
+ctxs = [torch.tensor(nf[:d - pd.Timedelta(days=1)].values[-1024:], dtype=torch.float32) for d in days]
+qm, _ = chronos2.predict_quantiles(ctxs, prediction_length=1, quantile_levels=[0.01, 0.5, 0.99])
+qm = np.stack([np.asarray(x).reshape(-1)[:3] for x in qm])
+actual_m = nf[days].values
+alarm = (actual_m > qm[:, 2]) | (actual_m < qm[:, 0])
+fig, ax = plt.subplots(figsize=(12, 3.2))
+ax.fill_between(days, qm[:, 0], qm[:, 2], color=turquoise, alpha=0.25, label="1%–99%, прогноз напередодні")
+ax.plot(days, actual_m, color=slate, linewidth=1, label="факт")
+ax.scatter(days[alarm], actual_m[alarm], color=red_pink, s=40, zorder=3, label=f"сигналів: {alarm.sum()}")
+ax.yaxis.set_major_formatter(thousands)
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%d.%m"))
+ax.legend(loc="upper left", fontsize=8)
+plt.show()
+```
+
+Три сигнали за 120 днів — достатньо мало, щоб розібрати кожен. Смуга широка в липні, після сплеску, і вузька
+в спокійні тижні: монітор підлаштовується під те, наскільки шумною щойно була метрика, — фіксоване правило
+«±20%» так не вміє.
+
+## Де foundation models помиляються {.smaller}
+
+Що разом кажуть бектести й кейси:
+
+- **Нові події** невідомого масштабу — кампанія, вірусний момент, збій. Жодна модель не бачила *саме цієї*.
+  Плануйте сценарії, а не одне число.
+- **Злами** в ряді — зміна трекінгу, перероблена воронка, новий ринок. Модель продовжує минуле, яке вже
+  не діє. Подивіться на графік, перш ніж його прогнозувати.
+- **Дуже коротка історія** — продукт запустили минулого тижня. Краще, ніж нічого; діапазон буде досить
+  широким, щоб це показати.
+- **Дані, які модель уже могла бачити.** TimesFM навчали переважно на переглядах Вікіпедії. Наші тестові
+  вікна — після її релізу, тож бачити їх вона не могла, — але бектест на старих публічних даних може
+  прикрасити будь-яку foundation model.
+
+::: {.callout-note}
+## Для аналітиків
+
+Тест на «запам'ятовування» на даних змагання M4, які входять у навчальний корпус Chronos, не виявив
+переваги на вікнах, які модель бачила (MATH840, тиждень 10). Але відсутність доказу на одному корпусі — не
+гарантія на вашому: беріть тестові періоди після дати релізу моделі.
+:::
+
+# «Хіба не можна просто спитати ChatGPT?»
+
+## Експеримент {.smaller}
+
+Можна вставити в чат 56 днів чисел і попросити наступні 28. Ми зробили саме це — з невеликою відкритою
+мовною моделлю **Qwen2.5-1.5B-Instruct**, щоб експеримент був безкоштовним і відтворюваним, — на тих самих
+10 продуктах і 6 вікнах, що й foundation models. Промпт (англійською, як в експерименті):
+
+```{python}
+#| echo: false
+example = series["ChatGPT"][:cutoffs[-1]][-56:]
+lines = [f"{day:%Y-%m-%d} ({day:%a}): {int(v)}" for day, v in example.items()]
+text = ["Daily Wikipedia page views of the article 'ChatGPT':", *lines[:3], "...", lines[-1], "",
+        "Forecast the next 28 days. Reply with exactly 28 integers separated by commas, nothing else."]
+print("\n".join(text))
+```
+
+Шістдесят відповідей — десять продуктів, шість вікон, — кожну оцінено так само, як foundation models.
+
+## Що повернулося {.smaller}
+
+```{python}
+llm = pd.read_csv("../data/llm_forecasts.csv", parse_dates=["cutoff", "ds"])
+llm = llm.merge(backtest[["unique_id", "ds", "y", "Сезонний наївний", "Chronos-2"]], on=["unique_id", "ds"])
+llm_mase = llm.groupby("unique_id").apply(
+    lambda g: pd.Series({m: np.mean(np.abs(g["y"] - g[m])) / scale[g.name]
+                         for m in ["LLM", "Сезонний наївний", "Chronos-2"]}), include_groups=False)
+answers = llm.groupby(["unique_id", "cutoff"])["numbers returned"].first()
+print(f"Відповідей рівно з 28 числами: {(answers == 28).sum()} з {len(answers)};  "
+      f"менше: {(answers < 28).sum()};  більше: {(answers > 28).sum()}")
+scoreboard(pd.DataFrame({"MASE, середнє": llm_mase.mean(),
+                         "краще за сезонний наївний": llm_mase.lt(llm_mase["Сезонний наївний"], axis=0).sum()
+                         .astype(int).astype(str) + " з 10"}).rename(index={"LLM": "LLM, запит у чаті"}),
+           rules={"MASE, середнє": "lower"}, size="0.9em")
+```
+
+**Жодна з 60 відповідей не містила рівно 28 чисел** — кожну довелося обрізати чи доповнити, щоб узагалі
+оцінити. Після цього мовна модель обіграла «як тиждень тому» на **3 з 10** продуктів; Chronos-2 — на 10 з 10.
+
+## Чому чат — не той інструмент для чисел {.smaller}
+
+- **Для мовної моделі числа — це текст.** Вона пише цифри токен за токеном; її вчили звучати правдоподібно,
+  а не бути відкаліброваною. Вона може повернути 36 чисел, коли просили 28.
+- **Одна відповідь, без діапазону.** Ви отримуєте одну траєкторію, а не P10–P90 — а спитаєте ще раз, і
+  вона може бути іншою.
+- **Розмову неможливо забектестити.** Чесний тест вище потребував 60 запусків і скрипта.
+- **Приватність.** Вставити метрики компанії в публічний чат — це рішення щодо даних, а не зручність.
+
+Велика чат-модель пише кращі числа, ніж модель на 1,5 мільярда параметрів. Жоден із чотирьох пунктів від
+цього не змінюється.
+
+## Правильний розподіл ролей {.smaller}
+
+:::: {.columns}
+::: {.column width="50%"}
+**AI-асистент / агент** робить роботу навколо чисел:
+
+- пише вивантаження даних і скрипт бектесту;
+- запускає foundation model і бенчмарки;
+- будує графік і щотижневий звіт;
+- пояснює результат простими словами.
+
+**Foundation model** дає числа й діапазон.
+
+**Бектест** вирішує, чи їм довіряти.
+:::
+
+::: {.column width="50%"}
+Промпт, який працює:
+
+```text
+У мене є CSV з колонками date, value (щоденні
+інстали, 2 роки). Напиши Python-ноутбук, який:
+1. відкладає останні 4 тижні, у 6 ковзних вікнах;
+2. прогнозує їх правилом «як тиждень тому» і
+   Chronos-2 (amazon/chronos-2), P10/P50/P90;
+3. рахує MASE для обох і як часто факт
+   потрапляє в P10–P90;
+4. потім прогнозує наступні 4 тижні переможцем.
+Нічого не налаштовуй на відкладених тижнях.
+```
+:::
+::::
+
+## Чекліст для будь-якого прогнозу від AI {.smaller}
+
+Перш ніж прогноз потрапить у план, спитайте — або попросіть агента показати:
+
+1. **Що він обіграє?** «Як тиждень тому» і «як рік тому» на відкладених тижнях.
+2. **Скільки вікон?** Одне — везіння. Кілька, у різні тижні, — доказ.
+3. **Чи відкалібрований діапазон?** Близько 80% днів усередині P10–P90 — пораховано, а не припущено.
+4. **Який горизонт?** Точність на 7 днів нічого не каже про 90.
+5. **Чи існували тестові дані до релізу моделі?** Якщо ні — так і скажіть.
+6. **Чого він не знає?** Кампаній, запусків, змін цін, зламів — і хто їх додасть.
+7. **Яке рішення зміниться**, якщо реальність опиниться на P10, а не на P50?
+
+# Практика: ваша метрика
+
+## Робота руками {.smaller}
+
+Відкрийте ноутбук — він працює в браузері, нічого встановлювати не треба:
+
+**[→ Відкрити ноутбук у Google Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/genesis/sdb/labs/forecast_your_metric_uk.ipynb)**
+
+1. **Оберіть ряд:** один із сьогоднішніх десяти продуктів або власний CSV з двома колонками — дата й
+   значення (щоденні інстали, сесії, виручка, тікети…). Лише публічні або анонімізовані дані.
+2. **Запустіть бектест:** «як тиждень тому» проти Chronos-2, шість вікон по 28 днів.
+3. **Прочитайте результат:** чи обіграє модель правило? Наскільки? Чи відкалібрований діапазон?
+4. **Ухваліть рішення:** одне речення — що б ви спланували за цим прогнозом і що змусило б вас змінити план?
+
+У командах: кожен приносить один результат, порівнюємо, де модель виграла, а де програла.
+
+## Що забрати з собою {.smaller}
+
+- Прогноз — це **число, діапазон, горизонт і рішення**; діапазон важить не менше за число.
+- **Спершу бенчмарки, завжди бектести.** «Як тиждень тому» — це планка; одне вдале вікно — не доказ.
+- **Foundation models** — справжній крок уперед: безкоштовні, швидкі, без налаштувань — і на наших десяти
+  продуктах вони обіграли класичні правила майже скрізь.
+- Вони **не знають вашого календаря.** Передбачувані сезони вони вчать з історії; про кампанії, запуски й
+  злами маєте сказати ви — або планувати сценарії.
+- **Мовні моделі — для роботи навколо чисел**, а не для самих чисел. Нехай агент напише бектест,
+  foundation model зробить прогноз, а бектест вирішить.
+
+::: {.callout-tip}
+## Що почитати
+
+M. Peixeiro, *Time Series Forecasting Using Foundation Models* (Manning, 2026) ·
+R. Hyndman & G. Athanasopoulos, *[Forecasting: Principles and Practice](https://otexts.com/fpp3/)*
+(безкоштовно онлайн) · [Chronos](https://github.com/amazon-science/chronos-forecasting) ·
+[TimesFM](https://github.com/google-research/timesfm)
+:::
+
+# Питання? {.unnumbered .unlisted background-iframe="colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
