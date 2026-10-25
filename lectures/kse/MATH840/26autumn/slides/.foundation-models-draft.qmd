@@ -1,0 +1,1061 @@
+---
+title: "Foundation Models — draft"
+subtitle: "MATH840 | Time Series | Week 9"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: colored-particles/index.html
+footer: <a href="https://teaching.kse.org.ua/course/view.php?id=4432">🔗MATH840 | Time Series</a>
+format:
+  revealjs:
+    fragments: false   # show every slide in full; no click-through reveals
+    code-line-numbers: false
+    code-fold: true
+    code-summary: "Code"
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+editor_options:
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+# Define colors
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+navy       = "#150E37FF"
+green      = "#8bb174"
+yellow     = "#D8BD44"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+import warnings
+warnings.filterwarnings("ignore")
+import os
+os.environ["NIXTLA_ID_AS_COL"] = "true"
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+import logging
+for name in ("lightning", "lightning.pytorch", "pytorch_lightning", "neuralforecast", "transformers"):
+    logging.getLogger(name).setLevel(logging.ERROR)
+import transformers
+transformers.utils.logging.disable_progress_bar()
+import numpy as np
+np.set_printoptions(suppress=True)
+np.random.seed(1)
+import pandas as pd
+pd.set_option("display.width", 130)
+pd.set_option("display.precision", 3)
+import seaborn as sns
+sns.set_style("whitegrid")
+import matplotlib.pyplot as plt
+plt.style.use("ggplot")
+plt.rcParams.update({
+    "figure.figsize": (8, 5),
+    "figure.dpi": 100,
+    "savefig.dpi": 300,
+    "figure.constrained_layout.use": True,
+    "axes.titlesize": 12,
+    "axes.labelsize": 10,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+    "legend.fontsize": 9,
+})
+import matplotlib as mpl
+from cycler import cycler
+mpl.rcParams['axes.prop_cycle'] = cycler(color=[slate, blue, turquoise, orange, red, green, purple, yellow, red_pink])
+
+import torch
+torch.manual_seed(1)
+import statsmodels.api as sm
+from statsforecast import StatsForecast
+from statsforecast.arima import ARIMASummary
+from statsforecast.models import AutoARIMA, AutoETS, AutoTheta, SeasonalNaive
+from sklearn.neural_network import MLPRegressor
+from great_tables import GT, loc, style as gt_style
+from matplotlib.colors import LinearSegmentedColormap, to_hex
+from matplotlib.patches import Circle, FancyBboxPatch
+
+
+shade = LinearSegmentedColormap.from_list("shade", ["#bfe0b0", "#ffffff", "#f5b8cb"])
+
+
+def scoreboard(table, rules=None, by="column", decimals=3):
+    """A results table in Great Tables: green is better, pink is worse, the best in bold.
+
+    rules maps a metric to "lower", "higher" or a target value (default: every column "lower").
+    by="column" compares the rows of each column; by="row" shades each metric on one scale
+    and bolds the best of each row.
+    """
+    df = table.to_frame() if isinstance(table, pd.Series) else table.copy()
+    df.index = [str(i) for i in df.index]
+    nested = isinstance(df.columns, pd.MultiIndex)
+    groups = list(dict.fromkeys(df.columns.get_level_values(0))) if nested else []
+    df.columns = ["|".join(map(str, c)) if nested else str(c) for c in df.columns]
+    metric = {c: c.split("|")[-1] for c in df.columns}
+    rules = rules or {m: "lower" for m in metric.values()}
+
+    gt = (GT(df.reset_index(names="row"), rowname_col="row")
+          .fmt_number(columns=list(df.select_dtypes("number").columns), decimals=decimals)
+          .sub_missing(missing_text="")
+          .cols_label(cases=metric)
+          .tab_options(table_font_size="0.75em", data_row_padding="4px"))
+    for g in groups:
+        gt = gt.tab_spanner(label=g, columns=[c for c in df.columns if c.startswith(f"{g}|")])
+
+    for m, rule in rules.items():
+        cols = [c for c in df.columns if metric[c] == m]
+        values = df[cols].astype(float)
+        bad = values if rule == "lower" else -values if rule == "higher" else (values - rule).abs()
+        blocks = [bad[[c]] for c in cols] if by == "column" else [bad]
+        for block in blocks:
+            lo, hi = np.nanmin(block.values), np.nanmax(block.values)
+            for c in block.columns:
+                for i, b in enumerate(block[c]):
+                    if np.isnan(b):
+                        continue
+                    fill = to_hex(shade((b - lo) / (hi - lo) if hi > lo else 0.0))
+                    best = b == (block[c].min() if by == "column" else bad.iloc[i].min())
+                    look = [gt_style.fill(color=fill)] + ([gt_style.text(weight="bold")] if best else [])
+                    gt = gt.tab_style(style=look, locations=loc.body(columns=c, rows=[i]))
+    return gt
+
+
+def draw_net(ax, layers, labels, colours, title=""):
+    """A small fully connected network: one column of circles per layer, every edge drawn."""
+    xs = np.linspace(0, 1, len(layers))
+    nodes = []
+    for x, n, names, colour in zip(xs, layers, labels, colours):
+        ys = np.linspace(0.5 + 0.13 * (n - 1), 0.5 - 0.13 * (n - 1), n)
+        nodes.append([(x, y) for y in ys])
+        for (cx, cy), name in zip(nodes[-1], names):
+            ax.add_patch(Circle((cx, cy), 0.045, facecolor="white", edgecolor=colour, linewidth=2, zorder=3))
+            ax.text(cx, cy, name, ha="center", va="center", fontsize=11, zorder=4)
+    for left, right in zip(nodes[:-1], nodes[1:]):
+        for a in left:
+            for b in right:
+                ax.plot([a[0] + 0.045, b[0] - 0.045], [a[1], b[1]], color="grey", linewidth=0.8, zorder=1)
+    ax.set_xlim(-0.1, 1.1)
+    ax.set_ylim(0, 1)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_title(title)
+```
+
+# Where this fits
+
+## Eight weeks of local models {.smaller}
+
+Every model so far has been **local**: fitted to one series, with its own parameters, knowing nothing
+about any other series.
+
+| Week | Model | Learns from |
+|---|---|---|
+| 1, 3 | benchmarks | one series, one rule |
+| 2 | decomposition | one series |
+| 4 | ETS | one series |
+| 5 | regression | one series and its predictors |
+| 6, 7 | ARIMA, dynamic regression | one series and its predictors |
+| 8 | MSTL, harmonic regression, Prophet, combinations | one series |
+
+Your Track B series has between 56 and 264 observations. Every parameter of your Lab 7 ARIMA was
+estimated from those, and nothing else.
+
+## Three steps away from "one series" {.smaller}
+
+:::: {.columns}
+::: {.column width="33%"}
+**1. Non-linear, still local**
+
+*Neural network autoregression.* The same lags as an AR model, but the forecast is a non-linear
+function of them.
+
+One series. Hundreds of observations.
+:::
+
+::: {.column width="33%"}
+**2. Global**
+
+*LightGBM on lags, N-HiTS, LSTM.* One model trained on **many series at once**; each series borrows
+the patterns of the others.
+
+One dataset. Thousands of series.
+:::
+
+::: {.column width="33%"}
+**3. Pretrained**
+
+*Chronos, TimesFM, Moirai.* One model trained on **millions of series** from many domains, then
+applied to yours with **no training at all**.
+
+Your series. Zero fitted parameters.
+:::
+::::
+
+The question for each step is the same one we have asked for eight weeks: **does it beat the benchmark
+on a holdout it never saw?** — and, new this week, *how do we know it never saw it?*
+
+::: {.callout-tip}
+## Reading
+
+[FPP3 §12.4 neural network models](https://otexts.com/fpp3/nnetar.html) ·
+[Ansari et al. (2024), *Chronos*](https://arxiv.org/abs/2403.07815) ·
+[Ansari et al. (2025), *Chronos-2*](https://arxiv.org/abs/2510.15821) ·
+M. Peixeiro, *Time Series Forecasting Using Foundation Models* (Manning, 2025)
+:::
+
+# Neural network autoregression
+
+## An AR model is a network with no hidden layer {.smaller}
+
+:::: {.columns}
+::: {.column width="45%"}
+$$
+\hat y_t = c + \phi_1 y_{t-1} + \phi_2 y_{t-2} + \phi_3 y_{t-3}
+$$
+
+| Time series | Neural networks |
+|---|---|
+| lags $y_{t-i}$ | inputs |
+| coefficients $\phi_i$ | weights |
+| intercept $c$ | bias |
+| least squares | training on squared loss |
+
+A linear regression on lags **is** a neural network — one with no hidden layer and no activation.
+:::
+
+::: {.column width="55%"}
+```{python}
+#| label: ar-as-net
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(5.5, 4))
+draw_net(ax, [3, 1], [["$y_{t-1}$", "$y_{t-2}$", "$y_{t-3}$"], [r"$\hat y_t$"]],
+         [blue, red_pink], "AR(3): inputs straight to the output")
+plt.show()
+```
+:::
+::::
+
+## Add a hidden layer {.smaller}
+
+:::: {.columns}
+::: {.column width="50%"}
+Each hidden neuron takes its own weighted sum of the lags and squeezes it through a non-linear
+**activation**:
+
+$$
+\begin{aligned}
+z_j &= b_j + \sum_{i=1}^{p} w_{ij}\, y_{t-i}\\[2pt]
+h_j &= s(z_j) = \frac{1}{1 + e^{-z_j}}\\[2pt]
+\hat y_t &= a + \sum_{j=1}^{k} v_j\, h_j
+\end{aligned}
+$$
+
+:::
+
+::: {.column width="50%"}
+```{python}
+#| label: nnar-net
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(6, 3.6))
+draw_net(ax, [3, 4, 1], [["$y_{t-1}$", "$y_{t-2}$", "$y_{t-3}$"], ["$h_1$", "$h_2$", "$h_3$", "$h_4$"],
+                         [r"$\hat y_t$"]],
+         [blue, turquoise, red_pink], "NNAR(3, 4): one hidden layer")
+plt.show()
+```
+:::
+::::
+
+$k$ hidden neurons, each a different "view" of the lags. The sigmoid is what makes the model
+non-linear — without it the network collapses back to an AR model. Weights start at random values and
+are fitted by gradient descent on the squared error.
+
+## NNAR$(p, P, k)_m$ {.smaller}
+
+The model in FPP3 §12.4 — `nnetar()` in R — is exactly this network, with conventions that make it a
+forecasting method:
+
+- **Inputs:** $p$ ordinary lags $y_{t-1}, \dots, y_{t-p}$ and $P$ seasonal lags $y_{t-m}, \dots, y_{t-Pm}$.
+- **Hidden layer:** one, with $k$ neurons. Default $k = (p + P + 1)/2$, rounded.
+- **Defaults for $p$:** the order of the best AR model on the seasonally adjusted series; $P = 1$.
+- **Twenty networks**, each from different random starting weights, and their forecasts **averaged**
+  — a combination (Week 8) used to tame the randomness of training.
+- Inputs are **scaled** first; a network trains badly on raw values in the thousands.
+
+NNAR$(p, 0, k)$ is the non-seasonal version — the one we fit next.
+
+## Sunspots: a non-linear series {.smaller}
+
+The yearly mean number of sunspots, 1700–2008 — Yule fitted the first autoregressive model to this
+series in 1927.
+
+```{python}
+#| label: sunspots
+#| fig-align: center
+spots = sm.datasets.sunspots.load_pandas().data
+spots["year"] = spots["YEAR"].astype(int)
+fig, axes = plt.subplots(1, 2, figsize=(12, 3.4), width_ratios=[2.2, 1])
+axes[0].plot(spots["year"], spots["SUNACTIVITY"], color=slate, linewidth=1)
+axes[0].set_title("Yearly sunspot number")
+cycle = spots.query("1933 <= year <= 1944")
+axes[1].plot(cycle["year"], cycle["SUNACTIVITY"], "o-", color=red_pink)
+axes[1].set_title("One cycle: up in 4 years, down in 7")
+plt.show()
+```
+
+The cycles are **asymmetric** — a fast rise, a slow decline — and peaks vary in height. A linear AR
+model produces only symmetric cycles: up and down are the same equation.
+
+## Fitting NNAR(9, 5) by hand {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+y_ss = np.sqrt(spots["SUNACTIVITY"].to_numpy())    # square root keeps the forecasts positive
+H_SS = 30
+train_ss, test_ss = y_ss[:-H_SS], y_ss[-H_SS:]
+p, k = 9, 5
+mu, sd = train_ss.mean(), train_ss.std()
+z = (train_ss - mu) / sd                            # scale the inputs
+
+
+def lag_matrix(z, p):
+    X = np.column_stack([z[p - i - 1:len(z) - i - 1] for i in range(p)])   # y_{t-1}, ..., y_{t-p}
+    return X, z[p:]
+
+
+X, target = lag_matrix(z, p)
+nets = [MLPRegressor(hidden_layer_sizes=(k,), activation="logistic", alpha=1e-3,
+                     max_iter=5000, random_state=seed).fit(X, target)
+        for seed in range(20)]                                             # twenty networks
+print(f"{len(target)} training rows, {p} inputs, {k} hidden neurons, "
+      f"{p * k + k + k + 1} weights per network")
+```
+
+## Forecasting: one step at a time {.smaller}
+
+A network predicts **one step ahead**. For $h > 1$ the forecast is fed back as if it were data — the
+same recursion as ARIMA, but through a non-linear function:
+
+```{python}
+#| echo: true
+#| code-fold: false
+def nnar_forecast(nets, z, h, noise=None, rng=None):
+    history, out = list(z[-p:]), []
+    for _ in range(h):
+        x = np.array(history[::-1][:p])[None, :]               # the latest p values, newest first
+        value = np.mean([net.predict(x)[0] for net in nets])   # average of the twenty networks
+        if noise is not None:
+            value += rng.choice(noise)                         # a resampled training error
+        out.append(value)
+        history.append(value)
+    return np.array(out)
+
+
+point_ss = (nnar_forecast(nets, z, H_SS) * sd + mu) ** 2      # back to the sunspot scale
+```
+
+There is no formula for the forecast variance of a non-linear model. FPP's answer: **simulate**. Add a
+resampled training error at every step, repeat many times, and read the interval off the paths.
+
+## The simulated paths {.smaller}
+
+```{python}
+#| label: nnar-paths
+#| fig-align: center
+residuals_ss = target - np.mean([net.predict(X) for net in nets], axis=0)
+rng = np.random.default_rng(1)
+paths_ss = np.array([(nnar_forecast(nets, z, H_SS, residuals_ss, rng) * sd + mu) ** 2 for _ in range(300)])
+lo80, hi80 = np.percentile(paths_ss, [10, 90], axis=0)
+years_test = spots["year"].to_numpy()[-H_SS:]
+fig, ax = plt.subplots(figsize=(12, 3.8))
+ax.plot(spots["year"], spots["SUNACTIVITY"], color=slate, linewidth=1, label="sunspots")
+for path in paths_ss[:12]:
+    ax.plot(years_test, path, color=turquoise, alpha=0.35, linewidth=0.8)
+ax.fill_between(years_test, lo80, hi80, color=red_pink, alpha=0.18, label="80% of 300 paths")
+ax.plot(years_test, point_ss, color=red_pink, linewidth=2, label="NNAR(9, 5) forecast")
+ax.set_xlim(1900, 2009)
+ax.legend(loc="upper left")
+ax.set_title("Thirty years ahead from 1978: twelve of the simulated paths, and the interval from all of them")
+plt.show()
+```
+
+Three cycles ahead, the forecast keeps their **timing** and the fast-rise, slow-fall shape — not their
+**height**: averaging damps every peak to about 100, and the two real peaks above 150 fall outside the
+80% band. Single paths reach those heights; their average cannot.
+
+## Scored on the thirty held-out years {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| output-location: column
+arima_ss = AutoARIMA().fit(train_ss)
+ets_ss = AutoETS().fit(train_ss)
+truth = test_ss ** 2
+candidates_ss = {
+    "NNAR(9, 5)": point_ss,
+    str(ARIMASummary(arima_ss.model_)): arima_ss.predict(H_SS)["mean"] ** 2,
+    "AutoETS": ets_ss.predict(H_SS)["mean"] ** 2,
+    "mean of the training years": np.full(H_SS, (train_ss ** 2).mean()),
+}
+scoreboard(pd.DataFrame({
+    name: {"MAE": np.mean(np.abs(truth - f)),
+           "RMSE": np.sqrt(np.mean((truth - f) ** 2))}
+    for name, f in candidates_ss.items()}).T, decimals=1)
+```
+
+- The network's error is about **a third lower** than the ARIMA's — both fitted on the same
+  square-root scale, both forecasting 30 years.
+- ETS, which has no cycles at all, does no better than the mean of the training years.
+- This is the case NNAR was built for: a **long** series (270 training rows) with **genuinely
+  non-linear** dynamics.
+
+## What NNAR is, and is not {.smaller}
+
+- **Is:** an autoregression that can bend. When the dynamics are genuinely non-linear — asymmetric
+  cycles, thresholds, saturation — it can see what a linear model cannot.
+- **Is not:** interpretable. 56 weights per network, twenty networks; there is no $\phi_1$ to read.
+- **Is not:** stable without care. Different seeds give different networks; that is why it averages
+  twenty.
+- **Is not:** data-efficient. Sunspots give 300 years; your Track B series gives 56 to 264
+  observations, and a network with 56 weights per 100 points is fitting noise.
+
+[That last point is the real limit of a local network — and the reason the next two sections train on
+many series at once.]{.hi}
+
+# Global models
+
+## Local and global {.smaller}
+
+:::: {.columns}
+::: {.column width="50%"}
+**Local** — one model per series
+
+- $N$ series → $N$ sets of parameters.
+- Each set is estimated from one series.
+- ETS, ARIMA, NNAR, Prophet.
+:::
+
+::: {.column width="50%"}
+**Global** — one model for all
+
+- $N$ series → **one** set of parameters.
+- Estimated from every window of every series.
+- A seasonal shape seen in 500 series helps forecast the 501st.
+:::
+::::
+
+A global model needs the series to be **comparable**, so each one is scaled by its own level first.
+After that, it learns "what happens after a pattern like this", pooled over everything it has seen.
+
+Evidence from the competitions: in **M4** (2018) the winner was a hybrid — exponential smoothing inside a
+recurrent network trained across series — and the pure machine-learning entries did worse than the
+statistical benchmarks. In **M5** (2020), on tens of thousands of Walmart series, the top of the
+leaderboard was dominated by **LightGBM** trained globally.
+
+## The data for this section: M3 Monthly {.smaller}
+
+The 1428 monthly series of the **M3 competition** (Makridakis & Hibon, 2000) — micro, industry, macro,
+finance, demographic — each with its last **18 months** held out, as in the competition.
+
+```{python}
+#| echo: true
+#| code-fold: false
+m3 = pd.read_csv("../data/m3_monthly.csv", parse_dates=["ds"])
+H_M3 = 18
+test_m3 = m3.groupby("unique_id").tail(H_M3)
+train_m3 = m3.drop(test_m3.index)
+lengths = train_m3.groupby("unique_id").size()
+print(f"{m3['unique_id'].nunique()} series; training length {lengths.min()} to {lengths.max()} months, "
+      f"median {lengths.median():.0f}")
+```
+
+Every model in the rest of this lecture is scored on these same 1428 × 18 held-out months, by MASE with
+$m = 12$ — the metric you have used since Week 3.
+
+## The local baseline {.smaller}
+
+Three local models, 1428 fits each — and the Week 8 combination of two of them:
+
+```{python}
+#| echo: true
+#| code-fold: false
+local = StatsForecast(models=[SeasonalNaive(season_length=12, alias="snaive"),
+                              AutoETS(season_length=12, alias="ETS"),
+                              AutoTheta(season_length=12, alias="Theta")],
+                      freq="MS")
+forecasts = test_m3.merge(local.forecast(df=train_m3, h=H_M3), on=["unique_id", "ds"])
+forecasts["ETS + Theta"] = (forecasts["ETS"] + forecasts["Theta"]) / 2
+```
+
+The **Theta** method won M3 in 2000. It is simple exponential smoothing with drift — Week 4 — on a
+seasonally adjusted series, and it remains one of the hardest benchmarks to beat on this data.
+
+```{python}
+#| include: false
+scale_m3 = train_m3.groupby("unique_id")["y"].apply(lambda s: np.mean(np.abs(s.to_numpy()[12:] - s.to_numpy()[:-12])))
+
+
+def m3_board(columns):
+    err = forecasts.groupby("unique_id").apply(
+        lambda g: pd.Series({c: np.mean(np.abs(g["y"] - g[c])) for c in columns}), include_groups=False)
+    mase_m3 = err.div(scale_m3, axis=0)
+    return pd.DataFrame({"mean MASE": mase_m3.mean(), "median MASE": mase_m3.median(),
+                         "beats ETS on": mase_m3.lt(mase_m3["ETS"], axis=0).mean()})
+```
+
+## A global LightGBM on lags {.smaller}
+
+The M5 recipe: a gradient-boosted tree model, **one** for all 1428 series, on lag features. Week 7's
+dynamic regression with the lags as predictors — except that a tree finds the non-linearities itself.
+
+```{python}
+#| echo: true
+#| code-fold: false
+from mlforecast import MLForecast
+from mlforecast.target_transforms import Differences, LocalStandardScaler
+import lightgbm as lgb
+
+boosted = MLForecast(
+    models={"LightGBM": lgb.LGBMRegressor(n_estimators=300, learning_rate=0.05, verbose=-1)},
+    freq="MS",
+    lags=[1, 2, 3, 6, 12, 24],                                   # the features
+    date_features=["month"],
+    target_transforms=[Differences([12]), LocalStandardScaler()],   # D = 1, then each series scaled
+)
+boosted.fit(train_m3)
+forecasts = forecasts.merge(boosted.predict(H_M3), on=["unique_id", "ds"])
+```
+
+- `Differences([12])` is Week 7's seasonal difference; `LocalStandardScaler` puts every series on one
+  scale, which is what makes **pooling** them possible.
+- Forecasts are recursive, as for NNAR: each prediction becomes a lag for the next.
+
+One reasonable configuration, the kind you would try first — **not tuned**. Tuning a global model is a
+project of its own; the scored table below is what you get on the first attempt.
+
+# Neural networks for sequences
+
+## Recurrent networks: a memory that is carried forward {.smaller}
+
+NNAR sees a **fixed window** of $p$ lags. A recurrent network (RNN) reads the series one value at a time
+and carries a **hidden state** $h_t$ — a vector summary of everything so far:
+
+$$
+h_t = \tanh\left(W h_{t-1} + U y_t + b\right), \qquad \hat y_{t+1} = V h_t + c
+$$
+
+```{python}
+#| label: rnn-unrolled
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(12, 2.1))
+for i, t in enumerate(["t-2", "t-1", "t", "t+1"]):
+    x = i * 2.2
+    ax.add_patch(FancyBboxPatch((x, 0.8), 1.2, 0.8, boxstyle="round,pad=0.05", facecolor="white",
+                                edgecolor=turquoise, linewidth=2))
+    ax.text(x + 0.6, 1.2, f"$h_{{{t}}}$", ha="center", va="center", fontsize=13)
+    ax.annotate("", xy=(x + 0.6, 0.78), xytext=(x + 0.6, 0.1), arrowprops=dict(arrowstyle="->", color=blue))
+    ax.text(x + 0.6, -0.05, f"$y_{{{t}}}$", ha="center", va="top", fontsize=13)
+    if i < 3:
+        ax.annotate("", xy=(x + 2.18, 1.2), xytext=(x + 1.27, 1.2), arrowprops=dict(arrowstyle="->", color=red_pink, lw=2))
+        ax.text(x + 1.72, 1.32, "$W$", color=red_pink, fontsize=12, ha="center")
+ax.set_xlim(-0.3, 8.2)
+ax.set_ylim(-0.5, 1.8)
+ax.axis("off")
+ax.set_title("The same weights $W, U$ at every step: the network unrolled through time")
+plt.show()
+```
+
+No fixed window, and the **same** weights at every step — as ARIMA's recursion is to a regression on
+fixed lags.
+
+## Why plain RNNs forget, and what LSTM does about it {.smaller}
+
+Training an RNN multiplies by $W$ once per step back in time. Over many steps the gradient shrinks to
+nothing (**vanishing**) or blows up (**exploding**) — so a plain RNN cannot learn that December depends
+on last December.
+
+The **LSTM** (Hochreiter & Schmidhuber, 1997) adds a second state $c_t$, the **cell**, changed only by
+gated, mostly additive updates:
+
+$$
+\begin{aligned}
+f_t &= \sigma(W_f[h_{t-1}, y_t] + b_f) & &\text{forget: how much of } c_{t-1} \text{ to keep}\\
+i_t &= \sigma(W_i[h_{t-1}, y_t] + b_i) & &\text{input: how much new to write}\\
+c_t &= f_t \odot c_{t-1} + i_t \odot \tanh(W_c[h_{t-1}, y_t] + b_c) & &\text{the cell: additive update}\\
+o_t &= \sigma(W_o[h_{t-1}, y_t] + b_o), \quad h_t = o_t \odot \tanh(c_t) & &\text{output}
+\end{aligned}
+$$
+
+Each gate is a sigmoid between 0 and 1. With $f_t \approx 1$ the cell passes information — and gradient —
+through many steps unchanged. It is the same idea as ETS's level equation: **keep most of the old state,
+add a little of the new**.
+
+## The architectures you will meet {.smaller}
+
+| Model | Year | Idea |
+|---|---|---|
+| **DeepAR** | 2020 | a global LSTM that outputs a **distribution**; intervals by sampling |
+| **N-BEATS** | 2020 | no recurrence: stacked fully connected blocks, each passing on its residual |
+| **N-HiTS** | 2023 | N-BEATS with blocks at several time resolutions; fast, long horizons |
+| **TFT** | 2021 | attention plus gating, built for covariates |
+| **PatchTST** | 2023 | a transformer reading the series in **patches** of values, like words |
+
+: {tbl-colwidths="[16,8,76]"}
+
+All of them in Python: [`neuralforecast`](https://nixtlaverse.nixtla.io/neuralforecast/) — the same
+`fit` / `predict` / `cross_validation` interface as `statsforecast`.
+
+## N-HiTS and an LSTM on M3 {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+from neuralforecast import NeuralForecast
+from neuralforecast.models import LSTM, NHITS
+
+quiet = dict(enable_progress_bar=False, logger=False, enable_model_summary=False)
+neural = NeuralForecast(
+    models=[NHITS(h=H_M3, input_size=24, scaler_type="robust", max_steps=600, random_seed=1, **quiet),
+            LSTM(h=H_M3, input_size=24, scaler_type="robust", max_steps=600, random_seed=1, **quiet)],
+    freq="MS")
+neural.fit(train_m3)                        # one network of each kind, trained on all 1428 series
+forecasts = forecasts.merge(neural.predict(), on=["unique_id", "ds"])
+```
+
+- `input_size=24`: each training example is a window of 24 months and the 18 that follow, cut from
+  every series — tens of thousands of windows.
+- `scaler_type="robust"`: each window scaled by its own median and spread — the global model's
+  equivalent of Week 7's log.
+
+Both train in about a minute on a laptop CPU. Again one configuration, not tuned, with one fixed seed —
+report the seed, because a network trained from another starting point is a different model.
+
+## The global models, scored {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| output-location: column
+scoreboard(m3_board(["snaive", "ETS", "Theta", "ETS + Theta",
+                     "LightGBM", "NHITS", "LSTM"]),
+           rules={"mean MASE": "lower", "median MASE": "lower",
+                  "beats ETS on": "higher"})
+```
+
+- **On M3 the global models do not beat the local ones.** N-HiTS is level with ETS; LightGBM and the
+  LSTM are clearly worse, though both still beat seasonal naive.
+- M3 is home ground for local models: **short** series (median 115 months) from **unrelated** domains —
+  little that pooling can borrow. Global models win where series are many, long and alike: M5's
+  products from one retailer.
+- The best on this board is still Week 8's: the average of ETS and Theta.
+
+# Foundation models
+
+## Pretrain once, forecast anything {.smaller}
+
+The step from global to **pretrained** is the step from "all the series in this dataset" to "all the
+series we could find":
+
+| | Trained on | At forecast time |
+|---|---|---|
+| Local (ETS, ARIMA) | your series | fit, then forecast |
+| Global (LightGBM, N-HiTS) | your dataset | fit, then forecast |
+| **Pretrained** (Chronos, TimesFM, Moirai) | **millions of other series** | **forecast only — zero-shot** |
+
+The analogy is a large language model: trained once on a vast corpus, then asked about text it has
+never seen. Here the "text" is your history, and the "answer" is its continuation.
+
+Chronos (Amazon, 2024): 28 datasets, about **890,000** series and 84 billion observations, plus a
+million synthetic ones. Your series is not one of them — or so we hope; this section ends on that word.
+
+## How Chronos reads a time series {.smaller}
+
+A language model needs **tokens** from a fixed vocabulary. Chronos makes them in two steps:
+
+1. **Scale** each context by its mean absolute value: $\tilde y_t = y_t / s$, $\;s = \frac{1}{C}\sum |y_t|$.
+2. **Quantise**: split $[-15, 15]$ into 4094 bins; each $\tilde y_t$ becomes the number of its bin.
+
+```{python}
+#| label: tokens
+#| fig-align: center
+air = pd.read_csv("../data/air_passengers.csv", parse_dates=["ds"])
+context = air["y"].to_numpy()[-48:]
+scaled = context / np.mean(np.abs(context))
+edges = np.linspace(0.4, 1.6, 13)                               # 12 coarse bins, for display only
+tokens = np.digitize(scaled, edges)
+fig, axes = plt.subplots(1, 2, figsize=(12, 3))
+axes[0].plot(air["ds"].iloc[-48:], scaled, "o-", color=slate, markersize=3)
+for e in edges:
+    axes[0].axhline(e, color=turquoise, linewidth=0.5)
+axes[0].set_title("Scaled air passengers, with the bin edges")
+axes[1].step(range(48), tokens, where="mid", color=red_pink)
+axes[1].set_title("The same series as a sequence of tokens (bin numbers)")
+plt.show()
+```
+
+Then an ordinary **T5 language model** is trained to predict the next token — cross-entropy, as for
+words. Forecasting is **sampling**: draw the next token, append, repeat; many sampled paths give the
+quantiles. (The real vocabulary is 4096 tokens, not 12.)
+
+## Chronos-Bolt and Chronos-2 {.smaller}
+
+The original Chronos samples one token at a time — accurate, slow. The two successors you would use now:
+
+- **Chronos-Bolt** (2024): reads the context in **patches** and outputs the quantiles of all $h$
+  steps **directly**, with no sampling — up to 250 times faster. The small version, 48M parameters,
+  forecasts a thousand series on a laptop CPU in seconds.
+- **Chronos-2** (October 2025, 120M parameters): **group attention** lets several series in a group
+  see each other — so it can use **covariates**, past-only or known in advance, which Chronos and
+  Chronos-Bolt cannot.
+
+Others you will see in papers and benchmarks: **TimesFM** (Google), **Moirai** (Salesforce), **TiRex**
+(NX-AI), **Toto** (Datadog) — open weights, like Chronos — and **TimeGPT** (Nixtla), a commercial API: your
+data leaves your machine.
+
+## Zero-shot in four lines {.smaller}
+
+The whole of "fitting" a foundation model:
+
+```{python}
+#| echo: true
+#| code-fold: false
+from chronos import BaseChronosPipeline
+
+bolt = BaseChronosPipeline.from_pretrained("amazon/chronos-bolt-small", device_map="cpu")
+context_m3 = [torch.tensor(g["y"].to_numpy(), dtype=torch.float32)
+              for _, g in train_m3.groupby("unique_id", sort=True)]
+quantiles, mean = bolt.predict_quantiles(context_m3, prediction_length=H_M3,
+                                         quantile_levels=[0.1, 0.5, 0.9])
+```
+
+```{python}
+#| include: false
+order = sorted(train_m3["unique_id"].unique())
+ds_sorted = test_m3.sort_values(["unique_id", "ds"])["ds"].to_numpy()
+
+
+def as_frame(alias, values):
+    return pd.DataFrame({"unique_id": np.repeat(order, H_M3), "ds": ds_sorted,
+                         alias: np.concatenate([np.asarray(v).ravel()[:H_M3] for v in values])})
+
+
+forecasts = forecasts.merge(as_frame("Chronos-Bolt", mean), on=["unique_id", "ds"])
+bolt_lo = np.concatenate([np.asarray(q[:, 0]).ravel() for q in quantiles])
+bolt_hi = np.concatenate([np.asarray(q[:, 2]).ravel() for q in quantiles])
+```
+
+No training step, no orders to choose, no seasonal period declared. The model was never told these
+series are monthly — it reads the season off the context. Chronos-2 is the same call with
+`"amazon/chronos-2"`.
+
+```{python}
+#| include: false
+chronos2 = BaseChronosPipeline.from_pretrained("amazon/chronos-2", device_map="cpu")
+_, mean2 = chronos2.predict_quantiles(context_m3, prediction_length=H_M3, quantile_levels=[0.5])
+forecasts = forecasts.merge(as_frame("Chronos-2", mean2), on=["unique_id", "ds"])
+```
+
+## Everything on M3, scored {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| output-location: column
+scoreboard(m3_board(["snaive", "ETS", "Theta", "ETS + Theta",
+                     "LightGBM", "NHITS", "LSTM",
+                     "Chronos-Bolt", "Chronos-2"]),
+           rules={"mean MASE": "lower", "median MASE": "lower",
+                  "beats ETS on": "higher"})
+```
+
+- **Chronos-2, never trained on these series, has the lowest error on the board** — about 6% below
+  ETS, better than ETS on 58% of series, and ahead of the ETS + Theta average.
+- **Chronos-Bolt** is level with ETS: an ETS-quality forecast for 1428 series in seconds.
+- M3 is in **neither** model's pretraining corpus: a fair zero-shot test. Keep the size in view — the
+  best pretrained model of 2025 beats the M3 winner of 2000, averaged with ETS, by about 3%.
+
+## What a zero-shot forecast looks like {.smaller}
+
+```{python}
+#| label: m3-examples
+#| fig-align: center
+examples = ["M1143", "M484", "M1176"]          # Chronos-Bolt's win, a tie, and a loss
+fig, axes = plt.subplots(1, 3, figsize=(13, 3.6))
+for ax, uid in zip(axes, examples):
+    hist = train_m3[train_m3["unique_id"] == uid].tail(48)
+    fut = forecasts[forecasts["unique_id"] == uid]
+    i = order.index(uid)
+    ax.plot(hist["ds"], hist["y"], color=slate, linewidth=1)
+    ax.plot(fut["ds"], fut["y"], color="black", linewidth=1, label="actual")
+    ax.fill_between(fut["ds"], bolt_lo[i * H_M3:(i + 1) * H_M3], bolt_hi[i * H_M3:(i + 1) * H_M3],
+                    color=red_pink, alpha=0.2, label="Chronos-Bolt 80%")
+    ax.plot(fut["ds"], fut["Chronos-Bolt"], color=red_pink, linewidth=1.8, label="Chronos-Bolt")
+    ax.plot(fut["ds"], fut["ETS"], "--", color=blue, linewidth=1.5, label="ETS")
+    mase_of = lambda c: np.mean(np.abs(fut["y"] - fut[c])) / scale_m3[uid]
+    ax.set_title(f"{uid}: MASE  ETS {mase_of('ETS'):.2f},  Chronos-Bolt {mase_of('Chronos-Bolt'):.2f}", fontsize=10)
+axes[0].legend(loc="upper left", fontsize=8)
+plt.show()
+```
+
+- **M1143:** ETS extends the long upward trend; Chronos-Bolt reads the last two years' decline and
+  follows it.
+- **M484:** a noisy series with no clear pattern — both forecast a flat line, Chronos-Bolt with a wide,
+  honest band.
+- **M1176:** sharp yearly spikes. ETS reproduces them exactly; Chronos-Bolt flattens them, and loses
+  five times over.
+
+## Covariates: Chronos-2 and the 2026 World Cup {.smaller}
+
+Messi's Wikipedia page views from Week 8, on logs. Chronos-2 was released in **October 2025**; the 2026
+World Cup ran from 11 June to 19 July 2026. Whatever it forecasts here, it **cannot have seen**.
+
+Stand on 10 June 2026 and forecast 51 days — once from the history alone, once with a **known future
+covariate**: a 0/1 flag for tournament days, which anyone could write down from the fixture list.
+
+```{python}
+#| echo: true
+#| code-fold: false
+messi = pd.read_csv("../data/messi_wikipedia.csv", parse_dates=["ds"]).assign(item_id="messi")
+messi["y"] = np.log(messi["y"])
+tournaments = [("2016-06-03", 23), ("2018-06-14", 31), ("2019-06-14", 23), ("2021-06-13", 27),
+               ("2022-11-20", 28), ("2024-06-20", 24), ("2026-06-11", 38)]
+messi["tournament"] = 0
+for start, days in tournaments:
+    messi.loc[messi["ds"].between(start, pd.Timestamp(start) + pd.Timedelta(days=days)), "tournament"] = 1
+
+H_WC = 51
+history_wc = messi[messi["ds"] < "2026-06-11"]
+future_wc = messi[messi["ds"] >= "2026-06-11"].head(H_WC)
+settings = dict(id_column="item_id", timestamp_column="ds", target="y",
+                prediction_length=H_WC, quantile_levels=[0.1, 0.5, 0.9])
+alone = chronos2.predict_df(history_wc[["item_id", "ds", "y"]], **settings)
+with_flag = chronos2.predict_df(history_wc[["item_id", "ds", "y", "tournament"]],
+                                future_df=future_wc[["item_id", "ds", "tournament"]], **settings)
+```
+
+## The World Cup, forecast in advance {.smaller}
+
+```{python}
+#| label: world-cup
+#| fig-align: center
+from prophet import Prophet
+logging.getLogger("cmdstanpy").setLevel(logging.ERROR)
+events = pd.DataFrame([{"holiday": "tournament", "ds": pd.Timestamp(s), "lower_window": 0, "upper_window": d}
+                       for s, d in tournaments])
+prophet_wc = Prophet(holidays=events).fit(history_wc[["ds", "y"]])
+prophet_fc = prophet_wc.predict(future_wc[["ds"]])
+actual_wc = future_wc["y"].to_numpy()
+runs = {"Chronos-2, history only": (alone["predictions"], alone["0.1"], alone["0.9"], blue),
+        "Chronos-2 + tournament flag": (with_flag["predictions"], with_flag["0.1"], with_flag["0.9"], red_pink),
+        "Prophet + events table (Week 8)": (prophet_fc["yhat"], prophet_fc["yhat_lower"], prophet_fc["yhat_upper"], turquoise)}
+fig, ax = plt.subplots(figsize=(12, 3.6))
+recent = messi[messi["ds"].between("2026-04-01", future_wc["ds"].max())]
+ax.plot(recent["ds"], recent["y"], color=slate, linewidth=1.2, label="actual")
+for name, (point, lo, hi, colour) in runs.items():
+    ax.plot(future_wc["ds"], point, color=colour, linewidth=1.8, label=name)
+ax.axvspan(pd.Timestamp("2026-06-11"), pd.Timestamp("2026-07-19"), color=orange, alpha=0.08)
+ax.set_ylabel("log views")
+ax.legend(loc="upper left", fontsize=8)
+ax.set_title("From 10 June 2026: 51 days ahead; the shaded weeks are the tournament")
+plt.show()
+```
+
+The flag lifts the whole tournament period and brings the forecast down again after the final — the
+shape is right. The **level** is not: every model stays far below the matches' peaks.
+
+## What the flag bought {.smaller}
+
+```{python}
+#| echo: false
+wc_scores = pd.DataFrame({
+    name: {"MAE, log views": np.mean(np.abs(actual_wc - np.asarray(point))),
+           "views forecast / actual": np.exp(np.asarray(point)).sum() / np.exp(actual_wc).sum(),
+           "80% coverage": np.mean((actual_wc >= np.asarray(lo)) & (actual_wc <= np.asarray(hi)))}
+    for name, (point, lo, hi, _) in runs.items()}).T
+scoreboard(wc_scores, rules={"MAE, log views": "lower", "views forecast / actual": 1.0, "80% coverage": 0.80},
+           decimals=2)
+```
+
+- **The flag helps.** The error falls from 1.31 to 0.87 log points and the interval's coverage from
+  0.47 to 0.65. Chronos-2 reads the whole history (its context holds 8192 days) and takes what a
+  tournament does to these views from the six earlier ones — **in-context learning**, with no
+  parameter fitted to Messi.
+- **Everyone under-forecasts.** The forecast totals are a fifth to a third of the views that actually
+  came: this World Cup drew far more attention than the history implied.
+- **Prophet with the same table does worst** — one "tournament" effect averaged over World Cups and the
+  smaller Copas, and an interval with no error dynamics (Week 8) that covers 2% of the days.
+
+## Did it see the answer? {.smaller}
+
+A zero-shot score is only zero-shot if the test data were not in the pretraining corpus. For Chronos:
+
+- **M4 Monthly** — all 48,000 series — is in the corpus of Chronos (the paper's "in-domain" benchmark)
+  and of Chronos-2. The **last 18 months** of every series were held out of training.
+- **M3 Monthly** is in neither corpus.
+
+So on an M4 series the 18 months **before** the official test were seen in pretraining; the test itself
+was not. If the model **remembers**, it should do unusually well on that earlier window.
+
+| | window 1: months $-36$ to $-19$ | window 2: last 18 months |
+|---|---|---|
+| **M4** | seen in pretraining | held out |
+| **M3** | never seen | never seen |
+
+The test: Chronos's MASE **relative to ETS**, on 1000 series from each dataset, in each window. Memory
+would show as a gain from window 2 to window 1 on M4 **larger than** the same gain on M3 — a
+difference-in-differences. M3 absorbs everything about the two windows that has nothing to do with
+memory.
+
+## Seen and unseen windows {.smaller}
+
+```{python}
+#| code-summary: "The test, in code"
+leak = pd.read_csv("../data/foundation_leakage.csv")   # built by infra/foundation_leakage.py
+
+
+def memory_effect(df, model):
+    """Geometric-mean MASE ratio to ETS: (M4 seen / M4 test) / (M3 / M3)."""
+    r = np.log(df[model] / df["ETS"]).groupby([df["dataset"], df["window"]]).mean()
+    return np.exp((r["M4", "pretraining window"] - r["M4", "held-out test"])
+                  - (r["M3", "pretraining window"] - r["M3", "held-out test"]))
+
+
+def resample(df, rng, n=None):
+    """The same series in both windows: draw series, not rows."""
+    parts = []
+    for name, d in df.groupby("dataset"):
+        ids = d["unique_id"].unique()
+        pick = rng.choice(ids, n or len(ids), replace=n is None)
+        parts.append(d.set_index("unique_id").loc[pick].reset_index())
+    return pd.concat(parts)
+
+
+rng = np.random.default_rng(1)
+rows = {}
+for model in ["Chronos-Bolt", "Chronos-2", "snaive"]:
+    boot = [memory_effect(resample(leak, rng), model) for _ in range(300)]
+    rows[model] = {"memory effect": memory_effect(leak, model),
+                   "2.5%": np.percentile(boot, 2.5), "97.5%": np.percentile(boot, 97.5)}
+scoreboard(pd.DataFrame(rows).T, rules={"memory effect": 1.0})
+```
+
+```{python}
+#| include: false
+# How often does a 300-series sample show a "memory effect" below 0.95 when there is none?
+pilots = np.array([memory_effect(resample(leak, np.random.default_rng(s), n=300), "Chronos-2")
+                   for s in range(500)])
+assert 0.08 < np.mean(pilots < 0.95) < 0.20, np.mean(pilots < 0.95)
+```
+
+- **No memory found.** Below 1 would mean Chronos does better on the window it saw; both sit at 1,
+  intervals about 0.94–1.06. Chronos-2 beats ETS by about 6% in all four cells, seen or unseen.
+- **The placebo shows the test can see.** Seasonal naive has no memory, yet its row moves (1.14,
+  interval excluding 1): differences between the windows are detected when they exist.
+- **Small tests mislead.** A first run on 300 series per dataset gave 0.94 — "6% memory". With no
+  effect at all, about one 300-series sample in seven shows that much.
+
+Not shown: that the corpus is harmless. If your holdout itself were in it, only the release date
+would protect you.
+
+## A zero-shot comparison you can trust {.smaller}
+
+The final project asks for one (2 points, for the setup — not for who wins). The checklist:
+
+1. **Same cutoff, same horizon, same metric** as your own model. The foundation model gets the
+   training history as its context and nothing after it.
+2. **No tuning on the holdout.** Choosing among five foundation models by their test score is
+   selection on the test set — Week 3's oldest mistake.
+3. **Check the corpus.** Find the model's list of training datasets (Chronos: the paper's Table 3;
+   Chronos-2: Table 6). If your data, or a famous public version of it, is on the list, say so.
+4. **Check the dates.** A model released before your holdout period began cannot have seen the holdout.
+   That is the one guarantee that does not depend on anyone's documentation.
+5. **Report the interval too.** A zero-shot model's quantiles are a forecast like any other: score
+   their coverage, as in Week 8.
+
+# Wrapping up
+
+## Eight ways to get this wrong {.tiny}
+
+| Trap | What you see | Fix |
+|---|---|---|
+| A neural network on 100 observations | A perfect fit, a wild forecast | Few weights, or a global model, or a simpler model |
+| One random seed | A different forecast every run | Average several networks, or fix and report the seed |
+| Unscaled inputs to a network | Training that never converges | Scale each series first |
+| A global model on incomparable series | Big series dominate the loss | Scale per series: `LocalStandardScaler`, `scaler_type` |
+| Neural results without a benchmark | "LSTM: MAE 412" — and nothing to compare it with | Seasonal naive and ETS on the same holdout, always |
+| Zero-shot scored on data in the pretraining corpus | Results that look too good | Check the corpus list and the release date |
+| Picking the foundation model by test score | An optimistic comparison | Choose on validation windows, report on the test |
+| "Pretrained" read as "better" | A slower, opaque model that loses to Theta | It is one more candidate on the rolling origin |
+
+## What this lecture is, in one slide {.smaller}
+
+- **NNAR** is an autoregression with a hidden layer: non-linear, local, averaged over random starts,
+  with intervals by simulation. It needs long series.
+- **Global models** pool many series after scaling each: LightGBM on lags, N-HiTS, LSTM. They borrow
+  strength across series; that is what makes deep learning work on short series at all.
+- **Recurrent networks** carry a state forward; the **LSTM** keeps it with gates — ETS's "keep most of
+  the old, add a little of the new", learned.
+- **Foundation models** are global models trained on everything available, applied **zero-shot**.
+  They are fast, easy, often strong — and their test is only honest if the test data were not in the
+  corpus.
+
+## In the practice session {.smaller}
+
+**Tomorrow's practice** is the worked example for **Lab 8**, the last weekly lab: the *Advanced
+Forecasting Methods* lecture — combining your ETS, ARIMA and MSTL forecasts on your own series.
+
+**Today's material has no lab of its own.** It comes back in **Week 10**, in the final project: run a
+foundation model zero-shot on the project dataset and compare it, honestly, with your own model.
+
+::: {.callout-tip}
+## Before Week 10
+
+Run Chronos-Bolt on **your Track B series** — the four lines above, `prediction_length` equal to your
+horizon. Put its forecast next to your Lab 7 model on the same validation window. You will have the
+whole comparison the project asks for, done once already.
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe="colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify solar book-bold >}} [Course materials](https://teaching.kse.org.ua/course/view.php?id=4432)
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi youtube >}} [@datamirosh](https://www.youtube.com/@datamirosh)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)

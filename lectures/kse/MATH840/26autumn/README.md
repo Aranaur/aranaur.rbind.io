@@ -39,13 +39,15 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 ## Layout
 
 ```
-slides/   .00 syllabus, .01–.08 weeks 1–8 (dot-prefixed: not rendered into the site)
+slides/   .00 syllabus, .01–.09 weeks 1–9 (dot-prefixed: not rendered into the site)
 labs/     .labNN.qmd handouts, _labNN.ipynb templates, _demoNN.ipynb practice demos,
           .demoNN-notes.md how to run the session
 data/     datasets served to students over raw.githubusercontent.com
           walmart.csv is the Kaggle Walmart store-sales file, kept here so the demo has covariates
+          m3_monthly.csv is the M3 competition monthly set (Week 9); neuralprophet_*.csv are built
+          by infra/neuralprophet_messi.py, foundation_leakage.csv by infra/foundation_leakage.py
 data/trackb/  the issued Track B series, one CSV per code, plus index.csv
-infra/    publishing, deck PDFs, and the Track B pool and scorer
+infra/    publishing, deck PDFs, the Track B pool and scorer, and the Week 9 experiments
 project/  final project (Week 10)
 ```
 
@@ -123,9 +125,24 @@ Credentials are read from the environment and are never stored in this repositor
 
 The decks need more than `pyproject.toml` declares: `statsforecast`, `utilsforecast`,
 `statsmodels`, `scipy`, `scikit-learn`, `duckdb`, `plotly`, `seaborn`, `tsfeatures`,
-`great_tables`, `fpppy` and `prophet` (Week 8). They are installed in `.venv` but not recorded as project
+`great_tables`, `fpppy` and `prophet` (Week 8), and for Week 9 `torch` (CPU build, from
+`--index-url https://download.pytorch.org/whl/cpu`), `neuralforecast`, `mlforecast`, `lightgbm`,
+`chronos-forecasting` and `datasetsforecast`. They are installed in `.venv` but not recorded as project
 dependencies, so **`uv sync` removes them** and the decks stop rendering. Reinstall with
 `uv pip install --link-mode=copy <packages>` if that happens.
+
+**`mlforecast` declares `pandas<3.0`**, so installing it downgrades pandas to 2.x. It works with
+pandas 3; restore it afterwards with `uv pip install --link-mode=copy --no-deps pandas==3.0.5`.
+The Week 9 deck trains ten `neuralforecast` models on M3 and takes about twenty minutes to render
+on a laptop CPU (TFT alone, ten).
+
+**NeuralProphet does not install here**: its last release (0.9.0, June 2024) needs `numpy<2` and
+`pandas<3`. `infra/neuralprophet_messi.py` runs in its own `.venv-neuralprophet` (Python 3.12; the
+commands are in its docstring) and writes the CSVs the Week 9 deck reads.
+
+`slides/.foundation-models-draft.qmd` is the foundation-models material (Chronos, Chronos-2, the
+pretraining-leakage test) cut from Week 9, kept for its own lecture. It renders as it stands, with the
+Chronos packages above and the Hugging Face weights.
 
 Pandas is 3.0.5, which satisfies the `>= 3.0.2` pin. Pandas 3 dropped the legacy
 frequency aliases, so use `QE`/`QS`, `ME`/`MS`, `YE`/`YS` and lowercase `h` in any new
@@ -146,3 +163,4 @@ Weeks are offset by one against the 2025/26 decks, because Week 1 merged last ye
 | 6 | `.06` | `.07`, non-seasonal half |
 | 7 | `.07` | `.07`, seasonal half, plus dynamic regression |
 | 8 | `.08` | `.08` |
+| 9 | `.09` | `.09` (neural networks, rewritten), plus NeuralProphet and the `neuralforecast` zoo |
