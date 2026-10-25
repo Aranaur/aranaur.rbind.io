@@ -1,0 +1,820 @@
+---
+title: "Time Series in the AI Era"
+subtitle: "Foundation Models for Forecasting | School of Digital Business 5.0"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown+emoji
+title-slide-attributes:
+    data-background-iframe: colored-particles/index.html
+footer: "Genesis × KSE | School of Digital Business"
+format:
+  revealjs:
+    fragments: false
+    code-line-numbers: false
+    code-fold: true
+    code-summary: "Code"
+    navigation-mode: vertical
+    transition: fade
+    background-transition: fade
+    chalkboard: true
+    logo: img/kse.png
+    slide-number: true
+    toc: true
+    toc-depth: 1
+    mouse-wheel: true
+    width: 1350
+    height: 759.375
+    highlight-style: github
+    fig-format: svg
+    fig-align: center
+    theme: [default, custom.scss]
+preload-iframes: true
+execute:
+  echo: true
+  warning: false
+editor_options:
+  chunk_output_type: console
+
+revealjs-plugins:
+  - verticator
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+red_pink   = "#e64173"
+turquoise  = "#20B2AA"
+orange     = "#FFA500"
+red        = "#fb6107"
+blue       = "#181485"
+green      = "#8bb174"
+purple     = "#6A5ACD"
+slate      = "#314f4f"
+
+import warnings
+warnings.filterwarnings("ignore")
+import os
+os.environ["NIXTLA_ID_AS_COL"] = "true"
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+import logging
+for name in ("transformers", "lightning", "pytorch_lightning"):
+    logging.getLogger(name).setLevel(logging.ERROR)
+import transformers
+transformers.utils.logging.disable_progress_bar()
+import numpy as np
+np.random.seed(1)
+import pandas as pd
+pd.set_option("display.precision", 3)
+import seaborn as sns
+sns.set_style("whitegrid")
+import matplotlib.pyplot as plt
+plt.style.use("ggplot")
+plt.rcParams.update({"figure.figsize": (8, 5), "figure.dpi": 100, "savefig.dpi": 300,
+                     "figure.constrained_layout.use": True, "axes.titlesize": 12, "axes.labelsize": 10,
+                     "xtick.labelsize": 9, "ytick.labelsize": 9, "legend.fontsize": 9})
+import matplotlib as mpl
+from cycler import cycler
+mpl.rcParams['axes.prop_cycle'] = cycler(color=[slate, blue, turquoise, orange, red, green, purple, red_pink])
+import matplotlib.dates as mdates
+from matplotlib.patches import FancyBboxPatch
+
+import torch
+torch.manual_seed(1)
+from statsmodels.tsa.seasonal import STL
+from statsforecast import StatsForecast
+from statsforecast.models import AutoETS, Naive, SeasonalNaive
+from great_tables import GT, loc, style as gt_style
+from matplotlib.colors import LinearSegmentedColormap, to_hex
+
+shade = LinearSegmentedColormap.from_list("shade", ["#bfe0b0", "#ffffff", "#f5b8cb"])
+
+
+def scoreboard(table, rules=None, decimals=2, size="0.8em"):
+    """A results table: green is better, pink is worse, the best in bold."""
+    df = table.to_frame() if isinstance(table, pd.Series) else table.copy()
+    df.index = [str(i) for i in df.index]
+    df.columns = [str(c) for c in df.columns]
+    rules = rules or {c: "lower" for c in df.columns}
+    gt = (GT(df.reset_index(names="row"), rowname_col="row")
+          .fmt_number(columns=list(df.select_dtypes("number").columns), decimals=decimals)
+          .sub_missing(missing_text="")
+          .tab_options(table_font_size=size, data_row_padding="3px"))
+    for c, rule in rules.items():
+        values = df[c].astype(float)
+        bad = values if rule == "lower" else -values if rule == "higher" else (values - rule).abs()
+        lo, hi = np.nanmin(bad), np.nanmax(bad)
+        for i, b in enumerate(bad):
+            if np.isnan(b):
+                continue
+            fill = to_hex(shade((b - lo) / (hi - lo) if hi > lo else 0.0))
+            look = [gt_style.fill(color=fill)] + ([gt_style.text(weight="bold")] if b == np.nanmin(bad) else [])
+            gt = gt.tab_style(style=look, locations=loc.body(columns=c, rows=[i]))
+    return gt
+
+
+def box(ax, x, y, w, h, text, colour, size=12):
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02", facecolor="white",
+                                edgecolor=colour, linewidth=2))
+    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=size)
+
+
+views = pd.read_csv("../data/pageviews.csv", parse_dates=["ds"])
+series = {name: g.set_index("ds")["y"] for name, g in views.groupby("unique_id")}
+thousands = mpl.ticker.FuncFormatter(lambda v, _: f"{v / 1000:,.0f}k")
+```
+
+# Why forecast at all
+
+## Every plan is a forecast {.smaller}
+
+:::: {.columns}
+::: {.column width="55%"}
+Whether or not anyone calls it that, a digital business forecasts every week:
+
+| Decision | The forecast behind it |
+|---|---|
+| Next month's ad budget | installs, CPI, conversion |
+| Servers, support shifts | traffic, tickets by hour |
+| Revenue plan for the board | subscriptions, renewals, churn |
+| When a campaign pays back | the cohort's revenue curve |
+| An alert on a dashboard | "what is normal today?" |
+:::
+
+::: {.column width="45%"}
+A useful forecast has four parts:
+
+1. **A number** — the most likely value.
+2. **A range** — how wrong it can reasonably be.
+3. **A horizon** — how far ahead it is honest.
+4. **A decision** it feeds. A forecast nobody acts on is a chart.
+
+[Today: how to get all four — and whether the new AI models get them better than the old tools.]{.hi}
+:::
+::::
+
+## What is new in 2026 {.smaller}
+
+You already use **foundation models** for text: one model, trained on most of the internet, answers
+questions about documents it has never seen.
+
+Since 2023–24 the same idea exists for **time series**: models trained on **hundreds of billions** of data
+points — web traffic, energy, retail, weather — that forecast **your** metric with **no training at
+all**. Amazon, Google, Salesforce and Nixtla release them; most are free.
+
+Three questions for today:
+
+- **Do they work** on the kind of numbers you look at — product attention, sales, traffic?
+- **Where do they fail**, and how do you notice before the board does?
+- **Can't I just paste the numbers into ChatGPT or Claude?** We will measure it.
+
+::: {.callout-note}
+## Our data today
+
+Daily **Wikipedia page views** of real products and events — ChatGPT, Duolingo, Spotify, Netflix, Tinder,
+Strava, TikTok, Notion, Threads, Black Friday. A public, honest proxy for **attention** to a product, with
+the same habits as your dashboards: weekly rhythms, seasons, campaigns, launches, decline.
+:::
+
+# The basics: reading a time series
+
+## Four things every series is made of {.smaller}
+
+```{python}
+#| label: anatomy
+#| fig-align: center
+fig, axes = plt.subplots(2, 2, figsize=(13, 5.4))
+cases = [("Tinder", "2019-01-01", "Trend: slow decline over years", slate),
+         ("ChatGPT", "2026-07-01", "Weekly season: weekdays vs weekends", blue),
+         ("Black Friday", "2019-01-01", "Yearly event: the same week every year", turquoise),
+         ("Duolingo", "2024-09-01", "Shock: a one-off campaign", red_pink)]
+for ax, (name, start, title, colour) in zip(axes.ravel(), cases):
+    s = series[name][start:]
+    ax.plot(s.index, s.values, color=colour, linewidth=0.9)
+    ax.set_title(f"{name} — {title}", fontsize=11)
+    ax.yaxis.set_major_formatter(thousands)
+plt.show()
+```
+
+**Trend**, **season**, **events**, **noise** — every method, classical or AI, separates these four and
+extends the first three.
+
+## Taking a series apart {.smaller}
+
+```{python}
+#| label: stl
+#| fig-align: center
+chatgpt = series["ChatGPT"]["2025-01-01":]
+parts = STL(np.log(chatgpt), period=7, robust=True).fit()
+fig, axes = plt.subplots(1, 3, figsize=(13, 3.2))
+axes[0].plot(chatgpt.index, np.exp(parts.trend), color=blue)
+axes[0].set_title("Trend (weekly rhythm removed)")
+axes[0].yaxis.set_major_formatter(thousands)
+week = pd.Series(np.exp(parts.seasonal.values), index=chatgpt.index).groupby(chatgpt.index.dayofweek).mean()
+axes[1].bar(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], week.values - 1, color=turquoise)
+axes[1].set_title("Weekly season: % above an average day")
+axes[1].yaxis.set_major_formatter(mpl.ticker.PercentFormatter(1.0))
+axes[2].plot(chatgpt.index, np.exp(parts.resid) - 1, color="grey", linewidth=0.6)
+axes[2].set_title("What is left: noise and events")
+axes[2].yaxis.set_major_formatter(mpl.ticker.PercentFormatter(1.0))
+plt.show()
+```
+
+- **Weekly season:** Tuesday and Wednesday are about **16%** above an average day, Saturday about **22%**
+  below — the rhythm of work and study. Any forecast that misses it is wrong every weekend.
+- **Trend:** after the weekly rhythm is removed, what remains moves slowly — that is what a forecast
+  extends.
+- **What is left** is mostly small noise, with a few huge days: events no history explains.
+
+## The first forecasts to try {.smaller}
+
+Before any model, three rules anyone can compute in a spreadsheet:
+
+```{python}
+#| label: baselines
+#| fig-align: center
+s = series["ChatGPT"]["2026-08-01":"2026-10-24"]
+cut = pd.Timestamp("2026-09-26")
+hist, future = s[:cut], s[cut + pd.Timedelta(days=1):]
+h = len(future)
+rules = {"naive: same as yesterday": np.repeat(hist.iloc[-1], h),
+         "seasonal naive: same day last week": hist.iloc[-7:].to_numpy()[np.arange(h) % 7],
+         "average of the last 4 weeks": np.repeat(hist.iloc[-28:].mean(), h)}
+fig, ax = plt.subplots(figsize=(12, 3.4))
+ax.plot(s.index, s.values, color=slate, linewidth=1, label="actual")
+for (name, f), colour in zip(rules.items(), [orange, red_pink, blue]):
+    ax.plot(future.index, f, color=colour, linewidth=1.8, label=name)
+ax.axvline(cut, color="grey", linewidth=0.8)
+ax.yaxis.set_major_formatter(thousands)
+ax.legend(loc="lower left", fontsize=8, ncol=3)
+ax.set_title("ChatGPT page views: four weeks ahead from 26 September 2026")
+plt.show()
+print({name: f"MAE {np.mean(np.abs(future.values - f)) / 1000:.1f}k" for name, f in rules.items()})
+```
+
+These are the **benchmarks**. A model — any model, however clever — earns its place only by beating
+them on data it has not seen. Surprisingly often, it does not.
+
+## Judging a forecast honestly: backtesting {.smaller}
+
+```{python}
+#| label: backtest
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(12, 2.8))
+for k in range(4):
+    y = 3 - k
+    ax.add_patch(plt.Rectangle((0, y), 6 + k, 0.6, color=blue, alpha=0.6))
+    ax.add_patch(plt.Rectangle((6 + k, y), 1, 0.6, color=red_pink, alpha=0.8))
+    ax.text(-0.2, y + 0.3, f"window {k + 1}", ha="right", va="center", fontsize=10)
+ax.text(3, 4.0, "history the model may use", color=blue, ha="center")
+ax.text(10.5, 4.0, "the period it must forecast", color=red_pink, ha="center")
+ax.set_xlim(-2, 12)
+ax.set_ylim(-0.2, 4.4)
+ax.axis("off")
+plt.show()
+```
+
+- Cut the history at a past date, forecast the next weeks, **compare with what actually happened**.
+  Move the cut forward and repeat: one window is luck, six windows are evidence.
+- **Never** judge a model on the data it was fitted to, and never shuffle days at random — the future
+  must stay in the future.
+- Score with an error you can explain: **MAE** (average miss, in views), **MAPE** (average miss, in %).
+
+::: {.callout-note}
+## For analysts
+
+MAPE explodes near zero and rewards under-forecasting; compare models with a **scaled** error instead.
+We use **MASE**: the model's MAE divided by the MAE of "same day last week" in the past. Below 1 —
+better than that rule.
+:::
+
+## A range, not a number {.smaller}
+
+```{python}
+#| label: quantiles
+#| fig-align: center
+from chronos import BaseChronosPipeline
+
+chronos2 = BaseChronosPipeline.from_pretrained("amazon/chronos-2", device_map="cpu")
+context = torch.tensor(hist.values, dtype=torch.float32)
+q, _ = chronos2.predict_quantiles([torch.tensor(series["ChatGPT"][:cut].values, dtype=torch.float32)],
+                                  prediction_length=h, quantile_levels=[0.1, 0.5, 0.9])
+q = np.asarray(q[0]).reshape(h, 3)
+fig, ax = plt.subplots(figsize=(12, 3.3))
+ax.plot(s.index, s.values, color=slate, linewidth=1, label="actual")
+ax.fill_between(future.index, q[:, 0], q[:, 2], color=red_pink, alpha=0.2, label="P10–P90")
+ax.plot(future.index, q[:, 1], color=red_pink, linewidth=2, label="P50 (median)")
+ax.axvline(cut, color="grey", linewidth=0.8)
+ax.yaxis.set_major_formatter(thousands)
+ax.legend(loc="lower left", fontsize=8)
+plt.show()
+inside = np.mean((future.values >= q[:, 0]) & (future.values <= q[:, 2]))
+print(f"Days inside the P10–P90 band: {inside:.0%} (a calibrated band holds about 80%)")
+```
+
+- **P50**: half the days will be above, half below. **P10 / P90**: a bad case and a good case.
+- Budget to P50, keep the cash for P90, check that P10 does not break anything.
+- The band is only worth something if it is **calibrated**: count how often reality falls inside.
+
+## The classical toolbox, in one slide {.smaller}
+
+| Method | Idea | Good at | Weak at |
+|---|---|---|---|
+| **Seasonal naive** | repeat last week / last year | strong seasons | everything else |
+| **Exponential smoothing (ETS)** | recent past weighs more | level, trend, one season | events, several seasons |
+| **ARIMA** | regression on its own past | short-term dynamics | long horizons, regime changes |
+| **Prophet** | trend + seasons + holidays | readable, quick | no memory of yesterday |
+| **Gradient boosting** (LightGBM) | features → number, across many series | many similar series | needs feature work |
+
+: {tbl-colwidths="[20,30,25,25]"}
+
+All of them are **fitted to your series**: someone chooses the model, its settings, its features, and
+refits it as data arrive. That is the work a foundation model promises to remove.
+
+# Foundation models for time series
+
+## The same idea as your chat assistant {.smaller}
+
+```{python}
+#| label: fm-idea
+#| fig-align: center
+fig, ax = plt.subplots(figsize=(12, 2.7))
+box(ax, 0.0, 0.35, 2.6, 0.5, "billions of points\nfrom thousands of domains", slate)
+box(ax, 3.3, 0.35, 2.0, 0.5, "pretraining\n(once, on GPUs)", blue)
+box(ax, 6.0, 0.35, 2.0, 0.5, "one model", red_pink)
+box(ax, 8.7, 0.6, 3.0, 0.35, "your metric's history  →", orange)
+box(ax, 8.7, 0.1, 3.0, 0.35, "→  forecast + range", turquoise)
+for x0, x1 in [(2.6, 3.3), (5.3, 6.0)]:
+    ax.annotate("", xy=(x1, 0.6), xytext=(x0, 0.6), arrowprops=dict(arrowstyle="->", lw=1.5, color="grey"))
+ax.annotate("", xy=(8.7, 0.6), xytext=(8.0, 0.6), arrowprops=dict(arrowstyle="<-", lw=1.5, color="grey"))
+ax.annotate("", xy=(8.7, 0.3), xytext=(8.0, 0.5), arrowprops=dict(arrowstyle="->", lw=1.5, color="grey"))
+ax.set_xlim(-0.1, 11.8)
+ax.set_ylim(0, 1.05)
+ax.axis("off")
+plt.show()
+```
+
+- **Pretraining:** a transformer — the architecture behind ChatGPT — learns from a huge, varied pile of
+  series what usually comes next.
+- **Zero-shot:** you give it your history; it gives back a forecast. No fitting, no model choice.
+- **Tokens:** a language model reads words; these read values or short **patches** of values. Chronos,
+  for example, scales the series and turns each value into one of 4096 "words".
+
+## Who makes them {.smaller}
+
+| Model | From | Released | Access | Covariates | Note |
+|---|---|---|---|---|---|
+| **Chronos-2** | Amazon | Oct 2025 | free, runs on a laptop | yes | strong across public benchmarks |
+| **TimesFM 2.5** | Google | Sep 2025 | free, runs on a laptop | yes (linear add-on) | trained mostly on Wikipedia page views |
+| **TimeGPT** | Nixtla | 2023– | paid API, 30-day trial | yes | your data goes to their servers |
+| **Moirai 2.0** | Salesforce | 2025 | free | yes | its first version was trained on the open LOTSA corpus |
+| **TiRex** | NX-AI | 2025 | free, small (35M) | no | a recurrent (xLSTM) design |
+
+: {tbl-colwidths="[14,11,11,22,14,28]"}
+
+**Open** models run on your own machine — the data never leave it. **API** models need an account,
+cost money at scale, and send your numbers to someone else's server: ask before you upload company data.
+
+
+
+## Zero-shot in four lines {.smaller}
+
+```{python}
+#| echo: true
+#| code-fold: false
+#| eval: false
+from chronos import BaseChronosPipeline
+import torch
+
+model = BaseChronosPipeline.from_pretrained("amazon/chronos-2", device_map="cpu")   # ~500 MB, once
+quantiles, mean = model.predict_quantiles([torch.tensor(history)], prediction_length=28,
+                                          quantile_levels=[0.1, 0.5, 0.9])
+```
+
+That is the whole of it: no seasonal period declared, no parameters chosen, no training. These four
+lines drew the P10–P90 range on the ChatGPT chart earlier.
+
+The question is not whether it runs. It is whether it **beats "same day last week"** — on many products,
+on many weeks, on data the model **cannot have seen**.
+
+## The test: ten products, six months {.smaller}
+
+- **Ten** daily series, from ChatGPT to Black Friday.
+- **Six windows** of **28 days**, May to October 2026 — all **after** the release of every model tested,
+  so none of them can have seen the answers.
+- **Six** forecasters: three classical rules and models, three foundation models. The same history for
+  each.
+
+```{python}
+#| echo: true
+#| code-fold: true
+#| code-summary: "The backtest, in code"
+import timesfm
+import tirex
+
+products = ["ChatGPT", "Duolingo", "Spotify", "Netflix", "Tinder", "Strava", "TikTok", "Notion",
+            "Threads", "Black Friday"]
+panel = views[views["unique_id"].isin(products) & (views["ds"] >= "2023-01-01")].dropna()
+H, WINDOWS = 28, 6
+dates = np.sort(panel["ds"].unique())
+cutoffs = [dates[len(dates) - (WINDOWS - k) * H - 1] for k in range(WINDOWS)]
+
+tfm = timesfm.TimesFM_2p5_200M_torch.from_pretrained("google/timesfm-2.5-200m-pytorch")
+tfm.compile(timesfm.ForecastConfig(max_context=1024, max_horizon=128, normalize_inputs=True,
+                                   use_continuous_quantile_head=True))
+tirex_model = tirex.load_model("NX-AI/TiRex", device="cpu")
+
+frames = []
+for cutoff in cutoffs:
+    history = panel[panel["ds"] <= cutoff]
+    window = panel[panel["ds"] > cutoff].groupby("unique_id").head(H).copy()
+    classic = StatsForecast(models=[Naive(alias="Naive"), SeasonalNaive(7, alias="Seasonal naive"),
+                                    AutoETS(season_length=7, alias="ETS")], freq="D")
+    window = window.merge(classic.forecast(df=history[history["ds"] > cutoff - np.timedelta64(730, "D")], h=H),
+                          on=["unique_id", "ds"])
+    ids = sorted(history["unique_id"].unique())
+    contexts = [torch.tensor(history[history["unique_id"] == i]["y"].values, dtype=torch.float32) for i in ids]
+    keys = pd.DataFrame({"unique_id": np.repeat(ids, H), "ds": np.tile(np.sort(window["ds"].unique()), len(ids))})
+    q, _ = chronos2.predict_quantiles(contexts, prediction_length=H, quantile_levels=[0.1, 0.5, 0.9])
+    keys["Chronos-2"] = np.concatenate([np.asarray(x).reshape(-1, 3)[:, 1] for x in q])
+    keys["Chronos-2 P10"] = np.concatenate([np.asarray(x).reshape(-1, 3)[:, 0] for x in q])
+    keys["Chronos-2 P90"] = np.concatenate([np.asarray(x).reshape(-1, 3)[:, 2] for x in q])
+    point, _ = tfm.forecast(horizon=H, inputs=[c.numpy() for c in contexts])
+    keys["TimesFM"] = np.asarray(point).ravel()
+    _, mean = tirex_model.forecast(context=contexts, prediction_length=H)
+    keys["TiRex"] = np.asarray(mean).ravel()
+    frames.append(window.merge(keys, on=["unique_id", "ds"]).assign(cutoff=cutoff))
+backtest = pd.concat(frames)
+
+scale = {}
+for name in products:                                   # MAE of "same day last week", in the year before
+    v = panel[(panel["unique_id"] == name) & (panel["ds"] <= cutoffs[0])]["y"].values[-365:]
+    scale[name] = np.mean(np.abs(v[7:] - v[:-7]))
+forecasters = ["Naive", "Seasonal naive", "ETS", "Chronos-2", "TimesFM", "TiRex"]
+mase = backtest.groupby("unique_id").apply(
+    lambda g: pd.Series({m: np.mean(np.abs(g["y"] - g[m])) / scale[g.name] for m in forecasters}),
+    include_groups=False)
+```
+
+## The result {.smaller}
+
+:::: {.columns}
+::: {.column width="48%"}
+```{python}
+summary = pd.DataFrame({
+    "MASE, average": mase.mean(),
+    "beats seasonal naive on": mase.lt(mase["Seasonal naive"], axis=0).sum().astype(int).astype(str) + " of 10"})
+summary = summary.loc[forecasters]
+scoreboard(summary, rules={"MASE, average": "lower"}, size="0.9em")
+```
+:::
+
+::: {.column width="52%"}
+```{python}
+#| label: per-product
+fig, ax = plt.subplots(figsize=(7, 4.6))
+order = mase["Seasonal naive"].sort_values().index
+y = np.arange(len(order))
+ax.scatter(mase.loc[order, "Seasonal naive"], y, color=slate, s=40, label="Seasonal naive", zorder=3)
+ax.scatter(mase.loc[order, "Chronos-2"], y, color=red_pink, s=40, label="Chronos-2", zorder=3)
+for i, name in enumerate(order):
+    ax.plot([mase.loc[name, "Seasonal naive"], mase.loc[name, "Chronos-2"]], [i, i], color="lightgray", zorder=1)
+ax.set_yticks(y, order)
+ax.set_xlabel("MASE (lower is better)")
+ax.legend(fontsize=8, loc="lower right")
+ax.set_title("Per product: the rule vs the foundation model", fontsize=10)
+plt.show()
+```
+:::
+::::
+
+**Chronos-2 beat "same day last week" on all ten products** with no setting chosen; TimesFM and TiRex on
+nine, ETS on six. The foundation models cut the best simple rule's error by **12–16%**.
+
+## What a 28-day forecast looks like {.smaller}
+
+```{python}
+#| label: examples
+#| fig-align: center
+last = backtest[backtest["cutoff"] == cutoffs[-1]]
+fig, axes = plt.subplots(1, 3, figsize=(13, 3.4))
+for ax, name in zip(axes, ["ChatGPT", "Netflix", "Spotify"]):
+    hist_ = panel[(panel["unique_id"] == name) & (panel["ds"] > cutoffs[-1] - np.timedelta64(70, "D"))]
+    g = last[last["unique_id"] == name]
+    ax.plot(hist_["ds"], hist_["y"], color=slate, linewidth=1)
+    ax.fill_between(g["ds"], g["Chronos-2 P10"], g["Chronos-2 P90"], color=red_pink, alpha=0.2)
+    ax.plot(g["ds"], g["Chronos-2"], color=red_pink, linewidth=1.8, label="Chronos-2")
+    ax.plot(g["ds"], g["Seasonal naive"], "--", color=blue, linewidth=1.2, label="same day last week")
+    ax.set_title(f"{name}: MASE {mase.loc[name, 'Chronos-2']:.2f} vs {mase.loc[name, 'Seasonal naive']:.2f}",
+                 fontsize=10)
+    ax.yaxis.set_major_formatter(thousands)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+axes[0].legend(fontsize=8, loc="lower left")
+plt.show()
+```
+
+The model follows each product's weekly rhythm and level; the band widens where the history has been
+volatile (Netflix) and stays narrow where it has not. Spotify is the hardest series of the ten for every
+method — MASE above 1 for all of them: its last months moved in a way its past did not foretell.
+
+# Events: the part that matters most
+
+## A predictable peak: Black Friday {.smaller}
+
+Every year, the same week. Can a model that was never told about Black Friday see it coming from the
+history alone? Forecast made on **1 October 2025**, 90 days ahead:
+
+```{python}
+#| label: black-friday
+#| fig-align: center
+bf = series["Black Friday"]
+cut_bf = pd.Timestamp("2025-10-01")
+ctx_bf = torch.tensor(bf[:cut_bf].values, dtype=torch.float32)
+qb, _ = chronos2.predict_quantiles([ctx_bf], prediction_length=90, quantile_levels=[0.1, 0.5, 0.9])
+qb = np.asarray(qb[0]).reshape(90, 3)
+future_bf = bf[cut_bf + pd.Timedelta(days=1):][:90]
+last_year = bf[cut_bf - pd.Timedelta(days=364) + pd.Timedelta(days=1):][:90].values      # same weekday, a year ago
+fig, ax = plt.subplots(figsize=(12, 3.4))
+ax.plot(bf["2025-08-01":"2026-01-05"].index, bf["2025-08-01":"2026-01-05"].values, color=slate, label="actual")
+ax.fill_between(future_bf.index, qb[:, 0], qb[:, 2], color=red_pink, alpha=0.2)
+ax.plot(future_bf.index, qb[:, 1], color=red_pink, linewidth=1.8, label="Chronos-2, from 1 Oct")
+ax.plot(future_bf.index, last_year, "--", color=blue, linewidth=1.2, label="same day last year")
+ax.set_yscale("log")
+ax.legend(loc="upper left", fontsize=8)
+plt.show()
+peak_day = future_bf.idxmax()
+print(f"Actual peak {peak_day:%d %b} ({future_bf.max():,.0f} views); Chronos-2's highest day "
+      f"{future_bf.index[np.argmax(qb[:, 1])]:%d %b} ({qb[:, 1].max():,.0f})")
+```
+
+It **saw the peak coming** from history alone — the right week, one day early — but **under-shot its
+height** (55k against 83k). Over the 90 days it beat "same day last year" by a third (miss 1.9k vs 2.8k).
+
+## An unpredictable peak: a campaign {.smaller}
+
+On 11 February 2025 Duolingo announced that its mascot, the green owl, had died — a viral marketing
+stunt. Page views went from about 2,000 a day to 75,000 in two days. The same model, forecasting from
+the week before:
+
+```{python}
+#| label: duolingo
+#| fig-align: center
+duo = series["Duolingo"]
+cut_d = pd.Timestamp("2025-02-04")
+qd, _ = chronos2.predict_quantiles([torch.tensor(duo[:cut_d].values, dtype=torch.float32)],
+                                   prediction_length=28, quantile_levels=[0.1, 0.5, 0.9])
+qd = np.asarray(qd[0]).reshape(28, 3)
+future_d = duo[cut_d + pd.Timedelta(days=1):][:28]
+fig, ax = plt.subplots(figsize=(12, 3.2))
+ax.plot(duo["2025-01-25":"2025-03-10"].index, duo["2025-01-25":"2025-03-10"].values, color=slate, label="actual")
+ax.fill_between(future_d.index, qd[:, 0], qd[:, 2], color=red_pink, alpha=0.25, label="Chronos-2 P10–P90")
+ax.plot(future_d.index, qd[:, 1], color=red_pink, linewidth=1.8)
+ax.set_yscale("log")
+ax.legend(loc="upper left", fontsize=8)
+plt.show()
+print(f"Peak day {future_d.idxmax():%d %b}: {future_d.max():,.0f} views; the model's P90 for that day: "
+      f"{qd[np.argmax(future_d.values), 2]:,.0f}")
+```
+
+The model's **90th percentile** for the peak day: about **5,000** views; the day brought **75,000**. No
+model could have known — **the marketing team did.** Such an event enters a forecast only through a
+person: as a scenario, or a covariate.
+
+## If you know the date, tell the model {.smaller}
+
+A **covariate** is something you know about the future: a release date, a promo calendar, a holiday, a
+price change. Chronos-2 can take it. Example: Lionel Messi's page views during the **2026 World Cup**,
+forecast on 10 June 2026 — once from history only, once with a 0/1 "tournament day" flag.
+
+```{python}
+#| label: world-cup
+#| fig-align: center
+messi = views[views["unique_id"] == "Lionel Messi"][["ds", "y"]].assign(item_id="messi")
+messi["y"] = np.log(messi["y"])
+tournaments = [("2016-06-03", 23), ("2018-06-14", 31), ("2019-06-14", 23), ("2021-06-13", 27),
+               ("2022-11-20", 28), ("2024-06-20", 24), ("2026-06-11", 38)]
+messi["tournament"] = 0
+for begin, days in tournaments:
+    messi.loc[messi["ds"].between(begin, pd.Timestamp(begin) + pd.Timedelta(days=days)), "tournament"] = 1
+before = messi[messi["ds"] < "2026-06-11"]
+after = messi[messi["ds"] >= "2026-06-11"].head(51)
+kw = dict(id_column="item_id", timestamp_column="ds", target="y", prediction_length=51, quantile_levels=[0.5])
+alone = chronos2.predict_df(before[["item_id", "ds", "y"]], **kw)
+flagged = chronos2.predict_df(before[["item_id", "ds", "y", "tournament"]],
+                              future_df=after[["item_id", "ds", "tournament"]], **kw)
+fig, ax = plt.subplots(figsize=(12, 3.0))
+recent = messi[messi["ds"].between("2026-04-15", after["ds"].max())]
+ax.plot(recent["ds"], np.exp(recent["y"]), color=slate, label="actual")
+ax.plot(after["ds"], np.exp(alone["predictions"]), color=blue, linewidth=1.8, label="history only")
+ax.plot(after["ds"], np.exp(flagged["predictions"]), color=red_pink, linewidth=1.8, label="+ tournament flag")
+ax.axvspan(pd.Timestamp("2026-06-11"), pd.Timestamp("2026-07-19"), color=orange, alpha=0.08)
+ax.set_yscale("log")
+ax.legend(loc="upper left", fontsize=8)
+plt.show()
+y_wc = after["y"].values
+print(f"Average miss (log points): history only {np.mean(np.abs(y_wc - alone['predictions'])):.2f}, "
+      f"with the flag {np.mean(np.abs(y_wc - flagged['predictions'])):.2f}")
+```
+
+The flag cut the average miss by about a **third** — the model learned what a tournament does from the
+six earlier ones in the history. It still under-shot the peaks. Release dates, promo calendars and
+holidays are the covariates a product team always has.
+
+## A forecast as an alarm {.smaller}
+
+The same range makes a **monitor**: forecast each day from the days before it; if the day falls outside
+the model's 1%–99% range, raise a flag. Netflix, the last 120 days:
+
+```{python}
+#| label: monitor
+#| fig-align: center
+nf = series["Netflix"]
+days = nf.index[-120:]
+ctxs = [torch.tensor(nf[:d - pd.Timedelta(days=1)].values[-1024:], dtype=torch.float32) for d in days]
+qm, _ = chronos2.predict_quantiles(ctxs, prediction_length=1, quantile_levels=[0.01, 0.5, 0.99])
+qm = np.stack([np.asarray(x).reshape(-1)[:3] for x in qm])
+actual_m = nf[days].values
+alarm = (actual_m > qm[:, 2]) | (actual_m < qm[:, 0])
+fig, ax = plt.subplots(figsize=(12, 3.2))
+ax.fill_between(days, qm[:, 0], qm[:, 2], color=turquoise, alpha=0.25, label="1%–99%, forecast the day before")
+ax.plot(days, actual_m, color=slate, linewidth=1, label="actual")
+ax.scatter(days[alarm], actual_m[alarm], color=red_pink, s=40, zorder=3, label=f"{alarm.sum()} alarms")
+ax.yaxis.set_major_formatter(thousands)
+ax.legend(loc="upper left", fontsize=8)
+plt.show()
+```
+
+Three alarms in 120 days: few enough to read every one. The band is wide in July, after a spike, and
+narrow in quiet weeks — the monitor adapts to how noisy the metric has just been, which a fixed
+"±20%" rule cannot.
+
+## Where foundation models fail {.smaller}
+
+What the backtests and the cases say, together:
+
+- **New events** of unknown size — a campaign, a viral moment, an outage. No model has seen *this*
+  one. Plan scenarios, not a number.
+- **Breaks** in the series — a tracking change, a redesigned funnel, a new market. The model extends a
+  past that no longer applies. Look at the chart before you forecast it.
+- **Very short histories** — a product launched last week. Better than nothing; a range wide enough to
+  say so.
+- **Data it may already have seen.** TimesFM was trained mostly on Wikipedia page views. Our test
+  windows are after its release, so it could not have seen them — but a backtest on old public data can
+  flatter any foundation model.
+
+::: {.callout-note}
+## For analysts
+
+A test of memorisation on the M4 competition data — which is in Chronos's training corpus — found no
+advantage on the windows it had seen (MATH840, week 10). Absence of evidence on one corpus is not a
+guarantee on yours: prefer test periods after the model's release date.
+:::
+
+# "Can't I just ask ChatGPT?"
+
+## The experiment {.smaller}
+
+You can paste 56 days of numbers into a chat and ask for the next 28. We did exactly that — with a small
+open language model, **Qwen2.5-1.5B-Instruct**, so that the experiment is free and repeatable — on the
+same 10 products and 6 windows as the foundation models:
+
+```{python}
+#| echo: false
+example = series["ChatGPT"][:cutoffs[-1]][-56:]
+lines = [f"{day:%Y-%m-%d} ({day:%a}): {int(v)}" for day, v in example.items()]
+text = ["Daily Wikipedia page views of the article 'ChatGPT':", *lines[:3], "...", lines[-1], "",
+        "Forecast the next 28 days. Reply with exactly 28 integers separated by commas, nothing else."]
+print("\n".join(text))
+```
+
+Sixty answers — ten products, six windows — each scored like the foundation models.
+
+## What came back {.smaller}
+
+```{python}
+llm = pd.read_csv("../data/llm_forecasts.csv", parse_dates=["cutoff", "ds"])
+llm = llm.merge(backtest[["unique_id", "ds", "y", "Seasonal naive", "Chronos-2"]], on=["unique_id", "ds"])
+llm_mase = llm.groupby("unique_id").apply(
+    lambda g: pd.Series({m: np.mean(np.abs(g["y"] - g[m])) / scale[g.name]
+                         for m in ["LLM", "Seasonal naive", "Chronos-2"]}), include_groups=False)
+answers = llm.groupby(["unique_id", "cutoff"])["numbers returned"].first()
+print(f"Answers with exactly 28 numbers: {(answers == 28).sum()} of {len(answers)};  "
+      f"fewer: {(answers < 28).sum()};  more: {(answers > 28).sum()}")
+scoreboard(pd.DataFrame({"MASE, average": llm_mase.mean(),
+                         "beats seasonal naive on": llm_mase.lt(llm_mase["Seasonal naive"], axis=0).sum()
+                         .astype(int).astype(str) + " of 10"}).rename(index={"LLM": "LLM, asked in a chat"}),
+           rules={"MASE, average": "lower"}, size="0.9em")
+```
+
+**Not one of 60 answers had 28 numbers** — each had to be cut or padded before it could be scored. Then
+it beat "same day last week" on **3 of 10** products; Chronos-2 on 10 of 10.
+
+## Why a chat is the wrong tool for the numbers {.smaller}
+
+- **Numbers are text to a language model.** It writes digits one token at a time; it was trained to
+  sound plausible, not to be calibrated. It can return 36 numbers when asked for 28.
+- **One answer, no range.** You get a single path, not P10–P90 — and ask again, and you may get a
+  different one.
+- **You cannot backtest a conversation.** The honest test above needed 60 runs and a script.
+- **Privacy.** Pasting company metrics into a public chat is a data decision, not a convenience.
+
+A large chat model writes better numbers than a 1.5-billion-parameter one. None of the four points
+changes.
+
+## The right division of labour {.smaller}
+
+:::: {.columns}
+::: {.column width="50%"}
+**The AI assistant / agent** does the work around the numbers:
+
+- writes the data pull and the backtest script;
+- runs the foundation model and the baselines;
+- builds the chart and the weekly report;
+- explains the result in plain language.
+
+**The foundation model** produces the numbers and the range.
+
+**The backtest** decides whether to trust them.
+:::
+
+::: {.column width="50%"}
+A prompt that works:
+
+```text
+I have a CSV with columns date, value (daily
+installs, 2 years). Write a Python notebook that:
+1. holds out the last 4 weeks, in 6 rolling windows;
+2. forecasts them with "same day last week" and with
+   Chronos-2 (amazon/chronos-2), P10/P50/P90;
+3. reports MASE for both and how often the actual
+   value falls inside P10–P90;
+4. then forecasts the next 4 weeks with the winner.
+Do not tune anything on the hold-out weeks.
+```
+:::
+::::
+
+## A checklist for any AI-made forecast {.smaller}
+
+Before a forecast goes into a plan, ask — or ask your agent to show:
+
+1. **What does it beat?** "Same day last week" and "same day last year", on held-out weeks.
+2. **How many windows?** One is luck. Several, in different weeks, are evidence.
+3. **Is the range calibrated?** About 80% of days inside P10–P90 — counted, not assumed.
+4. **What is the horizon?** Accuracy at 7 days says nothing about 90.
+5. **Did the test data exist before the model was released?** If not, say so.
+6. **What does it not know?** Campaigns, launches, price changes, breaks — and who adds them.
+7. **What decision changes** if the truth lands at P10 instead of P50?
+
+# Practice: your own metric
+
+## Hands-on {.smaller}
+
+Open the notebook — it runs in the browser, nothing to install:
+
+**[→ Open the notebook in Google Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/genesis/sdb/labs/forecast_your_metric.ipynb)**
+
+1. **Pick a series:** one of today's ten products, or your own CSV with two columns — date and value
+   (daily installs, sessions, revenue, tickets…). Public or anonymised data only.
+2. **Run the backtest:** "same day last week" vs Chronos-2, six windows of 28 days.
+3. **Read it:** does the model beat the rule? By how much? Is the range calibrated?
+4. **Decide:** one sentence — what would you plan with this forecast, and what would make you change
+   the plan?
+
+In teams: bring one result each, and compare where the model won and where it lost.
+
+## What to take away {.smaller}
+
+- A forecast is a **number, a range, a horizon and a decision** — the range matters as much as the
+  number.
+- **Baselines first, backtests always.** "Same day last week" is the bar; one lucky window is not
+  evidence.
+- **Foundation models** are a real step: free, fast, no tuning — and on our ten products they beat the
+  classical rules on almost every one.
+- They **do not know your calendar.** Predictable seasons they learn from history; campaigns, launches
+  and breaks you must tell them — or plan scenarios around.
+- **Language models are for the work around the numbers**, not for the numbers. Let the agent write the
+  backtest, let the foundation model forecast, let the backtest decide.
+
+::: {.callout-tip}
+## Read more
+
+M. Peixeiro, *Time Series Forecasting Using Foundation Models* (Manning, 2026) ·
+R. Hyndman & G. Athanasopoulos, *[Forecasting: Principles and Practice](https://otexts.com/fpp3/)* (free
+online) · [Chronos](https://github.com/amazon-science/chronos-forecasting) ·
+[TimesFM](https://github.com/google-research/timesfm)
+:::
+
+# Questions? {.unnumbered .unlisted background-iframe="colored-particles/index.html"}
+
+<br> <br>
+
+{{< iconify mdi envelope >}} imiroshnychenko\@kse.org.ua
+
+{{< iconify ic baseline-telegram >}} [@araprof](https://t.me/araprof)
+
+{{< iconify mdi linkedin >}} [\@ihormiroshnychenko](https://www.linkedin.com/in/ihormiroshnychenko/)
+
+{{< iconify mdi github >}} [\@aranaur](https://github.com/Aranaur)
+
+{{< iconify ion home >}} [aranaur.rbind.io](https://aranaur.rbind.io)
