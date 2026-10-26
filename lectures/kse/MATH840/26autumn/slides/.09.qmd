@@ -32,6 +32,7 @@ preload-iframes: true
 execute:
   echo: true
   warning: false
+  cache: true
 editor_options:
   chunk_output_type: console
 
@@ -97,6 +98,25 @@ from sklearn.neural_network import MLPRegressor
 from great_tables import GT, loc, style as gt_style
 from matplotlib.colors import LinearSegmentedColormap, to_hex
 from matplotlib.patches import Circle, FancyBboxPatch
+import time
+from pathlib import Path
+
+CACHE = Path("../cache/09")   # trained results, gitignored; delete a file to recompute it
+
+
+def cached(name, compute):
+    """Load a saved result, or compute it once and save it."""
+    path = CACHE / f"{name}.pkl"
+    if path.exists():
+        return pd.read_pickle(path)
+    start = time.time()
+    result = compute()
+    CACHE.mkdir(parents=True, exist_ok=True)
+    pd.to_pickle(result, path)
+    with open(CACHE / "timings.log", "a") as log:
+        device = "GPU" if torch.cuda.is_available() else "CPU"
+        print(f"{name}: {time.time() - start:.1f} s on {device}", file=log)
+    return result
 
 
 shade = LinearSegmentedColormap.from_list("shade", ["#bfe0b0", "#ffffff", "#f5b8cb"])
@@ -384,7 +404,8 @@ resampled training error at every step, repeat many times, and read the interval
 #| fig-align: center
 residuals_ss = target - np.mean([net.predict(X) for net in nets], axis=0)
 rng = np.random.default_rng(1)
-paths_ss = np.array([(nnar_forecast(nets, z, H_SS, residuals_ss, rng) * sd + mu) ** 2 for _ in range(300)])
+paths_ss = cached("nnar-paths", lambda: np.array(
+    [(nnar_forecast(nets, z, H_SS, residuals_ss, rng) * sd + mu) ** 2 for _ in range(300)]))
 lo80, hi80 = np.percentile(paths_ss, [10, 90], axis=0)
 years_test = spots["year"].to_numpy()[-H_SS:]
 fig, ax = plt.subplots(figsize=(12, 3.8))
@@ -399,9 +420,9 @@ ax.set_title("Thirty years ahead from 1978: twelve of the simulated paths, and t
 plt.show()
 ```
 
-Three cycles ahead, the forecast keeps their **timing** and the fast-rise, slow-fall shape — not their
-**height**: averaging damps every peak to about 100, and the two real peaks above 150 fall outside the
-80% band. Single paths reach those heights; their average cannot.
+Three cycles ahead, the forecast keeps their **timing** (about 11 years) but not their **height** —
+averaging damps every peak to about 100 — nor their **shape**: it rises for about 5 years and falls
+for 5.5, where the real cycles rise for 4.5 and fall for 6.4.
 
 ## Scored on the thirty held-out years {.smaller}
 
@@ -624,11 +645,22 @@ Three local models, 1428 fits each — and the Week 8 combination of two of them
 ```{python}
 #| echo: true
 #| code-fold: false
+#| eval: false
 local = StatsForecast(models=[SeasonalNaive(season_length=12, alias="snaive"),
                               AutoETS(season_length=12, alias="ETS"),
                               AutoTheta(season_length=12, alias="Theta")],
                       freq="MS")
 forecasts = test_m3.merge(local.forecast(df=train_m3, h=H_M3), on=["unique_id", "ds"])
+forecasts["ETS + Theta"] = (forecasts["ETS"] + forecasts["Theta"]) / 2
+```
+
+```{python}
+#| include: false
+local = StatsForecast(models=[SeasonalNaive(season_length=12, alias="snaive"),
+                              AutoETS(season_length=12, alias="ETS"),
+                              AutoTheta(season_length=12, alias="Theta")],
+                      freq="MS")
+forecasts = test_m3.merge(cached("m3-local", lambda: local.forecast(df=train_m3, h=H_M3)), on=["unique_id", "ds"])
 forecasts["ETS + Theta"] = (forecasts["ETS"] + forecasts["Theta"]) / 2
 ```
 
@@ -676,7 +708,78 @@ forecasts = forecasts.merge(boosted.predict(H_M3), on=["unique_id", "ds"])
 - Forecasts are recursive, as for NNAR: each prediction becomes a lag for the next.
 
 One reasonable configuration, the kind you would try first — **not tuned**. Tuning a global model is a
-project of its own; the scored table below is what you get on the first attempt.
+project of its own; the next slides show what you get on the first attempt.
+
+## LightGBM, scored {.smaller}
+
+:::: {.columns}
+::: {.column width="45%"}
+```{python}
+#| echo: true
+#| code-fold: true
+board_lgb = m3_board(["snaive", "ETS", "Theta", "ETS + Theta", "LightGBM"])
+scoreboard(board_lgb, rules={"mean MASE": "lower", "median MASE": "lower", "beats ETS on": "higher"})
+```
+:::
+
+::: {.column width="55%"}
+```{python}
+#| label: lgb-vs-ets
+#| fig-align: center
+err_m3 = forecasts.groupby("unique_id").apply(
+    lambda g: pd.Series({c: np.mean(np.abs(g["y"] - g[c])) for c in ["ETS", "LightGBM"]}),
+    include_groups=False).div(scale_m3, axis=0)
+ratio = err_m3["LightGBM"] / err_m3["ETS"]
+fig, ax = plt.subplots(figsize=(6.5, 3.0))
+ax.hist(np.log2(ratio), bins=np.arange(-4, 4.01, 0.25), color=red_pink, alpha=0.8)
+ax.axvline(0, color="black", linewidth=1)
+ax.set_xticks(range(-4, 5), ["1/16", "1/8", "1/4", "1/2", "1", "2", "4", "8", "16"])
+ax.set_xlabel("MASE of LightGBM / MASE of ETS, per series (log scale)")
+ax.set_ylabel("series")
+ax.set_title(f"LightGBM better on {np.mean(ratio < 1):.0%} of the series, worse on {np.mean(ratio > 1):.0%}",
+             fontsize=10)
+plt.show()
+```
+:::
+::::
+
+- **Better than "same month last year", worse than every local model.** One model for 1428 series
+  beats ETS on only a third of them.
+- **The losses are bigger than the wins:** ETS is more than twice as accurate on about one series in
+  five; LightGBM is, on about one in fourteen.
+
+## What the trees learned, and where they fail {.smaller}
+
+```{python}
+#| label: lgb-inside
+#| fig-align: center
+gain = pd.Series(boosted.models_["LightGBM"].booster_.feature_importance("gain"),
+                 index=boosted.ts.features_order_).sort_values()
+fig, axes = plt.subplots(1, 4, figsize=(14, 3.6), width_ratios=[0.8, 1, 1, 1])
+axes[0].barh(gain.index, gain / gain.sum(), color=slate)
+axes[0].xaxis.set_major_formatter(mpl.ticker.PercentFormatter(1.0))
+axes[0].set_title("Share of the split gain", fontsize=10)
+for ax, uid in zip(axes[1:], ["M1072", "M106", "M854"]):
+    hist = train_m3[train_m3["unique_id"] == uid].tail(48)
+    fut = forecasts[forecasts["unique_id"] == uid]
+    ax.plot(hist["ds"], hist["y"], color=slate, linewidth=1)
+    ax.plot(fut["ds"], fut["y"], color="black", linewidth=1, label="actual")
+    ax.plot(fut["ds"], fut["LightGBM"], color=red_pink, linewidth=1.8, label="LightGBM")
+    ax.plot(fut["ds"], fut["ETS"], "--", color=blue, linewidth=1.3, label="ETS")
+    ax.set_title(f"{uid}: LightGBM / ETS MASE = {ratio[uid]:.2f}", fontsize=10)
+    ax.tick_params(axis="x", labelsize=8)
+axes[1].legend(loc="upper left", fontsize=8)
+plt.tight_layout()
+plt.show()
+```
+
+- **Mostly the last month.** `lag1` carries over half of the gain, `lag12` comes second; `month` is
+  almost unused, because `Differences([12])` has already removed the seasonal shape.
+- **M1072:** a steady trend — LightGBM carries it on, ETS damps it. **M106:** noise around a level;
+  ETS forecasts the level, LightGBM chases the wiggles.
+- **M854:** a series that turned down. Its recent changes are unlike its own past, the trees have no leaf
+  for them, and the forecast jumps back up. **A tree cannot predict a value outside what it saw** —
+  the extrapolation that ETS's trend does for free.
 
 # The neuralforecast model zoo
 
@@ -763,27 +866,95 @@ plt.show()
 No fixed window, and the **same** weights at every step — as ARIMA's recursion is to a regression on
 fixed lags.
 
-## Why plain RNNs forget, and what LSTM does about it {.smaller}
+## Why RNNs forget, and how LSTM remembers {.smaller}
 
-Training an RNN multiplies by $W$ once per step back in time. Over many steps the gradient shrinks to
-nothing (**vanishing**) or blows up (**exploding**) — so a plain RNN cannot learn that December depends
-on last December.
+```{python}
+#| label: lstm-cell
+#| fig-align: center
+cell_c, hidden_c = "#2e8b57", red_pink
+fig, (ax, ax2) = plt.subplots(1, 2, figsize=(13.5, 4.4), width_ratios=[2.7, 1])
+ax.set_xlim(-0.6, 14.6)
+ax.set_ylim(-0.2, 8.4)
+ax.axis("off")
+ax.add_patch(FancyBboxPatch((1.2, 0.6), 12.4, 7.0, boxstyle="round,pad=0.1", facecolor="#f4f4f4",
+                            edgecolor="#cccccc", zorder=0))
 
-The **LSTM** (Hochreiter & Schmidhuber, 1997) adds a second state $c_t$, the **cell**, changed only by
-gated, mostly additive updates:
 
-$$
-\begin{aligned}
-f_t &= \sigma(W_f[h_{t-1}, y_t] + b_f) & &\text{forget: how much of } c_{t-1} \text{ to keep}\\
-i_t &= \sigma(W_i[h_{t-1}, y_t] + b_i) & &\text{input: how much new to write}\\
-c_t &= f_t \odot c_{t-1} + i_t \odot \tanh(W_c[h_{t-1}, y_t] + b_c) & &\text{the cell: additive update}\\
-o_t &= \sigma(W_o[h_{t-1}, y_t] + b_o), \quad h_t = o_t \odot \tanh(c_t) & &\text{output}
-\end{aligned}
-$$
+def arrow(x0, y0, x1, y1, colour="grey", width=1.6):
+    ax.annotate("", (x1, y1), (x0, y0), arrowprops=dict(arrowstyle="-|>", color=colour, lw=width,
+                                                        shrinkA=0, shrinkB=0), zorder=2)
 
-With $f_t \approx 1$ the cell passes information — and gradient — through many steps unchanged: ETS's
-level equation, **keep most of the old state, add a little of the new**, learned. The **GRU** (Cho et
-al., 2014) is the same idea with two gates and no separate cell.
+
+def node(x, y, sign, colour):
+    ax.add_patch(Circle((x, y), 0.3, facecolor="white", edgecolor=colour, lw=2, zorder=3))
+    ax.text(x, y, sign, ha="center", va="center", fontsize=13, fontweight="bold", color=colour, zorder=4)
+
+
+def gate(x, y, name, colour, label):
+    ax.add_patch(FancyBboxPatch((x - 0.55, y - 0.4), 1.1, 0.8, boxstyle="round,pad=0.04",
+                                facecolor="white", edgecolor=colour, lw=2, zorder=3))
+    ax.text(x, y, name, ha="center", va="center", fontsize=12, zorder=4)
+    ax.text(x, y - 0.68, label, ha="center", va="top", fontsize=9, color=colour, fontweight="bold")
+
+
+# the cell state: long-term memory, a highway with only x and +
+ax.plot([-0.4, 14.4], [7, 7], color=cell_c, lw=4, zorder=1)
+arrow(14.0, 7, 14.5, 7, cell_c, 4)
+ax.text(-0.4, 7.35, "$c_{t-1}$", fontsize=13, color=cell_c)
+ax.text(13.9, 7.35, "$c_t$", fontsize=13, color=cell_c)
+ax.text(7.2, 8.05, "cell state = long-term memory: only scaled (×) and added to (+)", ha="center",
+        fontsize=10, color=cell_c, fontweight="bold")
+# the hidden state: short-term memory
+ax.plot([-0.4, 3.0], [1.2, 1.2], color=hidden_c, lw=3, zorder=1)
+ax.plot([3.0, 3.0, 11.0], [1.2, 2.3, 2.3], color="grey", lw=1.8, zorder=1)        # [h, y] bus
+ax.text(-0.4, 1.5, "$h_{t-1}$", fontsize=13, color=hidden_c)
+arrow(3.0, -0.15, 3.0, 2.3, slate, 2)
+ax.text(2.85, -0.05, "this month $y_t$", ha="right", fontsize=10, color=slate)
+# four gates read [h_{t-1}, y_t]
+for x, name, colour, label in [(4.4, r"$\sigma$", blue, "forget $f_t$"), (6.5, r"$\sigma$", orange, "input $i_t$"),
+                               (8.6, "tanh", purple, "candidate"), (10.7, r"$\sigma$", red_pink, "output $o_t$")]:
+    ax.plot([x, x], [2.3, 3.6], color="grey", lw=1.8, zorder=1)
+    gate(x, 4.0, name, colour, label)
+# forget: scale the old memory
+arrow(4.4, 4.4, 4.4, 6.7, blue)
+node(4.4, 7, "×", blue)
+ax.text(4.6, 5.6, "keep how much\nof the old?", fontsize=9, color=blue)
+# input x candidate: what to write, added to the memory
+ax.plot([6.5, 6.5, 7.25], [4.4, 5.5, 5.5], color=orange, lw=1.6, zorder=1)
+ax.plot([8.6, 8.6, 7.85], [4.4, 5.5, 5.5], color=purple, lw=1.6, zorder=1)
+node(7.55, 5.5, "×", orange)
+arrow(7.55, 5.8, 7.55, 6.7, orange)
+node(7.55, 7, "+", cell_c)
+ax.text(7.85, 6.05, "write\nsomething new", fontsize=9, color=orange)
+# output: read a filtered memory into h_t
+ax.plot([12.4, 12.4], [7, 5.9], color=cell_c, lw=1.6, zorder=1)
+gate(12.4, 5.5, "tanh", cell_c, "")
+arrow(12.4, 5.1, 12.4, 4.3, cell_c)
+arrow(11.25, 4.0, 12.1, 4.0, red_pink)
+node(12.4, 4.0, "×", red_pink)
+ax.text(12.6, 3.3, "show\nhow much?", fontsize=9, color=red_pink)
+ax.plot([12.4, 12.4, 14.0], [3.7, 1.2, 1.2], color=hidden_c, lw=3, zorder=1)
+arrow(14.0, 1.2, 14.5, 1.2, hidden_c, 3)
+ax.text(13.9, 1.5, "$h_t$", fontsize=13, color=hidden_c)
+ax.text(8.3, 0.2, "hidden state = short-term memory; the forecast is read from it", ha="center",
+        fontsize=10, color=hidden_c, fontweight="bold")
+# why a plain RNN forgets
+steps = np.arange(0, 25)
+ax2.plot(steps, 0.75 ** steps, "o-", color=slate, ms=3, label="plain RNN: ×0.75 per step")
+ax2.plot(steps, 0.98 ** steps, "o-", color=cell_c, ms=3, label="LSTM cell: $f_t$ = 0.98")
+ax2.axvline(12, color="grey", linestyle="--", lw=1)
+ax2.text(12.4, 0.5, "last\nDecember", fontsize=9, color="grey")
+ax2.set_xlabel("steps back in time")
+ax2.set_title("How much of a month's signal\nis left after $k$ steps", fontsize=10)
+ax2.legend(fontsize=8, loc="upper right")
+plt.show()
+```
+
+- **Plain RNN:** the whole state is rewritten every step, so last December's signal is squeezed twelve
+  times and almost gone (right) — in training, the **vanishing gradient**.
+- **LSTM** (1997) adds the green line, a memory that is only **scaled and added to**. Three sigmoid gates
+  decide what to forget, write and show; with $f_t \approx 1$ the memory survives — ETS's level, learned.
+  **GRU** (2014): the same idea, two gates, no separate cell.
 
 ## TCN: convolutions that only look back {.smaller}
 
@@ -834,140 +1005,126 @@ $$
 - The interval comes from the model, not from resampled residuals — so it can widen where the
   network has learned that series are volatile.
 
-## N-BEATS: blocks that pass on what they could not explain {.smaller}
+## N-BEATS: pass on what you cannot explain {.smaller}
 
-**N-BEATS** (Oreshkin et al., 2020) has no recurrence and no convolution — only fully connected
-layers, arranged so that each block explains part of the window and hands on the rest:
-
-:::: {.columns}
-::: {.column width="50%"}
-For block $\ell$ with input $x_\ell$ (the window, at first):
-
-$$
-\begin{aligned}
-\theta^{b}_\ell, \theta^{f}_\ell &= \text{FC}_\ell(x_\ell)\\
-x_{\ell+1} &= x_\ell - V^{b}_\ell\, \theta^{b}_\ell \quad \text{(backcast removed)}\\
-\hat{\mathbf y} &= \sum_\ell V^{f}_\ell\, \theta^{f}_\ell \quad \text{(forecasts added)}
-\end{aligned}
-$$
-:::
-
-::: {.column width="50%"}
-- **Generic** N-BEATS learns the bases $V$.
-- **Interpretable** N-BEATS fixes them: a **trend** stack with polynomial bases $1, t, t^2$ and a
-  **seasonality** stack with Fourier bases — Week 5's trend and Fourier terms.
-- The interpretable version returns its forecast **split into trend and season**, like Week 2's
-  decomposition.
-:::
-::::
-
-On M4 its authors report it ahead of the competition's hybrid winner — the first pure deep-learning
-model to get there.
-
-## Interpretable N-BEATS {.smaller}
-
-The interpretable version may only output **combinations of fixed curves** — so whatever it forecasts
-is, by construction, a trend plus a season:
+**N-BEATS** (Oreshkin et al., 2020): a chain of fully connected blocks. Two of them, on Air Passengers:
 
 ```{python}
-#| echo: true
-#| code-fold: false
-from neuralforecast import NeuralForecast
-from neuralforecast.models import NBEATS
-
-quiet = dict(enable_progress_bar=False, logger=False, enable_model_summary=False)
-nbeats_i = NBEATS(h=24, input_size=48, stack_types=["trend", "seasonality"], n_blocks=[1, 1],
-                  n_polynomials=2, n_harmonics=2, scaler_type="robust", max_steps=500,
-                  random_seed=1, **quiet)
-interpretable = NeuralForecast(models=[nbeats_i], freq="MS")
-interpretable.fit(air.iloc[:-24][["unique_id", "ds", "y"]])
-air_fc = interpretable.predict()
-```
-
-`n_polynomials=2`: the trend stack may use $1, t, t^2$. `n_harmonics=2`: the seasonality stack, two
-Fourier pairs per period — Week 5's $K$.
-
-## What it is allowed to draw {.smaller}
-
-```{python}
-#| label: nbeats-bases
+#| label: nbeats-blocks
 #| fig-align: center
-steps = np.arange(24)
-fig, axes = plt.subplots(1, 3, figsize=(13, 3.6), width_ratios=[1, 1, 1.6])
-for power, colour in zip(range(3), [slate, blue, red_pink]):
-    axes[0].plot((steps / 24) ** power, color=colour, linewidth=2, label=f"$t^{power}$")
-axes[0].legend(fontsize=8)
-axes[0].set_title("Trend stack: polynomial bases")
-for k, colour in zip([1, 2], [turquoise, orange]):
-    axes[1].plot(np.cos(2 * np.pi * k * steps / 12), color=colour, linewidth=2, label=f"harmonic {k}")
-    axes[1].plot(np.sin(2 * np.pi * k * steps / 12), "--", color=colour, linewidth=1.2)
-axes[1].legend(fontsize=8)
-axes[1].set_title("Seasonality stack: Fourier bases")
-axes[2].plot(air["ds"].iloc[-72:], air["y"].iloc[-72:], color=slate, label="actual")
-axes[2].plot(air_fc["ds"], air_fc["NBEATS"], color=red_pink, linewidth=2, label="interpretable N-BEATS")
-axes[2].legend(loc="upper left", fontsize=8)
-axes[2].set_title("Air passengers: 1959–1960 forecast")
+window = np.log(air["y"].to_numpy()[-72:-24])           # 48 months in, 24 ahead
+future = np.log(air["y"].to_numpy()[-24:])
+t = np.arange(72) / 72                                     # one time axis for backcast and forecast
+past, ahead = slice(0, 48), slice(48, 72)
+trend_basis = np.column_stack([t ** k for k in range(2)])  # 1, t
+season_basis = np.column_stack([f(2 * np.pi * k * np.arange(72) / 12) for k in (1, 2) for f in (np.cos, np.sin)])
+
+
+def block(x, basis):
+    theta = np.linalg.lstsq(basis[past], x, rcond=None)[0]   # the network learns theta; here, least squares
+    return basis[past] @ theta, basis[ahead] @ theta         # backcast, forecast
+
+
+trend_back, trend_fore = block(window, trend_basis)
+rest = window - trend_back
+season_back, season_fore = block(rest, season_basis)
+left = rest - season_back
+
+months, horizon = np.arange(48), np.arange(48, 72)
+fig, axes = plt.subplots(1, 3, figsize=(13.5, 3.7), width_ratios=[1.15, 1.15, 1.15])
+axes[0].plot(months, window, color=slate, linewidth=1.2, label="input: the window")
+axes[0].plot(months, trend_back, color=blue, linewidth=2, label="backcast")
+axes[0].plot(horizon, trend_fore, "--", color=blue, linewidth=2, label="forecast")
+axes[0].set_title("Block 1 (trend): explains what it can", fontsize=10, color=blue)
+axes[1].plot(months, rest, color=slate, linewidth=1.2, label="input: window − block 1's backcast")
+axes[1].plot(months, season_back, color=orange, linewidth=2, label="backcast")
+axes[1].plot(horizon, season_fore, "--", color=orange, linewidth=2, label="forecast")
+axes[1].plot(months, left, ":", color="grey", linewidth=1, label="still unexplained")
+axes[1].set_title("Block 2 (season): gets only the rest", fontsize=10, color=orange)
+axes[2].plot(months, window, color=slate, linewidth=1.2, label="window")
+axes[2].plot(horizon, future, color="black", linewidth=1.2, label="actual")
+axes[2].plot(horizon, trend_fore + season_fore, color=red_pink, linewidth=2.2, label="block 1 + block 2")
+axes[2].set_title("Forecast = sum of the blocks' forecasts", fontsize=10, color=red_pink)
+for ax in axes:
+    ax.axvline(47.5, color="grey", linewidth=0.8)
+    ax.set_xlabel("month")
+    ax.legend(fontsize=7.5, loc="best")
+axes[0].set_ylabel("log passengers")
+for x in (0.345, 0.66):
+    fig.text(x, 0.5, "→", fontsize=24, color="grey", ha="center", va="center")
 plt.show()
 ```
 
-The network chooses the coefficients; the curves are Week 5's trend and Fourier terms. There is also a
-`decompose()` method — but with a scaler each part is un-scaled on its own, so the parts do not add up
-to the forecast. Read them with care.
+- Each block returns a **backcast** (the part of its input it explains) and a **forecast** of that part,
+  then passes on **the rest**. The final forecast is the **sum** of the blocks' forecasts.
+- Real N-BEATS stacks dozens of blocks whose layers learn the coefficients (least squares here, for the
+  mechanics). **Interpretable** blocks are fixed to trend and Fourier terms (Week 5). It beat M4's winner.
 
-## N-HiTS: one stack per time scale {.smaller}
-
-**N-HiTS** (Challu et al., 2023) is N-BEATS with two changes that make it fast and good at long horizons:
+## Not just a decomposition {.smaller}
 
 ```{python}
-#| label: nhits
+#| label: nbeats-vs-decomposition
 #| fig-align: center
-t_h = np.arange(18)
-smooth = 3 + np.sin(2 * np.pi * t_h / 12) + 0.08 * t_h
-fig, axes = plt.subplots(1, 3, figsize=(13, 2.6), sharey=True)
-for ax, (k, title) in zip(axes, [(6, "stack 1: 3 coefficients → slow movement"),
-                                 (3, "stack 2: 6 coefficients → the season"),
-                                 (1, "stack 3: 18 coefficients → detail")]):
-    knots = t_h[::k]
-    ax.plot(t_h, smooth, color="lightgray", linewidth=3)
-    ax.plot(knots, smooth[::k], "o", color=red_pink)
-    ax.plot(t_h, np.interp(t_h, knots, smooth[::k]), color=red_pink)
-    ax.set_title(title, fontsize=10)
+fig, ax = plt.subplots(figsize=(13.5, 5.0))
+ax.set_xlim(0, 27)
+ax.set_ylim(0, 9.4)
+ax.axis("off")
+
+
+def card(x, y, w, h, text, colour, filled=False):
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.08", lw=2, edgecolor=colour,
+                                facecolor=colour if filled else "white", alpha=1, zorder=2))
+    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=14, zorder=3,
+            color="white" if filled else "black")
+
+
+def link(x0, y0, x1, y1, colour="grey"):
+    ax.annotate("", (x1, y1), (x0, y0), arrowprops=dict(arrowstyle="-|>", color=colour, lw=1.8), zorder=1)
+
+
+def note(x, y, text, colour):
+    ax.text(x, y, text, ha="center", va="top", fontsize=12.5, color=colour, style="italic")
+
+
+# decomposition, then a forecast
+ax.text(0.1, 9.05, "Decomposition, then a forecast (Weeks 2–4)", fontsize=15, fontweight="bold", color=slate)
+card(0.3, 6.3, 3.6, 1.7, "one series\n(all of its past)", slate)
+card(5.0, 6.3, 4.2, 1.7, "STL / moving\naverages: smooth\nthe past", slate)
+card(10.3, 6.3, 4.6, 1.7, "trend + season\n+ remainder\nof the past", slate)
+card(16.0, 6.3, 4.6, 1.7, "a second model per\ncomponent: drift,\nseasonal naive, ETS", slate)
+card(21.7, 6.3, 3.6, 1.7, "forecast", slate, filled=True)
+for x0, x1 in [(3.9, 5.0), (9.2, 10.3), (14.9, 16.0), (20.6, 21.7)]:
+    link(x0, 7.15, x1, 7.15, slate)
+note(7.1, 6.05, "fitted to this series only", slate)
+note(12.6, 6.05, "describes the past:\njudged by how well it fits", slate)
+note(18.3, 6.05, "the future is a\nseparate step", slate)
+
+# N-BEATS
+ax.text(0.1, 4.15, "N-BEATS", fontsize=15, fontweight="bold", color=red_pink)
+card(0.3, 1.5, 3.6, 1.7, "a window of\nany series", red_pink)
+card(5.0, 1.5, 4.2, 1.7, "fully connected\nlayers: the same\nweights for all", red_pink)
+card(10.3, 2.45, 4.6, 0.85, "backcast  →  minus", blue)
+card(10.3, 1.4, 4.6, 0.85, "forecast  →  plus", orange)
+card(16.0, 2.3, 4.6, 1.0, "next block gets\nwhat is left", red_pink)
+card(21.7, 1.5, 3.6, 1.7, "forecast =\nsum of blocks", red_pink, filled=True)
+link(3.9, 2.35, 5.0, 2.35, red_pink)
+link(9.2, 2.85, 10.3, 2.85, red_pink)
+link(9.2, 1.85, 10.3, 1.85, red_pink)
+link(14.9, 2.85, 16.0, 2.85, blue)
+link(14.9, 1.8, 21.7, 1.8, orange)
+ax.annotate("", (7.1, 3.25), (18.3, 3.25), arrowprops=dict(arrowstyle="-|>", color="grey", lw=1.4,
+                                                           connectionstyle="arc3,rad=0.25", linestyle="--"))
+ax.text(12.6, 4.15, "repeat", fontsize=12.5, color="grey", ha="center")
+note(7.1, 1.2, "trained on thousands of windows\nfrom many series", red_pink)
+note(12.6, 1.15, "both from one pass", red_pink)
+note(18.3, 1.2, "trained on forecast error:\nthe backcast only serves the forecast", red_pink)
 plt.show()
 ```
 
-- **Multi-rate input pooling:** each stack first max-pools the window with its own kernel, so the
-  first stack sees only the slow movement and the last sees the detail.
-- **Hierarchical interpolation:** a coarse stack outputs a handful of coefficients and **interpolates**
-  them to 18 steps. Fewer outputs, fewer weights, faster training.
-
-## TFT and PatchTST: attention {.smaller}
-
-**Attention** lets every position in the window weigh every other: "to forecast next December, look
-hardest at last December" is learned, not specified.
-
-:::: {.columns}
-::: {.column width="50%"}
-**Temporal Fusion Transformer** (Lim et al., 2021; Google)
-
-- **Variable selection** networks choose which inputs matter at each step.
-- An LSTM encoder–decoder for local patterns, **multi-head attention** for long-range ones.
-- Built for **covariates**: static (the store), known (the calendar, prices), observed (past sales).
-- Quantile outputs; attention weights you can inspect.
-:::
-
-::: {.column width="50%"}
-**PatchTST** (Nie et al., 2023)
-
-- Cuts the window into **patches** of consecutive values — 16 at a time — and treats each patch as a
-  token, as a language model treats a word.
-- Attention over patches, not single values: shorter sequences, faster, more stable.
-- **Channel independence**: each series forecast on its own, with shared weights.
-:::
-::::
-
-**TiDE** (Das et al., 2023; Google), in the table that follows, is the counter-argument: an MLP
-encoder–decoder with covariates, as accurate as the transformers on its authors' benchmarks, and much
-cheaper.
+- **Where the pieces come from:** STL is fitted to one series; N-BEATS's layers read any window and output
+  the pieces — one set of weights for all series, no refit for a new one.
+- **What is optimised:** a decomposition is judged on the past, N-BEATS only on forecast error — a block
+  may describe the past imperfectly if the forecast gains. What is left after the last block is dropped.
 
 ## Training the zoo on M3 {.smaller}
 
@@ -977,10 +1134,13 @@ defaults plus three shared settings — **nothing tuned**:
 ```{python}
 #| echo: true
 #| code-fold: false
-from neuralforecast.models import MLP, LSTM, GRU, TCN, DeepAR, NHITS, TFT, PatchTST, TiDE
+#| eval: false
+from neuralforecast import NeuralForecast
+from neuralforecast.models import MLP, LSTM, GRU, TCN, DeepAR, NBEATS, NHITS, TFT, PatchTST, TiDE
 from neuralforecast.losses.pytorch import DistributionLoss, MAE
 import time
 
+quiet = dict(enable_progress_bar=False, logger=False, enable_model_summary=False)
 shared = dict(h=H_M3, input_size=24, scaler_type="robust", max_steps=600, random_seed=1, **quiet)
 zoo = {"MLP": MLP(**shared), "LSTM": LSTM(**shared), "GRU": GRU(**shared), "TCN": TCN(**shared),
        "DeepAR": DeepAR(**shared, loss=DistributionLoss("StudentT", level=[80]), valid_loss=MAE()),
@@ -995,6 +1155,30 @@ for name, model in zoo.items():
     seconds[name] = time.time() - start
 ```
 
+```{python}
+#| include: false
+from neuralforecast import NeuralForecast
+from neuralforecast.models import MLP, LSTM, GRU, TCN, DeepAR, NBEATS, NHITS, TFT, PatchTST, TiDE
+from neuralforecast.losses.pytorch import DistributionLoss, MAE
+import time
+
+quiet = dict(enable_progress_bar=False, logger=False, enable_model_summary=False)
+shared = dict(h=H_M3, input_size=24, scaler_type="robust", max_steps=600, random_seed=1, **quiet)
+zoo = {"MLP": MLP(**shared), "LSTM": LSTM(**shared), "GRU": GRU(**shared), "TCN": TCN(**shared),
+       "DeepAR": DeepAR(**shared, loss=DistributionLoss("StudentT", level=[80]), valid_loss=MAE()),
+       "NBEATS": NBEATS(**shared), "NHITS": NHITS(**shared), "TFT": TFT(**shared),
+       "PatchTST": PatchTST(**shared), "TiDE": TiDE(**shared)}
+seconds = {}
+for name, model in zoo.items():
+    def train(model=model):
+        start = time.time()
+        neural = NeuralForecast(models=[model], freq="MS")
+        neural.fit(train_m3)
+        return neural.predict(), time.time() - start
+    predicted, seconds[name] = cached(f"zoo-{name}", train)
+    forecasts = forecasts.merge(predicted, on=["unique_id", "ds"])
+```
+
 ## The zoo, scored {.smaller}
 
 ```{python}
@@ -1006,9 +1190,10 @@ point["DeepAR"] = "DeepAR-median" if "DeepAR-median" in forecasts else "DeepAR"
 board = m3_board(["snaive", "ETS", "Theta", "ETS + Theta", "LightGBM"]
                  + [point[name] for name in zoo])
 board.index = [i.replace("-median", "") for i in board.index]
-board["training, s"] = pd.Series(seconds)
+board["training, s (GPU)"] = pd.Series(seconds)
 scoreboard(board, rules={"mean MASE": "lower", "median MASE": "lower",
-                         "beats ETS on": "higher", "training, s": "lower"})
+                         "beats ETS on": "higher", "training, s (GPU)": "lower"}).tab_options(
+    table_font_size="0.72em", data_row_padding="1px")
 ```
 
 ## What the table says {.smaller}
@@ -1017,8 +1202,8 @@ scoreboard(board, rules={"mean MASE": "lower", "median MASE": "lower",
   MLP — are level with ETS. The fully connected family wins the zoo.
 - **Architecture fame is not accuracy.** PatchTST and TiDE, built for long multivariate data, are the
   two worst networks here; the LSTM loses to the plain MLP.
-- **Cost differs sixtyfold.** TFT trains for ten minutes where TCN takes ten seconds — for a middling
-  score.
+- **Cost differs.** On a GPU, TFT trains for 18 seconds where the MLP takes 4; on a laptop CPU the same
+  gap is ten minutes against ten seconds — for a middling score.
 - **The Week 8 average of ETS and Theta is still the best forecast on the board**, and it took no GPU,
   no seed and no hyperparameters.
 
@@ -1049,7 +1234,7 @@ plt.show()
 ```
 
 - **The interval is far too narrow.** A calibrated 80% interval covers 80% of the months; DeepAR's
-  covers under half. On M1143 the band sits tightly around a wrong trend.
+  covers under half. On M1143 the band is narrow and misses the actual months altogether.
 - **M1176:** the yearly spikes that ETS reproduces exactly are missing from both DeepAR's median and its
   band — the network smoothed them away as noise.
 - A distribution in the output does not make the forecast honest. As in Week 8: **score the coverage**,
