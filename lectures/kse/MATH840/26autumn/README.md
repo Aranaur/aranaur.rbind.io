@@ -36,7 +36,7 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 8 — practice demo, seasonal ARIMA in four real cases (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo08.ipynb) |
 | Week 8 — practice, Ukrainian version with full analysis and conclusions (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo08_uk.ipynb) |
 | Week 8 — Lab 7 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab08.ipynb) |
-| Week 9 — practice demo, when one model is not enough: four real cases (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo09.ipynb) |
+| Week 9 — practice demo, Prophet up close, then combining forecasts (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo09.ipynb) |
 | Week 9 — practice, Ukrainian version with full analysis and conclusions (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo09_uk.ipynb) |
 | Week 9 — Lab 8 handout: Combining forecasts | <https://01a18826-fc82-29d0-d9b1-ae5e1434d15f.share.connect.posit.cloud> |
 | Week 9 — Lab 8 template: combining forecasts (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab09.ipynb) |
