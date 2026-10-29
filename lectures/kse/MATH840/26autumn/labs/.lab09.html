@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Ihor Miroshnychenko">
+
+<title>Lab 8: Combining forecasts</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src=".lab09_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".lab09_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src=".lab09_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src=".lab09_files/libs/quarto-html/popper.min.js"></script>
+<script src=".lab09_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src=".lab09_files/libs/quarto-html/anchor.min.js"></script>
+<link href=".lab09_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".lab09_files/libs/quarto-html/quarto-syntax-highlighting-a6f4957c43e529dfa47e771024b1e13d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".lab09_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href=".lab09_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href=".lab09_files/libs/bootstrap/bootstrap-f0363865eaeadd24fdd349ba0d39ddd7.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#the-task" id="toc-the-task" class="nav-link active" data-scroll-target="#the-task">🎯 The task</a></li>
+  <li><a href="#what-you-are-marked-on" id="toc-what-you-are-marked-on" class="nav-link" data-scroll-target="#what-you-are-marked-on">📋 What you are marked on</a></li>
+  <li><a href="#section-1-your-models-rebuilt-1-point" id="toc-section-1-your-models-rebuilt-1-point" class="nav-link" data-scroll-target="#section-1-your-models-rebuilt-1-point">🔁 Section 1 — Your models, rebuilt (1 point)</a></li>
+  <li><a href="#section-2-forecast-accuracy-3-points" id="toc-section-2-forecast-accuracy-3-points" class="nav-link" data-scroll-target="#section-2-forecast-accuracy-3-points">🎯 Section 2 — Forecast accuracy (3 points)</a></li>
+  <li><a href="#section-3-justification-block-3-points" id="toc-section-3-justification-block-3-points" class="nav-link" data-scroll-target="#section-3-justification-block-3-points">✍️ Section 3 — Justification block (3 points)</a></li>
+  <li><a href="#section-4-code-quality-and-reproducibility-1-point" id="toc-section-4-code-quality-and-reproducibility-1-point" class="nav-link" data-scroll-target="#section-4-code-quality-and-reproducibility-1-point">🧹 Section 4 — Code quality and reproducibility (1 point)</a></li>
+  <li><a href="#submission" id="toc-submission" class="nav-link" data-scroll-target="#submission">📤 Submission</a></li>
+  <li><a href="#how-long-this-should-take" id="toc-how-long-this-should-take" class="nav-link" data-scroll-target="#how-long-this-should-take">⏱ How long this should take</a></li>
+  <li><a href="#what-comes-next" id="toc-what-comes-next" class="nav-link" data-scroll-target="#what-comes-next">📚 What comes next</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Lab 8: Combining forecasts</h1>
+<p class="subtitle lead">MATH840 | Time Series | Week 9 — graded assignment 7 of 7</p>
+</div>
+
+
+<div class="quarto-title-meta-author">
+  <div class="quarto-title-meta-heading">Author</div>
+  <div class="quarto-title-meta-heading">Affiliation</div>
+  
+    <div class="quarto-title-meta-contents">
+    <p class="author">Ihor Miroshnychenko </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            Kyiv School of Economics
+          </p>
+      </div>
+  </div>
+
+<div class="quarto-title-meta">
+
+      
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="callout callout-style-simple callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>The last weekly lab
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Your series from Week 4, for the fourth time. You have an ETS model from Lab 5 and a seasonal ARIMA from Lab 7, and a published accuracy score for each. Tonight you <strong>put them together</strong> and find out whether that was worth doing — on your series, with your own numbers.</p>
+</div>
+</div>
+<div class="callout callout-style-simple callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Open the notebook
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The template: <a href="https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab09.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" class="img-fluid" alt="Open In Colab"></a></p>
+<p>Click <strong>Copy to Drive</strong> before you start working, otherwise nothing you write is saved.</p>
+<p>The practice session — case 4 is this lab on a public series, end to end: <a href="https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo09.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" class="img-fluid" alt="Open In Colab"></a> · <a href="https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo09_uk.ipynb">Ukrainian version with results and conclusions</a></p>
+</div>
+</div>
+<section id="the-task" class="level2">
+<h2 class="anchored" data-anchor-id="the-task">🎯 The task</h2>
+<p>Forecast your series with an <strong>equal-weight combination</strong> — the <em>Advanced Forecasting Methods</em> lecture — and compare it with everything you have built before.</p>
+<ol type="1">
+<li><strong>Rebuild</strong> your Lab 5 and Lab 7 models exactly as you submitted them, and check that they reproduce your earlier validation numbers. <strong>Add MSTL</strong> as a third candidate.</li>
+<li><strong>Backtest</strong> all three on four rolling origins, next to your benchmark.</li>
+<li><strong>Combine</strong> two or three of them — members chosen <em>before</em> you read the table — and read the table: would selecting one model have done better?</li>
+<li><strong>Choose an interval</strong>: the averaged bounds of the members, or a conformal interval from the combination’s own errors — each judged on windows it did not see.</li>
+<li><strong>Conclude</strong> against your past results: your Lab 5 and Lab 7 scores on the hidden horizon, and what the combination is expected to add.</li>
+</ol>
+<p><strong>Not this time:</strong> plots of the series, decomposition, ACF and differencing. You have done them three times; nothing in the rubric asks for them again. Every plot tonight is about the models.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>This one counts
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>8 points. <strong>Deadline: 23:59 today</strong>, on Moodle. The accuracy score is published the next morning; marks and comments come back before the next practice session.</p>
+</div>
+</div>
+</section>
+<section id="what-you-are-marked-on" class="level2">
+<h2 class="anchored" data-anchor-id="what-you-are-marked-on">📋 What you are marked on</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Section</th>
+<th>Criteria</th>
+<th style="text-align: right;">Points</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Your models, rebuilt — and one new member</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Forecast accuracy against your benchmark</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Justification block</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>Code quality and reproducibility</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td><strong>Total</strong></td>
+<td style="text-align: right;"><strong>8</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The notebook has one section per row. <strong>Keep those headings.</strong></p>
+</section>
+<section id="section-1-your-models-rebuilt-1-point" class="level2">
+<h2 class="anchored" data-anchor-id="section-1-your-models-rebuilt-1-point">🔁 Section 1 — Your models, rebuilt (1 point)</h2>
+<ul>
+<li><code>MEMBERS</code> holds your <strong>submitted</strong> Lab 5 ETS and Lab 7 seasonal ARIMA — the specification, the damping, the log — and MSTL, with a log decision of its own.</li>
+<li><code>PAST</code> holds the hidden-horizon MASE and skill you were sent after Labs 5 and 7.</li>
+<li>The template prints each member’s MASE on the validation window. <strong>It must match your earlier notebooks.</strong> If it does not, find out why — a different specification, <code>AutoETS</code> choosing differently on a refit — and say so.</li>
+<li>Two or three sentences: do the numbers match, and where does MSTL land next to your two models?</li>
+</ul>
+</section>
+<section id="section-2-forecast-accuracy-3-points" class="level2">
+<h2 class="anchored" data-anchor-id="section-2-forecast-accuracy-3-points">🎯 Section 2 — Forecast accuracy (3 points)</h2>
+<p>What you submit is <strong>an equal-weight average of two or three members</strong>, with an 80% interval from one of the two recipes. No single model, no estimated weights, no model families beyond the three.</p>
+<p>Scored from your submission file on the <code>h</code> observations after your history that nobody has seen:</p>
+<p><span class="math display">\[
+\text{skill} = \frac{\text{MASE of your forecast}}{\text{MASE of your benchmark}}
+\]</span></p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Skill</th>
+<th style="text-align: right;">Points</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>below 1 — you beat your benchmark</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="even">
+<td>1 to 1.1 — within 10%</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr class="odd">
+<td>above 1.1</td>
+<td style="text-align: right;">1, and 3.3 must say why</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>What the pool guarantees, and what it does not
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Measured on all 140 issued series, with <strong>automatic</strong> members fitted on the raw history — <code>AutoETS</code>, <code>AutoARIMA</code>, <code>MSTL</code> — and scored on the hidden horizon:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 17%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Forecast</th>
+<th style="text-align: right;">Beats the benchmark</th>
+<th style="text-align: right;">Within 10%</th>
+<th style="text-align: right;">Worse</th>
+<th style="text-align: right;">Median skill</th>
+<th style="text-align: right;">Worst skill</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>AutoETS</code> + <code>AutoARIMA</code></td>
+<td style="text-align: right;"><strong>100%</strong></td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">0.805</td>
+<td style="text-align: right;">0.93</td>
+</tr>
+<tr class="even">
+<td>all three</td>
+<td style="text-align: right;">96%</td>
+<td style="text-align: right;">3%</td>
+<td style="text-align: right;">1%</td>
+<td style="text-align: right;">0.798</td>
+<td style="text-align: right;">1.18</td>
+</tr>
+<tr class="odd">
+<td>select the best of three on four windows</td>
+<td style="text-align: right;">96%</td>
+<td style="text-align: right;">2%</td>
+<td style="text-align: right;">2%</td>
+<td style="text-align: right;">0.811</td>
+<td style="text-align: right;">1.23</td>
+</tr>
+<tr class="even">
+<td><code>MSTL</code> alone</td>
+<td style="text-align: right;">80%</td>
+<td style="text-align: right;">6%</td>
+<td style="text-align: right;">14%</td>
+<td style="text-align: right;">0.812</td>
+<td style="text-align: right;">2.46</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>The pool was screened so that <code>AutoETS</code> and <code>AutoARIMA</code> each beat the benchmark — so their average does too. <strong>MSTL was not screened</strong>: on one series in seven it loses by more than 10% on its own, and it can pull a combination with it. Whether it belongs in yours is a decision for 2.2.</li>
+<li>Your Lab 5 and Lab 7 models may not be the automatic ones. The table is about the automatic ones.</li>
+<li><strong>Intervals, on the hidden horizon:</strong> the averaged bounds cover 78% of the months on average, the conformal recipe 79%; Winkler scores 3.75 and 3.85. Neither recipe wins in general — which is why you choose on your own windows.</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="section-3-justification-block-3-points" class="level2">
+<h2 class="anchored" data-anchor-id="section-3-justification-block-3-points">✍️ Section 3 — Justification block (3 points)</h2>
+<p>The part a human reads closely. Roughly a paragraph each, with numbers from your own cells.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 7%">
+<col style="width: 8%">
+<col style="width: 84%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Item</th>
+<th style="text-align: right;">Points</th>
+<th>What earns them</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>3.1</td>
+<td style="text-align: right;">1</td>
+<td><strong>Combine or select.</strong> The members you chose <em>before</em> the table and why each is defensible on its own. The rolling table read: who won how many windows, where the combination landed in each, how it compares with the best single member. The error correlations — how much there was to gain. What selection would have submitted, and why you combined anyway.</td>
+</tr>
+<tr class="even">
+<td>3.2</td>
+<td style="text-align: right;">1</td>
+<td><strong>The interval.</strong> Both recipes on unseen windows: coverage, Winkler score, width. The one you submitted and why. How many errors the conformal radius rests on — four windows of <span class="math inline">\(h\)</span> — and what that means for trusting it.</td>
+</tr>
+<tr class="odd">
+<td>3.3</td>
+<td style="text-align: right;">1</td>
+<td><strong>Conclusions against your past results.</strong> Your Lab 5 and Lab 7 hidden-horizon skills next to the rolling evidence for the combination: did combining help on your series, against which model, by how much? The skill you expect tonight, and why. One thing you would now do differently in Lab 5 or Lab 7.</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Marked on the reasoning. A combination that does no better than your best model scores full marks in 3.1 if you show it with numbers and say why you would still submit it — or why you would not. A rebuild that does not match, honestly explained, costs nothing.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Where this goes wrong
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><strong>Choosing the members after reading the table.</strong> Then the combination is a selection in disguise — the noisy decision it was meant to avoid. Write 2.2’s note first.</li>
+<li><strong>Comparing on the validation window alone.</strong> One window is one draw; the practice session’s tourism case showed selection on three windows picking the test winner barely more often than a coin.</li>
+<li><strong>Judging the conformal interval on the windows it was built from.</strong> It will look perfect. The template’s <code>interval_check</code> leaves each window out in turn — use it.</li>
+<li><strong>Averaging forecasts on different scales.</strong> Every member’s forecast must be on the original scale — <code>fit_member</code> takes care of the log; do not exponentiate twice.</li>
+<li><strong>Forecasting from <code>train</code>.</strong> The submission refits every member on the whole history.</li>
+</ul>
+<p>📖 <a href="https://otexts.com/fpp3/combinations.html">FPP3 §13.4 Forecast combinations</a> · <a href="https://otexts.com/fpp3/prediction-intervals.html">§5.5 Distributional forecasts and prediction intervals</a> · <a href="https://otexts.com/fpp3/complexseasonality.html">FPP3 §12.1 Complex seasonality (MSTL)</a></p>
+</div>
+</div>
+</section>
+<section id="section-4-code-quality-and-reproducibility-1-point" class="level2">
+<h2 class="anchored" data-anchor-id="section-4-code-quality-and-reproducibility-1-point">🧹 Section 4 — Code quality and reproducibility (1 point)</h2>
+<ul>
+<li>The notebook runs top to bottom on a fresh kernel without errors.</li>
+<li>The submission file is written <strong>by the notebook</strong>, not edited by hand.</li>
+<li>No leakage: members and interval recipes are compared on the rolling windows; only the final members are fitted on all of <code>y</code>.</li>
+<li>Every number in your text comes from a cell.</li>
+</ul>
+</section>
+<section id="submission" class="level2">
+<h2 class="anchored" data-anchor-id="submission">📤 Submission</h2>
+<p>Upload three files to the Week 9 activity on Moodle <strong>before 23:59 today</strong>:</p>
+<ul>
+<li><p><code>SURNAME_lab09_forecast.csv</code> — written by the last cell of the template. Exactly <span class="math inline">\(h\)</span> rows and these columns:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Column</th>
+<th>What</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>student_id</code></td>
+<td>your identifier</td>
+</tr>
+<tr class="even">
+<td><code>code</code></td>
+<td>your series code, the same as before</td>
+</tr>
+<tr class="odd">
+<td><code>ds</code></td>
+<td>the dates you are forecasting, in order</td>
+</tr>
+<tr class="even">
+<td><code>yhat</code></td>
+<td>the combination’s point forecast</td>
+</tr>
+<tr class="odd">
+<td><code>yhat_lo_80</code>, <code>yhat_hi_80</code></td>
+<td>the 80% interval you chose</td>
+</tr>
+</tbody>
+</table></li>
+<li><p><code>SURNAME_lab09.pdf</code> — the report, with the justification block;</p></li>
+<li><p><code>SURNAME_lab09.ipynb</code> — the source.</p></li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>A file that cannot be read scores 0 for accuracy
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Exactly <span class="math inline">\(h\)</span> rows, the dates asked for, no <code>NaN</code>, the interval around the point forecast. The template’s check cell is the same one the scorer uses — if it passes, your file is fine.</p>
+</div>
+</div>
+</section>
+<section id="how-long-this-should-take" class="level2">
+<h2 class="anchored" data-anchor-id="how-long-this-should-take">⏱ How long this should take</h2>
+<p>Ninety minutes. The backtest refits three members on four origins — on a monthly series with a seasonal ARIMA, a few minutes; run it once and keep <code>bt</code>. Most of the time should go into Section 3.</p>
+</section>
+<section id="what-comes-next" class="level2">
+<h2 class="anchored" data-anchor-id="what-comes-next">📚 What comes next</h2>
+<p>This was the last weekly lab. Keep this notebook: next week’s lecture, <em>Foundation Models for Time Series</em>, asks whether a pretrained network beats the combination you submit tonight.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

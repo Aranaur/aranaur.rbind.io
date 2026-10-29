@@ -1,0 +1,201 @@
+---
+title: "Lab 8: Combining forecasts"
+subtitle: "MATH840 | Time Series | Week 9 — graded assignment 7 of 7"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    highlight-style: github
+    theme: [default, custom.scss]
+execute:
+  echo: true
+  warning: false
+  eval: false
+editor_options:
+  chunk_output_type: console
+---
+
+::: {.callout-important appearance="simple"}
+## The last weekly lab
+
+Your series from Week 4, for the fourth time. You have an ETS model from Lab 5 and a seasonal ARIMA from
+Lab 7, and a published accuracy score for each. Tonight you **put them together** and find out whether
+that was worth doing — on your series, with your own numbers.
+:::
+
+::: {.callout-tip appearance="simple"}
+## Open the notebook
+
+The template: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab09.ipynb)
+
+Click **Copy to Drive** before you start working, otherwise nothing you write is saved.
+
+The practice session — case 4 is this lab on a public series, end to end:
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo09.ipynb)
+· [Ukrainian version with results and conclusions](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo09_uk.ipynb)
+:::
+
+## 🎯 The task
+
+Forecast your series with an **equal-weight combination** — the *Advanced Forecasting Methods* lecture —
+and compare it with everything you have built before.
+
+1. **Rebuild** your Lab 5 and Lab 7 models exactly as you submitted them, and check that they reproduce
+   your earlier validation numbers. **Add MSTL** as a third candidate.
+2. **Backtest** all three on four rolling origins, next to your benchmark.
+3. **Combine** two or three of them — members chosen *before* you read the table — and read the table:
+   would selecting one model have done better?
+4. **Choose an interval**: the averaged bounds of the members, or a conformal interval from the
+   combination's own errors — each judged on windows it did not see.
+5. **Conclude** against your past results: your Lab 5 and Lab 7 scores on the hidden horizon, and what the
+   combination is expected to add.
+
+**Not this time:** plots of the series, decomposition, ACF and differencing. You have done them three
+times; nothing in the rubric asks for them again. Every plot tonight is about the models.
+
+::: {.callout-important}
+## This one counts
+
+8 points. **Deadline: 23:59 today**, on Moodle. The accuracy score is published the next morning; marks
+and comments come back before the next practice session.
+:::
+
+## 📋 What you are marked on
+
+| Section | Criteria | Points |
+|---|---|---:|
+| 1 | Your models, rebuilt — and one new member | 1 |
+| 2 | Forecast accuracy against your benchmark | 3 |
+| 3 | Justification block | 3 |
+| 4 | Code quality and reproducibility | 1 |
+| | **Total** | **8** |
+
+The notebook has one section per row. **Keep those headings.**
+
+## 🔁 Section 1 — Your models, rebuilt (1 point)
+
+- `MEMBERS` holds your **submitted** Lab 5 ETS and Lab 7 seasonal ARIMA — the specification, the damping,
+  the log — and MSTL, with a log decision of its own.
+- `PAST` holds the hidden-horizon MASE and skill you were sent after Labs 5 and 7.
+- The template prints each member's MASE on the validation window. **It must match your earlier
+  notebooks.** If it does not, find out why — a different specification, `AutoETS` choosing differently on
+  a refit — and say so.
+- Two or three sentences: do the numbers match, and where does MSTL land next to your two models?
+
+## 🎯 Section 2 — Forecast accuracy (3 points)
+
+What you submit is **an equal-weight average of two or three members**, with an 80% interval from one of
+the two recipes. No single model, no estimated weights, no model families beyond the three.
+
+Scored from your submission file on the `h` observations after your history that nobody has seen:
+
+$$
+\text{skill} = \frac{\text{MASE of your forecast}}{\text{MASE of your benchmark}}
+$$
+
+| Skill | Points |
+|---|---:|
+| below 1 — you beat your benchmark | 3 |
+| 1 to 1.1 — within 10% | 2 |
+| above 1.1 | 1, and 3.3 must say why |
+
+::: {.callout-note}
+## What the pool guarantees, and what it does not
+
+Measured on all 140 issued series, with **automatic** members fitted on the raw history — `AutoETS`,
+`AutoARIMA`, `MSTL` — and scored on the hidden horizon:
+
+| Forecast | Beats the benchmark | Within 10% | Worse | Median skill | Worst skill |
+|---|---:|---:|---:|---:|---:|
+| `AutoETS` + `AutoARIMA` | **100%** | — | — | 0.805 | 0.93 |
+| all three | 96% | 3% | 1% | 0.798 | 1.18 |
+| select the best of three on four windows | 96% | 2% | 2% | 0.811 | 1.23 |
+| `MSTL` alone | 80% | 6% | 14% | 0.812 | 2.46 |
+
+- The pool was screened so that `AutoETS` and `AutoARIMA` each beat the benchmark — so their average does
+  too. **MSTL was not screened**: on one series in seven it loses by more than 10% on its own, and it can
+  pull a combination with it. Whether it belongs in yours is a decision for 2.2.
+- Your Lab 5 and Lab 7 models may not be the automatic ones. The table is about the automatic ones.
+- **Intervals, on the hidden horizon:** the averaged bounds cover 78% of the months on average, the
+  conformal recipe 79%; Winkler scores 3.75 and 3.85. Neither recipe wins in general — which is why you
+  choose on your own windows.
+:::
+
+## ✍️ Section 3 — Justification block (3 points)
+
+The part a human reads closely. Roughly a paragraph each, with numbers from your own cells.
+
+| Item | Points | What earns them |
+|------|------:|------------------------------------------------------------------------|
+| 3.1 | 1 | **Combine or select.** The members you chose *before* the table and why each is defensible on its own. The rolling table read: who won how many windows, where the combination landed in each, how it compares with the best single member. The error correlations — how much there was to gain. What selection would have submitted, and why you combined anyway. |
+| 3.2 | 1 | **The interval.** Both recipes on unseen windows: coverage, Winkler score, width. The one you submitted and why. How many errors the conformal radius rests on — four windows of $h$ — and what that means for trusting it. |
+| 3.3 | 1 | **Conclusions against your past results.** Your Lab 5 and Lab 7 hidden-horizon skills next to the rolling evidence for the combination: did combining help on your series, against which model, by how much? The skill you expect tonight, and why. One thing you would now do differently in Lab 5 or Lab 7. |
+
+::: {.callout-important}
+Marked on the reasoning. A combination that does no better than your best model scores full marks in 3.1
+if you show it with numbers and say why you would still submit it — or why you would not. A rebuild that
+does not match, honestly explained, costs nothing.
+:::
+
+::: {.callout-warning}
+## Where this goes wrong
+
+- **Choosing the members after reading the table.** Then the combination is a selection in disguise —
+  the noisy decision it was meant to avoid. Write 2.2's note first.
+- **Comparing on the validation window alone.** One window is one draw; the practice session's tourism
+  case showed selection on three windows picking the test winner barely more often than a coin.
+- **Judging the conformal interval on the windows it was built from.** It will look perfect. The
+  template's `interval_check` leaves each window out in turn — use it.
+- **Averaging forecasts on different scales.** Every member's forecast must be on the original scale —
+  `fit_member` takes care of the log; do not exponentiate twice.
+- **Forecasting from `train`.** The submission refits every member on the whole history.
+
+📖 [FPP3 §13.4 Forecast combinations](https://otexts.com/fpp3/combinations.html) ·
+[§5.5 Distributional forecasts and prediction intervals](https://otexts.com/fpp3/prediction-intervals.html) ·
+[FPP3 §12.1 Complex seasonality (MSTL)](https://otexts.com/fpp3/complexseasonality.html)
+:::
+
+## 🧹 Section 4 — Code quality and reproducibility (1 point)
+
+- The notebook runs top to bottom on a fresh kernel without errors.
+- The submission file is written **by the notebook**, not edited by hand.
+- No leakage: members and interval recipes are compared on the rolling windows; only the final members are
+  fitted on all of `y`.
+- Every number in your text comes from a cell.
+
+## 📤 Submission
+
+Upload three files to the Week 9 activity on Moodle **before 23:59 today**:
+
+- `SURNAME_lab09_forecast.csv` — written by the last cell of the template. Exactly $h$ rows and these
+  columns:
+
+  | Column | What |
+  |---|---|
+  | `student_id` | your identifier |
+  | `code` | your series code, the same as before |
+  | `ds` | the dates you are forecasting, in order |
+  | `yhat` | the combination's point forecast |
+  | `yhat_lo_80`, `yhat_hi_80` | the 80% interval you chose |
+
+- `SURNAME_lab09.pdf` — the report, with the justification block;
+- `SURNAME_lab09.ipynb` — the source.
+
+::: {.callout-warning}
+## A file that cannot be read scores 0 for accuracy
+
+Exactly $h$ rows, the dates asked for, no `NaN`, the interval around the point forecast. The template's
+check cell is the same one the scorer uses — if it passes, your file is fine.
+:::
+
+## ⏱ How long this should take
+
+Ninety minutes. The backtest refits three members on four origins — on a monthly series with a seasonal
+ARIMA, a few minutes; run it once and keep `bt`. Most of the time should go into Section 3.
+
+## 📚 What comes next
+
+This was the last weekly lab. Keep this notebook: next week's lecture, *Foundation Models for Time
+Series*, asks whether a pretrained network beats the combination you submit tonight.
