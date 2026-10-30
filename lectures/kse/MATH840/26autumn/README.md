@@ -41,6 +41,9 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 9 — Lab 8 handout: Combining forecasts | <https://01a18826-fc82-29d0-d9b1-ae5e1434d15f.share.connect.posit.cloud> |
 | Week 9 — Lab 8 template: combining forecasts (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab09.ipynb) |
 | Week 10 — TimeGPT: getting an API key (handout) | <https://01a17389-2e7b-9235-0fc3-163f41b0e192.share.connect.posit.cloud> |
+| Week 10 — practice demo, foundation models against everything you know (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo10.ipynb) |
+| Week 10 — practice, Ukrainian version with full analysis and conclusions (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo10_uk.ipynb) |
+| Week 10 — Lab 9 template: neural networks and foundation models (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab10.ipynb) |
 | Moodle | <https://teaching.kse.org.ua/course/view.php?id=4432> |
 
 ## Layout
