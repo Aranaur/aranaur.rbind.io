@@ -38,13 +38,11 @@ Autumn trimester, KSE. Tuesdays: lecture 10:00–11:20, practice 11:30–12:50 (
 | Week 8 — Lab 7 template (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab08.ipynb) |
 | Week 9 — practice demo, Prophet up close, then combining forecasts (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo09.ipynb) |
 | Week 9 — practice, Ukrainian version with full analysis and conclusions (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo09_uk.ipynb) |
-| Week 9 — Lab 8 handout: Combining forecasts | <https://01a18826-fc82-29d0-d9b1-ae5e1434d15f.share.connect.posit.cloud> |
-| Week 9 — Lab 8 template: combining forecasts (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab09.ipynb) |
+| Weeks 9–10 — Lab 8 handout: combinations, neural networks and foundation models (due 1 Nov) | <https://01a18826-fc82-29d0-d9b1-ae5e1434d15f.share.connect.posit.cloud> |
+| Weeks 9–10 — Lab 8 template: tracks A combine, B train, C borrow, D your own (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab09.ipynb) |
 | Week 10 — TimeGPT: getting an API key (handout) | <https://01a17389-2e7b-9235-0fc3-163f41b0e192.share.connect.posit.cloud> |
 | Week 10 — practice demo, foundation models against everything you know (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo10.ipynb) |
 | Week 10 — practice, Ukrainian version with full analysis and conclusions (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_demo10_uk.ipynb) |
-| Week 10 — Lab 9 handout: Neural networks and foundation models | <https://01a18d1c-e58a-d5b7-c48f-caf8c379fb7c.share.connect.posit.cloud> |
-| Week 10 — Lab 9 template: neural networks and foundation models (Colab) | [Open in Colab](https://colab.research.google.com/github/Aranaur/aranaur.rbind.io/blob/main/lectures/kse/MATH840/26autumn/labs/_lab10.ipynb) |
 | Moodle | <https://teaching.kse.org.ua/course/view.php?id=4432> |
 
 ## Layout
