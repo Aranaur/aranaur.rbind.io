@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<title>philosophy background</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #f5f7ff; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<script>
+// Повільний дрейф символів: здебільшого «?» (метод Сократа),
+// зрідка λ Σ Ω ☯ 無 ∞. Кольори — бренд KSE і чотири блоки лекції.
+(() => {
+  const cv = document.getElementById('bg');
+  const ctx = cv.getContext('2d');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const QUESTION = { ch: '?', colors: ['#0038FF', '#0038FF', '#05006B'] };
+  const OTHERS = [
+    { ch: 'λ', colors: ['#00D0FF', '#0038FF'] },
+    { ch: 'Σ', colors: ['#00D0FF', '#05006B'] },
+    { ch: 'Ω', colors: ['#62005F', '#0038FF'] },
+    { ch: '☯', colors: ['#4D6924'] },
+    { ch: '無', colors: ['#4D6924', '#05006B'] },
+    { ch: '∞', colors: ['#62005F', '#FB4F01'] },
+  ];
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+
+  let W, H, DPR, parts = [];
+  const mouse = { x: -1e4, y: -1e4 };
+
+  function make() {
+    const isQ = Math.random() < 0.6;
+    const g = isQ ? QUESTION : pick(OTHERS);
+    const size = 16 + Math.random() * (isQ ? 52 : 34);
+    return {
+      ch: g.ch, color: pick(g.colors), size,
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 0.25, vy: (Math.random() - 0.5) * 0.25,
+      a: 0.22 + Math.random() * 0.4,
+      rot: (Math.random() - 0.5) * 0.6, vr: (Math.random() - 0.5) * 0.002,
+    };
+  }
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const n = Math.round(Math.min(110, (W * H) / 14000));
+    parts = Array.from({ length: n }, make);
+  }
+
+  function step() {
+    ctx.clearRect(0, 0, W, H);
+
+    // тонкі лінії між сусідами: «мережа ідей»
+    const LINK = 150;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < parts.length; i++) {
+      for (let j = i + 1; j < parts.length; j++) {
+        const p = parts[i], q = parts[j];
+        const dx = p.x - q.x, dy = p.y - q.y, d = Math.hypot(dx, dy);
+        if (d < LINK) {
+          ctx.strokeStyle = `rgba(0, 56, 255, ${0.10 * (1 - d / LINK)})`;
+          ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+        }
+      }
+    }
+
+    for (const p of parts) {
+      if (!reduce) {
+        // м'яке відштовхування від курсора
+        const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx, dy);
+        if (d < 120 && d > 0) { p.vx += (dx / d) * 0.05; p.vy += (dy / d) * 0.05; }
+        p.vx *= 0.995; p.vy *= 0.995;
+        const sp = Math.hypot(p.vx, p.vy);
+        if (sp < 0.08) { p.vx *= 1.05; p.vy *= 1.05; }
+        p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+        const m = p.size;
+        if (p.x < -m) p.x = W + m; if (p.x > W + m) p.x = -m;
+        if (p.y < -m) p.y = H + m; if (p.y > H + m) p.y = -m;
+      }
+      ctx.save();
+      ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.globalAlpha = p.a;
+      ctx.fillStyle = p.color;
+      ctx.font = `600 ${p.size}px "Unbounded", "Segoe UI Symbol", "Noto Sans CJK SC", "Microsoft YaHei", serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(p.ch, 0, 0);
+      ctx.restore();
+    }
+    if (!reduce) requestAnimationFrame(step);
+  }
+
+  // Фон інтерактивний, тож клік переводить фокус в iframe і стрілки
+  // перестають гортати слайди. Повертаємо фокус презентації
+  // і на всяк випадок самі передаємо їй клавіші навігації.
+  const host = () => { try { return window.parent !== window ? window.parent : null; } catch (e) { return null; } };
+  const giveBack = () => { const h = host(); if (h) try { h.focus(); } catch (e) {} };
+  addEventListener('mousedown', () => setTimeout(giveBack, 0));
+  addEventListener('focus', giveBack);
+  addEventListener('keydown', e => {
+    const h = host(); let R;
+    try { R = h && h.Reveal; } catch (err) { R = null; }
+    if (!R) return;
+    const next = ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'n', 'N'];
+    const prev = ['ArrowLeft', 'ArrowUp', 'PageUp', 'p', 'P', 'Backspace'];
+    if (next.includes(e.key)) { R.next(); e.preventDefault(); }
+    else if (prev.includes(e.key)) { R.prev(); e.preventDefault(); }
+    giveBack();
+  });
+
+  addEventListener('resize', resize);
+  addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+  addEventListener('mouseleave', () => { mouse.x = mouse.y = -1e4; });
+  resize();
+  step();
+})();
+</script>
+</body>
+</html>
