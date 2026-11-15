@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Ihor Miroshnychenko">
+
+<title>Final project: 48 hours of generation</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src=".project_files/libs/clipboard/clipboard.min.js"></script>
+<script src=".project_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src=".project_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src=".project_files/libs/quarto-html/popper.min.js"></script>
+<script src=".project_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src=".project_files/libs/quarto-html/anchor.min.js"></script>
+<link href=".project_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href=".project_files/libs/quarto-html/quarto-syntax-highlighting-a6f4957c43e529dfa47e771024b1e13d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src=".project_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href=".project_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href=".project_files/libs/bootstrap/bootstrap-f0363865eaeadd24fdd349ba0d39ddd7.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#timeline" id="toc-timeline" class="nav-link active" data-scroll-target="#timeline">Timeline</a></li>
+  <li><a href="#the-data" id="toc-the-data" class="nav-link" data-scroll-target="#the-data">The data</a></li>
+  <li><a href="#the-task" id="toc-the-task" class="nav-link" data-scroll-target="#the-task">The task</a>
+  <ul class="collapse">
+  <li><a href="#the-submission-file" id="toc-the-submission-file" class="nav-link" data-scroll-target="#the-submission-file">The submission file</a></li>
+  </ul></li>
+  <li><a href="#scoring" id="toc-scoring" class="nav-link" data-scroll-target="#scoring">Scoring</a>
+  <ul class="collapse">
+  <li><a href="#public-and-private-leaderboards" id="toc-public-and-private-leaderboards" class="nav-link" data-scroll-target="#public-and-private-leaderboards">Public and private leaderboards</a></li>
+  </ul></li>
+  <li><a href="#points" id="toc-points" class="nav-link" data-scroll-target="#points">Points</a>
+  <ul class="collapse">
+  <li><a href="#beating-the-benchmark-8-points" id="toc-beating-the-benchmark-8-points" class="nav-link" data-scroll-target="#beating-the-benchmark-8-points">Beating the benchmark (8 points)</a></li>
+  <li><a href="#final-accuracy-5-points" id="toc-final-accuracy-5-points" class="nav-link" data-scroll-target="#final-accuracy-5-points">Final accuracy (5 points)</a></li>
+  <li><a href="#methodology-and-diagnostics-8-points" id="toc-methodology-and-diagnostics-8-points" class="nav-link" data-scroll-target="#methodology-and-diagnostics-8-points">Methodology and diagnostics (8 points)</a></li>
+  <li><a href="#code-quality-and-reproducibility-2-points" id="toc-code-quality-and-reproducibility-2-points" class="nav-link" data-scroll-target="#code-quality-and-reproducibility-2-points">Code quality and reproducibility (2 points)</a></li>
+  <li><a href="#defence-and-presentation-4-points" id="toc-defence-and-presentation-4-points" class="nav-link" data-scroll-target="#defence-and-presentation-4-points">Defence and presentation (4 points)</a></li>
+  </ul></li>
+  <li><a href="#between-the-sessions" id="toc-between-the-sessions" class="nav-link" data-scroll-target="#between-the-sessions">Between the sessions</a></li>
+  <li><a href="#final-submission-thursday-5-november-2359" id="toc-final-submission-thursday-5-november-2359" class="nav-link" data-scroll-target="#final-submission-thursday-5-november-2359">Final submission: Thursday 5 November, 23:59</a></li>
+  <li><a href="#session-2-friday-6-november" id="toc-session-2-friday-6-november" class="nav-link" data-scroll-target="#session-2-friday-6-november">Session 2: Friday 6 November</a></li>
+  <li><a href="#if-something-goes-wrong" id="toc-if-something-goes-wrong" class="nav-link" data-scroll-target="#if-something-goes-wrong">If something goes wrong</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Final project: 48 hours of generation</h1>
+<p class="subtitle lead">MATH840 | Time Series | Week 10 | 32 points</p>
+</div>
+
+
+<div class="quarto-title-meta-author">
+  <div class="quarto-title-meta-heading">Author</div>
+  <div class="quarto-title-meta-heading">Affiliation</div>
+  
+    <div class="quarto-title-meta-contents">
+    <p class="author">Ihor Miroshnychenko </p>
+  </div>
+  <div class="quarto-title-meta-contents">
+        <p class="affiliation">
+            Kyiv School of Economics
+          </p>
+      </div>
+  </div>
+
+<div class="quarto-title-meta">
+
+      
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="callout callout-style-simple callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>The brief
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>You work as a data scientist at an energy company. You have the hourly electricity generation of its portfolio, with the weather, up to midnight on 27 October 2026. The grid operator wants a forecast for the next 48 hours, hour by hour, with a 95% prediction interval: the interval tells them how much reserve to hold.</p>
+<p>Everyone in the group forecasts the same data. Session 1 gives you 80 minutes. After that you have two days at home, and you may use any method you like.</p>
+</div>
+</div>
+<section id="timeline" class="level2">
+<h2 class="anchored" data-anchor-id="timeline">Timeline</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>When</th>
+<th>What</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Tue 3 Nov, 10:00–11:20</td>
+<td>Session 1 (on campus or online). The data and the template appear on Moodle when it starts.</td>
+</tr>
+<tr class="even">
+<td><strong>Tue 3 Nov, 11:30</strong></td>
+<td><strong>Deadline for the Session 1 submission.</strong> One CSV file, Moodle activity <em>Session 1</em>.</td>
+</tr>
+<tr class="odd">
+<td>Wed 4 Nov, 09:00</td>
+<td>First update of the public leaderboard.</td>
+</tr>
+<tr class="even">
+<td>Thu 5 Nov, 09:00</td>
+<td>Second update of the public leaderboard.</td>
+</tr>
+<tr class="odd">
+<td><strong>Thu 5 Nov, 23:59</strong></td>
+<td><strong>Deadline for the final submission</strong> (moved from 21:00 because of the power outages). CSV, repository link and slides, Moodle activity <em>Final</em>.</td>
+</tr>
+<tr class="even">
+<td>Fri 6 Nov</td>
+<td>Session 2 (on campus or online). Five-minute talks with two or three questions each, then the private leaderboard.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="the-data" class="level2">
+<h2 class="anchored" data-anchor-id="the-data">The data</h2>
+<p>Three files on Moodle:</p>
+<ul>
+<li><code>train.csv</code>: the history, about 3.8 years of hours, with the target <code>y</code> and the actual weather.</li>
+<li><code>weather_forecast.csv</code>: a weather forecast for the 48 hours you predict.</li>
+<li><code>_project.ipynb</code>: the template. To open it in Colab, use <em>File → Upload notebook</em>. When you run it, it asks you to upload the two CSV files.</li>
+</ul>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ds</code></td>
+<td>the hour</td>
+</tr>
+<tr class="even">
+<td><code>y</code></td>
+<td>electricity generated in that hour; this is what you forecast</td>
+</tr>
+<tr class="odd">
+<td><code>cloud_cover</code></td>
+<td>from 0 (clear) to 1 (overcast), in steps of 0.25</td>
+</tr>
+<tr class="even">
+<td><code>temperature</code></td>
+<td>°C</td>
+</tr>
+<tr class="odd">
+<td><code>wind_speed</code></td>
+<td>m/s</td>
+</tr>
+<tr class="even">
+<td><code>pressure</code></td>
+<td>mm Hg</td>
+</tr>
+<tr class="odd">
+<td><code>humidity</code></td>
+<td>%</td>
+</tr>
+<tr class="even">
+<td><code>daylight</code></td>
+<td>1 while the sun is above the horizon</td>
+</tr>
+<tr class="odd">
+<td><code>air_density</code></td>
+<td>kg/m³</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>The weather for the horizon is a forecast
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>weather_forecast.csv</code> is what a weather service would have issued for those 48 hours. It is close to the weather that followed, but it has errors, and they grow from the first day to the second. You may use it or leave it out. Say which you did in the report, and why.</p>
+</div>
+</div>
+<p>The template loads the data, defines the three metrics, scores the benchmark on a validation window, and writes and checks the submission file. There is no model in it. The submission cell starts from the benchmark, so if you run the notebook from top to bottom you have a valid file within five minutes. The rest of the session is for beating it.</p>
+</section>
+<section id="the-task" class="level2">
+<h2 class="anchored" data-anchor-id="the-task">The task</h2>
+<p>Forecast the 48 hours that follow the last hour of <code>train.csv</code>. For every hour, give a point forecast and a 95% prediction interval. You can use any method or library, from the course or outside it.</p>
+<section id="the-submission-file" class="level3">
+<h3 class="anchored" data-anchor-id="the-submission-file">The submission file</h3>
+<p>The file is called <code>SURNAME_project.csv</code> and has 48 rows and four columns, in this order:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Column</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ds</code></td>
+<td>the hour as <code>YYYY-MM-DD HH:MM:SS</code>, the same hours as in <code>weather_forecast.csv</code></td>
+</tr>
+<tr class="even">
+<td><code>forecast</code></td>
+<td>the point forecast</td>
+</tr>
+<tr class="odd">
+<td><code>lower_95</code></td>
+<td>the lower bound of the 95% interval, 0 or above</td>
+</tr>
+<tr class="even">
+<td><code>upper_95</code></td>
+<td>the upper bound</td>
+</tr>
+</tbody>
+</table>
+<p><code>check_submission</code> in the template tests all of this. We cannot score a file that fails it.</p>
+</section>
+</section>
+<section id="scoring" class="level2">
+<h2 class="anchored" data-anchor-id="scoring">Scoring</h2>
+<p>Each forecast gets three scores on the 48 hidden hours. Lower is better for all three.</p>
+<p><span class="math display">\[
+\text{RMSE} = \sqrt{\frac{1}{48}\sum_{t}(y_t - \hat y_t)^2}
+\qquad
+\text{MAPE} = \frac{100\%}{48}\sum_{t}\left|\frac{y_t - \hat y_t}{y_t}\right|
+\]</span></p>
+<p><span class="math display">\[
+\text{Winkler} = \frac{1}{48}\sum_t \Big[(U_t - L_t) + \tfrac{2}{\alpha}(L_t - y_t)_+ + \tfrac{2}{\alpha}(y_t - U_t)_+\Big],
+\qquad \alpha = 0.05
+\]</span></p>
+<p>The Winkler score adds the width of the interval to a penalty for every hour the actual value falls outside it. The penalty is 40 times the distance to the nearest bound, so a narrow interval that misses can cost more than a wide one.</p>
+<p>The benchmark is a seasonal naive forecast with a daily season. Each hour of the next two days gets the value of the same hour on the last day of <code>train.csv</code>, and the interval is the standard one for seasonal naive. The template computes it for you. On the leaderboard it is listed as <code>----SNAIVE----</code>.</p>
+<section id="public-and-private-leaderboards" class="level3">
+<h3 class="anchored" data-anchor-id="public-and-private-leaderboards">Public and private leaderboards</h3>
+<p>The 48 hidden hours are split in two, as in a Kaggle competition. The first 24 hours make up the public part. On Wednesday and Thursday at 09:00 we score the latest file each of you has submitted on these hours and publish the table. The last 24 hours make up the private part, which stays hidden until Session 2, and the final ranking uses only these hours.</p>
+<p>The split protects you from tuning your model to the leaderboard. If you could see your score on all 48 hours, every resubmission would teach your model something about the answer. The public table shows roughly where you stand, and the ranking is decided on hours nobody has seen.</p>
+<p>The ranking on the private 24 hours combines the three metrics:</p>
+<p><span class="math display">\[
+\text{rank} = 0.3 \cdot \text{rank}_{\text{RMSE}} + 0.3 \cdot \text{rank}_{\text{MAPE}} + 0.4 \cdot \text{rank}_{\text{Winkler}}
+\]</span></p>
+<p>We rank the better of your two submissions, the Session 1 file or the final one. If a change you made at home turns out worse on the private hours, you lose nothing. This rule replaces the condition in the syllabus that the final result must be no worse than the Session 1 result.</p>
+</section>
+</section>
+<section id="points" class="level2">
+<h2 class="anchored" data-anchor-id="points">Points</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 40%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Criterion</th>
+<th style="text-align: right;">Points</th>
+<th>Based on</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Valid Session 1 submission: correct format, in by 11:30</td>
+<td style="text-align: right;">5</td>
+<td>Session 1</td>
+</tr>
+<tr class="even">
+<td>Beating the benchmark in Session 1</td>
+<td style="text-align: right;">8</td>
+<td>Session 1</td>
+</tr>
+<tr class="odd">
+<td>Final accuracy, ranked against the group</td>
+<td style="text-align: right;">5</td>
+<td>final submission</td>
+</tr>
+<tr class="even">
+<td>Methodology and diagnostics</td>
+<td style="text-align: right;">8</td>
+<td>report</td>
+</tr>
+<tr class="odd">
+<td>Code quality and reproducibility</td>
+<td style="text-align: right;">2</td>
+<td>repository</td>
+</tr>
+<tr class="even">
+<td>Defence and presentation</td>
+<td style="text-align: right;">4</td>
+<td>Session 2</td>
+</tr>
+<tr class="odd">
+<td>Total</td>
+<td style="text-align: right;">32</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<section id="beating-the-benchmark-8-points" class="level3">
+<h3 class="anchored" data-anchor-id="beating-the-benchmark-8-points">Beating the benchmark (8 points)</h3>
+<p>We compare your Session 1 file with the benchmark on all 48 hidden hours:</p>
+<p><span class="math display">\[
+\text{skill} = \frac{\text{RMSE of your forecast}}{\text{RMSE of the benchmark}}
+\]</span></p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Skill</th>
+<th style="text-align: right;">Points</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>below 1 (you beat the benchmark)</td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr class="even">
+<td>above 1, up to 1.1 (within 10% of it)</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr class="odd">
+<td>exactly 1 (the template's benchmark unchanged), or above 1.1</td>
+<td style="text-align: right;">2</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="final-accuracy-5-points" class="level3">
+<h3 class="anchored" data-anchor-id="final-accuracy-5-points">Final accuracy (5 points)</h3>
+<p>We take the better of your two submissions on the private 24 hours. A submission beats the benchmark there if it has a lower RMSE or a better combined rank than <code>----SNAIVE----</code>; either one is enough. Everyone who beats the benchmark is ranked with the formula above. The top third of that list gets 5 points, the middle third 4 and the bottom third 3. A submission that does not beat the benchmark gets 1 point.</p>
+<p>If only one of your two files beats the benchmark, that is the file we rank.</p>
+</section>
+<section id="methodology-and-diagnostics-8-points" class="level3">
+<h3 class="anchored" data-anchor-id="methodology-and-diagnostics-8-points">Methodology and diagnostics (8 points)</h3>
+<p>You decide which analyses to run. The report should answer four questions, worth 2 points each.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Question</th>
+<th>What to cover</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>What is in the series?</td>
+<td>The patterns you found, how the series changes over time, how the weather relates to it, and how all of that shaped your model.</td>
+</tr>
+<tr class="even">
+<td>How did you check the forecast before submitting it?</td>
+<td>How you compared your forecast with the benchmark on data you held back: which windows, how many, and what they showed.</td>
+</tr>
+<tr class="odd">
+<td>How good is your interval?</td>
+<td>How you built the 95% interval and how you checked it on held-back data, with coverage and the Winkler score.</td>
+</tr>
+<tr class="even">
+<td>What is left, and what did not work?</td>
+<td>The residuals of your final model, and the approaches you tried and dropped, with the reasons.</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>How the report is marked
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Points follow the reasoning. A model that lost to the benchmark can earn the full 8 if you read the numbers correctly and your conclusion follows from them. An approach that failed is worth reporting: it tells us what you tried and what you learned. If you go beyond the obvious steps and can explain why, that counts in your favour.</p>
+</div>
+</div>
+</section>
+<section id="code-quality-and-reproducibility-2-points" class="level3">
+<h3 class="anchored" data-anchor-id="code-quality-and-reproducibility-2-points">Code quality and reproducibility (2 points)</h3>
+<p>One point if the repository runs from a clean start and produces your final file. One point for a <code>README</code> that explains how to run it and, if you used LLMs, how you used them.</p>
+</section>
+<section id="defence-and-presentation-4-points" class="level3">
+<h3 class="anchored" data-anchor-id="defence-and-presentation-4-points">Defence and presentation (4 points)</h3>
+<p>Two points for the talk, which should show how you approached the problem and how your forecast did against the benchmark. Two points for your answers to two or three questions about the project and about decisions you made in your labs.</p>
+</section>
+</section>
+<section id="between-the-sessions" class="level2">
+<h2 class="anchored" data-anchor-id="between-the-sessions">Between the sessions</h2>
+<p>You can keep improving your forecast at home with any model, library or amount of tuning. LLMs are allowed; describe how you used them in the <code>README</code>.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Two rules
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Use only the data you were given. The series has been disguised. Searching for its original source counts as looking up the answer, and we treat it as cheating.</li>
+<li>Do your own work. You are welcome to discuss methods with each other, and Session 2 is where everyone compares approaches. Do not share forecasts or files.</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="final-submission-thursday-5-november-2359" class="level2">
+<h2 class="anchored" data-anchor-id="final-submission-thursday-5-november-2359">Final submission: Thursday 5 November, 23:59</h2>
+<p>Upload to the <em>Final</em> activity on Moodle:</p>
+<ol type="1">
+<li><code>SURNAME_project.csv</code> with your improved forecast, in the same format. If nothing you tried beat your Session 1 forecast, submit that file again and explain why in the report.</li>
+<li>A link to a public GitHub repository that contains:
+<ul>
+<li>the notebook or scripts that produce the file from <code>train.csv</code> and <code>weather_forecast.csv</code> (put both data files in the repository);</li>
+<li>the report, as a Jupyter notebook or a PDF, in English or Ukrainian;</li>
+<li>a <code>README</code> with instructions for running the code and a note on LLM use.</li>
+</ul></li>
+<li>Your slides as a PDF, made with any tool.</li>
+</ol>
+</section>
+<section id="session-2-friday-6-november" class="level2">
+<h2 class="anchored" data-anchor-id="session-2-friday-6-november">Session 2: Friday 6 November</h2>
+<p>Each of you has five minutes, followed by two or three questions. Show the main points: your approach, your results against the benchmark, and what you would do differently. After the talks we open the private leaderboard and compare how everyone approached the same data.</p>
+</section>
+<section id="if-something-goes-wrong" class="level2">
+<h2 class="anchored" data-anchor-id="if-something-goes-wrong">If something goes wrong</h2>
+<ul>
+<li>If an air raid or a power or connection outage interrupts you during Session 1, your deadline moves by the time you lost. Tell the instructor the same day. If the whole group loses more than 20 minutes, the session is rescheduled for everyone. The hidden hours and the leaderboard stay unpublished until every Session 1 file is in.</li>
+<li>If you cannot present on Friday, you present online at an extra slot within a week. The questions and the criteria are the same.</li>
+</ul>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

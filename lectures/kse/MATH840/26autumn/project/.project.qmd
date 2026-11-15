@@ -1,0 +1,247 @@
+---
+title: "Final project: 48 hours of generation"
+subtitle: "MATH840 | Time Series | Week 10 | 32 points"
+author: "Ihor Miroshnychenko"
+institute: Kyiv School of Economics
+from: markdown-smart
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    highlight-style: github
+    theme: [default, custom.scss]
+execute:
+  echo: true
+  warning: false
+  eval: false
+editor_options:
+  chunk_output_type: console
+---
+
+::: {.callout-important appearance="simple"}
+## The brief
+
+You work as a data scientist at an energy company. You have the hourly electricity generation of its
+portfolio, with the weather, up to midnight on 27 October 2026. The grid operator wants a forecast for
+the next 48 hours, hour by hour, with a 95% prediction interval: the interval tells them how much reserve
+to hold.
+
+Everyone in the group forecasts the same data. Session 1 gives you 80 minutes. After that you have two
+days at home, and you may use any method you like.
+:::
+
+## Timeline
+
+| When | What |
+|---|---|
+| Tue 3 Nov, 10:00–11:20 | Session 1 (on campus or online). The data and the template appear on Moodle when it starts. |
+| **Tue 3 Nov, 11:30** | **Deadline for the Session 1 submission.** One CSV file, Moodle activity *Session 1*. |
+| Wed 4 Nov, 09:00 | First update of the public leaderboard. |
+| Thu 5 Nov, 09:00 | Second update of the public leaderboard. |
+| **Thu 5 Nov, 23:59** | **Deadline for the final submission** (moved from 21:00 because of the power outages). CSV, repository link and slides, Moodle activity *Final*. |
+| Fri 6 Nov | Session 2 (on campus or online). Five-minute talks with two or three questions each, then the private leaderboard. |
+
+## The data
+
+Three files on Moodle:
+
+- `train.csv`: the history, about 3.8 years of hours, with the target `y` and the actual weather.
+- `weather_forecast.csv`: a weather forecast for the 48 hours you predict.
+- `_project.ipynb`: the template. To open it in Colab, use *File → Upload notebook*. When you run it, it
+  asks you to upload the two CSV files.
+
+| Column | Meaning |
+|---|---|
+| `ds` | the hour |
+| `y` | electricity generated in that hour; this is what you forecast |
+| `cloud_cover` | from 0 (clear) to 1 (overcast), in steps of 0.25 |
+| `temperature` | °C |
+| `wind_speed` | m/s |
+| `pressure` | mm Hg |
+| `humidity` | % |
+| `daylight` | 1 while the sun is above the horizon |
+| `air_density` | kg/m³ |
+
+::: {.callout-note}
+## The weather for the horizon is a forecast
+
+`weather_forecast.csv` is what a weather service would have issued for those 48 hours. It is close to the
+weather that followed, but it has errors, and they grow from the first day to the second. You may use it
+or leave it out. Say which you did in the report, and why.
+:::
+
+The template loads the data, defines the three metrics, scores the benchmark on a validation window, and
+writes and checks the submission file. There is no model in it. The submission cell starts from the
+benchmark, so if you run the notebook from top to bottom you have a valid file within five minutes. The
+rest of the session is for beating it.
+
+## The task
+
+Forecast the 48 hours that follow the last hour of `train.csv`. For every hour, give a point forecast
+and a 95% prediction interval. You can use any method or library, from the course or outside it.
+
+### The submission file
+
+The file is called `SURNAME_project.csv` and has 48 rows and four columns, in this order:
+
+| Column | Content |
+|---|---|
+| `ds` | the hour as `YYYY-MM-DD HH:MM:SS`, the same hours as in `weather_forecast.csv` |
+| `forecast` | the point forecast |
+| `lower_95` | the lower bound of the 95% interval, 0 or above |
+| `upper_95` | the upper bound |
+
+`check_submission` in the template tests all of this. We cannot score a file that fails it.
+
+## Scoring
+
+Each forecast gets three scores on the 48 hidden hours. Lower is better for all three.
+
+$$
+\text{RMSE} = \sqrt{\frac{1}{48}\sum_{t}(y_t - \hat y_t)^2}
+\qquad
+\text{MAPE} = \frac{100\%}{48}\sum_{t}\left|\frac{y_t - \hat y_t}{y_t}\right|
+$$
+
+$$
+\text{Winkler} = \frac{1}{48}\sum_t \Big[(U_t - L_t) + \tfrac{2}{\alpha}(L_t - y_t)_+ + \tfrac{2}{\alpha}(y_t - U_t)_+\Big],
+\qquad \alpha = 0.05
+$$
+
+The Winkler score adds the width of the interval to a penalty for every hour the actual value falls
+outside it. The penalty is 40 times the distance to the nearest bound, so a narrow interval that misses
+can cost more than a wide one.
+
+The benchmark is a seasonal naive forecast with a daily season. Each hour of the next two days gets the
+value of the same hour on the last day of `train.csv`, and the interval is the standard one for seasonal
+naive. The template computes it for you. On the leaderboard it is listed as `----SNAIVE----`.
+
+### Public and private leaderboards
+
+The 48 hidden hours are split in two, as in a Kaggle competition. The first 24 hours make up the public
+part. On Wednesday and Thursday at 09:00 we score the latest file each of you has submitted on these
+hours and publish the table. The last 24 hours make up the private part, which stays hidden until
+Session 2, and the final ranking uses only these hours.
+
+The split protects you from tuning your model to the leaderboard. If you could see your score on all 48
+hours, every resubmission would teach your model something about the answer. The public table shows
+roughly where you stand, and the ranking is decided on hours nobody has seen.
+
+The ranking on the private 24 hours combines the three metrics:
+
+$$
+\text{rank} = 0.3 \cdot \text{rank}_{\text{RMSE}} + 0.3 \cdot \text{rank}_{\text{MAPE}} + 0.4 \cdot \text{rank}_{\text{Winkler}}
+$$
+
+We rank the better of your two submissions, the Session 1 file or the final one. If a change you made at
+home turns out worse on the private hours, you lose nothing. This rule replaces the condition in the
+syllabus that the final result must be no worse than the Session 1 result.
+
+## Points
+
+| Criterion | Points | Based on |
+|---|---:|---|
+| Valid Session 1 submission: correct format, in by 11:30 | 5 | Session 1 |
+| Beating the benchmark in Session 1 | 8 | Session 1 |
+| Final accuracy, ranked against the group | 5 | final submission |
+| Methodology and diagnostics | 8 | report |
+| Code quality and reproducibility | 2 | repository |
+| Defence and presentation | 4 | Session 2 |
+| Total | 32 | |
+
+### Beating the benchmark (8 points)
+
+We compare your Session 1 file with the benchmark on all 48 hidden hours:
+
+$$
+\text{skill} = \frac{\text{RMSE of your forecast}}{\text{RMSE of the benchmark}}
+$$
+
+| Skill | Points |
+|---|---:|
+| below 1 (you beat the benchmark) | 8 |
+| above 1, up to 1.1 (within 10% of it) | 5 |
+| exactly 1 (the template's benchmark unchanged), or above 1.1 | 2 |
+
+### Final accuracy (5 points)
+
+We take the better of your two submissions on the private 24 hours. A submission beats the benchmark
+there if it has a lower RMSE or a better combined rank than `----SNAIVE----`; either one is enough.
+Everyone who beats the benchmark is ranked with the formula above. The top third of that list gets 5
+points, the middle third 4 and the bottom third 3. A submission that does not beat the benchmark gets
+1 point.
+
+If only one of your two files beats the benchmark, that is the file we rank.
+
+### Methodology and diagnostics (8 points)
+
+You decide which analyses to run. The report should answer four questions, worth 2 points each.
+
+| Question | What to cover |
+|---|---|
+| What is in the series? | The patterns you found, how the series changes over time, how the weather relates to it, and how all of that shaped your model. |
+| How did you check the forecast before submitting it? | How you compared your forecast with the benchmark on data you held back: which windows, how many, and what they showed. |
+| How good is your interval? | How you built the 95% interval and how you checked it on held-back data, with coverage and the Winkler score. |
+| What is left, and what did not work? | The residuals of your final model, and the approaches you tried and dropped, with the reasons. |
+
+::: {.callout-important}
+## How the report is marked
+
+Points follow the reasoning. A model that lost to the benchmark can earn the full 8 if you read the
+numbers correctly and your conclusion follows from them. An approach that failed is worth reporting: it
+tells us what you tried and what you learned. If you go beyond the obvious steps and can explain why,
+that counts in your favour.
+:::
+
+### Code quality and reproducibility (2 points)
+
+One point if the repository runs from a clean start and produces your final file. One point for a
+`README` that explains how to run it and, if you used LLMs, how you used them.
+
+### Defence and presentation (4 points)
+
+Two points for the talk, which should show how you approached the problem and how your forecast did
+against the benchmark. Two points for your answers to two or three questions about the project and about decisions you made in
+your labs.
+
+## Between the sessions
+
+You can keep improving your forecast at home with any model, library or amount of tuning. LLMs are
+allowed; describe how you used them in the `README`.
+
+::: {.callout-warning}
+## Two rules
+
+- Use only the data you were given. The series has been disguised. Searching for its original source
+  counts as looking up the answer, and we treat it as cheating.
+- Do your own work. You are welcome to discuss methods with each other, and Session 2 is where everyone
+  compares approaches. Do not share forecasts or files.
+:::
+
+## Final submission: Thursday 5 November, 23:59
+
+Upload to the *Final* activity on Moodle:
+
+1. `SURNAME_project.csv` with your improved forecast, in the same format. If nothing you tried beat your
+   Session 1 forecast, submit that file again and explain why in the report.
+2. A link to a public GitHub repository that contains:
+   - the notebook or scripts that produce the file from `train.csv` and `weather_forecast.csv` (put both
+     data files in the repository);
+   - the report, as a Jupyter notebook or a PDF, in English or Ukrainian;
+   - a `README` with instructions for running the code and a note on LLM use.
+3. Your slides as a PDF, made with any tool.
+
+## Session 2: Friday 6 November
+
+Each of you has five minutes, followed by two or three questions. Show the main points: your approach,
+your results against the benchmark, and what you would do differently. After the talks we open the
+private leaderboard and compare how everyone approached the same data.
+
+## If something goes wrong
+
+- If an air raid or a power or connection outage interrupts you during Session 1, your deadline moves by
+  the time you lost. Tell the instructor the same day. If the whole group loses more than 20 minutes, the
+  session is rescheduled for everyone. The hidden hours and the leaderboard stay unpublished until every
+  Session 1 file is in.
+- If you cannot present on Friday, you present online at an extra slot within a week. The questions and
+  the criteria are the same.

@@ -25,7 +25,6 @@ import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-LABS = HERE.parent / "labs"
 
 CHROME = os.environ.get(
     "CHROME",
@@ -96,11 +95,17 @@ def verify(qmd: Path, pdf: Path) -> None:
     pages = text.count("\f") or 1
     flat = words(text)
 
-    # Drop Pandoc attributes ({.smaller}, {.tiny}, {#id}) - they are markup, not printed text -
-    # and inline math: "$\lambda$" prints as "λ" once typeset, so only the words around it can match.
-    headings = [re.sub(r"\$[^$]*\$", " ", re.sub(r"\s*\{[^}]*\}\s*$", "", h))
+    # Drop Pandoc attributes ({.smaller}, {.tiny}, {#id}) - they are markup, not printed text.
+    # Inline math prints as whatever MathJax renders: "$\lambda$" becomes "λ" (no letters left),
+    # "$\phi_1$" becomes "ϕ1" and "$c$" stays "c". So a formula matches up to three printed words.
+    headings = [re.sub(r"\s*\{[^}]*\}\s*$", "", h)
                 for h in re.findall(r"(?m)^#{2,3} (.+)$", qmd.read_text(encoding="utf-8"))]
-    missing = [h for h in headings if words(h) and words(h) not in flat]
+
+    def found(heading: str) -> bool:
+        parts = [words(s) for s in re.split(r"\$[^$]*\$", heading) if words(s)]
+        return not parts or re.search(r"(?: \S+){0,3} ".join(map(re.escape, parts)), flat) is not None
+
+    missing = [h for h in headings if not found(h)]
 
     problems = []
     if missing:
@@ -120,15 +125,17 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("stem", help="handout stem, e.g. .lab02")
     ap.add_argument("--render", action="store_true", help="render the .qmd to html first")
+    ap.add_argument("--dir", default="labs", help="source directory (default: labs)")
     args = ap.parse_args()
 
-    qmd = LABS / f"{args.stem}.qmd"
-    html = LABS / f"{args.stem}.html"
-    pdf = LABS / f"{args.stem}.pdf"
+    src = HERE.parent / args.dir
+    qmd = src / f"{args.stem}.qmd"
+    html = src / f"{args.stem}.html"
+    pdf = src / f"{args.stem}.pdf"
 
     if args.render:
         subprocess.run(["quarto", "render", qmd.name, "--to", "html", "--no-execute-daemon"],
-                       cwd=LABS, check=True, shell=(os.name == "nt"))
+                       cwd=src, check=True, shell=(os.name == "nt"))
     if not html.exists():
         sys.exit(f"{html.name} not found - render it first (--render)")
     if not Path(CHROME).exists():

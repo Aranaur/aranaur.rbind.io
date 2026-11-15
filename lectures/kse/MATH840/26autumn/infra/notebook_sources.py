@@ -13,8 +13,11 @@ What goes in, all discovered automatically so a new week needs no edits here:
   * fpp_urls.txt - textbook chapters for the weeks covered so far, to add as website sources;
   * MANIFEST.md - what each file is, and what was left out on purpose.
 
-Never included: grading/ (answers), SYLLABUS-CHANGES.md (instructor notes), and the syllabus
-PDF while it still contradicts the rules deck.
+  * the syllabus PDF, the TimeGPT setup handout and the executed Ukrainian practice notebooks
+    (labs/_demoNN_uk.ipynb, already stored with outputs);
+  * the final-project handout, flagged in the manifest: upload it only once the project opens.
+
+Never included: grading/ (answers), SYLLABUS-CHANGES.md (instructor notes).
 """
 
 from __future__ import annotations
@@ -46,9 +49,11 @@ CHAPTERS_BY_WEEK = {
     5: ["07-regression"],
     6: ["09-arima"],
     7: ["09-arima", "10-dynamic-regression"],
-    8: ["12-advanced"],
-    9: ["14-neural-networks", "15-foundation-models"],
+    8: ["12-advanced", "13-practical"],
+    9: ["14-neural-networks"],
+    10: ["15-foundation-models"],
 }
+PROJECT = COURSE / "project"
 
 
 def slug(text: str) -> str:
@@ -73,9 +78,12 @@ def stale(qmd: Path, html: Path) -> bool:
 
 
 def pdf_text(pdf: Path) -> str:
-    raw = subprocess.run(["pdftotext", "-enc", "UTF-8", str(pdf), "-"],
-                         capture_output=True, check=True).stdout
-    return raw.decode("utf-8", errors="replace")
+    if shutil.which("pdftotext"):
+        raw = subprocess.run(["pdftotext", "-enc", "UTF-8", str(pdf), "-"],
+                             capture_output=True, check=True).stdout
+        return raw.decode("utf-8", errors="replace")
+    from pypdf import PdfReader                           # poppler is not always installed
+    return "\n".join(page.extract_text() or "" for page in PdfReader(pdf).pages)
 
 
 def calls_in_visible_code(qmd: Path) -> list[str]:
@@ -189,6 +197,44 @@ def build_worked_examples(manifest: list) -> None:
                          "Повністю виконане завдання на ряді поза студентським пулом"))
 
 
+def build_extras(manifest: list) -> None:
+    shutil.copy(COURSE / "MATH840-TimeSeries26-27.pdf", OUT / "course_syllabus.pdf")
+    manifest.append(("course_syllabus.pdf", "Силабус", "увесь курс", "Syllabus v.2.0 — актуальні правила курсу"))
+
+    setup = LABS / ".timegpt-setup.html"
+    if setup.exists():
+        pdf = OUT / "final_project_timegpt_setup.pdf"
+        chrome_print(setup.resolve().as_uri(), pdf, budget_ms=20000)
+        manifest.append((pdf.name, "Хендаут", "до фінального проєкту", title_of(LABS / ".timegpt-setup.qmd")))
+
+    project = PROJECT / ".project.pdf"
+    if project.exists():
+        shutil.copy(project, OUT / "final_project_handout.pdf")
+        manifest.append(("final_project_handout.pdf", "Хендаут проєкту",
+                         "⚠️ лише після відкриття проєкту", title_of(PROJECT / ".project.qmd")))
+
+
+def build_practices(manifest: list) -> None:
+    import nbformat
+    from nbconvert import HTMLExporter
+
+    for ipynb in sorted(LABS.glob("_demo[0-9][0-9]_uk.ipynb")):
+        n = int(ipynb.stem[5:7])
+        nb = nbformat.read(ipynb, as_version=4)
+        figures = sum(1 for c in nb.cells for o in c.get("outputs", []) if "image/png" in o.get("data", {}))
+        if figures == 0:
+            sys.exit(f"{ipynb.name}: stored without outputs - execute it before publishing")
+        body, _ = HTMLExporter().from_notebook_node(nb)
+        pdf = OUT / f"practice{n:02d}_worked_examples_uk.pdf"
+        with tempfile.TemporaryDirectory() as tmp:
+            page = Path(tmp) / "practice.html"
+            page.write_text(body, encoding="utf-8")
+            chrome_print(page.as_uri(), pdf)
+        title = next((line.lstrip("# ").strip() for c in nb.cells if c.cell_type == "markdown"
+                      for line in c.source.splitlines() if line.startswith("# ")), ipynb.stem)
+        manifest.append((pdf.name, "Практика з виводами (укр.)", f"практика тижня {n}", title))
+
+
 def write_urls(last_week: int) -> list[str]:
     chapters = []
     for week in range(1, last_week + 1):
@@ -223,9 +269,9 @@ def write_manifest(manifest: list, urls: list[str], warnings: list) -> None:
 
 ## Навмисно НЕ включено
 
-- **`MATH840-TimeSeries26-27.pdf`** — суперечить актуальним правилам: у ньому вісім лабораторних по
-  7 балів, 44 години практик, стеля асинхронної заміни 5/7 і немає правила лагу. Notebook цитуватиме
-  його впевнено й неправильно. Додайте лише після того, як перенесете `SYLLABUS-CHANGES.md` у документ.
+- **`final_project_handout.pdf`** зібрано, але завантажуйте його лише після відкриття проєкту: notebook
+  бачать усі студенти, і раніше додане джерело розкриє завдання.
+- **Англійські версії практик** (`_demoNN.ipynb`) — збережені без виводів; українські з виводами їх покривають.
 - **`grading/`** — еталонні відповіді до лабораторних.
 - **`SYLLABUS-CHANGES.md`** — нотатки викладача, не для студентів.
 - **Colab-шаблони** (`_labNN.ipynb`) — повторюють хендаути й містять лише заготовки.
@@ -255,6 +301,8 @@ def main() -> None:
     last_week = build_decks(manifest, warnings)
     build_handouts(manifest, warnings)
     build_worked_examples(manifest)
+    build_practices(manifest)
+    build_extras(manifest)
     urls = write_urls(last_week)
     write_manifest(manifest, urls, warnings)
 

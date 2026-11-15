@@ -1,0 +1,140 @@
+<script>
+// Links each leaderboard table to its scatter: hover or focus a row and the matching point lights up,
+// hover a point and its row lights up. A click pins the row; typing in the box above the table filters it.
+// The forecasts page has a student picker that redraws the highlighted forecast in both of its charts.
+(function () {
+  function whenPlotted(id, then) {
+    var tries = 0;
+    (function wait() {
+      var el = document.getElementById(id);
+      if (el && el.data && el._fullLayout && window.Plotly) return then(el);
+      if (++tries < 200) setTimeout(wait, 50);
+    })();
+  }
+
+  function traceOf(plot, meta) {
+    for (var i = 0; i < plot.data.length; i++) if (plot.data[i].meta === meta) return i;
+    return plot.data.length - 1;
+  }
+
+  function linkTable(table) {
+    whenPlotted(table.dataset.plot, function (plot) {
+      var base = plot.data[0], hl = traceOf(plot, "pick");
+      var rows = {};
+      table.querySelectorAll("tr.row").forEach(function (tr) { rows[tr.dataset.key] = tr; });
+      var pinned = null, current = null;
+
+      function show(name, scroll) {
+        if (name === current) return;
+        current = name;
+        Object.values(rows).forEach(function (tr) { tr.classList.toggle("on", tr.dataset.key === name); });
+        var i = name == null ? -1 : base.customdata.indexOf(name);
+        if (i < 0) {
+          Plotly.restyle(plot, { x: [[]], y: [[]], text: [[]] }, [hl]);
+          Plotly.restyle(plot, { "marker.opacity": 0.85 }, [0]);
+          return;
+        }
+        Plotly.restyle(plot, { x: [[base.x[i]]], y: [[base.y[i]]], text: [[name]], customdata: [[name]] }, [hl]);
+        Plotly.restyle(plot, { "marker.opacity": 0.35 }, [0]);
+        if (scroll && rows[name]) rows[name].scrollIntoView({ block: "nearest" });
+      }
+
+      Object.values(rows).forEach(function (tr) {
+        tr.addEventListener("mouseenter", function () { show(tr.dataset.key); });
+        tr.addEventListener("focus", function () { show(tr.dataset.key); });
+        tr.addEventListener("click", function () {
+          pinned = pinned === tr.dataset.key ? null : tr.dataset.key;
+          show(pinned || tr.dataset.key);
+        });
+        tr.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tr.click(); } });
+      });
+      table.addEventListener("mouseleave", function () { show(pinned); });
+      plot.on("plotly_hover", function (e) {
+        var p = e.points[0];
+        if (p.curveNumber === 0) show(p.customdata, true);
+      });
+      plot.on("plotly_unhover", function () { show(pinned); });
+
+      var box = document.querySelector('input.find[data-table="' + table.id + '"]');
+      if (box) box.addEventListener("input", function () {
+        var q = box.value.trim().toLowerCase(), left = [];
+        Object.values(rows).forEach(function (tr) {
+          var hit = !q || tr.dataset.key.toLowerCase().indexOf(q) >= 0;
+          tr.classList.toggle("gone", !hit);
+          if (hit) left.push(tr.dataset.key);
+        });
+        pinned = q && left.length === 1 ? left[0] : null;
+        show(pinned);
+      });
+    });
+  }
+
+  function linkPicker(select) {
+    var data = window.MATH840_FORECASTS;
+    if (!data) return;
+    function draw() {
+      var f = data[select.value];
+      if (!f) return;
+      whenPlotted("fc-all", function (plot) {
+        Plotly.restyle(plot, { x: [f.ds], y: [f.forecast], name: [select.value] }, [traceOf(plot, "pick")]);
+      });
+      whenPlotted("fc-band", function (plot) {
+        Plotly.restyle(plot, { x: [f.ds.concat(f.ds.slice().reverse())],
+                               y: [f.upper.concat(f.lower.slice().reverse())],
+                               name: [select.value + ", 95% interval"] }, [traceOf(plot, "pick-band")]);
+        Plotly.restyle(plot, { x: [f.ds], y: [f.forecast], name: [select.value] }, [traceOf(plot, "pick")]);
+      });
+    }
+    select.addEventListener("change", draw);
+    draw();
+  }
+
+  // Click a column name to sort by it, click again to reverse. Metrics sort best first (lowest); blanks
+  // always go last. "#" restores the ranking order.
+  function sortable(table) {
+    var body = table.tBodies[0], heads = table.tHead.rows[0].cells;
+    Array.prototype.forEach.call(body.rows, function (tr, i) { tr._o = i; });
+    Array.prototype.forEach.call(heads, function (th, col) {
+      th.tabIndex = 0;
+      function go() {
+        var dir = th.getAttribute("aria-sort") === "none" ? th.dataset.first
+                : th.getAttribute("aria-sort") === "ascending" ? "desc" : "asc";
+        Array.prototype.forEach.call(heads, function (h) { h.setAttribute("aria-sort", "none"); });
+        th.setAttribute("aria-sort", dir === "asc" ? "ascending" : "descending");
+        var sign = dir === "asc" ? 1 : -1, text = th.dataset.sort === "text";
+        var rows = Array.prototype.slice.call(body.rows);
+        rows.sort(function (a, b) {
+          var x = a.cells[col].dataset.v, y = b.cells[col].dataset.v;
+          if (x === "" || y === "") return x === y ? a._o - b._o : x === "" ? 1 : -1;
+          var d = text ? x.localeCompare(y) : parseFloat(x) - parseFloat(y);
+          return d ? sign * d : a._o - b._o;
+        });
+        rows.forEach(function (tr) { body.appendChild(tr); });
+      }
+      th.addEventListener("click", go);
+      th.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+    });
+  }
+
+  function start() {
+    document.querySelectorAll("table.lb").forEach(sortable);
+    document.querySelectorAll("table.lb[data-plot]").forEach(linkTable);
+    document.querySelectorAll("select.pick").forEach(linkPicker);
+    // Plots on pages hidden at load were laid out at zero size, with their text measured as zero wide, so
+    // the labels beside a line pile up on it. Redraw the visible plots when a page is shown and once the
+    // web font has arrived.
+    function redraw() {
+      document.querySelectorAll(".tab-pane.active .plotly-graph-div, .plotly-graph-div").forEach(function (el) {
+        if (!el.offsetParent || !el.layout || !window.Plotly) return;
+        Plotly.Plots.resize(el);
+        Plotly.relayout(el, { annotations: el.layout.annotations || [] });
+      });
+    }
+    document.querySelectorAll('[data-bs-toggle="tab"]').forEach(function (a) {
+      a.addEventListener("shown.bs.tab", function () { setTimeout(redraw, 30); });
+    });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { setTimeout(redraw, 30); });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
+})();
+</script>

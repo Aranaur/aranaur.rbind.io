@@ -1,0 +1,539 @@
+---
+title: "MATH840 Final project: leaderboard"
+from: markdown-smart
+format:
+  dashboard:
+    theme: [cosmo, leaderboard.scss]
+    orientation: rows
+    include-after-body: leaderboard_link.html
+---
+
+```{python}
+#| include: false
+# One dashboard for the whole project. The public page reads board/public.csv only. The other three pages
+# show the hidden hours, so they read nothing until both keys are turned:
+#   - board/private.csv exists, which only `project_score.py final` writes (after 21:00 on 5 November);
+#   - MATH840_REVEAL=1 is set for the render.
+# Before that each card on those pages says when it opens, and the hidden data never enters the HTML.
+#
+# Tables are plain HTML so that leaderboard_link.html can tie each row to its point in the scatter next
+# to it: in every linked scatter, trace 0 holds the students (customdata = name) and the trace with
+# meta "pick" is the empty highlight the script fills in.
+import html
+import json
+import os
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from IPython import get_ipython
+from IPython.display import HTML
+
+# Quarto displays every bare expression in a cell; each fig.add_trace(...) would become a figure of its own.
+get_ipython().ast_node_interactivity = "last_expr"
+
+PROJECT = Path(os.environ.get("MATH840_PROJECT_DIR", "../grading/project"))
+BOARD = PROJECT / "board"
+BENCHMARK = "----SNAIVE----"
+WEIGHTS = {"RMSE": 0.3, "MAPE": 0.3, "Winkler": 0.4}
+REVEAL = os.environ.get("MATH840_REVEAL") == "1" and (BOARD / "private.csv").exists()
+WAIT = HTML('<div class="wait">Opens at Session 2, on 6 November.</div>')
+NEXT = {"session1": "4 Nov, 09:00", "update1": "5 Nov, 09:00", "update2": "6 Nov, Session 2",
+        "final": "6 Nov, Session 2"}
+
+# Ink and marks: one blue for students, a darker step of it for the one in focus, ink for the benchmark.
+INK, INK2, MUTED, GRID, RULE, SURFACE = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3c2b7", "#fcfcfb"
+POINT, ACCENT = "#6da7ec", "#1c5cab"
+FONT = "Fira Sans, system-ui, -apple-system, Segoe UI, sans-serif"
+
+
+def look(fig, **layout):
+    layout = {"margin": dict(l=64, r=20, t=16, b=64), **layout}
+    fig.update_layout(template="none", font=dict(family=FONT, size=13, color=INK2), showlegend=False,
+                      paper_bgcolor=SURFACE, plot_bgcolor=SURFACE,
+                      hoverlabel=dict(bgcolor="white", bordercolor=RULE, font=dict(family=FONT, color=INK)),
+                      **layout)
+    axis = dict(showgrid=True, gridcolor=GRID, gridwidth=1, zeroline=False, showline=True, linecolor=RULE,
+                ticks="", tickfont=dict(color=MUTED), title_font=dict(color=INK2), automargin=True)
+    return fig.update_xaxes(**axis).update_yaxes(**axis)
+
+
+def show(fig, div_id, lead=""):
+    # The lead (subtitle, picker) sits above the plot; the stylesheet lets the plot take the rest of the card.
+    body = fig.to_html(full_html=False, include_plotlyjs="cdn", div_id=div_id, default_height="100%",
+                       config={"displayModeBar": False, "responsive": True})
+    return HTML(lead + body)
+
+
+def nice_ticks(values) -> list:
+    lo, hi = float(np.nanmin(values)) * 0.9, float(np.nanmax(values)) * 1.1
+    steps = [v * 10 ** e for e in range(0, 5) for v in (1, 1.5, 2, 3, 5, 7)]
+    inside = [t for t in steps if lo <= t <= hi]
+    return inside[:: max(1, len(inside) // 6)]
+
+
+def pick_trace(hover):
+    # The highlight the script moves around: empty until a row or a point is hovered.
+    return go.Scatter(x=[], y=[], text=[], customdata=[], meta="pick", mode="markers+text",
+                      textposition="top center", textfont=dict(color=INK, size=13), cliponaxis=False,
+                      marker=dict(size=15, color=ACCENT, line=dict(color=SURFACE, width=2)),
+                      hovertemplate=hover)
+
+
+def students_trace(df, x, y, hover):
+    # Plain lists: plotly 6 would ship arrays as base64, which the linking script cannot index into.
+    return go.Scatter(x=df[x].tolist(), y=df[y].tolist(), customdata=df["student"].tolist(), mode="markers",
+                      hovertemplate=hover,
+                      marker=dict(size=10, color=POINT, opacity=0.85, line=dict(color=SURFACE, width=1.5)))
+
+
+# --- tables --------------------------------------------------------------------------------------------
+
+def change(v):
+    if not isinstance(v, str) or not v:
+        return ""
+    if v == "=":
+        return '<span class="muted">=</span>'
+    if v == "new":
+        return '<span class="pill">new</span>'
+    return f'<span class="{"up" if v.startswith("↑") else "down"}">{v}</span>'
+
+
+def percent(v):
+    if pd.isna(v):
+        return ""
+    tone = "up" if v < -0.5 else "down" if v > 0.5 else "muted"
+    return f'<span class="{tone}">{v:+.0f}%</span>'.replace("-", "−")
+
+
+COLUMNS = [
+    ("place", "#", "place", lambda v: f"{int(v)}", "Place by score; tied scores share a place"),
+    ("student", "Student", "txt", html.escape, None),
+    ("RMSE", "RMSE", "", lambda v: f"{v:.1f}", "Root mean squared error. Lower is better."),
+    ("MAPE", "MAPE", "", lambda v: f"{v:.1f}%", "Mean absolute percentage error. Lower is better."),
+    ("Winkler", "Winkler", "", lambda v: f"{v:.0f}",
+     "Width of the 95% interval, plus 40 times the distance to every value outside it. Lower is better."),
+    ("coverage", "Coverage", "", lambda v: f"{v:.0%}", "Share of hours inside the 95% interval; 95% is the target."),
+    ("score", "Score", "", lambda v: f"{v:.1f}",
+     "0.3 × RMSE place + 0.3 × MAPE place + 0.4 × Winkler place. Lower is better."),
+]
+
+
+def sort_value(key, v) -> str:
+    # What a click on the column header sorts by; blank sorts last.
+    if key == "student" or key == "stage":
+        return html.escape(str(v)).lower()
+    if key == "since_last":
+        if not isinstance(v, str) or not v[:1] in "↑↓=":
+            return ""
+        return "0" if v == "=" else (v[1:] if v[0] == "↑" else f"-{v[1:]}")
+    return "" if pd.isna(v) else f"{float(v):.6g}"
+
+
+def board_table(board: pd.DataFrame, table_id: str, plot_id: str, extra=()) -> str:
+    # A student tied with the benchmark has not beaten it, so the benchmark goes first among equal scores:
+    # the rows above it are then exactly the students ahead of it.
+    board = (board.assign(_b=board["student"].ne(BENCHMARK))
+             .sort_values(["score", "_b"], kind="stable").drop(columns="_b"))
+    cols = COLUMNS + list(extra)
+    # Lower is better for every metric; for the change column, up is better, so it sorts largest first.
+    head = "".join(
+        f'<th class="{cls}" data-sort="{"text" if key in ("student", "stage") else "num"}"'
+        f' data-first="{"desc" if key == "since_last" else "asc"}" aria-sort="none"'
+        + (f' title="{html.escape(tip)}"' if tip else "") + f">{name}</th>"
+        for key, name, cls, _, tip in cols)
+    rows = []
+    for _, r in board.iterrows():
+        cells = "".join(f'<td class="{cls}" data-v="{sort_value(key, r[key])}">{fmt(r[key])}</td>'
+                        for key, _, cls, fmt, _ in cols)
+        if r["student"] == BENCHMARK:
+            rows.append(f'<tr class="bench" title="The benchmark: seasonal naive, the last day twice">{cells}</tr>')
+        else:
+            rows.append(f'<tr class="row" tabindex="0" data-key="{html.escape(r["student"])}">{cells}</tr>')
+    return (f'<input class="find" type="search" placeholder="Find a student" aria-label="Find a student" '
+            f'data-table="{table_id}">'
+            f'<table class="lb" id="{table_id}" data-plot="{plot_id}"><thead><tr>{head}</tr></thead>'
+            f'<tbody>{"".join(rows)}</tbody></table>')
+
+
+def stats(*items) -> HTML:
+    return HTML('<div class="stats">' + "".join(
+        f'<span class="stat"><span class="label">{label}</span><span class="value">{value}</span></span>'
+        for label, value in items) + "</div>")
+
+
+# --- data ----------------------------------------------------------------------------------------------
+
+public = pd.read_csv(BOARD / "public.csv")
+meta = json.loads((BOARD / "public.json").read_text(encoding="utf-8"))
+public_bench = public.set_index("student").loc[BENCHMARK]
+public_students = public[public["student"] != BENCHMARK]
+updated = datetime.strptime(meta["updated"], "%Y-%m-%d %H:%M")
+
+if REVEAL:
+    private = pd.read_csv(BOARD / "private.csv")
+    truth = pd.read_csv(PROJECT / "truth.csv", parse_dates=["ds"])
+    history = pd.read_csv(PROJECT / "moodle" / "train.csv", parse_dates=["ds"]).tail(48)
+    snaive = pd.read_csv(BOARD / "snaive.csv", parse_dates=["ds"])
+    stages = {s: pd.read_csv(BOARD / f"{s}.csv") for s in ("session1", "final")}
+    forecasts = pd.concat([pd.read_csv(BOARD / f"{s}_forecasts.csv", parse_dates=["ds"]) for s in stages])
+    students = private[private["student"] != BENCHMARK]
+    bench = private.set_index("student").loc[BENCHMARK]
+    counted = forecasts.merge(students[["student", "stage"]], on=["student", "stage"])
+    split = truth["ds"].iloc[len(truth) // 2]
+    # The group forecast: hour by hour, the mean of the ranked files that beat the benchmark. Only that
+    # flag is read from points.csv; the points themselves stay out of the page.
+    points = pd.read_csv(BOARD / "points.csv")
+    members = points.loc[points["beats_benchmark"] == True, "student"]  # noqa: E712, the column holds blanks
+    BANDS = ["forecast", "lower_95", "upper_95"]
+    group = counted[counted["student"].isin(members)].groupby("ds", as_index=False)[BANDS].mean()
+    everyone = counted.groupby("ds", as_index=False)[BANDS].mean()
+
+
+# --- charts --------------------------------------------------------------------------------------------
+
+def public_scatter():
+    hover = "<b>%{customdata}</b><br>RMSE %{x:.1f}<br>Winkler %{y:.0f}<extra></extra>"
+    bx, by = public_bench["RMSE"], public_bench["Winkler"]
+    fig = go.Figure([students_trace(public_students, "RMSE", "Winkler", hover)])
+    fig.add_trace(go.Scatter(x=[bx], y=[by], mode="markers+text", text=["benchmark"], textposition="middle right",
+                             textfont=dict(color=INK, size=12), hoverinfo="skip",
+                             marker=dict(symbol="diamond", size=11, color=INK, line=dict(color=SURFACE, width=2))))
+    fig.add_trace(pick_trace(hover))
+    for kind, v in (("x", bx), ("y", by)):
+        line = dict(type="line", line=dict(color=RULE, width=1), layer="below")
+        fig.add_shape(**line, **({"x0": v, "x1": v, "yref": "paper", "y0": 0, "y1": 1} if kind == "x"
+                                 else {"y0": v, "y1": v, "xref": "paper", "x0": 0, "x1": 1}))
+    xs, ys = public["RMSE"], public["Winkler"]
+    return (look(fig)
+            .update_xaxes(type="log", title_text="RMSE, point error (log scale)", tickvals=nice_ticks(xs))
+            .update_yaxes(type="log", title_text="Winkler, interval score (log scale)", tickvals=nice_ticks(ys)))
+
+
+def private_scatter(both):
+    hover = "<b>%{customdata}</b><br>public place %{x}<br>private place %{y}<extra></extra>"
+    top = int(both[["public place", "place"]].to_numpy().max()) + 1
+    ticks = [1] + list(range(5, top + 1, 5))
+    fig = go.Figure([students_trace(both, "public place", "place", hover)])
+    fig.add_shape(type="line", x0=0.5, y0=0.5, x1=top, y1=top, line=dict(color=RULE, width=1), layer="below")
+    fig.add_trace(pick_trace(hover))
+    return (look(fig)
+            .update_xaxes(autorange="reversed", title_text="Place on the first 24 hours", tickvals=ticks)
+            .update_yaxes(autorange="reversed", title_text="Place on the last 24 hours", tickvals=ticks))
+
+
+def public_vs_private():
+    # The public place of the very file that was ranked, so both places describe the same forecast.
+    both = pd.concat(stages.values()).merge(students[["student", "stage", "place"]], on=["student", "stage"])
+    both["public place"] = sum(w * both[f"public_{k}"].rank(method="min") for k, w in WEIGHTS.items()) \
+        .rank(method="min").astype(int)
+    return both
+
+
+def split_marks(fig):
+    fig.add_shape(type="line", x0=split, x1=split, yref="paper", y0=0, y1=1, line=dict(color=RULE, width=1))
+    for text, anchor in (("first 24 hours (public)", "right"), ("last 24 hours (private)", "left")):
+        fig.add_annotation(x=split, y=1, yref="paper", text=text, showarrow=False, xanchor=anchor,
+                           xshift=-6 if anchor == "right" else 6, yanchor="bottom", font=dict(color=MUTED, size=12))
+    return fig
+
+
+def all_forecasts():
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=history["ds"], y=history["y"], name="history", line=dict(color=INK2, width=1),
+                             hovertemplate="%{y:.0f}"))
+    xs, ys = [], []
+    for who in students["student"]:
+        fc = counted[counted["student"] == who]
+        xs += list(fc["ds"]) + [None]
+        ys += list(fc["forecast"]) + [None]
+    fig.add_trace(go.Scatter(x=xs, y=ys, name="every student", hoverinfo="skip", connectgaps=False,
+                             line=dict(color=RULE, width=1)))
+    fig.add_trace(go.Scatter(x=snaive["ds"], y=snaive["forecast"], name="benchmark",
+                             line=dict(color=INK2, width=1.5, dash="dash"), hovertemplate="%{y:.0f}"))
+    fig.add_trace(go.Scatter(x=truth["ds"], y=truth["y"], name="actual", line=dict(color=INK, width=2.5),
+                             hovertemplate="%{y:.0f}"))
+    fig.add_trace(go.Scatter(x=[], y=[], name="", meta="pick", line=dict(color=ACCENT, width=2.5),
+                             hovertemplate="%{y:.0f}"))
+    return split_marks(look(fig, hovermode="x unified", margin=dict(l=60, r=20, t=30, b=40))
+                       .update_yaxes(title_text="Generation", rangemode="tozero"))
+
+
+def winner_interval():
+    fig = go.Figure()
+    band = lambda f, lo, hi: (pd.concat([f["ds"], f["ds"][::-1]]), pd.concat([f[hi], f[lo][::-1]]))
+    x, y = band(snaive, "lower_95", "upper_95")
+    fig.add_trace(go.Scatter(x=x, y=y, fill="toself", fillcolor="rgba(137,135,129,0.16)", line=dict(width=0),
+                             name="benchmark, 95% interval", hoverinfo="skip"))
+    fig.add_trace(go.Scatter(x=[], y=[], meta="pick-band", fill="toself", fillcolor="rgba(28,92,171,0.16)",
+                             line=dict(width=0), name="", hoverinfo="skip"))
+    fig.add_trace(go.Scatter(x=snaive["ds"], y=snaive["forecast"], name="benchmark",
+                             line=dict(color=INK2, width=1.5, dash="dash"), hovertemplate="%{y:.0f}"))
+    fig.add_trace(go.Scatter(x=[], y=[], meta="pick", name="", line=dict(color=ACCENT, width=2.5),
+                             hovertemplate="%{y:.0f}"))
+    fig.add_trace(go.Scatter(x=truth["ds"], y=truth["y"], name="actual", line=dict(color=INK, width=2.5),
+                             hovertemplate="%{y:.0f}"))
+    return split_marks(look(fig, hovermode="x unified", margin=dict(l=60, r=20, t=30, b=40))
+                       .update_yaxes(title_text="Generation", rangemode="tozero"))
+
+
+def forecast_data() -> str:
+    data = {who: {"ds": f["ds"].dt.strftime("%Y-%m-%d %H:%M").tolist(), "forecast": f["forecast"].round(2).tolist(),
+                  "lower": f["lower_95"].round(2).tolist(), "upper": f["upper_95"].round(2).tolist()}
+            for who, f in counted.groupby("student")}
+    return f"<script>window.MATH840_FORECASTS = {json.dumps(data, ensure_ascii=False)};</script>"
+
+
+def picker() -> str:
+    options = "".join(f'<option value="{html.escape(s)}">{int(p)}. {html.escape(s)}</option>'
+                      for s, p in zip(students["student"], students["place"]))
+    return (f'<label class="pickrow">Highlight a student<select class="pick" aria-label="Highlight a student">'
+            f'{options}</select></label>')
+
+
+def last_day_scores(fc, name) -> dict:
+    # The scorer's metrics on the last 24 hours, for a forecast that is not a student's file.
+    last = truth.iloc[len(truth) // 2:].merge(fc, on="ds")
+    y, f, lo, hi = (last[c].to_numpy(float) for c in ["y", *BANDS])
+    return {"student": name, "RMSE": float(np.sqrt(np.mean((y - f) ** 2))),
+            "MAPE": float(np.mean(np.abs((y - f) / y)) * 100),
+            "Winkler": float(np.mean(hi - lo + 40 * np.maximum(lo - y, 0) + 40 * np.maximum(y - hi, 0))),
+            "coverage": float(np.mean((y >= lo) & (y <= hi)))}
+
+
+def group_place(row) -> int:
+    # Where the group forecast would stand in the private table. It is not added to the table itself.
+    pool = pd.concat([private, pd.DataFrame([row])], ignore_index=True)
+    score = sum(w * pool[k].rank(method="min") for k, w in WEIGHTS.items())
+    return int(score.rank(method="min").iloc[-1])
+
+
+def member_bootstrap() -> dict:
+    # Resample the students and take the 95% band of the group mean. This measures how sure we are of the
+    # average, not where the actual value lands, which is why the page does not use it as the interval.
+    wide = counted[counted["student"].isin(members)].pivot(index="ds", columns="student", values="forecast")
+    pick = np.random.default_rng(840).integers(0, wide.shape[1], (4000, wide.shape[1]))
+    means = wide.to_numpy()[:, pick].mean(axis=2)
+    band = pd.DataFrame({"ds": wide.index, "forecast": means.mean(axis=1),
+                         "lower_95": np.quantile(means, 0.025, axis=1),
+                         "upper_95": np.quantile(means, 0.975, axis=1)})
+    return {**last_day_scores(band, "bootstrap"), "width": float((band["upper_95"] - band["lower_95"]).tail(24).mean())}
+
+
+def group_chart():
+    fig = go.Figure()
+    x = pd.concat([group["ds"], group["ds"][::-1]])
+    fig.add_trace(go.Scatter(x=x, y=pd.concat([group["upper_95"], group["lower_95"][::-1]]), fill="toself",
+                             fillcolor="rgba(28,92,171,0.16)", line=dict(width=0), name="95% interval",
+                             hoverinfo="skip"))
+    fig.add_trace(go.Scatter(x=snaive["ds"], y=snaive["forecast"], name="benchmark",
+                             line=dict(color=INK2, width=1.5, dash="dash"), hovertemplate="%{y:.0f}"))
+    fig.add_trace(go.Scatter(x=group["ds"], y=group["forecast"], name="group forecast",
+                             line=dict(color=ACCENT, width=2.5), hovertemplate="%{y:.0f}"))
+    fig.add_trace(go.Scatter(x=truth["ds"], y=truth["y"], name="actual", line=dict(color=INK, width=2.5),
+                             hovertemplate="%{y:.0f}"))
+    return split_marks(look(fig, hovermode="x unified", margin=dict(l=60, r=20, t=30, b=40))
+                       .update_yaxes(title_text="Generation", rangemode="tozero"))
+
+
+def group_table(row) -> str:
+    # Lower is better for every metric here, so the header sorting works as on the leaderboards.
+    top = students.iloc[0]
+    middle = students[["RMSE", "MAPE", "Winkler", "coverage"]].median().to_dict()
+    entries = [row, {**top[["RMSE", "MAPE", "Winkler", "coverage"]].to_dict(), "student": f"First place: {top['student']}"},
+               {**middle, "student": "Median student"},
+               {**bench[["RMSE", "MAPE", "Winkler", "coverage"]].to_dict(), "student": BENCHMARK}]
+    cols = [c for c in COLUMNS if c[0] not in ("place", "score")]
+    head = "".join(f'<th class="{cls}" data-sort="{"text" if key == "student" else "num"}" data-first="asc" '
+                   f'aria-sort="none"' + (f' title="{html.escape(tip)}"' if tip else "") + f">{name}</th>"
+                   for key, name, cls, _, tip in cols)
+    body = "".join(
+        ('<tr class="bench">' if e["student"] == BENCHMARK else "<tr>")
+        + "".join(f'<td class="{cls}" data-v="{sort_value(key, e[key])}">{fmt(e[key])}</td>'
+                  for key, _, cls, fmt, _ in cols) + "</tr>"
+        for e in entries)
+    return f'<table class="lb" id="group-table"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>'
+
+
+def session1_vs_final():
+    pair = (stages["session1"].query("valid").set_index("student")[["private_RMSE"]]
+            .join(stages["final"].query("valid").set_index("student")[["private_RMSE"]],
+                  lsuffix="_s1", rsuffix="_final", how="inner").reset_index())
+    hi = float(pair[["private_RMSE_s1", "private_RMSE_final"]].to_numpy().max()) * 1.08 if len(pair) else 1
+    hover = "<b>%{customdata}</b><br>Session 1 file %{x:.1f}<br>final file %{y:.1f}<extra></extra>"
+    fig = go.Figure([students_trace(pair, "private_RMSE_s1", "private_RMSE_final", hover)])
+    fig.add_shape(type="line", x0=0, y0=0, x1=hi, y1=hi, line=dict(color=RULE, width=1), layer="below")
+    for kind in ("x", "y"):
+        v = bench["RMSE"]
+        fig.add_shape(type="line", line=dict(color=INK2, width=1, dash="dot"), layer="below",
+                      **({"x0": v, "x1": v, "y0": 0, "y1": hi} if kind == "x" else {"y0": v, "y1": v, "x0": 0, "x1": hi}))
+    fig.add_annotation(x=hi, y=bench["RMSE"], text="benchmark", showarrow=False, xanchor="right", xshift=-4,
+                       yanchor="bottom", font=dict(color=INK2, size=12))
+    # Name the three biggest improvements; the tooltip carries the rest.
+    pair["gain"] = pair["private_RMSE_s1"] - pair["private_RMSE_final"]
+    for _, r in pair.nlargest(3, "gain").query("gain > 0").iterrows():
+        fig.add_annotation(x=r["private_RMSE_s1"], y=r["private_RMSE_final"], text=html.escape(r["student"]),
+                           showarrow=False, yshift=12, font=dict(color=INK, size=12))
+    return (look(fig).update_xaxes(range=[0, hi], title_text="RMSE on the last 24 hours, Session 1 file")
+                     .update_yaxes(range=[0, hi], title_text="RMSE on the last 24 hours, final file"))
+```
+
+# Public leaderboard
+
+## Row {height="104px"}
+
+```{python}
+ahead = int((public_students["score"] < public_bench["score"]).sum())
+stats(("On the leaderboard", f"{len(public_students)} <small>students</small>"),
+      ("Above the benchmark in the table", f"{ahead} <small>of {len(public_students)}</small>"),
+      ("Updated", f"{updated.day} Nov, {updated:%H:%M}"),
+      ("Next update", "None, this is the last" if REVEAL else NEXT.get(meta["stage"], "")))
+```
+
+## Row
+
+### Column {width=55%}
+
+```{python}
+#| title: "First 24 hidden hours"
+HTML(board_table(public, "public-table", "public-scatter", extra=[
+    ("since_last", "Since last", "", change, "Change in place since the previous table"),
+    ("vs_session1", "vs Session 1", "", percent,
+     "RMSE of your latest file against your Session 1 file, same 24 hours. Negative means the error went down."),
+]))
+```
+
+### Column {width=45%}
+
+```{python}
+#| title: "Point error against interval score"
+both_better = int(((public_students["RMSE"] < public_bench["RMSE"])
+                   & (public_students["Winkler"] < public_bench["Winkler"])).sum())
+show(public_scatter(), "public-scatter",
+     f'<p class="sub">Lower and to the left is better. The lines go through the benchmark; {both_better} '
+     f'students beat it on both scores. Hover a row in the table to find a student here.</p>')
+```
+
+::: {.card title="How to read this" .note height="34%"}
+Each forecast is scored on the first 24 of the 48 hidden hours, with each student's latest valid file
+before the update. Hover a column name for what it measures; click it to sort by it, and
+click *#* to go back to the ranking.
+
+*Since last* and *vs Session 1* are for reference and do not affect points. *Since last* compares with the
+previous table (for the first update, with Session 1). *vs Session 1* is blank until you send a new file.
+
+The final ranking is computed on the last 24 hours, so a place there can differ from a place here.
+:::
+
+# Private leaderboard
+
+## Row {height="104px"}
+
+```{python}
+stats(("Ranked", f"{len(students)} <small>students</small>" if REVEAL else "6 Nov"),
+      # Beating it means a lower RMSE or a better combined score, either one (the rule from 5 Nov).
+      ("Beat the benchmark: lower RMSE or better score",
+       f"{int(((students['RMSE'] < bench['RMSE']) | (students['score'] < bench['score'])).sum())} "
+       f"<small>of {len(students)}</small>" if REVEAL else "6 Nov"),
+      ("First place", html.escape(students.iloc[0]["student"]) if REVEAL else "6 Nov"))
+```
+
+## Row
+
+### Column {width=55%}
+
+```{python}
+#| title: "Last 24 hidden hours, the better of each student's two files"
+HTML(board_table(private.assign(stage=private["stage"].map({"session1": "Session 1", "final": "final"}).fillna("")),
+                 "private-table", "private-scatter",
+                 extra=[("stage", "File", "", html.escape, "Which of the two files was ranked")])) if REVEAL else WAIT
+```
+
+### Column {width=45%}
+
+```{python}
+#| title: "Place on the first 24 hours against place on the last 24"
+show(private_scatter(public_vs_private()), "private-scatter",
+     '<p class="sub">On the line, the public place held. Up and to the right is first place. '
+     'Hover a row in the table to find a student here.</p>') if REVEAL else WAIT
+```
+
+# Forecasts
+
+## Row
+
+```{python}
+#| title: "Every ranked forecast against what happened"
+show(all_forecasts(), "fc-all", forecast_data() + picker() +
+     '<p class="sub">Black is what happened, dashed is the benchmark, grey lines are every other forecast.</p>') \
+    if REVEAL else WAIT
+```
+
+## Row
+
+```{python}
+#| title: "The highlighted forecast's 95% interval against the benchmark's"
+show(winner_interval(), "fc-band",
+     '<p class="sub">Blue is the highlighted student, grey the benchmark. Every hour outside a band costs '
+     '40 times the distance in the Winkler score.</p>') if REVEAL else WAIT
+```
+
+# Group forecast
+
+## Row {height="104px"}
+
+```{python}
+if REVEAL:
+    group_row = last_day_scores(group, "Group forecast")
+    all_row = last_day_scores(everyone, "All students")
+    boot = member_bootstrap()
+stats(("Forecasts combined", f"{len(members)} <small>of {len(students)}</small>" if REVEAL else "6 Nov"),
+      ("RMSE on the last 24 hours, against the benchmark",
+       f"{group_row['RMSE'] / bench['RMSE'] - 1:+.0%}".replace("-", "−") if REVEAL else "6 Nov"),
+      ("Place it would take in the private table",
+       f"{group_place(group_row)} <small>of {len(private) + 1}</small>" if REVEAL else "6 Nov"))
+```
+
+## Row
+
+### Column {width=62%}
+
+```{python}
+#| title: "The group's forecast against what happened"
+show(group_chart(), "group-fc",
+     '<p class="sub">Blue is the group forecast and its 95% interval, black is what happened, dashed is the '
+     'benchmark.</p>') if REVEAL else WAIT
+```
+
+### Column {width=38%}
+
+```{python}
+#| title: "Last 24 hours"
+HTML(group_table(group_row)) if REVEAL else WAIT
+```
+
+```{python}
+#| title: "How it was built"
+HTML(f'''<div class="note">
+<p>Each hour's forecast is the mean of the {len(members)} ranked files that beat the benchmark. The lower
+bound is the mean of their lower bounds, and the upper bound the mean of their upper bounds. It is not in
+the ranking and earns no points.</p>
+<p>A bootstrap over students would give the wrong band here. It shows how sure we are of the average, not
+where the actual value lands: on the last 24 hours that band was {boot["width"]:.0f} wide on average and
+held {boot["coverage"]:.0%} of the hours. The averaged bounds were {(group["upper_95"] - group["lower_95"]).tail(24).mean():.0f}
+wide and held {group_row["coverage"]:.0%}.</p>
+<p>These files were chosen on the same hours that score them, which flatters the result. The mean of all
+{len(students)} files, with nothing left out, has an RMSE of {all_row["RMSE"]:.1f} against {group_row["RMSE"]:.1f}.</p>
+</div>''') if REVEAL else WAIT
+```
+
+# Session 1 and final
+
+```{python}
+#| title: "Did the second file beat the first? RMSE on the last 24 hours"
+show(session1_vs_final(), "s1-final",
+     '<p class="sub">Each dot is a student who sent both files. Below the diagonal, the final file was better; '
+     'the dotted lines mark the benchmark. The three biggest improvements are named.</p>') if REVEAL else WAIT
+```
